@@ -15,7 +15,7 @@ import okhttp3.Request;
  * Useful to get around stupid censorship.
  */
 public class PvcHostInterceptor implements Interceptor {
-    private Map<String, String> replaceHosts;
+    private volatile Map<String, String> replaceHosts;
 
     public PvcHostInterceptor(final Map<String, String> hosts) {
         setHosts(hosts);

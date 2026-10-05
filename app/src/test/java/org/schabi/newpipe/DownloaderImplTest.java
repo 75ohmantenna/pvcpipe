@@ -113,6 +113,15 @@ public class DownloaderImplTest {
     }
 
     @Test
+    public void nullCookiesRemainSupportedWhenRestoringPreferences() {
+        downloader.setCookie(DownloaderImpl.YOUTUBE_RESTRICTED_MODE_COOKIE_KEY, null);
+        assertEquals("captcha=secret; PREF=f2=8000000",
+                downloader.getCookies("https://youtube.com/"));
+        downloader.setCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY, null);
+        assertEquals("", downloader.getCookies("https://youtube.com/"));
+    }
+
+    @Test
     public void crossHostRedirectDoesNotForwardSavedYoutubeCookies() throws Exception {
         // This self-signed fixture is trusted only by this local test client.
         final KeyStore keys = KeyStore.getInstance("PKCS12");
