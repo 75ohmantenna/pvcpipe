@@ -15,6 +15,7 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -231,6 +232,54 @@ class YoutubeClientVersionConcurrencyTest {
         assertEquals(FIRST_VERSION, getClientVersion());
         assertEquals(FIRST_VERSION, getClientVersion());
         assertEquals(3, requests.get());
+    }
+
+    @Test
+    void failedMusicValidationDoesNotPoisonTheCache() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws IOException {
+                if (requests.incrementAndGet() == 1) {
+                    throw new IOException("Fixture validation failed");
+                }
+                return response(request, "x".repeat(501));
+            }
+        });
+        assertThrows(IOException.class, YoutubeParsingHelper::getYoutubeMusicClientVersion);
+        assertEquals(WEB_REMIX_HARDCODED_CLIENT_VERSION, getYoutubeMusicClientVersion());
+        assertEquals(WEB_REMIX_HARDCODED_CLIENT_VERSION, getYoutubeMusicClientVersion());
+        assertEquals(2, requests.get());
+    }
+
+    @Test
+    void resetOnlyInvalidatesTheWebVersionAndKeepsOtherCaches() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) {
+                requests.incrementAndGet();
+                if (request.url().startsWith("https://music.youtube.com/")) {
+                    return response(request, "x".repeat(501));
+                }
+                if (request.url().contains("/guide?")) {
+                    return response(request, "x".repeat(5001));
+                }
+                return response(request, versionBody(FIRST_VERSION));
+            }
+        });
+        assertTrue(isHardcodedClientVersionValid());
+        assertEquals(WEB_REMIX_HARDCODED_CLIENT_VERSION, getYoutubeMusicClientVersion());
+        assertEquals(FIRST_VERSION, getClientVersion());
+
+        resetClientVersion();
+
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertTrue(isHardcodedClientVersionValid());
+        assertEquals(WEB_REMIX_HARDCODED_CLIENT_VERSION, getYoutubeMusicClientVersion());
+        assertEquals(List.of(WEB_REMIX_HARDCODED_CLIENT_VERSION),
+                YoutubeParsingHelper.getYoutubeMusicHeaders().get("X-YouTube-Client-Version"));
+        assertEquals(4, requests.get());
     }
 
     private static Field field(final String name) throws Exception {
