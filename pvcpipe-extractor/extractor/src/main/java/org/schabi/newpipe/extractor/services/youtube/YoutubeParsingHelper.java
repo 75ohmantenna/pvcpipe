@@ -80,7 +80,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -155,9 +154,14 @@ public final class YoutubeParsingHelper {
      */
     public static final String RACY_CHECK_OK = "racyCheckOk";
 
+    // Serialize each client cache independently, including extraction and WEB cache resets.
+    private static final Object WEB_CLIENT_VERSION_LOCK = new Object();
+    private static final Object MUSIC_CLIENT_VERSION_LOCK = new Object();
+
     private static String clientVersion;
 
-    private static String youtubeMusicClientVersion;
+    // Also read by getYoutubeMusicHeaders() without acquiring the extraction lock.
+    private static volatile String youtubeMusicClientVersion;
 
     private static boolean clientVersionExtracted = false;
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -174,7 +178,7 @@ public final class YoutubeParsingHelper {
     private static final String CONTENT_PLAYBACK_NONCE_ALPHABET =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-    private static Random numberGenerator = new Random();
+    private static volatile Random numberGenerator = new Random();
 
     private static final String FEED_BASE_CHANNEL_ID =
             "https://www.youtube.com/feeds/videos.xml?channel_id=";
@@ -198,7 +202,7 @@ public final class YoutubeParsingHelper {
     private static final Set<String> YOUTUBE_URLS = Set.of("youtube.com", "www.youtube.com",
             "m.youtube.com", "music.youtube.com");
 
-    private static boolean consentAccepted = false;
+    private static volatile boolean consentAccepted = false;
 
     public static boolean isGoogleURL(final String url) {
         final String cachedUrl = extractCachedUrlIfNeeded(url);
@@ -435,6 +439,13 @@ public final class YoutubeParsingHelper {
 
     public static boolean isHardcodedClientVersionValid()
             throws IOException, ExtractionException {
+        synchronized (WEB_CLIENT_VERSION_LOCK) {
+            return validateHardcodedClientVersion();
+        }
+    }
+
+    private static boolean validateHardcodedClientVersion()
+            throws IOException, ExtractionException {
         if (hardcodedClientVersionValid.isPresent()) {
             return hardcodedClientVersionValid.get();
         }
@@ -514,10 +525,8 @@ public final class YoutubeParsingHelper {
                 .getArray("serviceTrackingParams");
 
         // Try to get version from initial data first
-        final var serviceTrackingParamsStream = serviceTrackingParams.streamAsJsonObjects();
-
         clientVersion = getClientVersionFromServiceTrackingParam(
-                serviceTrackingParamsStream, "CSI", "cver");
+                serviceTrackingParams, "CSI", "cver");
 
         if (clientVersion == null) {
             try {
@@ -531,7 +540,7 @@ public final class YoutubeParsingHelper {
         // digits
         if (isNullOrEmpty(clientVersion)) {
             clientVersion = getClientVersionFromServiceTrackingParam(
-                    serviceTrackingParamsStream, "ECATCHER", "client.version");
+                    serviceTrackingParams, "ECATCHER", "client.version");
         }
 
         if (clientVersion == null) {
@@ -546,10 +555,10 @@ public final class YoutubeParsingHelper {
 
     @Nullable
     private static String getClientVersionFromServiceTrackingParam(
-            @Nonnull final Stream<JsonObject> serviceTrackingParamsStream,
+            @Nonnull final JsonArray serviceTrackingParams,
             @Nonnull final String serviceName,
             @Nonnull final String clientVersionKey) {
-        return serviceTrackingParamsStream.filter(serviceTrackingParam ->
+        return serviceTrackingParams.streamAsJsonObjects().filter(serviceTrackingParam ->
                         serviceTrackingParam.getString("service", "")
                                 .equals(serviceName))
                 .flatMap(serviceTrackingParam -> serviceTrackingParam.getArray("params")
@@ -566,6 +575,12 @@ public final class YoutubeParsingHelper {
      * Get the client version used by YouTube website on InnerTube requests.
      */
     public static String getClientVersion() throws IOException, ExtractionException {
+        synchronized (WEB_CLIENT_VERSION_LOCK) {
+            return getOrExtractClientVersion();
+        }
+    }
+
+    private static String getOrExtractClientVersion() throws IOException, ExtractionException {
         if (!isNullOrEmpty(clientVersion)) {
             return clientVersion;
         }
@@ -608,8 +623,10 @@ public final class YoutubeParsingHelper {
      * </p>
      */
     public static void resetClientVersion() {
-        clientVersion = null;
-        clientVersionExtracted = false;
+        synchronized (WEB_CLIENT_VERSION_LOCK) {
+            clientVersion = null;
+            clientVersionExtracted = false;
+        }
     }
 
     /**
@@ -663,6 +680,13 @@ public final class YoutubeParsingHelper {
     }
 
     public static String getYoutubeMusicClientVersion()
+            throws IOException, ReCaptchaException, Parser.RegexException {
+        synchronized (MUSIC_CLIENT_VERSION_LOCK) {
+            return getOrExtractYoutubeMusicClientVersion();
+        }
+    }
+
+    private static String getOrExtractYoutubeMusicClientVersion()
             throws IOException, ReCaptchaException, Parser.RegexException {
         if (!isNullOrEmpty(youtubeMusicClientVersion)) {
             return youtubeMusicClientVersion;
