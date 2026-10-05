@@ -3,12 +3,12 @@ package org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators;
 import org.schabi.newpipe.extractor.services.youtube.DeliveryType;
 import org.schabi.newpipe.extractor.services.youtube.ItagItem;
 import org.schabi.newpipe.extractor.utils.ManifestCreatorCache;
+import org.schabi.newpipe.extractor.utils.Pair;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import javax.annotation.Nonnull;
-import java.util.Objects;
 
 import static org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeDashManifestCreatorsUtils.BASE_URL;
 import static org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeDashManifestCreatorsUtils.INITIALIZATION;
@@ -81,9 +81,10 @@ public final class YoutubeProgressiveDashManifestCreator {
             @Nonnull final String progressiveStreamingBaseUrl,
             @Nonnull final ItagItem itagItem,
             final long durationSecondsFallback) throws CreationException {
-        if (PROGRESSIVE_STREAMS_CACHE.containsKey(progressiveStreamingBaseUrl)) {
-            return Objects.requireNonNull(
-                    PROGRESSIVE_STREAMS_CACHE.get(progressiveStreamingBaseUrl)).getSecond();
+        final Pair<Integer, String> cached =
+                PROGRESSIVE_STREAMS_CACHE.get(progressiveStreamingBaseUrl);
+        if (cached != null) {
+            return cached.getSecond();
         }
 
         final long itagItemDuration = itagItem.getApproxDurationMs();

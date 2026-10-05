@@ -16,13 +16,13 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.services.youtube.DeliveryType;
 import org.schabi.newpipe.extractor.services.youtube.ItagItem;
 import org.schabi.newpipe.extractor.utils.ManifestCreatorCache;
+import org.schabi.newpipe.extractor.utils.Pair;
 import org.schabi.newpipe.extractor.utils.Utils;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import java.util.Arrays;
-import java.util.Objects;
 
 import javax.annotation.Nonnull;
 
@@ -102,8 +102,9 @@ public final class YoutubeOtfDashManifestCreator {
             @Nonnull final String otfBaseStreamingUrl,
             @Nonnull final ItagItem itagItem,
             final long durationSecondsFallback) throws CreationException {
-        if (OTF_STREAMS_CACHE.containsKey(otfBaseStreamingUrl)) {
-            return Objects.requireNonNull(OTF_STREAMS_CACHE.get(otfBaseStreamingUrl)).getSecond();
+        final Pair<Integer, String> cached = OTF_STREAMS_CACHE.get(otfBaseStreamingUrl);
+        if (cached != null) {
+            return cached.getSecond();
         }
 
         String realOtfBaseStreamingUrl = otfBaseStreamingUrl;

@@ -2,8 +2,13 @@ package org.schabi.newpipe.extractor.utils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -12,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * generated with extractor's manifests generators.
  *
  * <p>
- * It relies internally on a {@link ConcurrentHashMap} to allow concurrent access to the cache.
+ * Cache operations are synchronized so insertion, eviction, and configuration changes are atomic.
  * </p>
  *
  * @param <K> the type of cache keys, which must be {@link Serializable serializable}
@@ -21,6 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class ManifestCreatorCache<K extends Serializable, V extends Serializable>
         implements Serializable {
+
+    // Preserve compatibility with caches serialized before synchronized methods were added.
+    private static final long serialVersionUID = 7144118292723300363L;
 
     /**
      * The default maximum size of a manifest cache.
@@ -68,7 +76,7 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * @param key the key to test its presence in the cache
      * @return {@code true} if the key is in the cache, {@code false} otherwise.
      */
-    public boolean containsKey(final K key) {
+    public synchronized boolean containsKey(final K key) {
         return concurrentHashMap.containsKey(key);
     }
 
@@ -80,7 +88,7 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * @return the value to which the specified key is mapped, or {@code null}
      */
     @Nullable
-    public Pair<Integer, V> get(final K key) {
+    public synchronized Pair<Integer, V> get(final K key) {
         return concurrentHashMap.get(key);
     }
 
@@ -88,7 +96,7 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * Adds a new element to the cache.
      *
      * <p>
-     * If the cache limit is reached, oldest elements will be cleared first using the load factor
+     * If the cache limit is reached, oldest elements will be cleared first using the clear factor
      * and the maximum size.
      * </p>
      *
@@ -100,15 +108,28 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * {@code null} with the key).
      */
     @Nullable
-    public V put(final K key, final V value) {
-        if (!concurrentHashMap.containsKey(key) && concurrentHashMap.size() == maximumSize) {
-            final int newCacheSize = (int) Math.round(maximumSize * clearFactor);
-            keepNewestEntries(newCacheSize != 0 ? newCacheSize : 1);
+    public synchronized V put(final K key, final V value) {
+        final Pair<Integer, V> previous = concurrentHashMap.get(key);
+        if (previous != null) {
+            // Replacing an entry makes it newest without leaving gaps or duplicate ranks.
+            final int previousRank = previous.getFirst();
+            concurrentHashMap.values().forEach(entry -> {
+                if (entry.getFirst() > previousRank) {
+                    entry.setFirst(entry.getFirst() - 1);
+                }
+            });
+            concurrentHashMap.put(key, new Pair<>(concurrentHashMap.size() - 1, value));
+            return previous.getSecond();
         }
 
-        final Pair<Integer, V> returnValue = concurrentHashMap.put(key,
-                new Pair<>(concurrentHashMap.size(), value));
-        return returnValue == null ? null : returnValue.getSecond();
+        if (concurrentHashMap.size() >= maximumSize) {
+            // Reserve a slot even when rounding would retain every existing entry.
+            final int retainedSize = Math.min(maximumSize - 1,
+                    Math.max(1, (int) Math.round(maximumSize * clearFactor)));
+            keepNewestEntries(retainedSize);
+        }
+        concurrentHashMap.put(key, new Pair<>(concurrentHashMap.size(), value));
+        return null;
     }
 
     /**
@@ -118,7 +139,7 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * The cache will be empty after this method is called.
      * </p>
      */
-    public void clear() {
+    public synchronized void clear() {
         concurrentHashMap.clear();
     }
 
@@ -134,7 +155,7 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * @see #resetClearFactor()
      * @see #resetMaximumSize()
      */
-    public void reset() {
+    public synchronized void reset() {
         clear();
         resetClearFactor();
         resetMaximumSize();
@@ -143,27 +164,27 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
     /**
      * @return the number of cached manifests in the cache
      */
-    public int size() {
+    public synchronized int size() {
         return concurrentHashMap.size();
     }
 
     /**
      * @return the maximum size of the cache
      */
-    public long getMaximumSize() {
+    public synchronized long getMaximumSize() {
         return maximumSize;
     }
 
     /**
      * Sets the maximum size of the cache.
      *
-     * If the current cache size is more than the new maximum size, the percentage of one less the
-     * clear factor of the maximum new size of manifests in the cache will be removed.
+     * Reducing the maximum keeps at most the rounded clear-factor portion of the new maximum,
+     * retaining at least one entry.
      *
      * @param maximumSize the new maximum size of the cache
      * @throws IllegalArgumentException if {@code maximumSize} is less than or equal to 0
      */
-    public void setMaximumSize(final int maximumSize) {
+    public synchronized void setMaximumSize(final int maximumSize) {
         if (maximumSize <= 0) {
             throw new IllegalArgumentException("Invalid maximum size");
         }
@@ -179,14 +200,14 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
     /**
      * Resets the maximum size of the cache to its {@link #DEFAULT_MAXIMUM_SIZE default value}.
      */
-    public void resetMaximumSize() {
+    public synchronized void resetMaximumSize() {
         this.maximumSize = DEFAULT_MAXIMUM_SIZE;
     }
 
     /**
      * @return the current clear factor of the cache, used when the cache limit size is reached
      */
-    public double getClearFactor() {
+    public synchronized double getClearFactor() {
         return clearFactor;
     }
 
@@ -204,8 +225,8 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
      * @param clearFactor the new clear factor of the cache
      * @throws IllegalArgumentException if the clear factor passed a parameter is invalid
      */
-    public void setClearFactor(final double clearFactor) {
-        if (clearFactor <= 0 || clearFactor >= 1) {
+    public synchronized void setClearFactor(final double clearFactor) {
+        if (Double.isNaN(clearFactor) || clearFactor <= 0 || clearFactor >= 1) {
             throw new IllegalArgumentException("Invalid clear factor");
         }
 
@@ -215,41 +236,54 @@ public final class ManifestCreatorCache<K extends Serializable, V extends Serial
     /**
      * Resets the clear factor to its {@link #DEFAULT_CLEAR_FACTOR default value}.
      */
-    public void resetClearFactor() {
+    public synchronized void resetClearFactor() {
         this.clearFactor = DEFAULT_CLEAR_FACTOR;
     }
 
     @Nonnull
     @Override
-    public String toString() {
+    public synchronized String toString() {
         return "ManifestCreatorCache[clearFactor=" + clearFactor + ", maximumSize=" + maximumSize
                 + ", concurrentHashMap=" + concurrentHashMap + "]";
     }
 
+    private synchronized void writeObject(final ObjectOutputStream output) throws IOException {
+        output.defaultWriteObject();
+    }
+
+    private void readObject(final ObjectInputStream input)
+            throws IOException, ClassNotFoundException {
+        input.defaultReadObject();
+        if (concurrentHashMap == null || maximumSize <= 0 || Double.isNaN(clearFactor)
+                || clearFactor <= 0 || clearFactor >= 1) {
+            throw new InvalidObjectException("Invalid manifest cache settings");
+        }
+        for (final Pair<Integer, V> value : concurrentHashMap.values()) {
+            if (value.getFirst() == null) {
+                throw new InvalidObjectException("Invalid manifest cache rank");
+            }
+        }
+        // Normalize legacy ranks, including gaps or duplicates from repeated replacements.
+        keepNewestEntries(maximumSize);
+    }
+
     /**
-     * Keeps only the newest entries in a cache.
+     * Keeps the newest entries and renumbers their insertion ranks contiguously.
      *
-     * <p>
-     * This method will first collect the entries to remove by looping through the concurrent hash
-     * map
-     * </p>
-     *
-     * @param newLimit the new limit of the cache
+     * @param newLimit the number of entries to retain
      */
     private void keepNewestEntries(final int newLimit) {
-        final int difference = concurrentHashMap.size() - newLimit;
-        final ArrayList<Map.Entry<K, Pair<Integer, V>>> entriesToRemove = new ArrayList<>();
-
-        concurrentHashMap.entrySet().forEach(entry -> {
-            final Pair<Integer, V> value = entry.getValue();
-            if (value.getFirst() < difference) {
-                entriesToRemove.add(entry);
+        final ArrayList<Map.Entry<K, Pair<Integer, V>>> entries =
+                new ArrayList<>(concurrentHashMap.entrySet());
+        entries.sort(Comparator.comparingInt(entry -> entry.getValue().getFirst()));
+        final int removeCount = Math.max(0, entries.size() - newLimit);
+        for (int i = 0; i < entries.size(); i++) {
+            final Map.Entry<K, Pair<Integer, V>> entry = entries.get(i);
+            if (i < removeCount) {
+                concurrentHashMap.remove(entry.getKey());
             } else {
-                value.setFirst(value.getFirst() - difference);
+                entry.getValue().setFirst(i - removeCount);
             }
-        });
-
-        entriesToRemove.forEach(entry -> concurrentHashMap.remove(entry.getKey(),
-                entry.getValue()));
+        }
     }
 }
