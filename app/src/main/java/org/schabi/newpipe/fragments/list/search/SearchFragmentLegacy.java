@@ -16,6 +16,7 @@ import org.schabi.newpipe.fragments.list.search.filter.SearchFilterUIOptionMenu;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 
 /**
  * Fragment that hosts the action menu based filter 'dialog'.
@@ -56,7 +57,8 @@ public class SearchFragmentLegacy extends SearchFragment {
                              final Bundle savedInstanceState) {
         super.initViews(rootView, savedInstanceState);
         final Toolbar toolbar = (Toolbar) searchToolbarContainer.getParent();
-        toolbar.setOverflowIcon(requireContext().getDrawable(R.drawable.ic_sort));
+        toolbar.setOverflowIcon(ContextCompat.getDrawable(requireContext(),
+                R.drawable.ic_sort));
     }
 
     @Override
