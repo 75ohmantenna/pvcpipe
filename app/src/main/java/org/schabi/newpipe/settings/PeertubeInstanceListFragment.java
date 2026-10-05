@@ -39,6 +39,7 @@ import org.schabi.newpipe.util.ThemeHelper;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Single;
@@ -159,9 +160,25 @@ public class PeertubeInstanceListFragment extends Fragment {
     //////////////////////////////////////////////////////////////////////////*/
 
     private void selectInstance(final PeertubeInstance instance) {
+        final String previousUrl = selectedInstance.getUrl();
         selectedInstance = PeertubeHelper.selectInstance(instance, requireContext());
         sharedPreferences.edit().putBoolean(Constants.KEY_MAIN_PAGE_CHANGE, true).apply();
-        instanceListAdapter.notifyDataSetChanged();
+        notifySelectionChanged(instanceListAdapter, previousUrl, selectedInstance.getUrl());
+    }
+
+    static void notifySelectionChanged(final ListAdapter<PeertubeInstance, ?> adapter,
+                                       final String previousUrl, final String selectedUrl) {
+        if (previousUrl.equals(selectedUrl)) {
+            return;
+        }
+
+        final List<PeertubeInstance> instances = adapter.getCurrentList();
+        for (int position = 0; position < instances.size(); position++) {
+            final String url = instances.get(position).getUrl();
+            if (previousUrl.equals(url) || selectedUrl.equals(url)) {
+                adapter.notifyItemChanged(position);
+            }
+        }
     }
 
     private void saveChanges() {
