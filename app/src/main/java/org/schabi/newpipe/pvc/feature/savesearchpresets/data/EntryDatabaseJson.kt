@@ -4,68 +4,85 @@ import com.grack.nanojson.JsonArray
 import com.grack.nanojson.JsonObject
 import com.grack.nanojson.JsonParser
 import com.grack.nanojson.JsonWriter
+import java.math.BigInteger
+import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortDirection
+import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortType
 
 /** Converts preset states to and from the existing SharedPreferences JSON format. */
 internal object EntryDatabaseJson {
     fun decode(jsonString: String): DBState {
         val root = JsonParser.`object`().from(jsonString)
 
-        val version = root.getInt(EntryDbKeys.VERSION)
-        val sorting = PresetSortMappings.dbKeyToSort[root.getString(EntryDbKeys.SORTING)]!!
+        val version = root.requiredLong(EntryDbKeys.VERSION)
+        require(version == 1L) { "Unsupported preset database version" }
+        val sorting = PresetSortMappings.dbKeyToSort[root.getString(EntryDbKeys.SORTING)]
+            ?: SortType.NAME
         val direction =
-            PresetSortMappings.dbKeyToSortDirection[root.getString(EntryDbKeys.DIRECTION)]!!
+            PresetSortMappings.dbKeyToSortDirection[root.getString(EntryDbKeys.DIRECTION)]
+                ?: SortDirection.DESC
 
-        val defaults = mutableListOf<DefaultEntry>()
-        val defaultsArray = root.getArray(EntryDbKeys.DEFAULTS)
-
-        if (defaultsArray != null) {
-            for (i in 0 until defaultsArray.size) {
-                val obj = defaultsArray.getObject(i)
-
-                defaults.add(
-                    DefaultEntry(
-                        obj.getString(EntryDbKeys.SERVICE),
-                        obj.getLong(EntryDbKeys.ENTRY)
-                    )
-                )
-            }
+        val defaults = root.optionalArray(EntryDbKeys.DEFAULTS).orEmpty().map { value ->
+            val obj = requiredObject(value)
+            DefaultEntry(obj.requiredString(EntryDbKeys.SERVICE), obj.requiredLong(EntryDbKeys.ENTRY))
+        }
+        val entries = root.optionalArray(EntryDbKeys.ENTRIES).orEmpty().map { value ->
+            val obj = requiredObject(value)
+            Entry(
+                obj.requiredString(EntryDbKeys.NAME),
+                obj.requiredString(EntryDbKeys.SERVICE),
+                obj.requiredLong(EntryDbKeys.CREATED_AT),
+                obj.requiredLong(EntryDbKeys.MODIFIED_AT),
+                obj.requiredLong(EntryDbKeys.LAST_USED),
+                obj.requiredIntArray(EntryDbKeys.CONTENT_FILTER_DATA),
+                obj.requiredIntArray(EntryDbKeys.SORT_FILTER_DATA)
+            )
         }
 
-        val entries = mutableListOf<Entry>()
-        val entriesArray = root.getArray(EntryDbKeys.ENTRIES)
+        return DBState(version.toInt(), sorting, direction, defaults, entries)
+    }
 
-        if (entriesArray != null) {
-            for (i in 0 until entriesArray.size) {
-                val obj = entriesArray.getObject(i)
+    private fun requiredObject(value: Any?): JsonObject {
+        require(value is JsonObject) { "Invalid preset record" }
+        return value
+    }
 
-                val contentFilterArray = obj.getArray(EntryDbKeys.CONTENT_FILTER_DATA)
-                val sortFilterArray = obj.getArray(EntryDbKeys.SORT_FILTER_DATA)
-                val contentFilterData = mutableListOf<Int>()
-                val sortFilterData = mutableListOf<Int>()
+    private fun JsonObject.requiredString(key: String): String {
+        val value = this[key]
+        require(value is String) { "Invalid preset field: $key" }
+        return value
+    }
 
-                for (j in 0 until contentFilterArray.size) {
-                    contentFilterData.add(contentFilterArray.getInt(j))
-                }
+    private fun JsonObject.requiredLong(key: String): Long = integralNumber(this[key], key)
 
-                for (j in 0 until sortFilterArray.size) {
-                    sortFilterData.add(sortFilterArray.getInt(j))
-                }
+    private fun integralNumber(value: Any?, key: String): Long {
+        return when (value) {
+            is Int -> value.toLong()
 
-                entries.add(
-                    Entry(
-                        obj.getString(EntryDbKeys.NAME),
-                        obj.getString(EntryDbKeys.SERVICE),
-                        obj.getLong(EntryDbKeys.CREATED_AT),
-                        obj.getLong(EntryDbKeys.MODIFIED_AT),
-                        obj.getLong(EntryDbKeys.LAST_USED),
-                        contentFilterData,
-                        sortFilterData
-                    )
-                )
+            is Long -> value
+
+            is BigInteger -> {
+                require(value.bitLength() <= 63) { "Invalid preset field: $key" }
+                value.toLong()
             }
-        }
 
-        return DBState(version, sorting, direction, defaults, entries)
+            else -> throw IllegalArgumentException("Invalid preset field: $key")
+        }
+    }
+
+    private fun JsonObject.optionalArray(key: String): JsonArray? {
+        val value = this[key]
+        require(value == null || value is JsonArray) { "Invalid preset field: $key" }
+        return value as JsonArray?
+    }
+
+    private fun JsonObject.requiredIntArray(key: String): List<Int> {
+        val array = optionalArray(key)
+        require(array != null) { "Missing preset field: $key" }
+        return array.map { value ->
+            val number = integralNumber(value, key)
+            require(number in Int.MIN_VALUE..Int.MAX_VALUE) { "Invalid preset filter: $key" }
+            number.toInt()
+        }
     }
 
     fun encode(state: DBState): String {

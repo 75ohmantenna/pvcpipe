@@ -2,6 +2,7 @@ package org.schabi.newpipe.pvc.feature.savesearchpresets.data
 
 import com.grack.nanojson.JsonParser
 import com.grack.nanojson.JsonParserException
+import com.grack.nanojson.JsonWriter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -99,13 +100,85 @@ class EntryDatabaseJsonTest {
     }
 
     @Test
-    fun `malformed JSON and unknown sort keys still fail`() {
+    fun `malformed JSON still fails in the codec`() {
         assertThrows(JsonParserException::class.java) { EntryDatabaseJson.decode("invalid") }
-        assertThrows(NullPointerException::class.java) {
-            EntryDatabaseJson.decode("""{"version":1,"sorting":"unknown","direction":"desc"}""")
+    }
+
+    @Test
+    fun `unknown sort keys retain entries with default sorting`() {
+        assertEquals(
+            storedState.copy(sorting = SortType.NAME, direction = SortDirection.DESC),
+            EntryDatabaseJson.decode(
+                storedJson.replace("byLastUsed", "unknown").replace("asc", "unknown")
+            )
+        )
+    }
+
+    @Test
+    fun `unsupported and nonintegral versions are rejected`() {
+        for (version in listOf("2", "0", "1.5", "null", "\"1\"")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                EntryDatabaseJson.decode(storedJson.replace("\"version\": 1", "\"version\": $version"))
+            }
         }
-        assertThrows(NullPointerException::class.java) {
-            EntryDatabaseJson.decode("""{"version":1,"sorting":"byName","direction":"unknown"}""")
+    }
+
+    @Test
+    fun `invalid collection and record types are rejected`() {
+        for (key in listOf("defaults", "entries")) {
+            for (value in listOf(1, "bad", listOf(null), listOf("bad"))) {
+                val root = JsonParser.`object`().from(storedJson)
+                root[key] = value
+                assertThrows(IllegalArgumentException::class.java) {
+                    EntryDatabaseJson.decode(JsonWriter.string(root))
+                }
+            }
         }
+    }
+
+    @Test
+    fun `missing and incorrectly typed entry fields are rejected`() {
+        val keys = listOf(
+            "name",
+            "service",
+            "created_at",
+            "modified_at",
+            "last_used",
+            "sort_filter_data",
+            "content_filter_data"
+        )
+        for (key in keys) {
+            val root = JsonParser.`object`().from(storedJson)
+            root.getArray("entries").getObject(0).remove(key)
+            assertThrows(IllegalArgumentException::class.java) {
+                EntryDatabaseJson.decode(JsonWriter.string(root))
+            }
+        }
+        for (invalid in listOf("null", "1.5", "9223372036854775808", "\"123\"")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                EntryDatabaseJson.decode(storedJson.replace("1774216721895", invalid))
+            }
+        }
+    }
+
+    @Test
+    fun `filter identifiers must be exact signed integers`() {
+        for (invalid in listOf("null", "1.5", "2147483648", "-2147483649", "\"12\"")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                EntryDatabaseJson.decode(storedJson.replace("[12, 17, 12]", "[$invalid]"))
+            }
+        }
+    }
+
+    @Test
+    fun `signed numeric limits round trip without precision loss`() {
+        val entry = storedState.entries.single().copy(
+            createdAt = Long.MIN_VALUE,
+            modifiedAt = Long.MAX_VALUE,
+            lastUsed = 0,
+            sortFilterData = listOf(Int.MIN_VALUE, Int.MAX_VALUE, -1, 0)
+        )
+        val state = storedState.copy(entries = listOf(entry))
+        assertEquals(state, EntryDatabaseJson.decode(EntryDatabaseJson.encode(state)))
     }
 }

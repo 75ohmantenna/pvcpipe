@@ -3,6 +3,7 @@ package org.schabi.newpipe.pvc.feature.savesearchpresets.data
 object EntryDbKeys {
 
     const val PREF_KEY_JSON_DB = "pvc_search_presets"
+    internal const val PREF_KEY_JSON_DB_RECOVERY = "pvc_search_presets_recovery"
 
     const val VERSION = "version"
     const val SORTING = "sorting"
