@@ -14,6 +14,23 @@ import java.util.List;
 
 public class ImageStrategyTest {
 
+    @Test
+    public void estimatesLargePixelCountsWithoutIntegerOverflow() {
+        assertEquals(2_500_000_000.0, estimatePixelCount(img(50_000, 50_000), 1.0), 0.0);
+        assertEquals(1_250_000_000.0,
+                estimatePixelCount(img(HEIGHT_UNKNOWN, 50_000), 2.0), 0.0);
+        assertEquals(5_000_000_000.0,
+                estimatePixelCount(img(50_000, WIDTH_UNKNOWN), 2.0), 0.0);
+    }
+
+    @Test
+    public void choosesTheLargerHighQualityImageEvenWhenItsAreaExceedsIntegerRange() {
+        assertEquals("larger", choosePreferredImage(List.of(
+                img("smaller", 40_000, 40_000, ResolutionLevel.HIGH),
+                img("larger", 50_000, 50_000, ResolutionLevel.HIGH)
+        ), PreferredImageQuality.HIGH));
+    }
+
     private static final List<ResolutionLevel> RESOLUTION_LEVELS = List.of(
             ResolutionLevel.LOW, ResolutionLevel.MEDIUM, ResolutionLevel.HIGH);
 
