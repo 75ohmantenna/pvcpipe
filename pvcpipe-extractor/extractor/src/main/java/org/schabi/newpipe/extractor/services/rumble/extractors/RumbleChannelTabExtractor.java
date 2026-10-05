@@ -8,7 +8,6 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabExtractor;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 
@@ -26,12 +25,8 @@ public class RumbleChannelTabExtractor extends ChannelTabExtractor {
         super(service, linkHandler);
         userId = getLinkHandler().getId();
 
-        try {
-            sharedTrendingAndChannelCode = new RumbleCommonCodeTrendingAndChannel(
-                    getServiceId(), getUrl(), new RumbleChannelTabItemsExtractorImpl());
-        } catch (final ParsingException e) {
-            e.printStackTrace();
-        }
+        sharedTrendingAndChannelCode = new RumbleCommonCodeTrendingAndChannel(
+                getServiceId(), new RumbleChannelTabItemsExtractorImpl());
     }
 
     @Override
@@ -50,7 +45,7 @@ public class RumbleChannelTabExtractor extends ChannelTabExtractor {
     @Override
     public InfoItemsPage<InfoItem> getInitialPage() throws IOException, ExtractionException {
         return sharedTrendingAndChannelCode
-                .extractAndGetInfoItemsFromPage(doc, getUrl());
+                .extractAndGetInfoItemsFromPage(doc);
     }
 
     @Override

@@ -20,23 +20,15 @@ public class RumbleCommonCodeTrendingAndSearching {
     }
 
     public Page getNewPageIfThereAreMoreThanOnePageResults(final int numberOfCollectedItems,
-                                                           final Document doc,
-                                                           final String urlPrefix) {
-
-        Page nextPage = null;
-
-        // -- check if there is a next page --
-        // If numberOfCollectedItems is 0 than we have no results at all
-        // -> assume no more pages
-        if (numberOfCollectedItems > 0) {
-            final Element nextLink = doc.selectFirst("link[rel=next]");
-            final String nextPageUrl = nextLink != null ? nextLink.attr("href") : null;
-            final boolean hasMorePages = nextPageUrl != null && !nextPageUrl.isEmpty();
-            if (hasMorePages) {
-                nextPage = new Page(nextPageUrl);
-            }
+                                                           final Document doc) {
+        if (numberOfCollectedItems <= 0) {
+            return null;
         }
-        return nextPage;
+        final Element nextLink = doc.selectFirst("link[rel=next]");
+        if (nextLink == null || nextLink.attr("href").isEmpty()) {
+            return null;
+        }
+        return new Page(nextLink.attr("href"));
     }
 
     @SuppressWarnings("checkstyle:InvalidJavadocPosition")
