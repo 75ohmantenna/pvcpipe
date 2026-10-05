@@ -17,11 +17,9 @@ import coil3.size.Size
 import coil3.target.Target
 import coil3.toBitmap
 import coil3.transform.Transformation
-import kotlin.math.min
 import org.schabi.newpipe.MainActivity
 import org.schabi.newpipe.R
 import org.schabi.newpipe.extractor.Image
-import org.schabi.newpipe.ktx.scale
 
 object CoilHelper {
     private val TAG = CoilHelper::class.java.simpleName
@@ -70,12 +68,14 @@ object CoilHelper {
         target: Target
     ): Disposable {
         val url = ImageStrategy.choosePreferredImage(images)
+        val thumbnailWidth = context.resources
+            .getDimension(R.dimen.player_notification_thumbnail_width).toInt().coerceAtLeast(1)
         val request =
             getImageRequest(context, url, R.drawable.placeholder_thumbnail_video)
                 .target(target)
                 .transformations(
                     object : Transformation() {
-                        override val cacheKey = "COIL_PLAYER_THUMBNAIL_TRANSFORMATION_KEY"
+                        override val cacheKey = "COIL_PLAYER_THUMBNAIL_TRANSFORMATION_V2_$thumbnailWidth"
 
                         override suspend fun transform(
                             input: Bitmap,
@@ -85,23 +85,7 @@ object CoilHelper {
                                 Log.d(TAG, "Thumbnail - transform() called")
                             }
 
-                            val notificationThumbnailWidth =
-                                min(
-                                    context.resources.getDimension(R.dimen.player_notification_thumbnail_width),
-                                    input.width.toFloat()
-                                ).toInt()
-
-                            var newHeight = input.height / (input.width / notificationThumbnailWidth)
-                            val result = input.scale(notificationThumbnailWidth, newHeight)
-
-                            return if (result == input || !result.isMutable) {
-                                // create a new mutable bitmap to prevent strange crashes on some
-                                // devices (see #4638)
-                                newHeight = input.height / (input.width / (notificationThumbnailWidth - 1))
-                                input.scale(notificationThumbnailWidth, newHeight)
-                            } else {
-                                result
-                            }
+                            return NotificationThumbnail.scale(input, thumbnailWidth)
                         }
                     }
                 ).build()
