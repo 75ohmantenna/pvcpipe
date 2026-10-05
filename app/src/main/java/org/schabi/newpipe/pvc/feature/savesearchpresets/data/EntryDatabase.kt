@@ -3,6 +3,7 @@ package org.schabi.newpipe.pvc.feature.savesearchpresets.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.grack.nanojson.JsonParserException
 import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortDirection
@@ -52,14 +53,15 @@ class EntryDatabase internal constructor(private val prefs: SharedPreferences) {
 
     fun save(state: DBState) {
         val json = EntryDatabaseJson.encode(state)
-        val editor = prefs.edit()
-        // Keep unreadable data before replacing it, including earlier recovery snapshots.
-        unreadableJson?.let { original ->
-            val recovered = prefs.getStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, emptySet())
-                .orEmpty() + original
-            editor.putStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, recovered)
+        prefs.edit {
+            // Keep unreadable data before replacing it, including earlier recovery snapshots.
+            unreadableJson?.let { original ->
+                val recovered = prefs.getStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, emptySet())
+                    .orEmpty() + original
+                putStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, recovered)
+            }
+            putString(EntryDbKeys.PREF_KEY_JSON_DB, json)
         }
-        editor.putString(EntryDbKeys.PREF_KEY_JSON_DB, json).apply()
         unreadableJson = null
     }
 
