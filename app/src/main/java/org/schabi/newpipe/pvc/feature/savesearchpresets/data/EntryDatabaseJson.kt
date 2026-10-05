@@ -72,7 +72,7 @@ internal object EntryDatabaseJson {
     private fun JsonObject.optionalArray(key: String): JsonArray? {
         val value = this[key]
         require(value == null || value is JsonArray) { "Invalid preset field: $key" }
-        return value as JsonArray?
+        return value
     }
 
     private fun JsonObject.requiredIntArray(key: String): List<Int> {
