@@ -41,37 +41,31 @@ public class PvcCfChallenge403Interceptor implements Interceptor {
     public Response intercept(final Chain chain) throws IOException {
         final Request request = chain.request();
 
-        if (!request.url().host().contains("rumble.com")) {
+        if (!isRumbleHost(request.url().host())) {
             return chain.proceed(request);
         }
 
-        // TODO reusing cookies from webview in okhttp might be useless as there it uses a different
-        // TODO network stack. maybe use a config option to let the user decide.
-        //USELESS->DISABLED // reuse previously retrieved cookies from the webView
-        //USELESS->DISABLED final Request.Builder builder = request.newBuilder();
-        //USELESS->DISABLED if (!cookies.isEmpty()) {
-        //USELESS->DISABLED     builder.header("Cookie", cookies);
-        //USELESS->DISABLED }
-
-        //USELESS->DISABLED final Response response = chain.proceed(builder.build());
         final Response response = chain.proceed(request);
 
-        //DBG if (!request.url().toString().contains("https://rumble.com/v")
-        //DBG    && response.code() == 200) {
         if (response.code() == 200) {
             debugMessage("CF_DBG Ic 1.0", response.code());
             return response;
         }
 
-        //DBG if ((response.code() == 403 || response.code() == 200) && request.url().toString()
-        //DBG         .contains("comment.list")) {
-        if (response.code() == 403) {
-            final ChallengeResult bypassResult =
-                    bypassManager.fetchContentViaWebView(request.url().toString(), 30000);
+        if (response.code() == 403 && isRumbleHost(response.request().url().host())) {
+            final ChallengeResult bypassResult;
+            try {
+                bypassResult = bypassManager.fetchContentViaWebView(
+                        request.url().toString(), 30000);
+            } catch (final RuntimeException exception) {
+                response.close();
+                throw exception;
+            }
 
             debugMessage("CF_DBG Ic 2.0", response.code());
 
             if (bypassResult.success && bypassResult.content != null) {
+                response.close();
 
                 debugMessage("CF_DBG Ic 2.1 webview success", 200);
 
@@ -90,6 +84,10 @@ public class PvcCfChallenge403Interceptor implements Interceptor {
         debugMessage("CF_DBG Ic 3.0", response.code());
 
         return response;
+    }
+
+    private static boolean isRumbleHost(final String host) {
+        return host.equals("rumble.com") || host.endsWith(".rumble.com");
     }
 
     private void debugMessage(
