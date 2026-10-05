@@ -29,9 +29,6 @@ import static org.schabi.newpipe.player.seekbarpreview.SeekbarPreviewThumbnailHe
  */
 public final class SeekbarPreviewThumbnailHelper {
 
-    // This has to be <= 23 chars on devices running Android 7 or lower (API <= 25)
-    // or it fails with an IllegalArgumentException
-    // https://stackoverflow.com/a/54744028
     public static final String TAG = "SeekbarPrevThumbHelper";
 
     private SeekbarPreviewThumbnailHelper() {

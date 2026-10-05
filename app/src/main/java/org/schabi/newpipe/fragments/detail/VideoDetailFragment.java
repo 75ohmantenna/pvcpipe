@@ -996,7 +996,7 @@ public final class VideoDetailFragment
                                 PlayerIntentType.AllOthers)
                         .putExtra(Player.PLAY_WHEN_READY, autoPlayEnabled)
                         .putExtra(Player.RESUME_PLAYBACK, true);
-        ContextCompat.startForegroundService(activity, playerIntent);
+        activity.startForegroundService(playerIntent);
     }
 
     /**
@@ -1382,12 +1382,12 @@ public final class VideoDetailFragment
         if (info.getDuration() > 0) {
             binding.detailDurationView.setText(Localization.getDurationString(info.getDuration()));
             binding.detailDurationView.setBackgroundColor(
-                    ContextCompat.getColor(activity, R.color.duration_background_color));
+                    activity.getColor(R.color.duration_background_color));
             animate(binding.detailDurationView, true, 100);
         } else if (info.getStreamType() == StreamType.LIVE_STREAM) {
             binding.detailDurationView.setText(R.string.duration_live);
             binding.detailDurationView.setBackgroundColor(
-                    ContextCompat.getColor(activity, R.color.live_duration_background_color));
+                    activity.getColor(R.color.live_duration_background_color));
             animate(binding.detailDurationView, true, 100);
         } else {
             binding.detailDurationView.setVisibility(View.GONE);
@@ -1857,8 +1857,7 @@ public final class VideoDetailFragment
     private void accommodateForTvAndDesktopMode() {
         if (DeviceUtils.isTv(getContext())) {
             // remove ripple effects from detail controls
-            final int transparent = ContextCompat.getColor(requireContext(),
-                    R.color.transparent_background_color);
+            final int transparent = requireContext().getColor(R.color.transparent_background_color);
             binding.detailControlsPlaylistAppend.setBackgroundColor(transparent);
             binding.detailControlsBackground.setBackgroundColor(transparent);
             binding.detailControlsPopup.setBackgroundColor(transparent);

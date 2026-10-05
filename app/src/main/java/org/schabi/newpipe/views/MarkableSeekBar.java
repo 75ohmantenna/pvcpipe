@@ -9,7 +9,6 @@ import android.graphics.drawable.LayerDrawable;
 import android.util.AttributeSet;
 
 import androidx.appcompat.widget.AppCompatSeekBar;
-import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 
@@ -74,8 +73,7 @@ public class MarkableSeekBar extends AppCompatSeekBar {
         for (final SeekBarMarker seekBarMarker : seekBarMarkers) {
             @SuppressLint("PrivateResource")
             final Drawable markerDrawable =
-                    ContextCompat.getDrawable(
-                            getContext(),
+                    getContext().getDrawable(
                             androidx.appcompat.R.drawable.abc_scrubber_primary_mtrl_alpha);
 
             final PorterDuffColorFilter colorFilter =

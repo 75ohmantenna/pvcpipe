@@ -8,7 +8,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -134,8 +133,7 @@ public final class PlayerHolder {
         }
         final Intent intent = new Intent(context, PlayerService.class);
         intent.putExtra(PlayerService.SHOULD_START_FOREGROUND_EXTRA, true);
-        ContextCompat.startForegroundService(context,
-                PlayerService.authenticateInternalIntent(context, intent));
+        context.startForegroundService(PlayerService.authenticateInternalIntent(context, intent));
         if (!isBound()) {
             bind(Context.BIND_AUTO_CREATE);
         }

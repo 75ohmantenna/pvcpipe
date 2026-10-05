@@ -18,7 +18,6 @@ import android.view.accessibility.CaptioningManager;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -297,8 +296,8 @@ public final class PlayerHelper {
 
     @NonNull
     public static CaptionStyleCompat getCaptionStyle(@NonNull final Context context) {
-        final CaptioningManager captioningManager = ContextCompat.getSystemService(context,
-                CaptioningManager.class);
+        final CaptioningManager captioningManager =
+                context.getSystemService(CaptioningManager.class);
         if (captioningManager == null || !captioningManager.isEnabled()) {
             return CaptionStyleCompat.DEFAULT;
         }
@@ -321,8 +320,8 @@ public final class PlayerHelper {
      * @return caption scaling
      */
     public static float getCaptionScale(@NonNull final Context context) {
-        final CaptioningManager captioningManager = ContextCompat.getSystemService(context,
-                CaptioningManager.class);
+        final CaptioningManager captioningManager =
+                context.getSystemService(CaptioningManager.class);
         if (captioningManager == null || !captioningManager.isEnabled()) {
             return 1.0f;
         }

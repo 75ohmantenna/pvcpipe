@@ -37,9 +37,6 @@ import java.util.function.Supplier;
  */
 public final class VideoDetailPlayerCrasher {
 
-    // This has to be <= 23 chars on devices running Android 7 or lower (API <= 25)
-    // or it fails with an IllegalArgumentException
-    // https://stackoverflow.com/a/54744028
     private static final String TAG = "VideoDetPlayerCrasher";
 
     private static final String DEFAULT_MSG = "Dummy";

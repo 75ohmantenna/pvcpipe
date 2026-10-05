@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.preference.PreferenceManager
 import org.schabi.newpipe.R
@@ -47,7 +46,7 @@ class NotificationHelper(val context: Context) {
             .setBadgeIconType(NotificationCompat.BADGE_ICON_LARGE)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setSmallIcon(R.drawable.ic_newpipe_triangle_white)
-            .setColor(ContextCompat.getColor(context, R.color.ic_launcher_background))
+            .setColor(context.getColor(R.color.ic_launcher_background))
             .setColorized(true)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
@@ -107,7 +106,7 @@ class NotificationHelper(val context: Context) {
             .setContentTitle(item.name)
             .setContentText(item.uploaderName)
             .setGroup(item.uploaderUrl)
-            .setColor(ContextCompat.getColor(context, R.color.ic_launcher_background))
+            .setColor(context.getColor(R.color.ic_launcher_background))
             .setColorized(true)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)

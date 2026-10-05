@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.res.Resources
 import android.net.ConnectivityManager
 import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import java.util.Collections
 import java.util.Locale
@@ -810,7 +809,7 @@ object ListHelper {
     @JvmStatic
     fun isMeteredNetwork(context: Context): Boolean {
         val manager =
-            ContextCompat.getSystemService(context, ConnectivityManager::class.java)
+            context.getSystemService(ConnectivityManager::class.java)
         if (manager == null || manager.activeNetworkInfo == null) {
             return false
         }

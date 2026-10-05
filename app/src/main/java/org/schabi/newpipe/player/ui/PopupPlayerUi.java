@@ -27,7 +27,6 @@ import android.view.animation.AnticipateInterpolator;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
 import androidx.core.math.MathUtils;
 
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
@@ -91,7 +90,7 @@ public final class PopupPlayerUi extends VideoPlayerUi {
     public PopupPlayerUi(@NonNull final Player player,
                          @NonNull final PlayerBinding playerBinding) {
         super(player, playerBinding);
-        windowManager = ContextCompat.getSystemService(context, WindowManager.class);
+        windowManager = context.getSystemService(WindowManager.class);
     }
 
     @Override

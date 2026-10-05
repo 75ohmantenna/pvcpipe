@@ -1,19 +1,18 @@
 package org.schabi.newpipe.util.text;
 
 import android.graphics.Paint;
+import android.text.Html;
 import android.text.Layout;
 import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.text.HtmlCompat;
 
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.stream.Description;
 
 import java.util.function.Consumer;
-
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
@@ -164,7 +163,7 @@ public final class TextEllipsizer {
         final boolean oldState = isEllipsized;
         disposable.clear();
         TextLinkifier.fromDescription(view, content,
-                HtmlCompat.FROM_HTML_MODE_LEGACY, streamingService, streamUrl, disposable,
+                Html.FROM_HTML_MODE_LEGACY, streamingService, streamUrl, disposable,
                 v -> {
                     consumer.accept(v);
                     notifyStateChangeListener(oldState);

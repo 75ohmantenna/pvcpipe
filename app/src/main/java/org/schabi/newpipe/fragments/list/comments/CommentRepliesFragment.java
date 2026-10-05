@@ -3,6 +3,7 @@ package org.schabi.newpipe.fragments.list.comments;
 import static org.schabi.newpipe.util.ServiceHelper.getServiceById;
 
 import android.os.Bundle;
+import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,7 +11,6 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.core.text.HtmlCompat;
 
 import com.evernote.android.state.State;
 
@@ -116,7 +116,7 @@ public final class CommentRepliesFragment
 
             // setup comment content
             TextLinkifier.fromDescription(binding.commentContent, item.getCommentText(),
-                    HtmlCompat.FROM_HTML_MODE_LEGACY, getServiceById(item.getServiceId()),
+                    Html.FROM_HTML_MODE_LEGACY, getServiceById(item.getServiceId()),
                     item.getUrl(), disposables, null);
             binding.commentContent.setMovementMethod(LongPressLinkMovementMethod.getInstance());
             return binding.getRoot();

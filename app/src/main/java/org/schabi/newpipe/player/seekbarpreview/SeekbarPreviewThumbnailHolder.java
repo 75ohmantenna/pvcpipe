@@ -27,9 +27,6 @@ import java.util.function.Supplier;
 
 public class SeekbarPreviewThumbnailHolder {
 
-    // This has to be <= 23 chars on devices running Android 7 or lower (API <= 25)
-    // or it fails with an IllegalArgumentException
-    // https://stackoverflow.com/a/54744028
     public static final String TAG = "SeekbarPrevThumbHolder";
 
     // Key = Position of the picture in milliseconds

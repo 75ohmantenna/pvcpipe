@@ -1,6 +1,7 @@
 package org.schabi.newpipe.util.text;
 
 import android.content.Context;
+import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
@@ -10,7 +11,6 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.text.HtmlCompat;
 
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.stream.Description;
@@ -48,8 +48,8 @@ public final class TextLinkifier {
      *
      * @param textView           the TextView to set the htmlBlock linked
      * @param description        the htmlBlock to be linked
-     * @param htmlCompatFlag     the int flag to be set if {@link HtmlCompat#fromHtml(String, int)}
-     *                           will be called (not used for formats different than HTML)
+     * @param htmlFlags         the flags passed to {@link Html#fromHtml(String, int)}
+     *                           (not used for formats different than HTML)
      * @param relatedInfoService if given, handle hashtags to search for the term in the correct
      *                           service
      * @param relatedStreamUrl   if given, used alongside {@code relatedInfoService} to handle
@@ -62,14 +62,14 @@ public final class TextLinkifier {
      */
     public static void fromDescription(@NonNull final TextView textView,
                                        @NonNull final Description description,
-                                       final int htmlCompatFlag,
+                                       final int htmlFlags,
                                        @Nullable final StreamingService relatedInfoService,
                                        @Nullable final String relatedStreamUrl,
                                        @NonNull final CompositeDisposable disposables,
                                        @Nullable final Consumer<TextView> onCompletion) {
         switch (description.getType()) {
             case Description.HTML:
-                TextLinkifier.fromHtml(textView, description.getContent(), htmlCompatFlag,
+                TextLinkifier.fromHtml(textView, description.getContent(), htmlFlags,
                         relatedInfoService, relatedStreamUrl, disposables, onCompletion);
                 break;
             case Description.MARKDOWN:
@@ -89,13 +89,12 @@ public final class TextLinkifier {
      * <p>
      * This method will call {@link #changeLinkIntents(TextView, CharSequence, StreamingService,
      * String, CompositeDisposable, Consumer)} after having linked the URLs with
-     * {@link HtmlCompat#fromHtml(String, int)}.
+     * {@link Html#fromHtml(String, int)}.
      * </p>
      *
      * @param textView           the {@link TextView} to set the HTML string block linked
      * @param htmlBlock          the HTML string block to be linked
-     * @param htmlCompatFlag     the int flag to be set when {@link HtmlCompat#fromHtml(String,
-     *                           int)} will be called
+     * @param htmlFlags         the flags passed to {@link Html#fromHtml(String, int)}
      * @param relatedInfoService if given, handle hashtags to search for the term in the correct
      *                           service
      * @param relatedStreamUrl   if given, used alongside {@code relatedInfoService} to handle
@@ -108,13 +107,13 @@ public final class TextLinkifier {
      */
     public static void fromHtml(@NonNull final TextView textView,
                                 @NonNull final String htmlBlock,
-                                final int htmlCompatFlag,
+                                final int htmlFlags,
                                 @Nullable final StreamingService relatedInfoService,
                                 @Nullable final String relatedStreamUrl,
                                 @NonNull final CompositeDisposable disposables,
                                 @Nullable final Consumer<TextView> onCompletion) {
         changeLinkIntents(
-                textView, HtmlCompat.fromHtml(htmlBlock, htmlCompatFlag), relatedInfoService,
+                textView, Html.fromHtml(htmlBlock, htmlFlags), relatedInfoService,
                 relatedStreamUrl, disposables, onCompletion);
     }
 

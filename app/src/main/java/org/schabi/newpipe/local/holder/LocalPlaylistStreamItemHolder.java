@@ -6,8 +6,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.core.content.ContextCompat;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.LocalItem;
 import org.schabi.newpipe.database.playlist.PlaylistStreamEntry;
@@ -65,8 +63,8 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
         if (item.getStreamEntity().getDuration() > 0) {
             itemDurationView.setText(Localization
                     .getDurationString(item.getStreamEntity().getDuration()));
-            itemDurationView.setBackgroundColor(ContextCompat.getColor(itemBuilder.getContext(),
-                    R.color.duration_background_color));
+            itemDurationView.setBackgroundColor(itemBuilder.getContext()
+                    .getColor(R.color.duration_background_color));
             itemDurationView.setVisibility(View.VISIBLE);
 
             if (DependentPreferenceHelper.getPositionsInListsEnabled(itemProgressView.getContext())

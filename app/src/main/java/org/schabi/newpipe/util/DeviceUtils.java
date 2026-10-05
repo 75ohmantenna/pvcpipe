@@ -22,7 +22,6 @@ import android.webkit.CookieManager;
 import androidx.annotation.Dimension;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.App;
@@ -102,7 +101,7 @@ public final class DeviceUtils {
         final PackageManager pm = App.getInstance().getPackageManager();
 
         // from doc: https://developer.android.com/training/tv/start/hardware.html#runtime-check
-        boolean isTv = ContextCompat.getSystemService(context, UiModeManager.class)
+        boolean isTv = context.getSystemService(UiModeManager.class)
                 .getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION
                 || isFireTv()
                 || pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK);
@@ -142,7 +141,7 @@ public final class DeviceUtils {
         }
 
         final UiModeManager uiModeManager =
-                ContextCompat.getSystemService(context, UiModeManager.class);
+                context.getSystemService(UiModeManager.class);
         if (uiModeManager != null
                 && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_DESK) {
             return true;

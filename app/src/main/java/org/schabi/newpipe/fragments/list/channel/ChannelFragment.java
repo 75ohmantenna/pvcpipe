@@ -389,10 +389,10 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
 
         final int subscribedBackground = ContextCompat
                 .getColor(activity, R.color.subscribed_background_color);
-        final int subscribedText = ContextCompat.getColor(activity, R.color.subscribed_text_color);
+        final int subscribedText = activity.getColor(R.color.subscribed_text_color);
         final int subscribeBackground = ColorUtils.blendARGB(ThemeHelper
                 .resolveColorFromAttr(activity, R.attr.colorPrimary), subscribedBackground, 0.35f);
-        final int subscribeText = ContextCompat.getColor(activity, R.color.subscribe_text_color);
+        final int subscribeText = activity.getColor(R.color.subscribe_text_color);
 
         if (isSubscribed) {
             binding.channelSubscribeButton.setText(R.string.subscribed_button_title);

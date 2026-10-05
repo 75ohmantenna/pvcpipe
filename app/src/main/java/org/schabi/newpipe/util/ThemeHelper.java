@@ -34,7 +34,6 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.content.res.AppCompatResources;
-import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.R;
@@ -225,7 +224,7 @@ public final class ThemeHelper {
         context.getTheme().resolveAttribute(attrColor, value, true);
 
         if (value.resourceId != 0) {
-            return ContextCompat.getColor(context, value.resourceId);
+            return context.getColor(value.resourceId);
         }
 
         return value.data;

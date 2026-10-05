@@ -9,7 +9,6 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.exoplayer2.util.Util;
 
@@ -153,7 +152,7 @@ public class Utility {
                 colorRes = R.color.gray;
         }
 
-        return ContextCompat.getColor(ctx, colorRes);
+        return ctx.getColor(colorRes);
     }
 
     @ColorInt
@@ -174,7 +173,7 @@ public class Utility {
                 break;
         }
 
-        return ContextCompat.getColor(ctx, colorRes);
+        return ctx.getColor(colorRes);
     }
 
     @DrawableRes

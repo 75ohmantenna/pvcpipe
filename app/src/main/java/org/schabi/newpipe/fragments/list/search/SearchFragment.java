@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.Html;
+import android.text.Html;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.style.CharacterStyle;
@@ -32,8 +33,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.TooltipCompat;
-import androidx.core.text.HtmlCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.ViewModelProvider;
@@ -561,7 +560,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             showKeyboardSearch();
         });
 
-        TooltipCompat.setTooltipText(searchClear, getString(R.string.clear));
+        searchClear.setTooltipText(getString(R.string.clear));
 
         searchEditText.setOnClickListener(v -> {
             if (DEBUG) {
@@ -1092,8 +1091,8 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             final String highlightedSearchSuggestion =
                     "<b><i>" + Html.escapeHtml(searchSuggestion) + "</i></b>";
             final String text = String.format(helperText, highlightedSearchSuggestion);
-            searchBinding.correctSuggestion.setText(HtmlCompat.fromHtml(text,
-                    HtmlCompat.FROM_HTML_MODE_LEGACY));
+            searchBinding.correctSuggestion.setText(Html.fromHtml(text,
+                    Html.FROM_HTML_MODE_LEGACY));
 
             searchBinding.correctSuggestion.setOnClickListener(v -> {
                 searchBinding.correctSuggestion.setVisibility(View.GONE);
