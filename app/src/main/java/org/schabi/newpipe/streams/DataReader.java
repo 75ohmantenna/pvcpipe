@@ -85,7 +85,7 @@ public class DataReader {
         final long high =
                 primitive[0] << 24 | primitive[1] << 16 | primitive[2] << 8 | primitive[3];
         final long low = primitive[4] << 24 | primitive[5] << 16 | primitive[6] << 8 | primitive[7];
-        return high << 32 | low;
+        return high << 32 | (low & 0xffffffffL);
     }
 
     public int read(final byte[] buffer) throws IOException {

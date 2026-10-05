@@ -35,12 +35,12 @@ object ImageStrategy {
                 // any one of them will do, hence returning the same value for all of them
                 return 0.0
             } else {
-                return image.width * image.width / widthOverHeight
+                return image.width.toDouble() * image.width / widthOverHeight
             }
         } else if (image.width == Image.WIDTH_UNKNOWN) {
-            return image.height * image.height * widthOverHeight
+            return image.height.toDouble() * image.height * widthOverHeight
         } else {
-            return (image.height * image.width).toDouble()
+            return image.height.toDouble() * image.width
         }
     }
 
