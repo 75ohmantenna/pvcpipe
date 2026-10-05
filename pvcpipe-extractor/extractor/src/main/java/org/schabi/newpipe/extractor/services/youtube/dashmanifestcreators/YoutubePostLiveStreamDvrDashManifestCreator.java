@@ -16,13 +16,13 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.services.youtube.DeliveryType;
 import org.schabi.newpipe.extractor.services.youtube.ItagItem;
 import org.schabi.newpipe.extractor.utils.ManifestCreatorCache;
+import org.schabi.newpipe.extractor.utils.Pair;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import javax.annotation.Nonnull;
 
@@ -110,9 +110,10 @@ public final class YoutubePostLiveStreamDvrDashManifestCreator {
             @Nonnull final ItagItem itagItem,
             final int targetDurationSec,
             final long durationSecondsFallback) throws CreationException {
-        if (POST_LIVE_DVR_STREAMS_CACHE.containsKey(postLiveStreamDvrStreamingUrl)) {
-            return Objects.requireNonNull(
-                    POST_LIVE_DVR_STREAMS_CACHE.get(postLiveStreamDvrStreamingUrl)).getSecond();
+        final Pair<Integer, String> cached =
+                POST_LIVE_DVR_STREAMS_CACHE.get(postLiveStreamDvrStreamingUrl);
+        if (cached != null) {
+            return cached.getSecond();
         }
 
         String realPostLiveStreamDvrStreamingUrl = postLiveStreamDvrStreamingUrl;
