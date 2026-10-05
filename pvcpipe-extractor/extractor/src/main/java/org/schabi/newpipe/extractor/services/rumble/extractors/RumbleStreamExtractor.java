@@ -35,6 +35,7 @@ import org.schabi.newpipe.extractor.stream.StreamSegment;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.extractor.utils.ExtractorLogger;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import javax.annotation.Nonnull;
@@ -44,6 +45,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,6 +61,7 @@ import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 @SuppressWarnings({"checkstyle:FinalLocalVariable", "checkstyle:FinalParameters"})
 public final class RumbleStreamExtractor extends StreamExtractor {
 
+    private static final String TAG = "RumbleStreamExtractor";
     private static final String AUTHOR = "author";
     private static final String TITLE = "title";
     private static final String COVER_IMAGE = "i";
@@ -429,25 +432,36 @@ public final class RumbleStreamExtractor extends StreamExtractor {
             final HlsParser parser = new HlsParser(
                     variants -> {
                         insertVariantsIntoVideoStreams(variants, videoStreamsList);
-
-                        // this will exit the parse function early with a nullpointer
-                        // exception. This is what we want and we catch it below.
-                        // HLSParser() should allow null to be a valid choice and exit
-                        // early - but until that may get fixed we go this route.
-                        return null;
+                        // The parser requires a selected variant and then fetches its media
+                        // playlist. We only need the variants; stop before that extra fetch.
+                        throw new HlsVariantsCollectedException();
                     },
                     new FetchWithDownloaderImpl(downloader),
                     false
             );
-
-            try {
-                parser.parse(new URI(hlsMasterPlaylist));
-            } catch (final NullPointerException ignored) {
-                // expect to throw a nullpointer and we ignore it
-            }
-        } catch (final Exception ignored) {
-            // Progressive formats remain usable if an HLS manifest cannot be parsed.
+            parser.parse(new URI(hlsMasterPlaylist));
+        } catch (final HlsVariantsCollectedException ignored) {
+            // All variants have been collected successfully.
+        } catch (final IOException | URISyntaxException | RuntimeException e) {
+            // HLS is optional: retain progressive streams or the master-playlist fallback.
+            logOptionalHlsFailure(e);
         }
+    }
+
+    private static void logOptionalHlsFailure(final Exception failure) {
+        try {
+            if (failure instanceof RuntimeException) {
+                ExtractorLogger.w(TAG, "Unexpected failure while extracting HLS variants", failure);
+            } else {
+                ExtractorLogger.d(TAG, "Could not load HLS variants", failure);
+            }
+        } catch (final RuntimeException ignored) {
+            // A custom logger must not prevent playback through the optional HLS fallback.
+        }
+    }
+
+    private static final class HlsVariantsCollectedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 
     private void insertVariantsIntoVideoStreams(
