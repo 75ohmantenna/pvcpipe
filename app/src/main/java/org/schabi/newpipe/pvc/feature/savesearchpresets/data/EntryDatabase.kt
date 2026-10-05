@@ -2,7 +2,9 @@ package org.schabi.newpipe.pvc.feature.savesearchpresets.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.preference.PreferenceManager
+import com.grack.nanojson.JsonParserException
 import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortDirection
 import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortType
 
@@ -29,19 +31,42 @@ import org.schabi.newpipe.pvc.feature.savesearchpresets.domain.SortType
  *  } ]
  *}
  */
-class EntryDatabase(context: Context) {
-    private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+class EntryDatabase internal constructor(private val prefs: SharedPreferences) {
+    constructor(context: Context) : this(PreferenceManager.getDefaultSharedPreferences(context))
+
+    private var unreadableJson: String? = null
 
     fun load(): DBState {
+        unreadableJson = null
         val jsonString = prefs.getString(EntryDbKeys.PREF_KEY_JSON_DB, null)
             ?: return emptyState()
 
-        return EntryDatabaseJson.decode(jsonString)
+        return try {
+            EntryDatabaseJson.decode(jsonString)
+        } catch (exception: JsonParserException) {
+            recover(jsonString, exception)
+        } catch (exception: IllegalArgumentException) {
+            recover(jsonString, exception)
+        }
     }
 
     fun save(state: DBState) {
         val json = EntryDatabaseJson.encode(state)
-        prefs.edit().putString(EntryDbKeys.PREF_KEY_JSON_DB, json).apply()
+        val editor = prefs.edit()
+        // Keep unreadable data before replacing it, including earlier recovery snapshots.
+        unreadableJson?.let { original ->
+            val recovered = prefs.getStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, emptySet())
+                .orEmpty() + original
+            editor.putStringSet(EntryDbKeys.PREF_KEY_JSON_DB_RECOVERY, recovered)
+        }
+        editor.putString(EntryDbKeys.PREF_KEY_JSON_DB, json).apply()
+        unreadableJson = null
+    }
+
+    private fun recover(jsonString: String, exception: Exception): DBState {
+        unreadableJson = jsonString
+        Log.w("EntryDatabase", "Unable to load search presets", exception)
+        return emptyState()
     }
 
     private fun emptyState(): DBState {
