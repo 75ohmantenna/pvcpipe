@@ -2,13 +2,16 @@ package org.schabi.newpipe.extractor.services.peertube;
 
 import com.grack.nanojson.JsonArray;
 import com.grack.nanojson.JsonObject;
+import com.grack.nanojson.JsonParser;
 
 import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.Image.ResolutionLevel;
 import org.schabi.newpipe.extractor.InfoItemExtractor;
 import org.schabi.newpipe.extractor.InfoItemsCollector;
 import org.schabi.newpipe.extractor.Page;
+import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
+import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubeChannelInfoItemExtractor;
 import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubePlaylistInfoItemExtractor;
@@ -18,6 +21,7 @@ import org.schabi.newpipe.extractor.utils.JsonUtils;
 import org.schabi.newpipe.extractor.utils.Parser;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,6 +39,27 @@ public final class PeertubeParsingHelper {
     public static final String START_PATTERN = "start=(\\d*)";
 
     private PeertubeParsingHelper() {
+    }
+
+    /** Parse a list response while retaining the calling extractor's error context. */
+    public static JsonObject parseAndValidateResponse(@Nullable final Response response,
+                                                       final String infoType)
+            throws ExtractionException {
+        if (response == null || isBlank(response.responseBody())) {
+            throw new ExtractionException("Unable to get PeerTube " + infoType + " info");
+        }
+
+        final JsonObject json;
+        try {
+            json = JsonParser.object().from(response.responseBody());
+        } catch (final Exception e) {
+            throw new ParsingException("Could not parse json data for " + infoType + " info", e);
+        }
+        if (json == null) {
+            throw new ExtractionException("Unable to get PeerTube " + infoType + " info");
+        }
+        validate(json);
+        return json;
     }
 
     public static void validate(final JsonObject json) throws ContentNotAvailableException {
