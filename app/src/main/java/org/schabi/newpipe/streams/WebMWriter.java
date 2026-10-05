@@ -636,7 +636,7 @@ public class WebMWriter implements Closeable {
     private byte[] encode(final long number, final boolean withLength) {
         int length = -1;
         for (int i = 1; i <= 7; i++) {
-            if (number < Math.pow(2, 7 * i)) {
+            if (number < (1L << (7 * i))) {
                 length = i;
                 break;
             }
@@ -646,18 +646,19 @@ public class WebMWriter implements Closeable {
             throw new ArithmeticException("Can't encode a number of bigger than 7 bytes");
         }
 
-        if (number == (Math.pow(2, 7 * length)) - 1) {
+        // The all-ones data value is reserved, so use the next encoding length.
+        if (number == (1L << (7 * length)) - 1) {
             length++;
         }
 
         final int offset = withLength ? 1 : 0;
         final byte[] buffer = new byte[offset + length];
-        final long marker = Math.floorDiv(length - 1, 8);
 
         int shift = 0;
         for (int i = length - 1; i >= 0; i--, shift += 8) {
             long b = number >>> shift;
-            if (!withLength && i == marker) {
+            // Encodings have at most eight bytes, so the marker belongs in the first byte.
+            if (!withLength && i == 0) {
                 b = b | (0x80 >>> (length - 1));
             }
             buffer[offset + i] = (byte) b;

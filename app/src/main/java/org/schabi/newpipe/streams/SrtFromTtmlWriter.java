@@ -127,17 +127,12 @@ public class SrtFromTtmlWriter {
      * @return Unified SRT NEW_LINE converted from all kinds of line breaks.
      */
     private String normalizeLineBreakForSrt(final String text) {
-        String cleaned = text;
-
         // NOTE:
         // The order of newline replacements must NOT change,
         // or duplicated line breaks (e.g. \r\n → \n\n) will occur.
-        cleaned = cleaned.replace("\r\n", "\n")
-                         .replace("\r", "\n");
-
-        cleaned = cleaned.replace("\n", NEW_LINE);
-
-        return cleaned;
+        return text.replace("\r\n", "\n")
+                .replace("\r", "\n")
+                .replace("\n", NEW_LINE);
     }
 
     private String normalizeForSrt(final String actualText) {
@@ -213,9 +208,7 @@ public class SrtFromTtmlWriter {
         //   across different editors or platforms.
         cleaned = cleaned.replace('\t', ' ');
 
-        cleaned = normalizeLineBreakForSrt(cleaned);
-
-        return cleaned;
+        return normalizeLineBreakForSrt(cleaned);
     }
 
     private String sanitizeFragment(final String raw) {
@@ -224,19 +217,7 @@ public class SrtFromTtmlWriter {
         }
 
         final String actualCharacters = decodeXmlEntities(raw);
-
-        final String srtSafeText = normalizeForSrt(actualCharacters);
-
-        return srtSafeText;
-    }
-
-    // Recursively process all child nodes to ensure text inside
-    // nested tags (e.g., <span>) is also extracted.
-    private void traverseChildNodesForNestedTags(final Node parent,
-                                                 final StringBuilder text) {
-        for (final Node child : parent.childNodes()) {
-            extractText(child, text);
-        }
+        return normalizeForSrt(actualCharacters);
     }
 
     // CHECKSTYLE:OFF checkstyle:JavadocStyle
@@ -268,18 +249,16 @@ public class SrtFromTtmlWriter {
     // --------------------------------------------------------------------
     private void extractText(final Node node, final StringBuilder text) {
         if (node instanceof TextNode textNode) {
-            String rawTtmlFragment = textNode.getWholeText();
-            String srtContent = sanitizeFragment(rawTtmlFragment);
+            final String srtContent = sanitizeFragment(textNode.getWholeText());
             text.append(srtContent);
-        } else if (node instanceof Element element) {
-            // <br> is a self-closing HTML tag used to insert a line break.
-            if (element.tagName().equalsIgnoreCase("br")) {
-                // Add a newline for <br> tags
-                text.append(NEW_LINE);
-            }
+        } else if (node instanceof Element element
+                && element.tagName().equalsIgnoreCase("br")) {
+            text.append(NEW_LINE);
         }
 
-        traverseChildNodesForNestedTags(node, text);
+        for (final Node child : node.childNodes()) {
+            extractText(child, text);
+        }
     }
     // CHECKSTYLE:ON
 
