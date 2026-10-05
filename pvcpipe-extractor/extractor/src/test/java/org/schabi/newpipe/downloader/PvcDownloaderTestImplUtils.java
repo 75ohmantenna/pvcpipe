@@ -2,7 +2,6 @@ package org.schabi.newpipe.downloader;
 
 import org.schabi.newpipe.extractor.downloader.PvcCookieManager;
 
-import java.net.CookiePolicy;
 
 import okhttp3.JavaNetCookieJar;
 import okhttp3.OkHttpClient;
@@ -25,7 +24,6 @@ final class PvcDownloaderTestImplUtils {
      */
     public static void addCookieManager(final OkHttpClient.Builder theBuilder) {
         final PvcCookieManager cookieManager = new PvcCookieManager();
-        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
         theBuilder.cookieJar(new JavaNetCookieJar(cookieManager));
     }
 }

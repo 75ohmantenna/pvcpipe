@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import okhttp3.HttpUrl;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
@@ -52,6 +54,10 @@ public final class DownloaderImpl extends Downloader {
 //                        16 * 1024 * 1024))
         PvcDownloaderImplUtils.addOrRemoveInterceptors(theBuilder);
         PvcDownloaderImplUtils.addCookieManager(theBuilder);
+        if (theBuilder.networkInterceptors().stream()
+                .noneMatch(YoutubeCookieInterceptor.class::isInstance)) {
+            theBuilder.addNetworkInterceptor(new YoutubeCookieInterceptor());
+        }
         this.client = theBuilder.build();
     }
 
@@ -87,11 +93,15 @@ public final class DownloaderImpl extends Downloader {
     }
 
     public String getCookies(final String url) {
-        final String youtubeCookie = url.contains(YOUTUBE_DOMAIN)
-                ? getCookie(YOUTUBE_RESTRICTED_MODE_COOKIE_KEY) : null;
+        final HttpUrl parsedUrl = HttpUrl.parse(url);
+        if (parsedUrl == null || !parsedUrl.isHttps() || !(parsedUrl.host().equals(YOUTUBE_DOMAIN)
+                || parsedUrl.host().endsWith("." + YOUTUBE_DOMAIN))) {
+            return "";
+        }
 
-        // Recaptcha cookie is always added TODO: not sure if this is necessary
-        return Stream.of(youtubeCookie, getCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY))
+        // ReCaptchaActivity currently collects only YouTube cookies.
+        return Stream.of(getCookie(YOUTUBE_RESTRICTED_MODE_COOKIE_KEY),
+                        getCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY))
                 .filter(Objects::nonNull)
                 .flatMap(cookies -> Arrays.stream(cookies.split("; *")))
                 .distinct()
@@ -167,11 +177,6 @@ public final class DownloaderImpl extends Downloader {
                 .url(url)
                 .addHeader("User-Agent", USER_AGENT);
 
-        final String cookies = getCookies(url);
-        if (!cookies.isEmpty()) {
-            requestBuilder.addHeader("Cookie", cookies);
-        }
-
         headers.forEach((headerName, headerValueList) -> {
             requestBuilder.removeHeader(headerName);
             headerValueList.forEach(headerValue ->
@@ -197,6 +202,20 @@ public final class DownloaderImpl extends Downloader {
                     response.headers().toMultimap(),
                     responseBodyToReturn,
                     latestUrl);
+        }
+    }
+
+    static final class YoutubeCookieInterceptor implements Interceptor {
+        @NonNull
+        @Override
+        public okhttp3.Response intercept(@NonNull final Chain chain) throws IOException {
+            final okhttp3.Request request = chain.request();
+            // Network interceptors run after host replacement and on every redirect hop.
+            final String cookies = INSTANCE.getCookies(request.url().toString());
+            if (!cookies.isEmpty() && request.header("Cookie") == null) {
+                return chain.proceed(request.newBuilder().header("Cookie", cookies).build());
+            }
+            return chain.proceed(request);
         }
     }
 }

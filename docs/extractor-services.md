@@ -39,9 +39,10 @@ Run extractor unit tests independently:
 ./pvcpipe-extractor/gradlew -p pvcpipe-extractor :extractor:test
 ```
 
-Snapshot publications default to `<extractor-version>-SNAPSHOT`. Override that
-version when publishing with `-PextractorSnapshotVersion=<version>`; configuring
-or building the extractor does not require Git metadata.
+Maven publications are local-only, under `pvcpipe-extractor/extractor/build/maven`.
+Snapshot publications default to `<extractor-version>-SNAPSHOT`; override the
+version with `-PextractorSnapshotVersion=<version>`. Configuring or building the
+extractor does not require Git metadata or publishing credentials.
 
 Run all application checks, both APK builds, and the extractor's deterministic
 regression tests:

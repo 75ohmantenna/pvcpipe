@@ -12,7 +12,6 @@ import org.schabi.newpipe.extractor.downloader.PvcCookieManager;
 import org.schabi.newpipe.util.PermissionHelper;
 
 import java.io.IOException;
-import java.net.CookiePolicy;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
@@ -268,7 +267,6 @@ public final class PvcDownloaderImplUtils {
      */
     public static void addCookieManager(final OkHttpClient.Builder theBuilder) {
         final PvcCookieManager cookieManager = new PvcCookieManager();
-        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
         theBuilder.cookieJar(new JavaNetCookieJar(cookieManager));
     }
 

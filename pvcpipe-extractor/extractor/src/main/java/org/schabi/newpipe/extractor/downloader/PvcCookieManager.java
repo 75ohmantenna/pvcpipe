@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -23,18 +24,14 @@ import java.util.Map;
  */
 public class PvcCookieManager extends CookieManager {
 
-    final String[] hosts2AcceptCookiesFor = {"rumble."};
-
     @Override
     public void put(
             final URI uri,
             final Map<String, List<String>> responseHeaders) throws IOException {
         final String host = uri.getHost();
-        for (final String hostThatAcceptsCookie : hosts2AcceptCookiesFor) {
-            if (host.contains(hostThatAcceptsCookie)) {
-                super.put(uri, responseHeaders);
-                return;
-            }
+        if (host != null && (host.equalsIgnoreCase("rumble.com")
+                || host.toLowerCase(Locale.ROOT).endsWith(".rumble.com"))) {
+            super.put(uri, responseHeaders);
         }
     }
 }
