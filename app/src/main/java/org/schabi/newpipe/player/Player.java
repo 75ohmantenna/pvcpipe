@@ -345,16 +345,14 @@ public final class Player implements PlaybackListener, Listener {
     //////////////////////////////////////////////////////////////////////////*/
     //region Playback initialization via intent
 
-    @SuppressWarnings("MethodLength")
     public void handleIntent(@NonNull final Intent intent) {
         final var playerIntentType = IntentCompat.getSerializableExtra(intent, PLAYER_INTENT_TYPE,
                 PlayerIntentType.class);
         if (playerIntentType == null) {
             return;
         }
-        // TODO: this should be in the second switch below, but I’m not sure whether I
-        // can move the initUIs stuff without breaking the setup for edge cases somehow.
-        // when playing from a timestamp, keep the current player as-is.
+        // Timestamp requests keep the current player type. Set up UIs before dispatching
+        // any queue or timestamp action.
         if (playerIntentType != PlayerIntentType.TimestampChange) {
             playerType = IntentCompat.getSerializableExtra(intent, PLAYER_TYPE, PlayerType.class);
         }
@@ -384,51 +382,7 @@ public final class Player implements PlaybackListener, Listener {
                 // With no active queue, install the supplied queue below.
             }
             case TimestampChange -> {
-                final var data = Objects.requireNonNull(IntentCompat.getParcelableExtra(intent,
-                        PLAYER_INTENT_DATA, TimestampChangeData.class));
-                final Single<StreamInfo> single =
-                        ExtractorHelper.getStreamInfo(data.getServiceId(), data.getUrl(), false);
-                streamItemDisposable.add(single.subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(info -> {
-                            final @Nullable PlayQueue oldPlayQueue = playQueue;
-                            info.setStartPosition(data.getSeconds());
-                            final PlayQueueItem playQueueItem = new PlayQueueItem(info);
-
-                            // If the stream is already playing,
-                            // we can just seek to the appropriate timestamp
-                            if (oldPlayQueue != null
-                                    && playQueueItem.isSameItem(oldPlayQueue.getItem())) {
-                                prepareIfIdle();
-                                simpleExoPlayer.seekTo(oldPlayQueue.getIndex(),
-                                        data.getSeconds() * 1000L);
-                                simpleExoPlayer.setPlayWhenReady(playWhenReady);
-
-                            } else {
-                                final PlayQueue newPlayQueue;
-
-                                // If there is no queue yet, just add our item
-                                if (oldPlayQueue == null) {
-                                    newPlayQueue = new SinglePlayQueue(playQueueItem);
-
-                                // else we add the timestamped stream behind the current video
-                                // and start playing it.
-                                } else {
-                                    oldPlayQueue.enqueueNext(playQueueItem, true);
-                                    oldPlayQueue.offsetIndex(1);
-                                    newPlayQueue = oldPlayQueue;
-                                }
-                                initPlayback(newPlayQueue, playWhenReady);
-                            }
-
-                        }, throwable -> {
-                            // This will only show a snackbar if the passed context has a root view:
-                            // otherwise it will resort to showing a notification, so we are safe
-                            // here.
-                            final var info = new ErrorInfo(throwable, UserAction.PLAY_ON_POPUP,
-                                    data.getUrl(), null, data.getUrl());
-                            ErrorUtil.createNotification(context, info);
-                        }));
+                handleTimestampChange(intent, playWhenReady);
                 return;
             }
             case AllOthers -> {
@@ -436,6 +390,10 @@ public final class Player implements PlaybackListener, Listener {
             }
         }
 
+        handleQueuePlayback(intent, playWhenReady);
+    }
+
+    private void handleQueuePlayback(@NonNull final Intent intent, final boolean playWhenReady) {
         final PlayQueue newQueue = getPlayQueueFromCache(intent);
         if (newQueue == null) {
             return;
@@ -477,39 +435,92 @@ public final class Player implements PlaybackListener, Listener {
                 && !newQueue.isEmpty()
                 && newQueue.getItem() != null
                 && newQueue.getItem().getRecoveryPosition() == PlayQueueItem.RECOVERY_UNSET) {
-            databaseUpdateDisposable.add(recordManager.loadStreamState(newQueue.getItem())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    // Do not place initPlayback() in doFinally() because
-                    // it restarts playback after destroy()
-                    //.doFinally()
-                    .subscribe(
-                            state -> {
-                                if (!state.isFinished(newQueue.getItem().getDuration())) {
-                                    // resume playback only if the stream was not played to the end
-                                    newQueue.setRecovery(newQueue.getIndex(),
-                                            state.getProgressMillis());
-                                }
-                                initPlayback(newQueue, playWhenReady);
-                            },
-                            error -> {
-                                if (DEBUG) {
-                                    Log.w(TAG, "Failed to start playback", error);
-                                }
-                                // In case any error we can start playback without history
-                                initPlayback(newQueue, playWhenReady);
-                            },
-                            () -> {
-                                // Completed but not found in history
-                                initPlayback(newQueue, playWhenReady);
-                            }
-                    ));
+            resumePlaybackFromHistory(newQueue, playWhenReady);
         } else {
             // Good to go...
             // In a case of equal PlayQueues we can re-init old one but only when it is disposed
             initPlayback(samePlayQueue ? playQueue : newQueue, playWhenReady);
         }
-
     }
+
+    private void handleTimestampChange(@NonNull final Intent intent, final boolean playWhenReady) {
+        final var data = Objects.requireNonNull(IntentCompat.getParcelableExtra(intent,
+                PLAYER_INTENT_DATA, TimestampChangeData.class));
+        final Single<StreamInfo> single =
+                ExtractorHelper.getStreamInfo(data.getServiceId(), data.getUrl(), false);
+        streamItemDisposable.add(single.subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(info -> playFromTimestamp(info, data.getSeconds(), playWhenReady),
+                        throwable -> {
+                            // Show a snackbar when a root view is available, otherwise notify.
+                            final var info = new ErrorInfo(throwable, UserAction.PLAY_ON_POPUP,
+                                    data.getUrl(), null, data.getUrl());
+                            ErrorUtil.createNotification(context, info);
+                        }));
+    }
+
+    private void playFromTimestamp(final StreamInfo info, final int seconds,
+                                   final boolean playWhenReady) {
+        final @Nullable PlayQueue oldPlayQueue = playQueue;
+        info.setStartPosition(seconds);
+        final PlayQueueItem playQueueItem = new PlayQueueItem(info);
+
+        // If the stream is already playing,
+        // we can just seek to the appropriate timestamp
+        if (oldPlayQueue != null
+                && playQueueItem.isSameItem(oldPlayQueue.getItem())) {
+            prepareIfIdle();
+            simpleExoPlayer.seekTo(oldPlayQueue.getIndex(),
+                    seconds * 1000L);
+            simpleExoPlayer.setPlayWhenReady(playWhenReady);
+
+        } else {
+            final PlayQueue newPlayQueue;
+
+            // If there is no queue yet, just add our item
+            if (oldPlayQueue == null) {
+                newPlayQueue = new SinglePlayQueue(playQueueItem);
+
+            // else we add the timestamped stream behind the current video
+            // and start playing it.
+            } else {
+                oldPlayQueue.enqueueNext(playQueueItem, true);
+                oldPlayQueue.offsetIndex(1);
+                newPlayQueue = oldPlayQueue;
+            }
+            initPlayback(newPlayQueue, playWhenReady);
+        }
+    }
+
+    private void resumePlaybackFromHistory(@NonNull final PlayQueue newQueue,
+                                          final boolean playWhenReady) {
+        databaseUpdateDisposable.add(recordManager.loadStreamState(newQueue.getItem())
+                .observeOn(AndroidSchedulers.mainThread())
+                // Do not place initPlayback() in doFinally() because
+                // it restarts playback after destroy()
+                .subscribe(
+                        state -> {
+                            if (!state.isFinished(newQueue.getItem().getDuration())) {
+                                // resume playback only if the stream was not played to the end
+                                newQueue.setRecovery(newQueue.getIndex(),
+                                        state.getProgressMillis());
+                            }
+                            initPlayback(newQueue, playWhenReady);
+                        },
+                        error -> {
+                            if (DEBUG) {
+                                Log.w(TAG, "Failed to start playback", error);
+                            }
+                            // In case any error we can start playback without history
+                            initPlayback(newQueue, playWhenReady);
+                        },
+                        () -> {
+                            // Completed but not found in history
+                            initPlayback(newQueue, playWhenReady);
+                        }
+                ));
+    }
+
     private void prepareIfIdle() {
         if (simpleExoPlayer.getPlaybackState()
                 == com.google.android.exoplayer2.Player.STATE_IDLE) {
