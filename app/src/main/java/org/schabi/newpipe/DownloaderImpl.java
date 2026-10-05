@@ -15,6 +15,7 @@ import org.schabi.newpipe.util.InfoCache;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,10 +41,11 @@ public final class DownloaderImpl extends Downloader {
 
     private static final DownloaderImpl INSTANCE = new DownloaderImpl();
     private final Map<String, String> mCookies;
-    private OkHttpClient client = new OkHttpClient();
+    private volatile OkHttpClient client = new OkHttpClient();
 
     private DownloaderImpl() {
-        this.mCookies = new HashMap<>();
+        // Preferences and captcha UI update cookies while network threads read them.
+        this.mCookies = Collections.synchronizedMap(new HashMap<>());
     }
 
     private void initInternal(final @Nullable OkHttpClient.Builder builder) {

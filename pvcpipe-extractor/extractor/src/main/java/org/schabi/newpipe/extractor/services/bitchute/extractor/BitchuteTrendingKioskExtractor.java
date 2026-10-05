@@ -29,9 +29,6 @@ import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.Bitchut
 
 public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoItem> {
 
-    private static final int UNLIMITED_PAGES = 0;
-    private int pageLimit;
-
     public BitchuteTrendingKioskExtractor(final StreamingService streamingService,
                                           final ListLinkHandler linkHandler,
                                           final String kioskId) {
@@ -59,9 +56,9 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
             final String pageNo
     ) throws ExtractionException, IOException {
         final int currentPageNo = Integer.parseInt(pageNo);
-
+        final String category = getApiSelection();
         final ResultsStreamVideos results = getCategoryResultForQuery(
-                remapper(), currentPageNo
+                category, currentPageNo
         );
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
 
@@ -69,7 +66,8 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
             collector.commit(new BitchuteVideoInfoItemExtractor(videos));
         }
 
-        if (results.getVideos().isEmpty() || pageLimit != UNLIMITED_PAGES) {
+        // Only popular/suggested results are paginated; trending is a single snapshot.
+        if (results.getVideos().isEmpty() || !"popular".equals(category)) {
             return new InfoItemsPage<>(collector, null);
         } else {
             return new InfoItemsPage<>(collector, new Page(
@@ -96,31 +94,19 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
                         .callJsonApi(query, ResultsStreamVideos.ENDPOINT));
     }
 
-    private String remapper() {
-        final String selector;
+    private String getApiSelection() {
         switch (getId()) {
             case SUGGESTED:
-                this.pageLimit = UNLIMITED_PAGES;
-                selector = "popular";
-                break;
             case POPULAR:
-                this.pageLimit = UNLIMITED_PAGES;
-                selector = "popular";
-                break;
+                return "popular";
             case TRENDING_MONTH:
-                this.pageLimit = 1;
-                selector = "trending-month";
-                break;
+                return "trending-month";
             case TRENDING_WEEK:
-                this.pageLimit = 1;
-                selector = "trending-week";
-                break;
+                return "trending-week";
             case TRENDING_DAY:
             default:
-                this.pageLimit = 1;
-                selector = "trending-day";
+                return "trending-day";
         }
-        return selector;
     }
 
     @Override
