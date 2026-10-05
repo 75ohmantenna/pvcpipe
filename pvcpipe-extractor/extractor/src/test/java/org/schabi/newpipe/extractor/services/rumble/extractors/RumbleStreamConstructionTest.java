@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -106,6 +107,53 @@ class RumbleStreamConstructionTest {
                 DeliveryMethod.PROGRESSIVE_HTTP, "720p", 0);
     }
 
+    @Test
+    void collectsAllVariantsWithoutFetchingChildPlaylists() throws Exception {
+        final FixtureDownloader downloader = new FixtureDownloader(hlsFormats(),
+                "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360\n"
+                        + "low.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720\n"
+                        + "high.m3u8\n");
+        final List<VideoStream> streams = extractor(downloader).getVideoStreams();
+        assertEquals(2, streams.size());
+        assertEquals("https://cdn.example/low.m3u8", streams.get(0).getContent());
+        assertEquals("https://cdn.example/high.m3u8", streams.get(1).getContent());
+        assertEquals(1, downloader.requests.stream().filter(MASTER_URL::equals).count());
+        assertFalse(downloader.requests.contains("https://cdn.example/low.m3u8"));
+        assertFalse(downloader.requests.contains("https://cdn.example/high.m3u8"));
+    }
+
+    @Test
+    void malformedManifestsRetainTheMasterPlaylistFallback() throws Exception {
+        for (final String manifest : List.of("not a playlist",
+                "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=invalid\nvariant.m3u8\n",
+                "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n")) {
+            final List<VideoStream> streams = extractor(hlsFormats(), manifest).getVideoStreams();
+            assertEquals(1, streams.size());
+            assertEquals(MASTER_URL, streams.get(0).getContent());
+            assertEquals("auto", streams.get(0).getResolution());
+        }
+    }
+
+    @Test
+    void absentManifestBodyRetainsTheMasterPlaylistFallback() throws Exception {
+        final FixtureDownloader downloader = new FixtureDownloader(hlsFormats(), null);
+        downloader.returnNullBody = true;
+        final List<VideoStream> streams = extractor(downloader).getVideoStreams();
+        assertEquals(1, streams.size());
+        assertEquals(MASTER_URL, streams.get(0).getContent());
+        assertEquals("auto", streams.get(0).getResolution());
+    }
+
+    @Test
+    void unexpectedManifestFailuresRetainTheMasterPlaylistFallback() throws Exception {
+        final FixtureDownloader downloader = new FixtureDownloader(hlsFormats(), null);
+        downloader.failure = new IllegalStateException("Downloader fixture failure");
+        final List<VideoStream> streams = extractor(downloader).getVideoStreams();
+        assertEquals(1, streams.size());
+        assertEquals(MASTER_URL, streams.get(0).getContent());
+        assertEquals("auto", streams.get(0).getResolution());
+    }
+
     private static String hlsFormats() {
         return "{\"hls\":[{\"url\":\"" + MASTER_URL + "\"}]}";
     }
@@ -130,22 +178,46 @@ class RumbleStreamConstructionTest {
 
     private static StreamExtractor extractor(final String formats, final String manifest)
             throws Exception {
-        NewPipe.init(new Downloader() {
-            @Override
-            public Response execute(@Nonnull final Request request) throws IOException {
-                final String body;
-                if (request.url().startsWith("https://rumble.com/embedJS/")) {
-                    body = "{\"ua\":" + formats + ",\"cc\":{}}";
-                } else if (MASTER_URL.equals(request.url()) && manifest != null) {
-                    body = manifest;
-                } else {
-                    throw new IOException("No fixture for " + request.url());
-                }
-                return new Response(200, "OK", Map.of(), body, request.url());
-            }
-        });
+        return extractor(new FixtureDownloader(formats, manifest));
+    }
+
+    private static StreamExtractor extractor(final FixtureDownloader downloader) throws Exception {
+        NewPipe.init(downloader);
         final StreamExtractor extractor = Rumble.getStreamExtractor("https://rumble.com/embed/vtest/");
         extractor.fetchPage();
         return extractor;
+    }
+
+    private static final class FixtureDownloader extends Downloader {
+        private final String formats;
+        private final String manifest;
+        private final List<String> requests = new ArrayList<>();
+        private boolean returnNullBody;
+        private RuntimeException failure;
+
+        private FixtureDownloader(final String formats, final String manifest) {
+            this.formats = formats;
+            this.manifest = manifest;
+        }
+
+        @Override
+        public Response execute(@Nonnull final Request request) throws IOException {
+            requests.add(request.url());
+            final String body;
+            if (request.url().startsWith("https://rumble.com/embedJS/")) {
+                body = "{\"ua\":" + formats + ",\"cc\":{}}";
+            } else if (MASTER_URL.equals(request.url())) {
+                if (failure != null) {
+                    throw failure;
+                }
+                if (manifest == null && !returnNullBody) {
+                    throw new IOException("Missing fixture manifest");
+                }
+                body = manifest;
+            } else {
+                throw new IOException("No fixture for " + request.url());
+            }
+            return new Response(200, "OK", Map.of(), body, request.url());
+        }
     }
 }
