@@ -171,8 +171,10 @@ public class DataReader {
                         return -1;
                     }
                     final int res = DataReader.this.read();
-                    if (res > 0) {
+                    if (res >= 0) {
                         viewSize--;
+                    } else {
+                        viewSize = 0;
                     }
                     return res;
                 }
@@ -185,19 +187,30 @@ public class DataReader {
                 @Override
                 public int read(final byte[] buffer, final int offset, final int count)
                         throws IOException {
+                    final int bufferLength = buffer.length;
+                    if (offset < 0 || count < 0 || offset > bufferLength - count) {
+                        throw new IndexOutOfBoundsException();
+                    }
+                    if (count == 0) {
+                        return 0;
+                    }
                     if (viewSize < 1) {
                         return -1;
                     }
 
                     final int res = DataReader.this.read(buffer, offset, Math.min(viewSize, count));
-                    viewSize -= res;
-
-                    return res;
+                    if (res > 0) {
+                        viewSize -= res;
+                        return res;
+                    }
+                    // DataReader's bulk read returns zero when it first reaches physical EOF.
+                    viewSize = 0;
+                    return -1;
                 }
 
                 @Override
                 public long skip(final long amount) throws IOException {
-                    if (viewSize < 1) {
+                    if (amount <= 0 || viewSize < 1) {
                         return 0;
                     }
                     final int res = (int) DataReader.this.skipBytes(Math.min(amount, viewSize));
@@ -253,7 +266,7 @@ public class DataReader {
         if (readCount < 0) {
             return true;
         }
-        if (readOffset >= readBuffer.length) {
+        if (readCount == 0) {
             readCount = stream.read(readBuffer);
             if (readCount < 1) {
                 readCount = -1;
