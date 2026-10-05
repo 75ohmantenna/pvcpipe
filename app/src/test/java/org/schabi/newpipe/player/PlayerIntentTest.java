@@ -238,6 +238,23 @@ public class PlayerIntentTest {
     }
 
     @Test
+    public void timestampPreparesAnIdlePlayerBeforeSeeking() throws Exception {
+        type(PlayerIntentType.TimestampChange);
+        final SingleSubject<StreamInfo> pending = timestamp("target", 30);
+        setField("playQueue", queue("target"));
+        when(exoPlayer.getPlaybackState()).thenReturn(
+                com.google.android.exoplayer2.Player.STATE_IDLE);
+        player.handleIntent(intent);
+
+        pending.onSuccess(info("target"));
+
+        final InOrder order = inOrder(exoPlayer);
+        order.verify(exoPlayer).prepare();
+        order.verify(exoPlayer).seekTo(0, 30_000);
+        order.verify(exoPlayer).setPlayWhenReady(true);
+    }
+
+    @Test
     public void disposedTimestampSubscriptionCannotSeek() throws Exception {
         type(PlayerIntentType.TimestampChange);
         final SingleSubject<StreamInfo> pending = timestamp("target", 30);
