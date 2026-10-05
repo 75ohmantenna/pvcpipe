@@ -280,22 +280,24 @@ public final class Localization {
             throw new IllegalArgumentException("duration can not be negative");
         }
 
-        final int days = (int) (durationInSecs / (24 * 60 * 60L));
-        final int hours = (int) (durationInSecs % (24 * 60 * 60L) / (60 * 60L));
-        final int minutes = (int) (durationInSecs % (24 * 60 * 60L) % (60 * 60L) / 60L);
-        final int seconds = (int) (durationInSecs % (24 * 60 * 60L) % (60 * 60L) % 60L);
-
         final Resources resources = context.getResources();
 
+        final int days = durationInSecs / (24 * 60 * 60);
         if (days > 0) {
             return resources.getQuantityString(R.plurals.days, days, days);
-        } else if (hours > 0) {
-            return resources.getQuantityString(R.plurals.hours, hours, hours);
-        } else if (minutes > 0) {
-            return resources.getQuantityString(R.plurals.minutes, minutes, minutes);
-        } else {
-            return resources.getQuantityString(R.plurals.seconds, seconds, seconds);
         }
+
+        final int hours = durationInSecs / (60 * 60);
+        if (hours > 0) {
+            return resources.getQuantityString(R.plurals.hours, hours, hours);
+        }
+
+        final int minutes = durationInSecs / 60;
+        if (minutes > 0) {
+            return resources.getQuantityString(R.plurals.minutes, minutes, minutes);
+        }
+
+        return resources.getQuantityString(R.plurals.seconds, durationInSecs, durationInSecs);
     }
 
     /**
