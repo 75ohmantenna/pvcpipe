@@ -14,8 +14,11 @@ import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.extractor.utils.ExtractorLogger;
+import org.schabi.newpipe.extractor.utils.Logger;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,7 @@ import javax.annotation.Nonnull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.schabi.newpipe.extractor.ServiceList.Rumble;
 import static org.schabi.newpipe.extractor.stream.Stream.ID_UNKNOWN;
@@ -154,6 +158,35 @@ class RumbleStreamConstructionTest {
         assertEquals("auto", streams.get(0).getResolution());
     }
 
+    @Test
+    void successfulCollectionIsQuietButUnexpectedNullPointersAreDiagnosable() throws Exception {
+        final Field loggerField = ExtractorLogger.class.getDeclaredField("logger");
+        loggerField.setAccessible(true);
+        final Logger previousLogger = (Logger) loggerField.get(null);
+        final RecordingLogger logger = new RecordingLogger();
+        try {
+            ExtractorLogger.setLogger(logger);
+            extractor(hlsFormats(), "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nvariant.m3u8\n");
+            extractor(hlsFormats(), null);
+            assertTrue(logger.warnings.isEmpty());
+
+            final FixtureDownloader downloader = new FixtureDownloader(hlsFormats(), null);
+            downloader.failure = new NullPointerException("Unexpected downloader failure");
+            final List<VideoStream> streams = extractor(downloader).getVideoStreams();
+            assertEquals(MASTER_URL, streams.get(0).getContent());
+            assertEquals(1, logger.warnings.size());
+            assertSame(downloader.failure, logger.warnings.get(0));
+
+            logger.failOnLog = true;
+            final List<VideoStream> fallback = extractor(downloader).getVideoStreams();
+            assertEquals(MASTER_URL, fallback.get(0).getContent());
+            final List<VideoStream> missingManifest = extractor(hlsFormats(), null).getVideoStreams();
+            assertEquals(MASTER_URL, missingManifest.get(0).getContent());
+        } finally {
+            ExtractorLogger.setLogger(previousLogger);
+        }
+    }
+
     private static String hlsFormats() {
         return "{\"hls\":[{\"url\":\"" + MASTER_URL + "\"}]}";
     }
@@ -186,6 +219,38 @@ class RumbleStreamConstructionTest {
         final StreamExtractor extractor = Rumble.getStreamExtractor("https://rumble.com/embed/vtest/");
         extractor.fetchPage();
         return extractor;
+    }
+
+    private static final class RecordingLogger implements Logger {
+        private final List<Throwable> warnings = new ArrayList<>();
+        private boolean failOnLog;
+
+        @Override
+        public void debug(final String tag, final String message) { }
+
+        @Override
+        public void debug(final String tag, final String message, final Throwable throwable) {
+            if (failOnLog) {
+                throw new IllegalStateException("Logger fixture failure");
+            }
+        }
+
+        @Override
+        public void warn(final String tag, final String message) { }
+
+        @Override
+        public void warn(final String tag, final String message, final Throwable throwable) {
+            warnings.add(throwable);
+            if (failOnLog) {
+                throw new IllegalStateException("Logger fixture failure");
+            }
+        }
+
+        @Override
+        public void error(final String tag, final String message) { }
+
+        @Override
+        public void error(final String tag, final String message, final Throwable throwable) { }
     }
 
     private static final class FixtureDownloader extends Downloader {

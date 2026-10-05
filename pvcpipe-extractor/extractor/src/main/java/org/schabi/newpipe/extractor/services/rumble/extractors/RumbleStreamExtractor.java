@@ -442,12 +442,21 @@ public final class RumbleStreamExtractor extends StreamExtractor {
             parser.parse(new URI(hlsMasterPlaylist));
         } catch (final HlsVariantsCollectedException ignored) {
             // All variants have been collected successfully.
-        } catch (final IOException | URISyntaxException e) {
+        } catch (final IOException | URISyntaxException | RuntimeException e) {
             // HLS is optional: retain progressive streams or the master-playlist fallback.
-            ExtractorLogger.d(TAG, "Could not load HLS variants", e);
-        } catch (final RuntimeException e) {
-            // Retain the optional-manifest behavior, but make unexpected failures diagnosable.
-            ExtractorLogger.w(TAG, "Unexpected failure while extracting HLS variants", e);
+            logOptionalHlsFailure(e);
+        }
+    }
+
+    private static void logOptionalHlsFailure(final Exception failure) {
+        try {
+            if (failure instanceof RuntimeException) {
+                ExtractorLogger.w(TAG, "Unexpected failure while extracting HLS variants", failure);
+            } else {
+                ExtractorLogger.d(TAG, "Could not load HLS variants", failure);
+            }
+        } catch (final RuntimeException ignored) {
+            // A custom logger must not prevent playback through the optional HLS fallback.
         }
     }
 
