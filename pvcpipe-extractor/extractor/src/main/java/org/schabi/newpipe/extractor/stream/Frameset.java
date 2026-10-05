@@ -110,21 +110,23 @@ public final class Frameset implements Serializable {
      * </ul>
      */
     public int[] getFrameBoundsAt(final long position) {
-        if (position < 0 || position > ((long) (totalCount + 1) * durationPerFrame)) {
+        if (totalCount <= 0 || durationPerFrame <= 0
+                || framesPerPageX <= 0 || framesPerPageY <= 0
+                || position < 0 || position > ((totalCount + 1L) * durationPerFrame)) {
             // Return the first frame as fallback
             return new int[] {0, 0, 0, frameWidth, frameHeight};
         }
 
-        final int framesPerStoryboard = framesPerPageX * framesPerPageY;
-        final int absoluteFrameNumber = Math.min((int) (position / durationPerFrame), totalCount);
+        final long framesPerStoryboard = (long) framesPerPageX * framesPerPageY;
+        final long absoluteFrameNumber = Math.min(position / durationPerFrame, totalCount - 1L);
 
-        final int relativeFrameNumber = absoluteFrameNumber % framesPerStoryboard;
+        final long relativeFrameNumber = absoluteFrameNumber % framesPerStoryboard;
 
-        final int rowIndex = Math.floorDiv(relativeFrameNumber, framesPerPageX);
-        final int columnIndex = relativeFrameNumber % framesPerPageY;
+        final int rowIndex = (int) (relativeFrameNumber / framesPerPageX);
+        final int columnIndex = (int) (relativeFrameNumber % framesPerPageX);
 
         return new int[] {
-                /* storyboardIndex */ Math.floorDiv(absoluteFrameNumber, framesPerStoryboard),
+                /* storyboardIndex */ (int) (absoluteFrameNumber / framesPerStoryboard),
                 /* left */ columnIndex * frameWidth,
                 /* top */ rowIndex * frameHeight,
                 /* right */ columnIndex * frameWidth + frameWidth,
