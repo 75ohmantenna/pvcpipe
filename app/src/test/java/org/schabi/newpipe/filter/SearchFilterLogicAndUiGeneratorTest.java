@@ -319,6 +319,9 @@ public class SearchFilterLogicAndUiGeneratorTest {
             assertEquals(List.of(PeertubeFilters.ID_SF_SORT_BY_NAME,
                     PeertubeFilters.ID_SF_KIND_VOD_VIDEOS),
                     selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_VOD_VIDEOS,
+                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
 
             selectionLogic.reset();
             selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
@@ -357,6 +360,10 @@ public class SearchFilterLogicAndUiGeneratorTest {
         final SearchFilterLogic legacyLogic = SearchFilterLogic.Factory.create(
                 SearchFilterLogic.Factory.Variant.SEARCH_FILTER_LOGIC_LEGACY,
                 service.getSearchQHFactory(), null);
+        legacyLogic.selectSortFilter(id);
+        assertTrue(legacyLogic.getSelectedSortFilters().contains(id));
+        legacyLogic.selectSortFilter(id);
+        assertFalse(legacyLogic.getSelectedSortFilters().contains(id));
         legacyLogic.addSortFilterUiWrapperToItemMap(id, wrapper);
 
         legacyLogic.selectSortFilter(id);

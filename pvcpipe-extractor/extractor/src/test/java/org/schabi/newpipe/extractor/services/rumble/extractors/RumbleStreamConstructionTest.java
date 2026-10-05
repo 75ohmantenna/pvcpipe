@@ -1,5 +1,7 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.MediaFormat;
@@ -7,6 +9,8 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.localization.ContentCountry;
+import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.stream.VideoStream;
@@ -27,6 +31,21 @@ import static org.schabi.newpipe.extractor.stream.Stream.ID_UNKNOWN;
 @Tag("offline")
 class RumbleStreamConstructionTest {
     private static final String MASTER_URL = "https://cdn.example/master.m3u8";
+    private Downloader previousDownloader;
+    private Localization previousLocalization;
+    private ContentCountry previousCountry;
+
+    @BeforeEach
+    void saveExtractorConfiguration() {
+        previousDownloader = NewPipe.getDownloader();
+        previousLocalization = NewPipe.getPreferredLocalization();
+        previousCountry = NewPipe.getPreferredContentCountry();
+    }
+
+    @AfterEach
+    void restoreExtractorConfiguration() {
+        NewPipe.init(previousDownloader, previousLocalization, previousCountry);
+    }
 
     @Test
     void preservesProgressiveFormatsAndMetadata() throws Exception {
