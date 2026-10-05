@@ -63,6 +63,11 @@ public class WebMWriterTest {
         assertEquals(length + 1, withLength.length);
         assertEquals(0x80 | length, withLength[0] & 0xff);
 
+        // EBML stores the length as one plus the leading zero bits in the first byte.
+        final int leadingZeroBits = Integer.numberOfLeadingZeros(variableLength[0] & 0xff)
+                - (Integer.SIZE - Byte.SIZE);
+        assertEquals(length, leadingZeroBits + 1);
+
         long decodedVariableLength = variableLength[0] & (0xff >>> length);
         long decodedWithLength = 0;
         for (int index = 1; index < variableLength.length; index++) {
