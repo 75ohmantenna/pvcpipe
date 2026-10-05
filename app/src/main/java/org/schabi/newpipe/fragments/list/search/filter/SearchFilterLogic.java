@@ -95,8 +95,7 @@ public class SearchFilterLogic {
         checkIfIdsAreValid(selectedFilters, exclusive);
 
         for (final int id : selectedFilters) {
-            exclusive.ifInExclusiveGroupRemovePreviouslySelectedId(id);
-            exclusive.addIdIfBelongsToExclusiveGroup(id);
+            exclusive.recordSelection(id);
         }
     }
 
@@ -464,22 +463,16 @@ public class SearchFilterLogic {
     protected void handleIdInNonExclusiveGroup(final int filterId,
                                                @Nullable final IUiItemWrapper uiItemWrapper,
                                                @NonNull final List<Integer> selectedFilter) {
-        if (uiItemWrapper != null) { // could be null if there is no UI
-            if (uiItemWrapper.isChecked()) {
-                if (!selectedFilter.contains(filterId)) {
-                    selectedFilter.add(filterId);
-                }
-            } else { // remove from list
-                if (selectedFilter.contains(filterId)) {
-                    selectedFilter.remove((Integer) filterId);
-                }
-            }
-        } else { // we have no UI
-            if (!selectedFilter.contains(filterId)) {
+        // UI-backed filters follow the checkbox; filters without a UI toggle their selection.
+        final boolean wasSelected = selectedFilter.contains(filterId);
+        final boolean shouldSelect = uiItemWrapper != null
+                ? uiItemWrapper.isChecked() : !wasSelected;
+        if (shouldSelect) {
+            if (!wasSelected) {
                 selectedFilter.add(filterId);
-            } else {
-                selectedFilter.remove((Integer) filterId);
             }
+        } else if (wasSelected) {
+            selectedFilter.remove((Integer) filterId);
         }
     }
 
@@ -713,20 +706,22 @@ public class SearchFilterLogic {
          */
         private boolean handleIdInExclusiveGroup(final int filterId,
                                                  @NonNull final List<Integer> selectedFilter) {
-            // case exclusive group selection
-            if (isFilterIdPartOfAnExclusiveGroup(filterId)) {
-                final int previousSelectedId =
-                        ifInExclusiveGroupRemovePreviouslySelectedId(filterId);
-                if (selectedFilter.contains(previousSelectedId)) {
-                    selectedFilter.remove((Integer) previousSelectedId);
-                    selectedFilter.add(filterId);
-                } else if (previousSelectedId == ITEM_IDENTIFIER_UNKNOWN) {
-                    selectedFilter.add(filterId);
-                }
-                addIdIfBelongsToExclusiveGroup(filterId);
-                return true;
+            if (!isFilterIdPartOfAnExclusiveGroup(filterId)) {
+                return false;
             }
-            return false;
+
+            final int groupId = Objects.requireNonNull(filterIdToGroupIdMap.get(filterId));
+            final int previousSelectedId = actualSelectedFilterIdInExclusiveGroupMap.get(
+                    groupId, ITEM_IDENTIFIER_UNKNOWN);
+            actualSelectedFilterIdInExclusiveGroupMap.remove(groupId);
+            if (selectedFilter.contains(previousSelectedId)) {
+                selectedFilter.remove((Integer) previousSelectedId);
+                selectedFilter.add(filterId);
+            } else if (previousSelectedId == ITEM_IDENTIFIER_UNKNOWN) {
+                selectedFilter.add(filterId);
+            }
+            actualSelectedFilterIdInExclusiveGroupMap.put(groupId, filterId);
+            return true;
         }
 
         /**
@@ -752,7 +747,7 @@ public class SearchFilterLogic {
             exclusiveGroupsIdSet.add(groupId);
         }
 
-        private void addIdIfBelongsToExclusiveGroup(final int filterId) {
+        private void recordSelection(final int filterId) {
             final int filterGroupId =
                     Objects.requireNonNull(filterIdToGroupIdMap.get(filterId));
             if (exclusiveGroupsIdSet.contains(filterGroupId)) {
@@ -760,28 +755,6 @@ public class SearchFilterLogic {
             }
         }
 
-        /**
-         * check if the filter group id for a given filter id is already in a exclusive group.
-         * <p>
-         * If so remove the group filter id.
-         *
-         * @param filterId the id of a filter that might belong to an exclusive filter group
-         * @return id of removed filter id from {@link #actualSelectedFilterIdInExclusiveGroupMap}
-         * otherwise {@link FilterContainer#ITEM_IDENTIFIER_UNKNOWN}
-         */
-
-        private int ifInExclusiveGroupRemovePreviouslySelectedId(final int filterId) {
-            int previousFilterId = ITEM_IDENTIFIER_UNKNOWN;
-            final int filterGroupId =
-                    Objects.requireNonNull(filterIdToGroupIdMap.get(filterId));
-
-            final int index = actualSelectedFilterIdInExclusiveGroupMap.indexOfKey(filterGroupId);
-            if (exclusiveGroupsIdSet.contains(filterGroupId) && index >= 0) {
-                previousFilterId = actualSelectedFilterIdInExclusiveGroupMap.valueAt(index);
-                actualSelectedFilterIdInExclusiveGroupMap.removeAt(index);
-            }
-            return previousFilterId;
-        }
     }
 
     public static final class Factory {
