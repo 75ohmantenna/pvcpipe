@@ -297,6 +297,83 @@ public class SearchFilterLogicAndUiGeneratorTest {
         selectMultipleSortFilterInNonExclusiveGroupHelper(true);
     }
 
+    @Test
+    public void restoredExclusiveSelectionsKeepOtherGroupsAndSelectionOrder() {
+        for (final SearchFilterLogic.Factory.Variant variant
+                : SearchFilterLogic.Factory.Variant.values()) {
+            final SearchFilterLogic selectionLogic = SearchFilterLogic.Factory.create(
+                    variant, org.schabi.newpipe.extractor.ServiceList.PeerTube.getSearchQHFactory(),
+                    null);
+            selectionLogic.restorePreviouslySelectedFilters(
+                    new ArrayList<>(List.of(PeertubeFilters.ID_CF_MAIN_PLAYLISTS)),
+                    new ArrayList<>(List.of(PeertubeFilters.ID_SF_SORT_BY_DURATION,
+                            PeertubeFilters.ID_SF_KIND_LIVE)));
+
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_LIVE,
+                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_LIVE,
+                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_KIND_VOD_VIDEOS);
+            assertEquals(List.of(PeertubeFilters.ID_SF_SORT_BY_NAME,
+                    PeertubeFilters.ID_SF_KIND_VOD_VIDEOS),
+                    selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_VOD_VIDEOS,
+                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
+
+            selectionLogic.reset();
+            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            assertFalse(selectionLogic.getSelectedSortFilters()
+                    .contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+            assertTrue(selectionLogic.getSelectedSortFilters()
+                    .contains(PeertubeFilters.ID_SF_SORT_BY_NAME));
+        }
+    }
+
+    @Test
+    public void nonExclusiveUiSelectionIsIdempotent() throws ExtractionException {
+        setupEach(true, YOUTUBE_SERVICE_ID, null);
+        generator.createSearchUI();
+        final int id = YoutubeFilters.ID_SF_FEATURES_3D;
+
+        universalWrapper.get(id).setChecked(true);
+        logic.selectSortFilter(id);
+        logic.selectSortFilter(id);
+        assertEquals(1, logic.getSelectedSortFilters().stream()
+                .filter(selected -> selected == id).count());
+
+        universalWrapper.get(id).setChecked(false);
+        logic.selectSortFilter(id);
+        logic.selectSortFilter(id);
+        assertFalse(logic.getSelectedSortFilters().contains(id));
+    }
+
+    @Test
+    public void legacyNonExclusiveUiSelectionTogglesBeforeUpdatingTheList()
+            throws ExtractionException {
+        setupEach(true, YOUTUBE_SERVICE_ID, null);
+        generator.createSearchUI();
+        final int id = YoutubeFilters.ID_SF_FEATURES_3D;
+        final ElementsWrapper wrapper = universalWrapper.get(id);
+        final SearchFilterLogic legacyLogic = SearchFilterLogic.Factory.create(
+                SearchFilterLogic.Factory.Variant.SEARCH_FILTER_LOGIC_LEGACY,
+                service.getSearchQHFactory(), null);
+        legacyLogic.selectSortFilter(id);
+        assertTrue(legacyLogic.getSelectedSortFilters().contains(id));
+        legacyLogic.selectSortFilter(id);
+        assertFalse(legacyLogic.getSelectedSortFilters().contains(id));
+        legacyLogic.addSortFilterUiWrapperToItemMap(id, wrapper);
+
+        legacyLogic.selectSortFilter(id);
+        assertTrue(wrapper.isChecked());
+        assertTrue(legacyLogic.getSelectedSortFilters().contains(id));
+        legacyLogic.selectSortFilter(id);
+        assertFalse(wrapper.isChecked());
+        assertFalse(legacyLogic.getSelectedSortFilters().contains(id));
+    }
+
     private void selectMultipleSortFilterInNonExclusiveGroupHelper(final boolean withUiWorker)
             throws ExtractionException {
         setupEach(withUiWorker, YOUTUBE_SERVICE_ID, null);

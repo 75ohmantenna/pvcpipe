@@ -393,7 +393,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         }
 
         if (videoStreamsList.isEmpty() && fallbackHlsUrl != null) {
-            videoStreamsList.add(hlsStream(fallbackHlsUrl, "auto", MediaFormat.MPEG_4));
+            videoStreamsList.add(createVideoStream("hls", fallbackHlsUrl, "auto"));
         }
 
         videoStreams = videoStreamsList;
@@ -488,7 +488,6 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     private AudioStream createAudioStream(
             final String videoUrl,
             final int bitrate) {
-        // media format should be aac but it's not mentioned in MediaFormat so default to 'null'
         final AudioStream.Builder builder = new AudioStream.Builder()
                 .setId(ID_UNKNOWN)
                 .setContent(videoUrl, true)
@@ -502,38 +501,18 @@ public final class RumbleStreamExtractor extends StreamExtractor {
             final String formatKey,
             final String videoUrl,
             final String resolution) {
+        final VideoStream.Builder builder = new VideoStream.Builder()
+                .setId(ID_UNKNOWN)
+                .setIsVideoOnly(false)
+                .setResolution(resolution)
+                .setContent(videoUrl, true);
         if ("hls".equals(formatKey)) {
-            return hlsStream(videoUrl, resolution, MediaFormat.MPEG_4);
+            builder.setManifestUrl(videoUrl)
+                    .setDeliveryMethod(DeliveryMethod.HLS)
+                    .setMediaFormat(MediaFormat.MPEG_4);
         } else {
-            final MediaFormat format = MediaFormat.getFromSuffix(formatKey);
-            return normalStream(videoUrl, resolution, format);
+            builder.setMediaFormat(MediaFormat.getFromSuffix(formatKey));
         }
-    }
-
-    private VideoStream normalStream(
-            final String videoUrl,
-            final String resolution,
-            final MediaFormat format) {
-        final VideoStream.Builder builder = new VideoStream.Builder()
-                .setId(ID_UNKNOWN)
-                .setIsVideoOnly(false)
-                .setResolution(resolution)
-                .setContent(videoUrl, true)
-                .setMediaFormat(format);
-        return builder.build();
-    }
-    private VideoStream hlsStream(
-            final String videoUrl,
-            final String resolution,
-            final MediaFormat format) {
-        final VideoStream.Builder builder = new VideoStream.Builder()
-                .setId(ID_UNKNOWN)
-                .setIsVideoOnly(false)
-                .setResolution(resolution)
-                .setContent(videoUrl, true)
-                .setManifestUrl(videoUrl)
-                .setDeliveryMethod(DeliveryMethod.HLS)
-                .setMediaFormat(format);
         return builder.build();
     }
 
