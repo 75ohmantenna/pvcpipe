@@ -46,7 +46,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.os.HandlerCompat;
 import androidx.recyclerview.widget.DiffUtil;
@@ -704,7 +703,7 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
                 return true;
             }
             final NotificationManager notificationManager
-                    = ContextCompat.getSystemService(mContext, NotificationManager.class);
+                    = mContext.getSystemService(NotificationManager.class);
             final NotificationCompat.Builder progressNotificationBuilder
                     = new NotificationCompat.Builder(mContext,
                     mContext.getString(R.string.hash_channel_id))

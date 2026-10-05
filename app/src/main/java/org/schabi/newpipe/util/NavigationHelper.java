@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
@@ -151,7 +150,7 @@ public final class NavigationHelper {
                 PlayerIntentType.AllOthers)
                 .putExtra(Player.PLAYER_TYPE, PlayerType.POPUP)
                 .putExtra(Player.RESUME_PLAYBACK, resumePlayback);
-        ContextCompat.startForegroundService(context, intent);
+        context.startForegroundService(intent);
     }
 
     public static void playOnBackgroundPlayer(final Context context,
@@ -164,7 +163,7 @@ public final class NavigationHelper {
                 PlayerIntentType.AllOthers)
                 .putExtra(Player.PLAYER_TYPE, PlayerType.AUDIO)
                 .putExtra(Player.RESUME_PLAYBACK, resumePlayback);
-        ContextCompat.startForegroundService(context, intent);
+        context.startForegroundService(intent);
     }
 
     /* ENQUEUE */
@@ -188,7 +187,7 @@ public final class NavigationHelper {
                 PlayerIntentType.Enqueue)
                 .putExtra(Player.RESUME_PLAYBACK, false)
                 .putExtra(Player.PLAYER_TYPE, playerType);
-        ContextCompat.startForegroundService(context, intent);
+        context.startForegroundService(intent);
     }
 
     public static void enqueueOnPlayer(final Context context, final PlayQueue queue) {
@@ -211,7 +210,7 @@ public final class NavigationHelper {
         Toast.makeText(context, R.string.enqueued_next, Toast.LENGTH_SHORT).show();
         final Intent intent = getPlayerEnqueueNextIntent(context, PlayerService.class, queue)
                 .putExtra(Player.PLAYER_TYPE, playerType);
-        ContextCompat.startForegroundService(context, intent);
+        context.startForegroundService(intent);
     }
 
     /*//////////////////////////////////////////////////////////////////////////

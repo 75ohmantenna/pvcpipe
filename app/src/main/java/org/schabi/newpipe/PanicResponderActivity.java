@@ -1,6 +1,5 @@
 package org.schabi.newpipe;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -26,7 +25,6 @@ import android.os.Bundle;
 public class PanicResponderActivity extends Activity {
     public static final String PANIC_TRIGGER_ACTION = "info.guardianproject.panic.action.TRIGGER";
 
-    @SuppressLint("NewApi")
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

@@ -18,7 +18,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import org.schabi.newpipe.BuildConfig;
@@ -284,7 +283,7 @@ public final class ShareUtils {
      */
     public static void copyToClipboard(@NonNull final Context context, final String text) {
         final ClipboardManager clipboardManager =
-                ContextCompat.getSystemService(context, ClipboardManager.class);
+                context.getSystemService(ClipboardManager.class);
 
         if (clipboardManager == null) {
             Toast.makeText(context, R.string.permission_denied, Toast.LENGTH_LONG).show();

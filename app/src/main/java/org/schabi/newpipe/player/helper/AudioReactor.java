@@ -10,7 +10,6 @@ import android.media.audiofx.AudioEffect;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
 import androidx.media.AudioFocusRequestCompat;
 import androidx.media.AudioManagerCompat;
 
@@ -39,7 +38,7 @@ public class AudioReactor extends PvcAudioReactor
         super(context, player);
         this.player = player;
         this.context = context;
-        this.audioManager = ContextCompat.getSystemService(context, AudioManager.class);
+        this.audioManager = context.getSystemService(AudioManager.class);
         player.addAnalyticsListener(this);
 
         request = new AudioFocusRequestCompat.Builder(FOCUS_GAIN_TYPE)

@@ -6,8 +6,6 @@ import android.net.wifi.WifiManager;
 import android.os.PowerManager;
 import android.util.Log;
 
-import androidx.core.content.ContextCompat;
-
 public class LockManager {
     private final String TAG = "LockManager@" + hashCode();
 
@@ -18,9 +16,8 @@ public class LockManager {
     private WifiManager.WifiLock wifiLock;
 
     public LockManager(final Context context) {
-        powerManager = ContextCompat.getSystemService(context.getApplicationContext(),
-                PowerManager.class);
-        wifiManager = ContextCompat.getSystemService(context, WifiManager.class);
+        powerManager = context.getApplicationContext().getSystemService(PowerManager.class);
+        wifiManager = context.getSystemService(WifiManager.class);
     }
 
     @SuppressLint("WakelockTimeout")

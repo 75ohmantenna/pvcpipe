@@ -17,7 +17,6 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.PendingIntentCompat;
 import androidx.core.app.ServiceCompat;
-import androidx.core.content.ContextCompat;
 
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
@@ -162,7 +161,7 @@ public final class NotificationUtil {
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setShowWhen(false)
                 .setSmallIcon(R.drawable.ic_newpipe_triangle_white)
-                .setColor(ContextCompat.getColor(context, R.color.dark_background_color))
+                .setColor(context.getColor(R.color.dark_background_color))
                 .setDeleteIntent(PendingIntentCompat.getBroadcast(context,
                         NOTIFICATION_ID, new Intent(ACTION_CLOSE), FLAG_UPDATE_CURRENT, false));
     }

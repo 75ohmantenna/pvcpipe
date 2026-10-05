@@ -2,7 +2,6 @@ package org.schabi.newpipe.util.text;
 
 import android.content.Context;
 import android.content.Intent;
-import androidx.core.content.ContextCompat;
 
 import androidx.annotation.NonNull;
 import org.schabi.newpipe.extractor.NewPipe;
@@ -96,7 +95,7 @@ public final class InternalUrlsHandler {
                         cleanUrl,
                         seconds
                 ));
-        ContextCompat.startForegroundService(context, intent);
+        context.startForegroundService(intent);
 
         return true;
     }

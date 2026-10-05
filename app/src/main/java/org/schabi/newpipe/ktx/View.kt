@@ -12,7 +12,6 @@ import android.view.View
 import androidx.annotation.ColorInt
 import androidx.annotation.FloatRange
 import androidx.core.animation.addListener
-import androidx.core.view.ViewCompat
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
@@ -105,7 +104,7 @@ fun View.animateBackgroundColor(duration: Long, @ColorInt colorStart: Int, @Colo
     viewPropertyAnimator.duration = duration
 
     fun listenerAction(color: Int) {
-        ViewCompat.setBackgroundTintList(this, ColorStateList.valueOf(color))
+        backgroundTintList = ColorStateList.valueOf(color)
     }
     viewPropertyAnimator.addUpdateListener { listenerAction(it.animatedValue as Int) }
     viewPropertyAnimator.addListener(onCancel = { listenerAction(colorEnd) }, onEnd = { listenerAction(colorEnd) })

@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 
-import androidx.core.content.ContextCompat;
-
 /**
  * Utility class for the Android keyboard.
  * <p>
@@ -22,8 +20,7 @@ public final class KeyboardUtil {
         }
 
         if (editText.requestFocus()) {
-            final InputMethodManager imm = ContextCompat.getSystemService(activity,
-                    InputMethodManager.class);
+            final InputMethodManager imm = activity.getSystemService(InputMethodManager.class);
             if (!imm.showSoftInput(editText, InputMethodManager.SHOW_FORCED)) {
                 /*
                  * Sometimes the keyboard can't be shown because Android's ImeFocusController is in
@@ -45,8 +42,7 @@ public final class KeyboardUtil {
             return;
         }
 
-        final InputMethodManager imm = ContextCompat.getSystemService(activity,
-                InputMethodManager.class);
+        final InputMethodManager imm = activity.getSystemService(InputMethodManager.class);
         imm.hideSoftInputFromWindow(editText.getWindowToken(),
                 InputMethodManager.HIDE_NOT_ALWAYS);
 

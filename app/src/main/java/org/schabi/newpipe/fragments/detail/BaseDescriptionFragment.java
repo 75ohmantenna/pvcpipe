@@ -6,6 +6,7 @@ import static org.schabi.newpipe.util.text.TextLinkifier.SET_LINK_MOVEMENT_METHO
 
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
@@ -19,8 +20,6 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
-import androidx.appcompat.widget.TooltipCompat;
-import androidx.core.text.HtmlCompat;
 
 import com.google.android.material.chip.Chip;
 
@@ -131,7 +130,7 @@ public abstract class BaseDescriptionFragment extends BaseFragment {
 
         final String buttonLabel = getString(R.string.description_select_disable);
         binding.detailSelectDescriptionButton.setContentDescription(buttonLabel);
-        TooltipCompat.setTooltipText(binding.detailSelectDescriptionButton, buttonLabel);
+        binding.detailSelectDescriptionButton.setTooltipText(buttonLabel);
         binding.detailSelectDescriptionButton.setImageResource(R.drawable.ic_close);
     }
 
@@ -140,7 +139,7 @@ public abstract class BaseDescriptionFragment extends BaseFragment {
         final Description description = getDescription();
         if (description != null) {
             TextLinkifier.fromDescription(binding.detailDescriptionView,
-                    description, HtmlCompat.FROM_HTML_MODE_LEGACY,
+                    description, Html.FROM_HTML_MODE_LEGACY,
                     getService(), getStreamUrl(),
                     descriptionDisposables, SET_LINK_MOVEMENT_METHOD);
         }
@@ -150,7 +149,7 @@ public abstract class BaseDescriptionFragment extends BaseFragment {
 
         final String buttonLabel = getString(R.string.description_select_enable);
         binding.detailSelectDescriptionButton.setContentDescription(buttonLabel);
-        TooltipCompat.setTooltipText(binding.detailSelectDescriptionButton, buttonLabel);
+        binding.detailSelectDescriptionButton.setTooltipText(buttonLabel);
         binding.detailSelectDescriptionButton.setImageResource(R.drawable.ic_select_all);
     }
 

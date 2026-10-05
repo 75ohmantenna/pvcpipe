@@ -34,10 +34,8 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationCompat.Builder;
 import androidx.core.app.PendingIntentCompat;
 import androidx.core.app.ServiceCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.IntentCompat;
 import androidx.preference.PreferenceManager;
-
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.download.DownloadActivity;
@@ -163,10 +161,8 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         mNotification = builder.build();
 
-        mNotificationManager = ContextCompat.getSystemService(this,
-                NotificationManager.class);
-        mConnectivityManager = ContextCompat.getSystemService(this,
-                ConnectivityManager.class);
+        mNotificationManager = this.getSystemService(NotificationManager.class);
+        mConnectivityManager = this.getSystemService(ConnectivityManager.class);
 
         mNetworkStateListenerL = new ConnectivityManager.NetworkCallback() {
             @Override

@@ -23,6 +23,7 @@ import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 import static org.schabi.newpipe.util.text.TextLinkifier.SET_LINK_MOVEMENT_METHOD;
 
 import android.content.Context;
+import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -31,7 +32,6 @@ import org.schabi.newpipe.extractor.search.filter.FilterItem;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.text.HtmlCompat;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.MainActivity;
@@ -340,7 +340,7 @@ public final class ExtractorHelper {
 
             metaInfoSeparator.setVisibility(View.VISIBLE);
             TextLinkifier.fromHtml(metaInfoTextView, stringBuilder.toString(),
-                    HtmlCompat.FROM_HTML_SEPARATOR_LINE_BREAK_HEADING, null, null, disposables,
+                    Html.FROM_HTML_SEPARATOR_LINE_BREAK_HEADING, null, null, disposables,
                     SET_LINK_MOVEMENT_METHOD);
         }
     }
