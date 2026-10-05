@@ -3,9 +3,11 @@ package org.schabi.newpipe.extractor.services.peertube;
 import com.grack.nanojson.JsonParserException;
 
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.schabi.newpipe.extractor.ListExtractor;
+import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.downloader.Downloader;
@@ -144,6 +146,51 @@ class PeertubePageResponseTest {
         };
         assertSame(failure, assertThrows(IOException.class,
                 () -> extractor(mode, downloader).getPage(new Page(URL))));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Mode.class)
+    void leavesChallengeFailuresUnwrapped(final Mode mode) {
+        final ReCaptchaException failure = new ReCaptchaException("Challenge", URL);
+        final Downloader downloader = new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws ReCaptchaException {
+                throw failure;
+            }
+        };
+        assertSame(failure, assertThrows(ReCaptchaException.class,
+                () -> extractor(mode, downloader).getPage(new Page(URL))));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Mode.class)
+    void keepsCollectionErrorsSeparateFromResponseParsing(final Mode mode) {
+        final ParsingException error = assertThrows(ParsingException.class,
+                () -> extractor(mode, new FixedDownloader(response("{\"total\":1}")))
+                        .getPage(new Page(URL)));
+        assertEquals("Unable to extract list info", error.getMessage());
+        assertInstanceOf(ParsingException.class, error.getCause());
+    }
+
+    @Test
+    void preservesMixedSearchItemTypesAndOrder() throws Exception {
+        final String channel = "{\"followersCount\":5,\"displayName\":\"Channel\","
+                + "\"url\":\"https://pt.example/video-channels/alice\"}";
+        final String playlist = "{\"videosLength\":2,\"displayName\":\"Playlist\","
+                + "\"url\":\"https://pt.example/videos/watch/playlist/" + UUID + "\","
+                + "\"uploader\":{\"displayName\":\"Alice\",\"url\":\"https://pt.example/accounts/alice\"}}";
+        final ListExtractor.InfoItemsPage<?> page = extractor(Mode.SEARCH,
+                new FixedDownloader(response("{\"total\":3,\"data\":["
+                        + VIDEO + "," + channel + "," + playlist + "]}")))
+                .getPage(new Page(URL));
+
+        assertTrue(page.getErrors().isEmpty(), page.getErrors().toString());
+        assertEquals(List.of(InfoItem.InfoType.STREAM, InfoItem.InfoType.CHANNEL,
+                InfoItem.InfoType.PLAYLIST), page.getItems().stream()
+                .map(InfoItem::getInfoType).collect(java.util.stream.Collectors.toList()));
+        assertEquals(List.of("Video", "Channel", "Playlist"), page.getItems().stream()
+                .map(InfoItem::getName).collect(java.util.stream.Collectors.toList()));
+        assertNull(page.getNextPage());
     }
 
     private static ListExtractor<?> extractor(final Mode mode, final Downloader downloader) {

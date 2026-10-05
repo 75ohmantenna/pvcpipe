@@ -5,9 +5,14 @@ import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.Page;
+import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.stream.StreamInfoItemExtractor;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("offline")
 class RumblePaginationTest {
@@ -38,5 +43,28 @@ class RumblePaginationTest {
             final Page page = helper.getNewPageIfThereAreMoreThanOnePageResults(1, doc);
             assertEquals(url, page.getUrl());
         }
+    }
+
+    @Test
+    void keepsPaginationWhenCollectorsFilterEveryItem() throws Exception {
+        final RumbleItemsExtractorImpl itemsExtractor = new RumbleSearchTrendingItemsExtractorImpl() {
+            @Override
+            public List<StreamInfoItemExtractor> extractStreamItems(final Document doc) {
+                return List.of(new RumbleSearchVideoStreamInfoItemExtractor(
+                        "Filtered", "https://rumble.com/v123-filtered.html", List.of(),
+                        null, null, null, null, null, null, false, true));
+            }
+        };
+        final RumbleCommonCodeTrendingAndChannel shared = new RumbleCommonCodeTrendingAndChannel(
+                ServiceList.Rumble.getServiceId(), itemsExtractor);
+        final Document doc = Jsoup.parse("<link rel='next' href='?page=2'>");
+
+        final var streamPage = shared.extractAndGetStreamInfoItemsFromPage(doc);
+        assertTrue(streamPage.getItems().isEmpty());
+        assertEquals("?page=2", streamPage.getNextPage().getUrl());
+
+        final var mixedPage = shared.extractAndGetInfoItemsFromPage(doc);
+        assertTrue(mixedPage.getItems().isEmpty());
+        assertEquals("?page=2", mixedPage.getNextPage().getUrl());
     }
 }
