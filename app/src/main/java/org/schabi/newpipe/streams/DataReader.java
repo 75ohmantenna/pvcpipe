@@ -229,10 +229,10 @@ public class DataReader {
     }
 
     private final short[] primitive = new short[LONG_SIZE];
+    private final byte[] primitiveBuffer = new byte[LONG_SIZE];
 
     private void primitiveRead(final int amount) throws IOException {
-        final byte[] buffer = new byte[amount];
-        final int read = read(buffer, 0, amount);
+        final int read = read(primitiveBuffer, 0, amount);
 
         if (read != amount) {
             throw new EOFException("Truncated stream, missing "
@@ -241,7 +241,7 @@ public class DataReader {
 
         for (int i = 0; i < amount; i++) {
             // the "byte" data type in java is signed and is very annoying
-            primitive[i] = (short) (buffer[i] & 0xFF);
+            primitive[i] = (short) (primitiveBuffer[i] & 0xFF);
         }
     }
 
