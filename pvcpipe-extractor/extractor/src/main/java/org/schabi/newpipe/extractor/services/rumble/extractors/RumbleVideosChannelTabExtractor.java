@@ -9,7 +9,6 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabExtractor;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 
 import java.io.IOException;
@@ -26,12 +25,8 @@ public class RumbleVideosChannelTabExtractor extends ChannelTabExtractor {
             @Nonnull final ListLinkHandler linkHandler) {
         super(service, linkHandler);
 
-        try {
-            sharedTrendingAndChannelCode =
-                    new RumbleCommonCodeTrendingAndChannel(getServiceId(), getUrl(), null);
-        } catch (final ParsingException e) {
-            e.printStackTrace();
-        }
+        sharedTrendingAndChannelCode =
+                new RumbleCommonCodeTrendingAndChannel(getServiceId(), null);
     }
 
     @Override

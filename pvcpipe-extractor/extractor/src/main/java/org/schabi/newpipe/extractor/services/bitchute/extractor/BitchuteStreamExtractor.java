@@ -178,7 +178,7 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     public StreamInfoItemsCollector getRelatedItems() throws ExtractionException {
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final Videos video : streamVideosSuggested.getVideos()) {
-            collector.commit(new BitchuteStreamRelatedInfoItemExtractor(video));
+            collector.commit(new BitchuteVideoInfoItemExtractor(video));
         }
         return collector;
     }

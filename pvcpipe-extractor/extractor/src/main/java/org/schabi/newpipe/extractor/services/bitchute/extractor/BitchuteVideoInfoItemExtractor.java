@@ -16,10 +16,12 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public class BitchuteTrendingStreamInfoItemExtractor implements StreamInfoItemExtractor {
+public class BitchuteVideoInfoItemExtractor implements StreamInfoItemExtractor {
+
     private final Videos video;
 
-    public BitchuteTrendingStreamInfoItemExtractor(final Videos video) {
+    public BitchuteVideoInfoItemExtractor(
+            final Videos video) {
         this.video = video;
     }
 
@@ -44,12 +46,12 @@ public class BitchuteTrendingStreamInfoItemExtractor implements StreamInfoItemEx
     }
 
     @Override
-    public String getUploaderName() throws ParsingException {
+    public String getUploaderName() {
         return video.getChannel().getChannelName();
     }
 
     @Override
-    public String getUploaderUrl() throws ParsingException {
+    public String getUploaderUrl() {
         return BitchuteConstants.BASE_URL + video.getChannel().getChannelUrl();
     }
 
@@ -83,10 +85,7 @@ public class BitchuteTrendingStreamInfoItemExtractor implements StreamInfoItemEx
     @Nonnull
     @Override
     public List<Image> getThumbnails() throws ParsingException {
-        return List.of(
-                new Image(video.getThumbnailUrl(),
-                        Image.HEIGHT_UNKNOWN,
-                        Image.WIDTH_UNKNOWN,
-                        Image.ResolutionLevel.UNKNOWN));
+        return List.of(new Image(video.getThumbnailUrl(),
+                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
 }

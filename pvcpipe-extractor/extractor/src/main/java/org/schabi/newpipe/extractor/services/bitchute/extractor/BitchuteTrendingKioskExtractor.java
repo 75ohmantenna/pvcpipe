@@ -66,7 +66,7 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
 
         for (final Videos videos : results.getVideos()) {
-            collector.commit(new BitchuteTrendingStreamInfoItemExtractor(videos));
+            collector.commit(new BitchuteVideoInfoItemExtractor(videos));
         }
 
         if (results.getVideos().isEmpty() || pageLimit != UNLIMITED_PAGES) {

@@ -1,7 +1,6 @@
 package org.schabi.newpipe.extractor.services.peertube.extractors;
 
 import com.grack.nanojson.JsonObject;
-import com.grack.nanojson.JsonParser;
 
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
@@ -14,7 +13,6 @@ import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.services.peertube.PeertubeParsingHelper;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItemsCollector;
-import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
 
@@ -55,27 +53,14 @@ public class PeertubeTrendingExtractor extends KioskExtractor<StreamInfoItem> {
 
         final Response response = getDownloader().get(page.getUrl());
 
-        JsonObject json = null;
-        if (response != null && !Utils.isBlank(response.responseBody())) {
-            try {
-                json = JsonParser.object().from(response.responseBody());
-            } catch (final Exception e) {
-                throw new ParsingException("Could not parse json data for kiosk info", e);
-            }
-        }
+        final JsonObject json = PeertubeParsingHelper.parseAndValidateResponse(response, "kiosk");
+        final long total = json.getLong("total");
 
-        if (json != null) {
-            PeertubeParsingHelper.validate(json);
-            final long total = json.getLong("total");
+        final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
+        collectItemsFrom(collector, json, getBaseUrl());
 
-            final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-            collectItemsFrom(collector, json, getBaseUrl());
-
-            return new InfoItemsPage<>(collector,
-                    PeertubeParsingHelper.getNextPage(page.getUrl(), total));
-        } else {
-            throw new ExtractionException("Unable to get PeerTube kiosk info");
-        }
+        return new InfoItemsPage<>(collector,
+                PeertubeParsingHelper.getNextPage(page.getUrl(), total));
     }
 
     @Override

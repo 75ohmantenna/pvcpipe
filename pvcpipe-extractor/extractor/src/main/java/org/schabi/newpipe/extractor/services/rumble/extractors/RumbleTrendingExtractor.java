@@ -28,20 +28,16 @@ public class RumbleTrendingExtractor extends KioskExtractor<StreamInfoItem> {
                                    final String kioskId) {
         super(service, linkHandler, kioskId);
 
-        try {
-            final RumbleItemsExtractorImpl itemsExtractor;
-            if (RumbleTrendingLinkHandlerFactory.LIVE.equals(kioskId)) {
-                itemsExtractor = new RumbleBrowseLiveItemExtractorImpl();
-            } else if (RumbleTrendingLinkHandlerFactory.EDITOR_PICKS.equals(kioskId)) {
-                itemsExtractor = new RumbleEditorPicksItemsExtractorImpl();
-            } else {
-                itemsExtractor = new RumbleSearchTrendingItemsExtractorImpl();
-            }
-            sharedTrendingAndChannelCode = new RumbleCommonCodeTrendingAndChannel(
-                    getServiceId(), getUrl(), itemsExtractor);
-        } catch (final ParsingException e) {
-            e.printStackTrace();
+        final RumbleItemsExtractorImpl itemsExtractor;
+        if (RumbleTrendingLinkHandlerFactory.LIVE.equals(kioskId)) {
+            itemsExtractor = new RumbleBrowseLiveItemExtractorImpl();
+        } else if (RumbleTrendingLinkHandlerFactory.EDITOR_PICKS.equals(kioskId)) {
+            itemsExtractor = new RumbleEditorPicksItemsExtractorImpl();
+        } else {
+            itemsExtractor = new RumbleSearchTrendingItemsExtractorImpl();
         }
+        sharedTrendingAndChannelCode = new RumbleCommonCodeTrendingAndChannel(
+                getServiceId(), itemsExtractor);
     }
 
     @Override

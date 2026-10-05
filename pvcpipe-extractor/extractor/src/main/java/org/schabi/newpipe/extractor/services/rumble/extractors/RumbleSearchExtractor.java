@@ -101,7 +101,7 @@ public class RumbleSearchExtractor extends SearchExtractor {
 
         final Page nextPage =
                 rumbleCommonCodeTrendingAndSearching.getNewPageIfThereAreMoreThanOnePageResults(
-                        infoItemsListSize, doc, getUrl() + "&page=");
+                        infoItemsListSize, doc);
 
         return new InfoItemsPage<>(collector, nextPage);
     }

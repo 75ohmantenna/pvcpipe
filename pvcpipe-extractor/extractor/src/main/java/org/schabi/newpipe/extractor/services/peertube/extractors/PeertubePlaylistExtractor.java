@@ -16,7 +16,6 @@ import org.schabi.newpipe.extractor.services.peertube.PeertubeParsingHelper;
 import org.schabi.newpipe.extractor.stream.Description;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItemsCollector;
-import org.schabi.newpipe.extractor.utils.Utils;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -116,27 +115,15 @@ public class PeertubePlaylistExtractor extends PlaylistExtractor {
 
         final Response response = getDownloader().get(page.getUrl());
 
-        JsonObject json = null;
-        if (response != null && !Utils.isBlank(response.responseBody())) {
-            try {
-                json = JsonParser.object().from(response.responseBody());
-            } catch (final Exception e) {
-                throw new ParsingException("Could not parse json data for playlist info", e);
-            }
-        }
+        final JsonObject json =
+                PeertubeParsingHelper.parseAndValidateResponse(response, "playlist");
+        final long total = json.getLong("total");
 
-        if (json != null) {
-            PeertubeParsingHelper.validate(json);
-            final long total = json.getLong("total");
+        final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
+        collectItemsFrom(collector, json, getBaseUrl());
 
-            final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-            collectItemsFrom(collector, json, getBaseUrl());
-
-            return new InfoItemsPage<>(collector,
-                    PeertubeParsingHelper.getNextPage(page.getUrl(), total));
-        } else {
-            throw new ExtractionException("Unable to get PeerTube playlist info");
-        }
+        return new InfoItemsPage<>(collector,
+                PeertubeParsingHelper.getNextPage(page.getUrl(), total));
     }
 
     @Override
