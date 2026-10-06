@@ -28,11 +28,14 @@ internal class PoTokenWebViewTestEnvironment : PoTokenWebViewEnvironment, PoToke
     var now = Instant.parse("2026-01-01T00:00:00Z")
     var htmlResult: Single<String> = Single.just("<html><script>function runBotGuard() {}</script></html>")
     var evaluationError: Exception? = null
+    var creationError: Exception? = null
+    var loadError: Exception? = null
 
     override fun readHtml(): Single<String> = htmlResult
     override fun postBotguard(url: String, data: String): Single<Response> = SingleSubject.create<Response>().also { requests.add(Request(url, data, it)) }
 
     override fun createBrowser(bridge: PoTokenWebView, onConsoleError: (Int) -> Unit): PoTokenBrowser {
+        creationError?.let { throw it }
         this.bridge = bridge
         consoleError = onConsoleError
         return this
@@ -48,6 +51,7 @@ internal class PoTokenWebViewTestEnvironment : PoTokenWebViewEnvironment, PoToke
     override fun debug(message: String) = Unit
     override fun error(message: String) = Unit
     override fun loadHtml(html: String) {
+        loadError?.let { throw it }
         this.html = html
     }
 
@@ -55,7 +59,10 @@ internal class PoTokenWebViewTestEnvironment : PoTokenWebViewEnvironment, PoToke
         evaluationError?.let { throw it }
         evaluations.add(Evaluation(script, onComplete))
         if (script.contains("obtainPoToken(webPoSignalOutput")) {
-            val identifier = Regex("identifier = \"([^\"]*)\"").find(script)!!.groupValues[1]
+            val identifier = Regex("identifier = \"([^\"]*)\"").find(script)?.groupValues?.get(1)
+                ?: Regex("u8Identifier = new Uint8Array\\(\\[([^]]*)]")
+                    .find(script)!!.groupValues[1].split(",")
+                    .filter { it.isNotEmpty() }.map { it.toInt().toByte() }.toByteArray().decodeToString()
             val requestId = Regex("requestId = \"([^\"]*)\"").find(script)?.groupValues?.get(1)
             tokenCalls.add(TokenCall(identifier, requestId ?: identifier))
         }
@@ -74,10 +81,13 @@ internal class PoTokenWebViewTestEnvironment : PoTokenWebViewEnvironment, PoToke
     fun initialize(): PoTokenGenerator {
         val result = start()
         bridge.downloadAndRunBotguard()
+        runMain()
         respond(0, CHALLENGE)
         bridge.onRunBotguardResult("botguard-response")
+        runMain()
         respond(1, INTEGRITY_TOKEN)
         evaluations.last().complete()
+        runMain()
         result.assertValueCount(1).assertComplete()
         return result.values().single()
     }
