@@ -1,31 +1,23 @@
 package org.schabi.newpipe.util.potoken
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebView
 import androidx.annotation.MainThread
-import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewFeature
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.core.SingleEmitter
 import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.schedulers.Schedulers
 import java.time.Instant
-import org.schabi.newpipe.BuildConfig
-import org.schabi.newpipe.DownloaderImpl
 
 class PoTokenWebView private constructor(
-    context: Context,
+    private val environment: PoTokenWebViewEnvironment,
     // to be used exactly once only during initialization!
     private val generatorEmitter: SingleEmitter<PoTokenGenerator>
 ) : PoTokenGenerator {
-    private val webView = WebView(context)
+    private val webView = environment.createBrowser(this) { line ->
+        val exception = BadWebViewException("Uncaught JavaScript error at line $line")
+        onInitializationErrorCloseAndCancel(exception)
+        popAllPoTokenEmitters().forEach { (_, emitter) -> emitter.tryOnError(exception) }
+    }
     private val disposables = CompositeDisposable() // used only during initialization
     private val poTokenEmitters = mutableListOf<Pair<String, SingleEmitter<String>>>()
     private lateinit var expirationInstant: Instant
@@ -36,72 +28,26 @@ class PoTokenWebView private constructor(
     @Volatile private var initializationComplete = false
 
     //region Initialization
-    init {
-        val webViewSettings = webView.settings
-        webViewSettings.allowFileAccess = false
-        webViewSettings.allowContentAccess = false
-        //noinspection SetJavaScriptEnabled we want to use JavaScript!
-        webViewSettings.javaScriptEnabled = true
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.SAFE_BROWSING_ENABLE)) {
-            WebSettingsCompat.setSafeBrowsingEnabled(webViewSettings, false)
-        }
-        webViewSettings.userAgentString = DownloaderImpl.USER_AGENT
-        webViewSettings.blockNetworkLoads = true // the WebView does not need internet access
-
-        // so that we can run async functions and get back the result
-        webView.addJavascriptInterface(this, JS_INTERFACE)
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
-                if (m.message().contains("Uncaught")) {
-                    // There should not be any uncaught errors while executing the code, because
-                    // everything that can fail is guarded by try-catch. Therefore, this likely
-                    // indicates that there was a syntax error in the code, i.e. the WebView only
-                    // supports a really old version of JS.
-
-                    val exception = BadWebViewException(
-                        "Uncaught JavaScript error at line ${m.lineNumber()}"
-                    )
-                    Log.e(TAG, "This WebView implementation reported an uncaught error")
-
-                    onInitializationErrorCloseAndCancel(exception)
-                    popAllPoTokenEmitters().forEach { (_, emitter) -> emitter.tryOnError(exception) }
-                }
-                return super.onConsoleMessage(m)
-            }
-        }
-    }
 
     /**
      * Must be called right after instantiating [PoTokenWebView] to perform the actual
      * initialization. This will asynchronously go through all the steps needed to load BotGuard,
      * run it, and obtain an `integrityToken`.
      */
-    private fun loadHtmlAndObtainBotguard(context: Context) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "loadHtmlAndObtainBotguard() called")
-        }
+    private fun loadHtmlAndObtainBotguard() {
+        environment.debug("loadHtmlAndObtainBotguard() called")
 
         disposables.add(
-            Single.fromCallable {
-                val html = context.assets.open("po_token.html").bufferedReader()
-                    .use { it.readText() }
-                return@fromCallable html
-            }
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
+            environment.readHtml()
+                .observeOn(environment.mainScheduler)
                 .subscribe(
                     { html ->
-                        webView.loadDataWithBaseURL(
-                            "https://www.youtube.com",
+                        webView.loadHtml(
                             html.replaceFirst(
                                 "</script>",
                                 // calls downloadAndRunBotguard() when the page has finished loading
                                 "\n$JS_INTERFACE.downloadAndRunBotguard()</script>"
-                            ),
-                            "text/html",
-                            "utf-8",
-                            null
+                            )
                         )
                     },
                     this::onInitializationErrorCloseAndCancel
@@ -115,9 +61,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun downloadAndRunBotguard() {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "downloadAndRunBotguard() called")
-        }
+        environment.debug("downloadAndRunBotguard() called")
 
         makeBotguardServiceRequest(
             "https://www.youtube.com/api/jnn/v1/Create",
@@ -136,7 +80,7 @@ class PoTokenWebView private constructor(
                 } catch (error) {
                     $JS_INTERFACE.onJsInitializationError(error + "\n" + error.stack)
                 }""",
-                null
+                {}
             )
         }
     }
@@ -147,9 +91,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onJsInitializationError(error: String) {
-        if (BuildConfig.DEBUG) {
-            Log.e(TAG, "Initialization error from JavaScript")
-        }
+        environment.error("Initialization error from JavaScript")
         onInitializationErrorCloseAndCancel(buildExceptionForJsError(error))
     }
 
@@ -159,27 +101,21 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onRunBotguardResult(botguardResponse: String) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "BotGuard response received")
-        }
+        environment.debug("BotGuard response received")
         makeBotguardServiceRequest(
             "https://www.youtube.com/api/jnn/v1/GenerateIT",
             "[ \"$REQUEST_KEY\", \"$botguardResponse\" ]"
         ) { responseBody ->
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "GenerateIT response received")
-            }
+            environment.debug("GenerateIT response received")
             val (integrityToken, expirationTimeInSeconds) = parseIntegrityTokenData(responseBody)
 
             // leave 10 minutes of margin just to be sure
-            expirationInstant = Instant.now().plusSeconds(expirationTimeInSeconds - 600)
+            expirationInstant = environment.now().plusSeconds(expirationTimeInSeconds - 600)
 
             webView.evaluateJavascript(
                 "this.integrityToken = $integrityToken"
             ) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "initialization finished, expiration=${expirationTimeInSeconds}s")
-                }
+                environment.debug("initialization finished, expiration=${expirationTimeInSeconds}s")
                 initializationComplete = true
                 generatorEmitter.onSuccess(this)
             }
@@ -189,10 +125,8 @@ class PoTokenWebView private constructor(
 
     //region Obtaining poTokens
     override fun generatePoToken(identifier: String): Single<String> = Single.create { emitter ->
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "generatePoToken() called")
-        }
-        runOnMainThread(emitter) {
+        environment.debug("generatePoToken() called")
+        runOnMainThread(environment, emitter) {
             if (closed) {
                 emitter.tryOnError(PoTokenException("PoToken generator is closed"))
                 return@runOnMainThread
@@ -232,9 +166,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onObtainPoTokenError(identifier: String, error: String) {
-        if (BuildConfig.DEBUG) {
-            Log.e(TAG, "obtainPoToken error from JavaScript")
-        }
+        environment.error("obtainPoToken error from JavaScript")
         popPoTokenEmitter(identifier)?.tryOnError(buildExceptionForJsError(error))
     }
 
@@ -244,9 +176,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onObtainPoTokenResult(identifier: String, poTokenU8: String) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "Generated encoded poToken")
-        }
+        environment.debug("Generated encoded poToken")
         val poToken = try {
             u8ToBase64(poTokenU8)
         } catch (t: Throwable) {
@@ -254,14 +184,12 @@ class PoTokenWebView private constructor(
             return
         }
 
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "Decoded poToken")
-        }
+        environment.debug("Decoded poToken")
         popPoTokenEmitter(identifier)?.onSuccess(poToken)
     }
 
     override fun isExpired(): Boolean {
-        return Instant.now().isAfter(expirationInstant)
+        return environment.now().isAfter(expirationInstant)
     }
     //endregion
 
@@ -320,22 +248,8 @@ class PoTokenWebView private constructor(
         handleResponseBody: (String) -> Unit
     ) {
         disposables.add(
-            Single.fromCallable {
-                return@fromCallable DownloaderImpl.getInstance().post(
-                    url,
-                    mapOf(
-                        // replace the downloader user agent
-                        "User-Agent" to listOf(DownloaderImpl.USER_AGENT),
-                        "Accept" to listOf("application/json"),
-                        "Content-Type" to listOf("application/json+protobuf"),
-                        "x-goog-api-key" to listOf(GOOGLE_API_KEY),
-                        "x-user-agent" to listOf("grpc-web-javascript/0.1")
-                    ),
-                    data.toByteArray()
-                )
-            }
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
+            environment.postBotguard(url, data)
+                .observeOn(environment.mainScheduler)
                 .subscribe(
                     { response ->
                         val httpCode = response.responseCode()
@@ -358,7 +272,7 @@ class PoTokenWebView private constructor(
      * to [generatorEmitter].
      */
     private fun onInitializationErrorCloseAndCancel(error: Throwable) {
-        runOnMainThread(generatorEmitter, runWhenDisposed = true) {
+        runOnMainThread(environment, generatorEmitter, runWhenDisposed = true) {
             generatorEmitter.tryOnError(error)
             close()
         }
@@ -376,35 +290,27 @@ class PoTokenWebView private constructor(
         generatorEmitter.tryOnError(error)
         disposables.dispose()
 
-        webView.clearHistory()
-        // clears RAM cache and disk cache (globally for all WebViews)
-        webView.clearCache(true)
-
-        // ensures that the WebView isn't doing anything when destroying it
-        webView.loadUrl("about:blank")
-
-        webView.onPause()
-        webView.removeAllViews()
-        webView.destroy()
+        webView.close()
     }
     //endregion
 
     companion object : PoTokenGenerator.Factory {
-        private val TAG = PoTokenWebView::class.simpleName
-
-        // Public API key used by BotGuard, which has been got by looking at BotGuard requests
-        private const val GOOGLE_API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw" // NOSONAR
+        // Request key used by the bundled BotGuard workflow.
         private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
-        private const val JS_INTERFACE = "PoTokenWebView"
+        internal const val JS_INTERFACE = "PoTokenWebView"
 
-        override fun newPoTokenGenerator(context: Context): Single<PoTokenGenerator> = Single.create { emitter ->
-            runOnMainThread(emitter) {
-                val potWv = PoTokenWebView(context, emitter)
-                potWv.loadHtmlAndObtainBotguard(context)
+        override fun newPoTokenGenerator(context: Context): Single<PoTokenGenerator> = newPoTokenGenerator(AndroidPoTokenWebViewEnvironment(context))
+
+        internal fun newPoTokenGenerator(
+            environment: PoTokenWebViewEnvironment
+        ): Single<PoTokenGenerator> = Single.create { emitter ->
+            runOnMainThread(environment, emitter) {
+                val potWv = PoTokenWebView(environment, emitter)
+                potWv.loadHtmlAndObtainBotguard()
                 emitter.setCancellable {
                     potWv.disposables.dispose()
                     if (!potWv.initializationComplete) {
-                        Handler(Looper.getMainLooper()).post { potWv.close() }
+                        environment.postToMain { potWv.close() }
                     }
                 }
             }
@@ -415,11 +321,12 @@ class PoTokenWebView private constructor(
          * if the `post` fails emits an error on [emitterIfPostFails].
          */
         private fun runOnMainThread(
+            environment: PoTokenWebViewEnvironment,
             emitterIfPostFails: SingleEmitter<out Any>,
             runWhenDisposed: Boolean = false,
             runnable: Runnable
         ) {
-            if (!Handler(Looper.getMainLooper()).post {
+            if (!environment.postToMain {
                     if (runWhenDisposed || !emitterIfPostFails.isDisposed) runnable.run()
                 }
             ) {

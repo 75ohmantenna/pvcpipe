@@ -78,3 +78,9 @@ A playlist image chosen from its current streams, or the default image when empt
 
 **Permanent playlist thumbnail**:
 A fixed playlist image retained independently of playlist contents.
+
+## Proof tokens
+
+**Proof-token session**:
+The shared visitor data, streaming proof token, and generator used to produce
+player proof tokens for individual video requests.
