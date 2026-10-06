@@ -30,12 +30,19 @@ both directions remain expedited with ordinary-work fallback and the existing
 append-or-replace policy. Keeping these identities allows already queued work to
 continue using the same input representation after an application update.
 
-This refactor preserves existing failure handling for independent correction.
-Unavailable document streams currently behave as empty imports or unwritten
-exports. Source and extraction failures produce failure outcomes; import storage
-failures still escape to WorkManager. Cancellation behavior and dispatcher
-parallelism are also unchanged. A success outcome describes completion under
-these existing rules rather than a stronger new durability guarantee.
+Unavailable document streams produce failure outcomes instead of successful empty
+imports or unwritten exports. Import source, extraction, progress, and storage
+errors produce failure outcomes. A later failed batch leaves earlier committed
+batches intact; successful progress is reported only after each batch commits.
+Export success requires the destination to open, serialize, and close successfully.
+Cancellation propagates through the codec, transfer, and worker presentation
+instead of becoming an ordinary failure outcome.
+
+An explicit permit limits the whole channel-and-tab extraction to eight requests
+in flight, including suspended external requests. Loading progress increments and
+reporting are serialized together, preventing overlapping foreground updates or
+backwards progress. WorkManager retains ownership of cancellation and lifetime;
+the module executes in its caller's coroutine.
 
 `SubscriptionTransferTest` exercises the execution interface with actual JSON
 and streams, including malformed input, closure, extraction-before-storage,

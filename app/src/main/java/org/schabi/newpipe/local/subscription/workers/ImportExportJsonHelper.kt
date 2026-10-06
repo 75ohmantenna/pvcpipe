@@ -21,6 +21,7 @@ package org.schabi.newpipe.local.subscription.workers
 
 import java.io.InputStream
 import java.io.OutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -50,6 +51,8 @@ object ImportExportJsonHelper {
         try {
             @OptIn(ExperimentalSerializationApi::class)
             return json.decodeFromStream<SubscriptionData>(`in`).subscriptions
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             throw InvalidSourceException("Couldn't parse json", e)
         }

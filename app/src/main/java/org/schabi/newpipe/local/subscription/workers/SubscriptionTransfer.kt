@@ -11,8 +11,10 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -20,7 +22,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.rx3.await
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.channel.ChannelInfo
@@ -55,44 +59,55 @@ class SubscriptionTransfer internal constructor(
                         operations.channelSource(input.serviceId, input.url)
 
                     is SubscriptionImportInput.InputStreamMode ->
-                        operations.openInput(input.url)?.use {
+                        openInput(input.url).use {
                             operations.streamSource(input.serviceId, it, input.url)
                         }
 
                     is SubscriptionImportInput.PreviousExportMode ->
-                        operations.openInput(input.url)?.use(ImportExportJsonHelper::readFrom)
-                } ?: emptyList()
+                        openInput(input.url).use(ImportExportJsonHelper::readFrom)
+                }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
 
         val mutex = Mutex()
+        val permits = Semaphore(PARALLEL_EXTRACTIONS)
         var index = 1
         val qty = subscriptions.size
         val channels = try {
             withContext(ioDispatcher.limitedParallelism(PARALLEL_EXTRACTIONS)) {
                 subscriptions.map { item ->
                     async {
-                        val channel = operations.extract(item)
-                        val current = mutex.withLock { index++ }
-                        progress(Progress.Loading(current, qty, channel.first.name))
-                        channel
+                        permits.withPermit {
+                            val channel = operations.extract(item)
+                            mutex.withLock {
+                                progress(Progress.Loading(index++, qty, channel.first.name))
+                            }
+                            channel
+                        }
                     }
                 }.awaitAll()
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
 
-        progress(Progress.Importing(0, qty))
-        index = 0
-        for (chunk in channels.chunked(BUFFER_COUNT_BEFORE_INSERT)) {
-            withContext(ioDispatcher) {
-                operations.store(chunk)
+        try {
+            progress(Progress.Importing(0, qty))
+            index = 0
+            for (chunk in channels.chunked(BUFFER_COUNT_BEFORE_INSERT)) {
+                withContext(ioDispatcher) {
+                    operations.store(chunk)
+                }
+                index += chunk.size
+                progress(Progress.Importing(index, qty))
             }
-            index += chunk.size
-            progress(Progress.Importing(index, qty))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            return Outcome.Failure(e)
         }
         return Outcome.Success(qty)
     }
@@ -101,14 +116,20 @@ class SubscriptionTransfer internal constructor(
         val subscriptions = operations.snapshot()
         progress(Progress.Exporting(subscriptions.size))
         withContext(ioDispatcher) {
-            operations.openOutput(destination)?.use {
+            val output = operations.openOutput(destination)
+                ?: throw IOException("Cannot open subscription export destination: $destination")
+            output.use {
                 ImportExportJsonHelper.writeTo(subscriptions, it)
             }
         }
         Outcome.Success(subscriptions.size)
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         Outcome.Failure(e)
     }
+
+    private fun openInput(url: String): InputStream = operations.openInput(url)
+        ?: throw IOException("Cannot open subscription import source: $url")
 
     internal interface Operations {
         fun openInput(url: String): InputStream?
