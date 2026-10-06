@@ -24,14 +24,36 @@ Submission means that the Android service launch returned successfully. The
 service constructs and registers its mission asynchronously, so submission is
 not a durable-registration or atomic-replacement guarantee.
 
-This structural change deliberately retains existing behavior for separate
-failure correction: selection is read again after picker/confirmation callbacks,
-launch planning occurs after truncation, and replaceable missions are forgotten
-before reacquiring their output. Configured folders check available space and
-remember media type; picked folders and Save As retain their existing branch
-behavior. Tests characterize the workflow before these behaviors change.
+Preparation captures the selection and builds its complete launch plan before
+creating, replacing, or truncating a file. Unsupported stream combinations fail
+without changing the destination or mission metadata. Picker descriptors retain
+that plan through recreation; changing the dialog selection does not alter it.
+Mutable launch arrays are copied.
+
+Each decision is consumed once. New save attempts invalidate earlier decisions,
+and closing the module prevents old callbacks from submitting. Saved picker
+state can be resumed by a fresh module, with repeated descriptors ignored within
+that module. The dialog admits one outstanding picker, matches results to their launcher,
+clears consumed, cancelled, or failed-launch picker state, and dismisses collision presentation
+when its view is destroyed. Calls and decisions run on the UI thread.
+
+Confirmation checks the current mission state again. A mission that starts while
+an overwrite prompt is open receives a fresh running-mission decision; the old
+confirmation cannot overwrite it. Folder capacity checks include known audio
+and video sizes, saturate on overflow, and also apply after folder picking and
+before confirmation. These checks are best effort; they do not reserve space or
+provide atomic admission against other writers.
+
+Replacement mission metadata is forgotten only after preparation and dispatch
+succeed. Dispatch failure reports an error rather than a started download.
+Failure to clean up old metadata after accepted dispatch is logged without
+reporting a false submission failure. Existing file bytes may already have been
+truncated when dispatch fails; the workflow does not promise rollback of that
+file or durable mission registration.
 
 Run `make ci` for formatting, lint, application and deterministic extractor tests,
 and debug/release APK builds. Focused tests are `DownloadPreparationTest`;
 neighboring `DownloadMissionLifecycleTest` and `HlsPreparationLifecycleTest`
-continue to protect background phases.
+continue to protect background phases. `DownloadPreparationIntegrationTest`
+uses real Android file helpers, isolated files, serialized picker state, and
+controlled manager/dispatch effects.

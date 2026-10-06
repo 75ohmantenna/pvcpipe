@@ -31,6 +31,7 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
     final List<DownloadPreparation.Launch> launches = new ArrayList<>();
     final List<DownloadPreparation.Failure> failures = new ArrayList<>();
     final List<StoredFileHelper> forgotten = new ArrayList<>();
+    final List<RuntimeException> cleanupWarnings = new ArrayList<>();
     final List<DownloadPreparation.Kind> remembered = new ArrayList<>();
     final StoredFileHelper storage;
     final StoredFileHelper uniqueStorage;
@@ -40,6 +41,9 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
             new DownloadPreparation.DocumentMetadata("picked.mp4", "video/mp4");
     MissionState state = MissionState.None;
     boolean failResolve;
+    boolean failDispatch;
+    boolean failForget;
+    boolean missingLookup;
     boolean failCreate;
     boolean failTruncate;
     boolean writable = true;
@@ -60,7 +64,7 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
         when(folder.getTag()).thenReturn("video");
         when(folder.getFreeStorageSpace()).thenReturn(Long.MAX_VALUE);
         when(folder.findFile(anyString())).thenAnswer(call ->
-                Files.exists(output) ? fileUri : null);
+                !missingLookup && Files.exists(output) ? fileUri : null);
         when(folder.mkdirs()).thenAnswer(call -> {
             Files.createDirectories(directory);
             return true;
@@ -127,16 +131,28 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
 
     @Override
     public MissionState missionState(final StoredFileHelper file) {
-        return state;
+        return file == uniqueStorage ? MissionState.None : state;
     }
 
     @Override
     public void forget(final StoredFileHelper file) {
+        if (failForget) {
+            throw new IllegalStateException("metadata cleanup failed");
+        }
         forgotten.add(file);
+        state = MissionState.None;
+    }
+
+    @Override
+    public void warnCleanupFailure(final RuntimeException error) {
+        cleanupWarnings.add(error);
     }
 
     @Override
     public void dispatch(final DownloadPreparation.Launch launch) {
+        if (failDispatch) {
+            throw new IllegalStateException("service rejected launch");
+        }
         launches.add(launch);
     }
 
