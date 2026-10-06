@@ -29,7 +29,8 @@ final class BackupOperations {
                 return Single.error(new IllegalStateException("A backup operation is in progress"));
             }
             return Single.fromCallable(operation).subscribeOn(scheduler)
-                    .doFinally(() -> running.set(false));
+                    .doOnSuccess(ignored -> running.set(false))
+                    .doOnError(error -> running.set(false));
         }).cache();
     }
 }

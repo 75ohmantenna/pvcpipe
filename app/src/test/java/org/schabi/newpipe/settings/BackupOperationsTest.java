@@ -40,6 +40,16 @@ public class BackupOperationsTest {
     }
 
     @Test
+    public void inspectionCompletionCanImmediatelyStartTheAcceptedImport() {
+        final TestScheduler io = new TestScheduler();
+        final BackupOperations operations = new BackupOperations(io);
+        final var result = operations.submit(() -> true)
+                .flatMap(ignored -> operations.submit(() -> 2)).test();
+        io.triggerActions();
+        result.assertValue(2);
+    }
+
+    @Test
     public void failedOperationReleasesAdmissionForRetry() {
         final TestScheduler io = new TestScheduler();
         final BackupOperations operations = new BackupOperations(io);
