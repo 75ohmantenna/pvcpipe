@@ -19,22 +19,16 @@ import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceManager;
 
-import com.jakewharton.processphoenix.ProcessPhoenix;
 
-import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.local.subscription.SubscriptionsImportExportHelper;
-import org.schabi.newpipe.settings.export.BackupFileLocator;
-import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.streams.io.NoFileManagerSafeGuard;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.NavigationHelper;
-import org.schabi.newpipe.util.ZipHelper;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -47,7 +41,7 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
 
     private final SimpleDateFormat exportDateFormat =
             new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
-    private ImportExportManager manager;
+    private BackupRestore backups;
     private String importExportDataPathKey;
     private final ActivityResultLauncher<Intent> requestImportPathLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
@@ -69,7 +63,7 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
     @Override
     public void onCreatePreferences(@Nullable final Bundle savedInstanceState,
                                     @Nullable final String rootKey) {
-        manager = new ImportExportManager(new BackupFileLocator(requireContext()));
+        backups = new BackupRestore(requireContext().getApplicationContext());
 
         importExportDataPathKey = getString(R.string.import_export_data_path);
 
@@ -149,11 +143,7 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
             // will be saved only on success
             final Uri lastExportDataUri = result.getData().getData();
 
-            final StoredFileHelper file = new StoredFileHelper(
-                    requireContext().getApplicationContext(),
-                    result.getData().getData(), ZIP_MIME_TYPE);
-
-            exportDatabase(file, lastExportDataUri);
+            exportDatabase(lastExportDataUri);
         }
     }
 
@@ -162,14 +152,10 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
             // will be saved only on success
             final Uri lastImportDataUri = result.getData().getData();
 
-            final StoredFileHelper file = new StoredFileHelper(
-                    requireContext().getApplicationContext(),
-                    result.getData().getData(), ZIP_MIME_TYPE);
-
             importSettingsDialog = new androidx.appcompat.app.AlertDialog.Builder(requireActivity())
                     .setMessage(R.string.override_current_data)
                     .setPositiveButton(R.string.ok, (d, id) ->
-                            importDatabase(file, lastImportDataUri))
+                            importDatabase(lastImportDataUri))
                     .setNegativeButton(R.string.cancel, (d, id) ->
                             d.cancel())
                     .show();
@@ -186,117 +172,45 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
         super.onDestroyView();
     }
 
-    private void exportDatabase(final StoredFileHelper file, final Uri exportDataUri) {
-        final Context context = requireContext().getApplicationContext();
-        final SharedPreferences preferences =
-                PreferenceManager.getDefaultSharedPreferences(context);
-        final ImportExportManager exportManager = manager;
-        final String pathKey = importExportDataPathKey;
-        backupObservers.add(BackupOperations.INSTANCE.submit(() -> {
-            NewPipeDatabase.checkpoint();
-            exportManager.exportDatabase(preferences, file);
-            preferences.edit().putString(pathKey, exportDataUri.toString()).apply();
-            return true;
-        }).observeOn(AndroidSchedulers.mainThread()).subscribe(ignored ->
-                Toast.makeText(requireContext(), R.string.export_complete_toast, Toast.LENGTH_SHORT)
-                        .show(), error ->
+    private void exportDatabase(final Uri exportDataUri) {
+        backupObservers.add(backups.exportTo(exportDataUri)
+                .observeOn(AndroidSchedulers.mainThread()).subscribe(() ->
+                        Toast.makeText(requireContext(), R.string.export_complete_toast,
+                                Toast.LENGTH_SHORT).show(), error ->
                         showErrorSnackbar(error, "Exporting database and settings")));
     }
 
-    private record ImportContents(boolean valid, boolean json, boolean serialized) { }
-
-    private void importDatabase(final StoredFileHelper file, final Uri importDataUri) {
-        final ImportExportManager importManager = manager;
-        backupObservers.add(BackupOperations.INSTANCE.submit(() -> {
-            if (!ZipHelper.isValidZipFile(file)) {
-                return new ImportContents(false, false, false);
-            }
-            final boolean json = importManager.exportHasJsonPrefs(file);
-            return new ImportContents(true, json,
-                    !json && importManager.exportHasSerializedPrefs(file));
-        }).observeOn(AndroidSchedulers.mainThread()).subscribe(contents -> {
-            if (!contents.valid()) {
-                Toast.makeText(requireContext(), R.string.no_valid_zip_file, Toast.LENGTH_SHORT)
-                        .show();
-            } else if (contents.json() || contents.serialized()) {
-                importSettingsDialog =
-                        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                        .setTitle(R.string.import_settings)
-                        .setMessage(contents.json() ? null : getString(
-                                R.string.import_settings_vulnerable_format))
-                        .setNegativeButton(R.string.cancel, (dialog, which) ->
-                                performImport(file, importDataUri, contents, false))
-                        .setPositiveButton(R.string.ok, (dialog, which) ->
-                                performImport(file, importDataUri, contents, true))
-                        .show();
-            } else {
-                performImport(file, importDataUri, contents, false);
-            }
-        }, error -> showErrorSnackbar(error, "Inspecting backup")));
+    private void importDatabase(final Uri importDataUri) {
+        backupObservers.add(backups.inspect(importDataUri)
+                .observeOn(AndroidSchedulers.mainThread()).subscribe(inspection -> {
+                    if (!inspection.readable()) {
+                        Toast.makeText(requireContext(), R.string.no_valid_zip_file,
+                                Toast.LENGTH_SHORT).show();
+                    } else if (inspection.preferenceFormat()
+                            != BackupRestore.PreferenceFormat.NONE) {
+                        importSettingsDialog =
+                                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                                .setTitle(R.string.import_settings)
+                                .setMessage(inspection.preferenceFormat()
+                                        == BackupRestore.PreferenceFormat.JSON ? null : getString(
+                                        R.string.import_settings_vulnerable_format))
+                                .setNegativeButton(R.string.cancel, (dialog, which) ->
+                                        performImport(inspection,
+                                                BackupRestore.RestoreChoice.DATABASE_ONLY))
+                                .setPositiveButton(R.string.ok, (dialog, which) ->
+                                        performImport(inspection,
+                                                BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS))
+                                .show();
+                    } else {
+                        performImport(inspection, BackupRestore.RestoreChoice.DATABASE_ONLY);
+                    }
+                }, error -> showErrorSnackbar(error, "Inspecting backup")));
     }
 
-    private void performImport(final StoredFileHelper file, final Uri uri,
-                               final ImportContents contents, final boolean importPreferences) {
-        final Context context = requireContext().getApplicationContext();
-        final SharedPreferences preferences =
-                PreferenceManager.getDefaultSharedPreferences(context);
-        final ImportExportManager importManager = manager;
-        final String pathKey = importExportDataPathKey;
-        // Complete an accepted restore independently of its view, then restart exactly once.
-        backupObservers.add(BackupOperations.INSTANCE.submit(() -> {
-            if (importPreferences) {
-                if (contents.json()) {
-                    importManager.loadJsonPrefs(file, preferences);
-                } else {
-                    importManager.loadSerializedPrefs(file, preferences);
-                }
-                cleanImport(context, preferences);
-            }
-            importManager.ensureDbDirectoryExists();
-            if (!importManager.stageDb(file)) {
-                throw new IOException("Backup does not contain a database");
-            }
-            preferences.edit().putString(pathKey, uri.toString()).apply();
-            return true;
-        }).observeOn(AndroidSchedulers.mainThread())
-                .doOnSuccess(ignored -> ProcessPhoenix.triggerRebirth(context))
-                .doOnError(error -> ErrorUtil.createNotification(context,
-                        new ErrorInfo(error, UserAction.DATABASE_IMPORT_EXPORT,
-                                "Importing backup")))
-                .cache()
-                .subscribe(ignored -> { }, error -> { }));
-    }
-
-    /**
-     * Remove settings that are not supposed to be imported on different devices
-     * and reset them to default values.
-     * @param context the context used for the import
-     * @param prefs the preferences used while running the import
-     */
-    private static void cleanImport(@NonNull final Context context,
-                             @NonNull final SharedPreferences prefs) {
-        // Check if media tunnelling needs to be disabled automatically,
-        // if it was disabled automatically in the imported preferences.
-        final String tunnelingKey = context.getString(R.string.disable_media_tunneling_key);
-        final String automaticTunnelingKey =
-                context.getString(R.string.disabled_media_tunneling_automatically_key);
-        // R.string.disable_media_tunneling_key should always be true
-        // if R.string.disabled_media_tunneling_automatically_key equals 1,
-        // but we double check here just to be sure and to avoid regressions
-        // caused by possible later modification of the media tunneling functionality.
-        // R.string.disabled_media_tunneling_automatically_key == 0:
-        //     automatic value overridden by user in settings
-        // R.string.disabled_media_tunneling_automatically_key == -1: not set
-        final boolean wasMediaTunnelingDisabledAutomatically =
-                prefs.getInt(automaticTunnelingKey, -1) == 1
-                        && prefs.getBoolean(tunnelingKey, false);
-        if (wasMediaTunnelingDisabledAutomatically) {
-            prefs.edit()
-                    .putInt(automaticTunnelingKey, -1)
-                    .putBoolean(tunnelingKey, false)
-                    .apply();
-            NewPipeSettings.setMediaTunneling(context);
-        }
+    private void performImport(final BackupRestore.Inspection inspection,
+                               final BackupRestore.RestoreChoice choice) {
+        backupObservers.add(backups.restore(inspection, choice)
+                .subscribe(() -> { }, error -> { }));
     }
 
     private Uri getImportExportDataUri() {
