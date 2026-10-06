@@ -75,6 +75,7 @@ import org.schabi.newpipe.ktx.animateHideRecyclerViewAllowingScrolling
 import org.schabi.newpipe.ktx.slideUp
 import org.schabi.newpipe.local.feed.item.StreamItem
 import org.schabi.newpipe.local.feed.service.FeedLoadService
+import org.schabi.newpipe.local.feed.service.FeedRefresh
 import org.schabi.newpipe.local.subscription.SubscriptionManager
 import org.schabi.newpipe.util.DeviceUtils
 import org.schabi.newpipe.util.Localization
@@ -468,7 +469,7 @@ class FeedFragment : BaseStateFragment<FeedState>() {
 
     private fun handleItemsErrors(errors: List<Throwable>) {
         errors.forEachIndexed { i, t ->
-            if (t is FeedLoadService.RequestException &&
+            if (t is FeedRefresh.RequestException &&
                 t.cause is ContentNotAvailableException
             ) {
                 disposables.add(

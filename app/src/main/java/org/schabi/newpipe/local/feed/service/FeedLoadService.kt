@@ -62,6 +62,7 @@ class FeedLoadService : Service() {
     private var notificationDisposable: Disposable? = null
 
     private lateinit var feedLoadManager: FeedLoadManager
+    private var feedRefresh: FeedRefresh? = null
 
     // /////////////////////////////////////////////////////////////////////////
     // Lifecycle
@@ -85,11 +86,13 @@ class FeedLoadService : Service() {
             return START_NOT_STICKY
         }
 
-        setupNotification()
+        val groupId = intent.getLongExtra(EXTRA_GROUP_ID, FeedGroupEntity.GROUP_ALL_ID)
+        val refresh = feedLoadManager.createRefresh(groupId)
+        feedRefresh = refresh
+        setupNotification(refresh)
         setupBroadcastReceiver()
 
-        val groupId = intent.getLongExtra(EXTRA_GROUP_ID, FeedGroupEntity.GROUP_ALL_ID)
-        loadingDisposable = feedLoadManager.startLoading(groupId)
+        loadingDisposable = refresh.result
             .observeOn(AndroidSchedulers.mainThread())
             .doOnSubscribe {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -130,12 +133,12 @@ class FeedLoadService : Service() {
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         // Stop foreground work promptly; cooperative cancellation flushes collected feed results.
-        feedLoadManager.cancel()
+        feedRefresh?.cancel()
         stopService()
     }
 
     override fun onDestroy() {
-        feedLoadManager.cancel()
+        feedRefresh?.cancel()
         disposeAll()
         // Do not dispose loading: its final buffered results must still reach the database.
         super.onDestroy()
@@ -144,12 +147,6 @@ class FeedLoadService : Service() {
     override fun onBind(intent: Intent): IBinder? {
         return null
     }
-
-    // /////////////////////////////////////////////////////////////////////////
-    // Loading & Handling
-    // /////////////////////////////////////////////////////////////////////////
-
-    class RequestException(val subscriptionId: Long, message: String, cause: Throwable) : Exception(message, cause)
 
     // /////////////////////////////////////////////////////////////////////////
     // Notification
@@ -175,7 +172,7 @@ class FeedLoadService : Service() {
             .setContentTitle(getString(R.string.feed_notification_loading))
     }
 
-    private fun setupNotification() {
+    private fun setupNotification(refresh: FeedRefresh) {
         notificationManager = NotificationManagerCompat.from(this)
         notificationBuilder = createNotification()
 
@@ -183,7 +180,7 @@ class FeedLoadService : Service() {
             flow.take(1).concatWith(flow.skip(1).throttleLatest(NOTIFICATION_SAMPLING_PERIOD.toLong(), TimeUnit.MILLISECONDS))
         }
 
-        notificationDisposable = feedLoadManager.notification
+        notificationDisposable = refresh.progress
             .publish(throttleAfterFirstEmission)
             .observeOn(AndroidSchedulers.mainThread())
             .doOnTerminate { notificationManager.cancel(NOTIFICATION_ID) }
@@ -218,7 +215,7 @@ class FeedLoadService : Service() {
         broadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == ACTION_CANCEL) {
-                    feedLoadManager.cancel()
+                    feedRefresh?.cancel()
                 }
             }
         }
