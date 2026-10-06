@@ -48,6 +48,7 @@ import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subjects.MaybeSubject;
@@ -63,6 +64,7 @@ public class PlayerIntentTest {
     private HistoryRecordManager history;
     private CompositeDisposable streamSubscriptions;
     private CompositeDisposable historySubscriptions;
+    private SerialDisposable playbackDecision;
     private MockedStatic<IntentCompat> intentCompat;
     private MockedStatic<SerializedCache> serializedCache;
     private MockedStatic<ExtractorHelper> extractorHelper;
@@ -82,6 +84,8 @@ public class PlayerIntentTest {
         history = mock(HistoryRecordManager.class);
         streamSubscriptions = new CompositeDisposable();
         historySubscriptions = new CompositeDisposable();
+        playbackDecision = new SerialDisposable();
+        setField("playbackDecision", playbackDecision);
         setField("playerType", PlayerType.MAIN);
         setField("UIs", uis);
         setField("simpleExoPlayer", exoPlayer);
@@ -113,6 +117,7 @@ public class PlayerIntentTest {
 
     @After
     public void tearDown() {
+        playbackDecision.dispose();
         streamSubscriptions.dispose();
         historySubscriptions.dispose();
         schedulers.close();
@@ -262,7 +267,7 @@ public class PlayerIntentTest {
         player.handleIntent(intent);
         assertTrue(pending.hasObservers());
 
-        streamSubscriptions.dispose();
+        playbackDecision.set(null);
         pending.onSuccess(info("target"));
 
         assertFalse(pending.hasObservers());
@@ -283,12 +288,50 @@ public class PlayerIntentTest {
         player.handleIntent(intent);
         assertTrue(pending.hasObservers());
 
-        historySubscriptions.dispose();
+        playbackDecision.set(null);
         pending.onSuccess(new StreamStateEntity(1, 45_000));
 
         assertFalse(pending.hasObservers());
         assertEquals(PlayQueueItem.RECOVERY_UNSET, incoming.getItem().getRecoveryPosition());
         assertNull(player.getPlayQueue());
+    }
+
+    @Test
+    public void newerTimestampCancelsOlderTimestamp() throws Exception {
+        type(PlayerIntentType.TimestampChange);
+        setField("playQueue", queue("target"));
+        final SingleSubject<StreamInfo> old = timestamp("target", 10);
+        player.handleIntent(intent);
+        final SingleSubject<StreamInfo> latest = timestamp("target", 20);
+        player.handleIntent(intent);
+        assertFalse(old.hasObservers());
+        latest.onSuccess(info("target"));
+        old.onSuccess(info("target"));
+        verify(exoPlayer).seekTo(0, 20_000);
+        org.mockito.Mockito.verify(exoPlayer, org.mockito.Mockito.never()).seekTo(0, 10_000);
+    }
+
+    @Test
+    public void directQueueCommandCancelsOlderHistoryDecision() throws Exception {
+        type(PlayerIntentType.AllOthers);
+        final PlayQueue current = queue("current");
+        final PlayQueue oldQueue = queue("old");
+        setField("playQueue", current);
+        final MaybeSubject<StreamStateEntity> old = MaybeSubject.create();
+        when(cache.take("queue", PlayQueue.class)).thenReturn(oldQueue);
+        when(intent.getBooleanExtra(Player.RESUME_PLAYBACK, false)).thenReturn(true);
+        preferences.when(() -> DependentPreferenceHelper.getResumePlaybackEnabled(
+                player.getContext())).thenReturn(true);
+        when(history.loadStreamState(oldQueue.getItem())).thenReturn(old);
+        player.handleIntent(intent);
+        assertTrue(old.hasObservers());
+        final PlayQueue incoming = queue("current");
+        when(cache.take("queue", PlayQueue.class)).thenReturn(incoming);
+        player.handleIntent(intent);
+        assertFalse(old.hasObservers());
+        old.onSuccess(new StreamStateEntity(1, 45_000));
+        assertSame(current, player.getPlayQueue());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, oldQueue.getItem().getRecoveryPosition());
     }
 
     private void type(final PlayerIntentType type) {

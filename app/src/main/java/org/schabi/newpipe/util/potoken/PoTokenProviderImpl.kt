@@ -3,6 +3,7 @@ package org.schabi.newpipe.util.potoken
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.util.concurrent.TimeUnit
 import org.schabi.newpipe.App
 import org.schabi.newpipe.BuildConfig
 import org.schabi.newpipe.extractor.NewPipe
@@ -50,13 +51,18 @@ object PoTokenProviderImpl : PoTokenProvider {
      * case the current [webPoTokenGenerator] threw an error last time
      * [PoTokenGenerator.generatePoToken] was called
      */
-    private fun getWebClientPoToken(videoId: String, forceRecreate: Boolean): PoTokenResult {
+    private fun getWebClientPoToken(
+        videoId: String,
+        forceRecreate: Boolean,
+        failedGenerator: PoTokenGenerator? = null
+    ): PoTokenResult {
         // just a helper class since Kotlin does not have builtin support for 4-tuples
         data class Quadruple<T1, T2, T3, T4>(val t1: T1, val t2: T2, val t3: T3, val t4: T4)
 
         val (poTokenGenerator, visitorData, streamingPot, hasBeenRecreated) =
             synchronized(WebPoTokenGenLock) {
-                val shouldRecreate = webPoTokenGenerator == null || forceRecreate ||
+                val shouldRecreate = webPoTokenGenerator == null ||
+                    (forceRecreate && webPoTokenGenerator === failedGenerator) ||
                     webPoTokenGenerator!!.isExpired()
 
                 if (shouldRecreate) {
@@ -64,7 +70,7 @@ object PoTokenProviderImpl : PoTokenProvider {
                     innertubeClientRequestInfo.clientInfo.clientVersion =
                         YoutubeParsingHelper.getClientVersion()
 
-                    webPoTokenVisitorData = YoutubeParsingHelper.getVisitorDataFromInnertube(
+                    val visitorData = YoutubeParsingHelper.getVisitorDataFromInnertube(
                         innertubeClientRequestInfo,
                         NewPipe.getPreferredLocalization(),
                         NewPipe.getPreferredContentCountry(),
@@ -73,17 +79,21 @@ object PoTokenProviderImpl : PoTokenProvider {
                         null,
                         false
                     )
-                    // close the current webPoTokenGenerator on the main thread
-                    webPoTokenGenerator?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-
-                    // create a new webPoTokenGenerator
-                    webPoTokenGenerator = PoTokenWebView
-                        .newPoTokenGenerator(App.instance).blockingGet()
-
-                    // The streaming poToken needs to be generated exactly once before generating
-                    // any other (player) tokens.
-                    webPoTokenStreamingPot = webPoTokenGenerator!!
-                        .generatePoToken(webPoTokenVisitorData!!).blockingGet()
+                    val generator = PoTokenWebView.newPoTokenGenerator(App.instance)
+                        .timeout(30, TimeUnit.SECONDS).blockingGet()
+                    val streamingPot = try {
+                        generator.generatePoToken(visitorData)
+                            .timeout(30, TimeUnit.SECONDS).blockingGet()
+                    } catch (error: Throwable) {
+                        Handler(Looper.getMainLooper()).post { generator.close() }
+                        throw error
+                    }
+                    // Publish a coherent replacement only after initialization succeeds.
+                    val previous = webPoTokenGenerator
+                    webPoTokenVisitorData = visitorData
+                    webPoTokenStreamingPot = streamingPot
+                    webPoTokenGenerator = generator
+                    previous?.let { Handler(Looper.getMainLooper()).post { it.close() } }
                 }
 
                 return@synchronized Quadruple(
@@ -98,7 +108,7 @@ object PoTokenProviderImpl : PoTokenProvider {
             // Not using synchronized here, since poTokenGenerator would be able to generate
             // multiple poTokens in parallel if needed. The only important thing is for exactly one
             // visitorData/streaming poToken to be generated before anything else.
-            poTokenGenerator.generatePoToken(videoId).blockingGet()
+            poTokenGenerator.generatePoToken(videoId).timeout(30, TimeUnit.SECONDS).blockingGet()
         } catch (throwable: Throwable) {
             if (hasBeenRecreated) {
                 // the poTokenGenerator has just been recreated (and possibly this is already the
@@ -109,7 +119,11 @@ object PoTokenProviderImpl : PoTokenProvider {
                 // this might happen for example if NewPipe goes in the background and the WebView
                 // content is lost
                 Log.e(TAG, "Failed to obtain poToken, retrying")
-                return getWebClientPoToken(videoId = videoId, forceRecreate = true)
+                return getWebClientPoToken(
+                    videoId = videoId,
+                    forceRecreate = true,
+                    failedGenerator = poTokenGenerator
+                )
             }
         }
 
