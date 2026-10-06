@@ -21,9 +21,11 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
+import org.schabi.newpipe.extractor.utils.Utils;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,10 +56,16 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
             return commentsUrl;
         }
         final String videoUrl = getOriginalUrl();
+        final String path;
+        try {
+            path = Utils.stringToURL(videoUrl).getPath();
+        } catch (final MalformedURLException e) {
+            throw new ParsingException("Invalid Rumble video URL", e);
+        }
         final String id;
-        if (videoUrl.contains("/embed/")) {
+        if (path.startsWith("/embed/")) {
             id = getId().substring(1);
-        } else if (videoUrl.contains("/shorts/")) {
+        } else if (path.startsWith("/shorts/")) {
             id = getShortsVideoId(videoUrl);
         } else {
             id = RumbleParsingHelper.getEmbedVideoId(videoUrl,

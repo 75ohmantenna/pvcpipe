@@ -104,7 +104,7 @@ Existing stream tests cover progressive media, HLS variants/fallbacks, audio, ca
 states. These deterministic checks do not prove that every current Rumble page has compatible
 markup or that media actually plays on every device.
 
-The final checks passed: 142 offline extractor tests (40 for Rumble), 281 application unit tests,
+The original investigation checks passed: 142 offline extractor tests (40 for Rumble), 281 application unit tests,
 and 283 tests in the broader Rumble suite. The broader suite includes historical fixtures and live
 browse checks for all five categories. Historical fixtures were repaired for missing empty About
 pages and current image representations; test setup no longer mutates the global downloader type.
@@ -134,6 +134,30 @@ Android lint analysis was canceled after a prolonged stall. The debug build, ext
 unit tests, and on-device link resolution passed; a completed Android lint run is not claimed.
 The test emulator was stopped after verification. The `pvcpipe_rumble_api35` AVD and its installed
 debug APK remain available for repeat checks.
+
+## Adversarial PR review
+
+The PR review reproduced five failures with offline regression tests before applying fixes:
+
+- Comment routing matched `/embed/` or `/shorts/` inside query parameters and selected the
+  wrong internal video ID. Routing now checks the parsed URL path while keeping the original
+  watch URL for fetching and comment-item links.
+- Inline player extraction rejected script attributes and single-quoted `play` calls. It now
+  reads script data through Jsoup and accepts either quote style, including multiline scripts.
+- An unavailable About page aborted a channel that had otherwise loaded successfully. About
+  failures now surface through the description getter as nonfatal `ChannelInfo` errors; the
+  original challenge exception is preserved.
+- Channel cards without optional subscriber counts or avatars aborted search. Missing counts
+  now use the unknown-count value, and missing image avatars return an empty image list.
+- An unrelated heading link before a profile link hid the channel. Extraction now selects the
+  profile link and keeps nested heading text while removing verification SVG labels.
+
+`RumbleAdversarialReviewTest` contains the five reproductions. All five failed on the initial
+PR tree. The repository-instruction change is reviewed and submitted separately.
+
+After the fixes, all 188 offline extractor tests (45 for Rumble), all 288 tests in the broader
+Rumble suite, and all 283 application unit tests passed with no failures or skipped tests.
+Both extractor and application Checkstyle passed, and the debug APK built successfully.
 
 ## References
 

@@ -34,14 +34,16 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
     private void extractData(final Element element, final Document doc) throws ParsingException {
         final Element data = element.selectFirst("div[class*=media-subscribe-and-notify]");
         if (data == null) {
-            final Element link = element.selectFirst("a:has(h3)");
+            final Element link = element.selectFirst(
+                    "a[href*='/c/']:has(h3), a[href*='/user/']:has(h3)");
             if (link == null) {
                 throw new ParsingException("Channel link not found");
             }
             this.url = RumbleChannelLinkHandlerFactory.getInstance()
                     .fromUrl(link.absUrl("href")).getUrl();
-            final Element title = link.selectFirst("h3 .truncate");
-            this.name = title == null ? link.selectFirst("h3").ownText() : title.text();
+            final Element title = link.selectFirst("h3").clone();
+            title.select("svg").remove();
+            this.name = title.text();
         } else {
             this.name = data.attr("data-title");
             this.url = Rumble.getBaseUrl() + "/"
@@ -63,7 +65,7 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
             throws ParsingException {
 
         final String errorMsg = "Could not get subscriber count";
-        final String amountOfSubscribers = RumbleParsingHelper.extractSafely(true,
+        final String amountOfSubscribers = RumbleParsingHelper.extractSafely(false,
                 errorMsg,
                 () -> element.selectFirst(
                         ".channel-item--subscribers, span[class*='text-sm text-fjord']")
@@ -84,6 +86,9 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
     private String extractTheThumbnailOfAChannelInASearchForChannels(final Element element,
                                                                      final Document document)
             throws ParsingException {
+        if (element.selectFirst("i.user-image") == null) {
+            return null;
+        }
         return RumbleParsingHelper.extractThumbnail(document, element.toString(),
                 () -> {
                     final String thumbUrlIdentifier = "i." + element

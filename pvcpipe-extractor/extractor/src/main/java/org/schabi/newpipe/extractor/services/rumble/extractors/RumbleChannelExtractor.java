@@ -10,6 +10,7 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.rumble.RumbleChannelParsingHelper;
@@ -32,6 +33,7 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     private Document doc;
     private Document about;
+    private ParsingException aboutError;
 
     public RumbleChannelExtractor(final StreamingService service,
                                   final ListLinkHandler linkHandler) {
@@ -57,7 +59,13 @@ public class RumbleChannelExtractor extends ChannelExtractor {
         final String aboutLink = RumbleParsingHelper.extractSafely(false, "",
                 () -> doc.selectFirst("[href*='about']").absUrl("href"));
         if (aboutLink != null && !aboutLink.isEmpty()) {
-            about = RumbleParsingHelper.fetchParseValidate(downloader, aboutLink);
+            try {
+                about = RumbleParsingHelper.fetchParseValidate(downloader, aboutLink);
+            } catch (final ParsingException e) {
+                aboutError = e;
+            } catch (final IOException | ReCaptchaException e) {
+                aboutError = new ParsingException("Could not fetch channel About page", e);
+            }
         }
     }
 
@@ -152,6 +160,9 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Override
     public String getDescription() throws ParsingException {
+        if (aboutError != null) {
+            throw aboutError;
+        }
         if (null != about) {
             try {
                 StringBuilder sb = new StringBuilder();

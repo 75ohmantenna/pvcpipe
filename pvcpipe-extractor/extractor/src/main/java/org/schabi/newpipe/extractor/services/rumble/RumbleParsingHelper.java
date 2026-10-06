@@ -269,17 +269,20 @@ public final class RumbleParsingHelper {
         } catch (final ParsingException e) {
             throw e;
         } catch (final Exception e) {
-            throw new ParsingException("Could not extract the embed id due to missing content");
+            throw new ParsingException("Could not extract the embed id due to missing content", e);
         }
 
         Matcher matcher = pattern.matcher(content);
         String embedId = matcher.find() ? matcher.group(1) : null;
         if (embedId == null) {
-            pattern = Pattern.compile("<script>[^<]*\\bRumble\\(\\s*\"play\"\\s*,\\s*\\{[^}]*"
-                    + "[\"']?video[\"']?\\s*:\\s*[\"']([0-9a-z]+)[\"']");
-            matcher = pattern.matcher(content);
-            if (matcher.find()) {
-                embedId = matcher.group(1);
+            pattern = Pattern.compile("\\bRumble\\(\\s*[\"']play[\"']\\s*,\\s*\\{[^}]*"
+                    + "[\"']?video[\"']?\\s*:\\s*[\"'](v[0-9a-z]+)[\"']");
+            for (final Element script : Jsoup.parse(content).select("script")) {
+                matcher = pattern.matcher(script.data());
+                if (matcher.find()) {
+                    embedId = matcher.group(1);
+                    break;
+                }
             }
         }
         if (embedId != null) {
