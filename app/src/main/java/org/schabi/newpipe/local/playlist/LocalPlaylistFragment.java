@@ -703,12 +703,14 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
                     + "with [" + streamIds.size() + "] items");
         }
 
+        final DebounceSaver saver = debounceSaver;
+        final long revision = saver.getRevision();
         final Disposable disposable = playlistManager.updateJoin(playlistId, streamIds)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         () -> {
-                            if (debounceSaver != null) {
-                                debounceSaver.setNoChangesToSave();
+                            if (debounceSaver == saver) {
+                                saver.setNoChangesToSave(revision);
                             }
                         },
                         throwable -> showError(new ErrorInfo(throwable,
