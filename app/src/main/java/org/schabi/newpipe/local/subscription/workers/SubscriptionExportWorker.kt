@@ -3,24 +3,15 @@ package org.schabi.newpipe.local.subscription.workers
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ServiceInfo
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.BuildConfig
-import org.schabi.newpipe.NewPipeDatabase
 import org.schabi.newpipe.R
 
 class SubscriptionExportWorker(
@@ -29,23 +20,22 @@ class SubscriptionExportWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         return try {
-            val uri = inputData.getString(EXPORT_PATH)!!.toUri()
-            val table = NewPipeDatabase.getInstance(applicationContext).subscriptionDAO()
-            val subscriptions =
-                table.getAll()
-                    .awaitFirst()
-                    .map { SubscriptionItem(it.serviceId, it.url ?: "", it.name ?: "") }
-
-            val qty = subscriptions.size
-            val title = applicationContext.resources.getQuantityString(R.plurals.export_subscriptions, qty, qty)
-            setForeground(createForegroundInfo(title))
-
-            withContext(Dispatchers.IO) {
-                // Truncate file if it already exists
-                applicationContext.contentResolver.openOutputStream(uri, "wt")?.use {
-                    ImportExportJsonHelper.writeTo(subscriptions, it)
+            val outcome = SubscriptionTransfer.create(applicationContext).export(
+                inputData.getString(SubscriptionTransfer.EXPORT_PATH)!!
+            ) { progress ->
+                if (progress is SubscriptionTransfer.Progress.Exporting) {
+                    val title = applicationContext.resources.getQuantityString(
+                        R.plurals.export_subscriptions,
+                        progress.total,
+                        progress.total
+                    )
+                    setForeground(createForegroundInfo(title))
                 }
             }
+            if (outcome is SubscriptionTransfer.Outcome.Failure) {
+                throw outcome.cause
+            }
+            val qty = (outcome as SubscriptionTransfer.Outcome.Success).count
 
             if (BuildConfig.DEBUG) {
                 Log.i(TAG, "Exported $qty subscriptions")
@@ -92,23 +82,5 @@ class SubscriptionExportWorker(
         private const val TAG = "SubscriptionExportWork"
         private const val NOTIFICATION_ID = 4567
         private const val NOTIFICATION_CHANNEL_ID = "newpipe"
-        private const val WORK_NAME = "exportSubscriptions"
-        private const val EXPORT_PATH = "exportPath"
-
-        fun schedule(
-            context: Context,
-            uri: Uri
-        ) {
-            val data = workDataOf(EXPORT_PATH to uri.toString())
-            val workRequest =
-                OneTimeWorkRequestBuilder<SubscriptionExportWorker>()
-                    .setInputData(data)
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                    .build()
-
-            WorkManager
-                .getInstance(context)
-                .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
-        }
     }
 }

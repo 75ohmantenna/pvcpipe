@@ -9,8 +9,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import org.schabi.newpipe.local.subscription.SubscriptionFragment.Companion.JSON_MIME_TYPE
-import org.schabi.newpipe.local.subscription.workers.SubscriptionExportWorker
 import org.schabi.newpipe.local.subscription.workers.SubscriptionImportInput
+import org.schabi.newpipe.local.subscription.workers.SubscriptionTransfer
 import org.schabi.newpipe.streams.io.NoFileManagerSafeGuard
 import org.schabi.newpipe.streams.io.StoredFileHelper
 
@@ -40,7 +40,7 @@ class SubscriptionsImportExportHelper(
     private fun requestExportResult(result: ActivityResult) {
         val data = result.data?.data
         if (data != null && result.resultCode == Activity.RESULT_OK) {
-            SubscriptionExportWorker.schedule(context, data)
+            SubscriptionTransfer.enqueueExport(context, data)
         }
     }
 

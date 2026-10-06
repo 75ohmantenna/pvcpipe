@@ -61,3 +61,9 @@ finished storing batches and cleaning up the feed.
 **Accepted feed refresh**:
 A feed refresh admitted for completion independently of its observers while the
 application process remains running.
+
+## Subscription transfers
+
+**Subscription transfer**:
+Importing subscriptions from a channel source or saved file, or exporting followed
+channels to a saved file.
