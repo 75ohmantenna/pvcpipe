@@ -46,8 +46,9 @@ public final class NoFileManagerSafeGuard {
      * @param tag Tag used for logging
      * @param context Context
      * @param <I> see {@link ActivityResultLauncher#launch(Object)}
+     * @return whether the file manager was launched
      */
-    public static <I> void launchSafe(
+    public static <I> boolean launchSafe(
             final ActivityResultLauncher<I> activityResultLauncher,
             final I input,
             final String tag,
@@ -55,9 +56,11 @@ public final class NoFileManagerSafeGuard {
     ) {
         try {
             activityResultLauncher.launch(input);
+            return true;
         } catch (final ActivityNotFoundException aex) {
             Log.w(tag, "Unable to launch file/directory picker", aex);
             NoFileManagerSafeGuard.showActivityNotFoundAlert(context);
+            return false;
         }
     }
 }

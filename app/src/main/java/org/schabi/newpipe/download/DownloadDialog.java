@@ -100,6 +100,7 @@ public class DownloadDialog extends PvcDownloadDialog
     private StoredDirectoryHelper mainStorageAudio = null;
     private StoredDirectoryHelper mainStorageVideo = null;
     private DownloadPreparation downloadPreparation;
+    private AlertDialog collisionDialog;
     private MenuItem okButton = null;
     private Context context = null;
     private boolean askForSavePath;
@@ -218,7 +219,7 @@ public class DownloadDialog extends PvcDownloadDialog
                         DownloadDialog.this::selectedDownload);
                 askForSavePath = mgr.askForSavePath();
 
-                okButton.setEnabled(true);
+                okButton.setEnabled(pendingLocationState == null);
                 downloadServiceBinding.unbind();
                 resumePendingLocation();
             }
@@ -346,7 +347,14 @@ public class DownloadDialog extends PvcDownloadDialog
     @Override
     public void onDestroyView() {
         disposables.clear();
-        downloadPreparation = null;
+        if (collisionDialog != null) {
+            collisionDialog.dismiss();
+            collisionDialog = null;
+        }
+        if (downloadPreparation != null) {
+            downloadPreparation.close();
+            downloadPreparation = null;
+        }
         downloadServiceBinding.unbind();
         okButton = null;
         dialogBinding = null;
@@ -464,27 +472,47 @@ public class DownloadDialog extends PvcDownloadDialog
     //////////////////////////////////////////////////////////////////////////*/
 
     private void requestDownloadPickAudioFolderResult(final ActivityResult result) {
-        completeLocation(result);
+        completeLocation(result, DownloadPreparation.LocationType.FOLDER,
+                DownloadPreparation.Kind.AUDIO);
     }
 
     private void requestDownloadPickVideoFolderResult(final ActivityResult result) {
-        completeLocation(result);
+        completeLocation(result, DownloadPreparation.LocationType.FOLDER,
+                DownloadPreparation.Kind.VIDEO);
     }
 
     private void requestDownloadSaveAsResult(@NonNull final ActivityResult result) {
-        completeLocation(result);
+        completeLocation(result, DownloadPreparation.LocationType.DOCUMENT, null);
     }
 
-    private void completeLocation(final ActivityResult result) {
+    private void completeLocation(final ActivityResult result,
+                                  final DownloadPreparation.LocationType expectedType,
+                                  @Nullable final DownloadPreparation.Kind expectedKind) {
+        if (pendingLocationState == null || pendingLocationState.type != expectedType
+                || (expectedType == DownloadPreparation.LocationType.FOLDER
+                && (pendingLocationState.kind == DownloadPreparation.Kind.AUDIO)
+                != (expectedKind == DownloadPreparation.Kind.AUDIO))) {
+            return;
+        }
         if (result.getResultCode() != Activity.RESULT_OK) {
+            clearPendingLocation();
             return;
         }
         if (result.getData() == null || result.getData().getData() == null) {
+            clearPendingLocation();
             showFailedDialog(R.string.general_error);
             return;
         }
         pendingLocationResult = result.getData().getData();
         resumePendingLocation();
+    }
+
+    private void clearPendingLocation() {
+        pendingLocationState = null;
+        pendingLocationResult = null;
+        if (okButton != null) {
+            okButton.setEnabled(downloadPreparation != null && dialogBinding != null);
+        }
     }
 
     private void resumePendingLocation() {
@@ -494,8 +522,7 @@ public class DownloadDialog extends PvcDownloadDialog
         }
         final DownloadPreparation.Location location = pendingLocationState;
         final Uri result = pendingLocationResult;
-        pendingLocationState = null;
-        pendingLocationResult = null;
+        clearPendingLocation();
         downloadPreparation.resume(location, result, new DownloadPresentation());
     }
 
@@ -697,12 +724,15 @@ public class DownloadDialog extends PvcDownloadDialog
                 .show();
     }
 
-    private void launchDirectoryPicker(final ActivityResultLauncher<Intent> launcher) {
-        NoFileManagerSafeGuard.launchSafe(launcher, StoredDirectoryHelper.getPicker(context), TAG,
-                context);
+    private boolean launchDirectoryPicker(final ActivityResultLauncher<Intent> launcher) {
+        return NoFileManagerSafeGuard.launchSafe(launcher,
+                StoredDirectoryHelper.getPicker(context), TAG, context);
     }
 
     private void prepareSelectedDownload() {
+        if (downloadPreparation == null || dialogBinding == null || pendingLocationState != null) {
+            return;
+        }
         final DownloadPreparation.Destination destination;
         if (askForSavePath) {
             destination = DownloadPreparation.Destination.askDocument();
@@ -752,21 +782,32 @@ public class DownloadDialog extends PvcDownloadDialog
         public void chooseLocation(final DownloadPreparation.LocationRequest request) {
             pendingLocationState = request.state();
             pendingLocationResult = null;
+            if (okButton != null) {
+                okButton.setEnabled(false);
+            }
+            final boolean launched;
             if (request.type == DownloadPreparation.LocationType.DOCUMENT) {
-                NoFileManagerSafeGuard.launchSafe(requestDownloadSaveAsLauncher,
+                launched = NoFileManagerSafeGuard.launchSafe(requestDownloadSaveAsLauncher,
                         StoredFileHelper.getNewPicker(context, request.filename, request.mime,
                                 null),
                         TAG, context);
             } else {
                 Toast.makeText(context, getString(R.string.no_dir_yet), Toast.LENGTH_LONG).show();
-                launchDirectoryPicker(request.kind == DownloadPreparation.Kind.AUDIO
+                launched = launchDirectoryPicker(request.kind == DownloadPreparation.Kind.AUDIO
                         ? requestDownloadPickAudioFolderLauncher
                         : requestDownloadPickVideoFolderLauncher);
+            }
+            if (!launched) {
+                clearPendingLocation();
             }
         }
 
         @Override
         public void confirmCollision(final DownloadPreparation.CollisionRequest request) {
+            if (collisionDialog != null) {
+                collisionDialog.dismiss();
+                collisionDialog = null;
+            }
             final int message;
             switch (request.reason) {
                 case FINISHED:
@@ -796,7 +837,7 @@ public class DownloadDialog extends PvcDownloadDialog
                     request.confirm();
                 });
             }
-            askDialog.show();
+            collisionDialog = askDialog.show();
         }
 
         @Override
@@ -814,6 +855,11 @@ public class DownloadDialog extends PvcDownloadDialog
                     ErrorUtil.createNotification(requireContext(), new ErrorInfo(failure.cause,
                             UserAction.DOWNLOAD_FAILED, "Getting storage"));
                     return;
+                case INVALID_SELECTION:
+                case DISPATCH:
+                    Log.e(TAG, "Failed to prepare or submit the download", failure.cause);
+                    message = R.string.general_error;
+                    break;
                 case PATH_CREATION:
                     message = R.string.error_path_creation;
                     break;
