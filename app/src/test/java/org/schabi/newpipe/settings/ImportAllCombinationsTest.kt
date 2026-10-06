@@ -3,6 +3,7 @@ package org.schabi.newpipe.settings
 import android.content.SharedPreferences
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import kotlin.io.path.createTempFile
 import kotlin.io.path.exists
 import kotlin.io.path.fileSize
@@ -11,6 +12,7 @@ import org.junit.Test
 import org.mockito.Mockito
 import org.schabi.newpipe.settings.export.BackupFileLocator
 import org.schabi.newpipe.settings.export.ImportExportManager
+import org.schabi.newpipe.settings.export.PendingDatabaseRestore
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import us.shandian.giga.io.FileStream
 
@@ -50,17 +52,15 @@ class ImportAllCombinationsTest {
             Mockito.withSettings().stubOnly()
         )
         val db = createTempFile("newpipe_", "")
-        val dbJournal = createTempFile("newpipe_", "")
-        val dbWal = createTempFile("newpipe_", "")
-        val dbShm = createTempFile("newpipe_", "")
+        val dbJournal = Files.createFile(db.resolveSibling("${db.fileName}-journal"))
+        val dbWal = Files.createFile(db.resolveSibling("${db.fileName}-wal"))
+        val dbShm = Files.createFile(db.resolveSibling("${db.fileName}-shm"))
         Mockito.`when`(fileLocator.db).thenReturn(db)
-        Mockito.`when`(fileLocator.dbJournal).thenReturn(dbJournal)
-        Mockito.`when`(fileLocator.dbShm).thenReturn(dbShm)
-        Mockito.`when`(fileLocator.dbWal).thenReturn(dbWal)
 
         if (containsDb) {
             runTest {
-                Assert.assertTrue(ImportExportManager(fileLocator).extractDb(zip))
+                ImportExportManager(fileLocator).prepareRestore(zip, null).use { it.publish() }
+                PendingDatabaseRestore.install(fileLocator.db)
                 Assert.assertFalse(dbJournal.exists())
                 Assert.assertFalse(dbWal.exists())
                 Assert.assertFalse(dbShm.exists())
@@ -68,7 +68,9 @@ class ImportAllCombinationsTest {
             }
         } else {
             runTest {
-                Assert.assertFalse(ImportExportManager(fileLocator).extractDb(zip))
+                Assert.assertThrows(IOException::class.java) {
+                    ImportExportManager(fileLocator).prepareRestore(zip, null).use { it.publish() }
+                }
                 Assert.assertTrue(dbJournal.exists())
                 Assert.assertTrue(dbWal.exists())
                 Assert.assertTrue(dbShm.exists())

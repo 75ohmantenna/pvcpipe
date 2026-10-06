@@ -7,10 +7,17 @@ import com.grack.nanojson.JsonParserException
 import com.grack.nanojson.JsonWriter
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.io.ObjectOutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.deleteIfExists
+import org.schabi.newpipe.streams.io.SharpInputStream
 import org.schabi.newpipe.streams.io.SharpOutputStream
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import org.schabi.newpipe.util.ZipHelper
@@ -18,6 +25,34 @@ import org.schabi.newpipe.util.ZipHelper
 class ImportExportManager(private val fileLocator: BackupFileLocator) {
     companion object {
         const val TAG = "ImportExportManager"
+
+        /** Persist a complete map; failed commit may still change Android's in-memory values. */
+        @JvmStatic
+        fun replacePreferences(preferences: SharedPreferences, entries: Map<String, *>) {
+            val editor = preferences.edit()
+            editor.clear()
+            for ((key, value) in entries) {
+                when (value) {
+                    is Boolean -> editor.putBoolean(key, value)
+
+                    is Float -> editor.putFloat(key, value)
+
+                    is Int -> editor.putInt(key, value)
+
+                    is Long -> editor.putLong(key, value)
+
+                    is String -> editor.putString(key, value)
+
+                    is Set<*> -> {
+                        if (value.any { it !is String }) throw IOException("Invalid settings set")
+                        editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+                    }
+
+                    else -> throw IOException("Invalid settings value")
+                }
+            }
+            if (!editor.commit()) throw IOException("Unable to persist settings")
+        }
     }
 
     /**
@@ -66,34 +101,85 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
         fileLocator.db.createParentDirectories()
     }
 
-    /**
-     * Extracts the database from the given file to the app's database directory.
-     * The current app's database will be overwritten.
-     * @param file the .zip file to extract the database from
-     * @return true if the database was successfully extracted, false otherwise
-     */
-    fun extractDb(file: StoredFileHelper): Boolean {
-        val name = BackupFileLocator.FILE_NAME_DB
-        val success = ZipHelper.extractFileFromZip(file, name, fileLocator.db)
-
-        if (success) {
-            fileLocator.dbJournal.deleteIfExists()
-            fileLocator.dbWal.deleteIfExists()
-            fileLocator.dbShm.deleteIfExists()
+    /** Prepare from one private copy; no live settings or pending restore are modified. */
+    fun prepareRestore(file: StoredFileHelper, settingsEntry: String?): PreparedRestore {
+        if (hasPendingRestore()) throw IOException("A restored database is awaiting restart")
+        ensureDbDirectoryExists()
+        val snapshot = Files.createTempFile(fileLocator.db.parent, "backup-source-", ".zip")
+        var temporary: Path? = null
+        try {
+            file.stream.use { stream ->
+                Files.copy(SharpInputStream(stream), snapshot, StandardCopyOption.REPLACE_EXISTING)
+            }
+            val preferences = ZipFile(snapshot.toFile()).use { zip ->
+                if (settingsEntry == null) {
+                    null
+                } else {
+                    val offered = if (zip.getEntry(BackupFileLocator.FILE_NAME_JSON_PREFS) != null) {
+                        BackupFileLocator.FILE_NAME_JSON_PREFS
+                    } else if (zip.getEntry(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) != null) {
+                        BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
+                    } else {
+                        null
+                    }
+                    if (offered != settingsEntry) {
+                        throw IOException("Backup settings changed; inspect the backup again")
+                    }
+                    zip.getInputStream(zip.getEntry(settingsEntry)).use {
+                        if (settingsEntry == BackupFileLocator.FILE_NAME_JSON_PREFS) {
+                            decodeJson(it)
+                        } else {
+                            decodeSerialized(it)
+                        }
+                    }
+                }
+            }
+            val preparedDatabase = Files.createTempFile(fileLocator.db.parent, "backup-db-", ".tmp")
+            temporary = preparedDatabase
+            var found = false
+            ZipInputStream(Files.newInputStream(snapshot)).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.name == BackupFileLocator.FILE_NAME_DB) {
+                        Files.copy(zip, preparedDatabase, StandardCopyOption.REPLACE_EXISTING)
+                        found = true
+                        break
+                    }
+                }
+            }
+            if (!found || Files.size(preparedDatabase) == 0L) {
+                throw IOException("Backup does not contain a nonempty database")
+            }
+            Files.delete(snapshot)
+            val prepared = PreparedRestore(fileLocator.db, preparedDatabase, preferences)
+            temporary = null
+            return prepared
+        } finally {
+            try {
+                temporary?.deleteIfExists()
+            } finally {
+                snapshot.deleteIfExists()
+            }
         }
-
-        return success
     }
 
-    /** Stages a complete database without modifying the database used by this process. */
-    fun stageDb(file: StoredFileHelper): Boolean {
-        val temporary = PendingDatabaseRestore.temporaryPath(fileLocator.db)
-        try {
-            val success = ZipHelper.extractFileFromZip(file, BackupFileLocator.FILE_NAME_DB, temporary)
-            if (success) PendingDatabaseRestore.commit(fileLocator.db)
-            return success
-        } finally {
-            temporary.deleteIfExists()
+    fun hasPendingRestore(): Boolean = PendingDatabaseRestore.hasPending(fileLocator.db)
+
+    /** Owns only this attempt's unpublished database; publication transfers ownership to startup. */
+    class PreparedRestore internal constructor(
+        private val database: Path,
+        private val temporary: Path,
+        val preferences: MutableMap<String, Any>?
+    ) : AutoCloseable {
+        private var published = false
+
+        fun publish() {
+            PendingDatabaseRestore.publish(database, temporary)
+            published = true
+        }
+
+        override fun close() {
+            if (!published) temporary.deleteIfExists()
         }
     }
 
@@ -118,85 +204,50 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
     )
     @Throws(IOException::class, ClassNotFoundException::class)
     fun loadSerializedPrefs(zipFile: StoredFileHelper, preferences: SharedPreferences) {
-        ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) {
-            PreferencesObjectInputStream(it).use { input ->
-                @Suppress("UNCHECKED_CAST")
-                val entries = input.readObject() as Map<String, *>
-
-                val editor = preferences.edit()
-                editor.clear()
-
-                for ((key, value) in entries) {
-                    when (value) {
-                        is Boolean -> editor.putBoolean(key, value)
-
-                        is Float -> editor.putFloat(key, value)
-
-                        is Int -> editor.putInt(key, value)
-
-                        is Long -> editor.putLong(key, value)
-
-                        is String -> editor.putString(key, value)
-
-                        is Set<*> -> {
-                            // There are currently only Sets with type String possible
-                            @Suppress("UNCHECKED_CAST")
-                            editor.putStringSet(key, value as Set<String>?)
-                        }
-                    }
-                }
-
-                if (!editor.commit()) {
-                    throw IOException("Unable to commit loadSerializedPrefs")
-                }
+        if (!ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) {
+                replacePreferences(preferences, decodeSerialized(it))
             }
-        }.let { fileExists ->
-            if (!fileExists) {
-                throw FileNotFoundException(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS)
-            }
+        ) {
+            throw FileNotFoundException(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS)
         }
     }
 
-    /**
-     * Remove all shared preferences from the app and load the preferences supplied to the manager.
-     */
     @Throws(IOException::class, JsonParserException::class)
     fun loadJsonPrefs(zipFile: StoredFileHelper, preferences: SharedPreferences) {
-        ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_JSON_PREFS) {
-            val jsonObject = JsonParser.`object`().from(it)
+        if (!ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_JSON_PREFS) {
+                replacePreferences(preferences, decodeJson(it))
+            }
+        ) {
+            throw FileNotFoundException(BackupFileLocator.FILE_NAME_JSON_PREFS)
+        }
+    }
 
-            val editor = preferences.edit()
-            editor.clear()
+    private fun decodeSerialized(input: InputStream): MutableMap<String, Any> = PreferencesObjectInputStream(input).use {
+        val entries = it.readObject() as? Map<*, *> ?: throw IOException("Invalid settings map")
+        decodeEntries(entries, false)
+    }
 
-            for ((key, value) in jsonObject) {
-                when (value) {
-                    is Boolean -> editor.putBoolean(key, value)
+    private fun decodeJson(input: InputStream): MutableMap<String, Any> = decodeEntries(JsonParser.`object`().from(input), true)
 
-                    is Float -> editor.putFloat(key, value)
+    private fun decodeEntries(entries: Map<*, *>, json: Boolean): MutableMap<String, Any> {
+        val decoded = mutableMapOf<String, Any>()
+        for ((key, value) in entries) {
+            if (key !is String) throw IOException("Invalid settings key")
+            when (value) {
+                is Boolean, is Float, is Int, is Long, is String -> decoded[key] = value
 
-                    is Double -> value.toFloat().takeIf { it.isFinite() }?.let {
-                        editor.putFloat(key, it)
-                    }
-
-                    is Int -> editor.putInt(key, value)
-
-                    is Long -> editor.putLong(key, value)
-
-                    is String -> editor.putString(key, value)
-
-                    is JsonArray -> {
-                        editor.putStringSet(key, value.mapNotNull { e -> e as? String }.toSet())
-                    }
+                is Double -> if (json) {
+                    value.toFloat().takeIf { it.isFinite() }?.let { decoded[key] = it }
                 }
-            }
 
-            if (!editor.commit()) {
-                throw IOException("Unable to commit loadJsonPrefs")
-            }
-        }.let { fileExists ->
-            if (!fileExists) {
-                throw FileNotFoundException(BackupFileLocator.FILE_NAME_JSON_PREFS)
+                is Set<*> -> {
+                    if (value.any { it !is String }) throw IOException("Invalid settings set")
+                    decoded[key] = value.filterIsInstance<String>().toSet()
+                }
+
+                is JsonArray -> if (json) decoded[key] = value.filterIsInstance<String>().toSet()
             }
         }
+        return decoded
     }
 }

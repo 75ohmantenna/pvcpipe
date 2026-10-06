@@ -22,6 +22,15 @@ public final class PendingDatabaseRestore {
                 StandardCopyOption.REPLACE_EXISTING);
     }
 
+    public static boolean hasPending(final Path database) {
+        return Files.exists(pendingPath(database));
+    }
+
+    public static void publish(final Path database, final Path prepared) throws IOException {
+        // Do not replace a previously accepted restore, even if one appears during preparation.
+        Files.move(prepared, pendingPath(database));
+    }
+
     public static void install(final Path database) throws IOException {
         final Path pending = pendingPath(database);
         if (!Files.exists(pending)) {

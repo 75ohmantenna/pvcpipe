@@ -3,7 +3,9 @@ package org.schabi.newpipe.settings
 import android.content.SharedPreferences
 import com.grack.nanojson.JsonParser
 import java.io.File
+import java.io.IOException
 import java.io.ObjectInputStream
+import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -34,6 +36,7 @@ import org.mockito.Mockito.withSettings
 import org.mockito.junit.MockitoJUnitRunner
 import org.schabi.newpipe.settings.export.BackupFileLocator
 import org.schabi.newpipe.settings.export.ImportExportManager
+import org.schabi.newpipe.settings.export.PendingDatabaseRestore
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import us.shandian.giga.io.FileStream
 
@@ -110,19 +113,17 @@ class ImportExportManagerTest {
     @Test
     fun `The database must be extracted from the zip file`() {
         val db = createTempFile("newpipe_", "")
-        val dbJournal = createTempFile("newpipe_", "")
-        val dbWal = createTempFile("newpipe_", "")
-        val dbShm = createTempFile("newpipe_", "")
+        val dbJournal = Files.createFile(db.resolveSibling("${db.fileName}-journal"))
+        val dbWal = Files.createFile(db.resolveSibling("${db.fileName}-wal"))
+        val dbShm = Files.createFile(db.resolveSibling("${db.fileName}-shm"))
         `when`(fileLocator.db).thenReturn(db)
-        `when`(fileLocator.dbJournal).thenReturn(dbJournal)
-        `when`(fileLocator.dbShm).thenReturn(dbShm)
-        `when`(fileLocator.dbWal).thenReturn(dbWal)
 
         val zip = File(classloader.getResource("settings/db_ser_json.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(zip))
-        val success = ImportExportManager(fileLocator).extractDb(storedFileHelper)
-
-        assertTrue(success)
+        ImportExportManager(fileLocator).prepareRestore(storedFileHelper, null).use { it.publish() }
+        assertEquals(0, db.fileSize())
+        assertTrue(dbWal.exists())
+        PendingDatabaseRestore.install(db)
         assertFalse(dbJournal.exists())
         assertFalse(dbWal.exists())
         assertFalse(dbShm.exists())
@@ -132,16 +133,16 @@ class ImportExportManagerTest {
     @Test
     fun `Extracting the database from an empty zip must not work`() {
         val db = createTempFile("newpipe_", "")
-        val dbJournal = createTempFile("newpipe_", "")
-        val dbWal = createTempFile("newpipe_", "")
-        val dbShm = createTempFile("newpipe_", "")
+        val dbJournal = Files.createFile(db.resolveSibling("${db.fileName}-journal"))
+        val dbWal = Files.createFile(db.resolveSibling("${db.fileName}-wal"))
+        val dbShm = Files.createFile(db.resolveSibling("${db.fileName}-shm"))
         `when`(fileLocator.db).thenReturn(db)
 
         val emptyZip = File(classloader.getResource("settings/nodb_noser_nojson.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(emptyZip))
-        val success = ImportExportManager(fileLocator).extractDb(storedFileHelper)
-
-        assertFalse(success)
+        assertThrows(IOException::class.java) {
+            ImportExportManager(fileLocator).prepareRestore(storedFileHelper, null).use { it.publish() }
+        }
         assertTrue(dbJournal.exists())
         assertTrue(dbWal.exists())
         assertTrue(dbShm.exists())
