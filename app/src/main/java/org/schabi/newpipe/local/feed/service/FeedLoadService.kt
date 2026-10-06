@@ -41,8 +41,6 @@ import org.schabi.newpipe.App
 import org.schabi.newpipe.MainActivity.DEBUG
 import org.schabi.newpipe.R
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity
-import org.schabi.newpipe.local.feed.service.FeedEventManager.Event.ErrorResultEvent
-import org.schabi.newpipe.local.feed.service.FeedEventManager.postEvent
 
 class FeedLoadService : Service() {
     companion object {
@@ -110,8 +108,6 @@ class FeedLoadService : Service() {
                 loadingDisposable = null
                 if (error != null) {
                     Log.e(TAG, "Error while storing result", error)
-                    handleError(error)
-                    return@subscribe
                 }
                 stopService()
             }
@@ -119,6 +115,8 @@ class FeedLoadService : Service() {
     }
 
     private fun disposeAll() {
+        loadingDisposable?.dispose()
+        loadingDisposable = null
         broadcastReceiver?.let { unregisterReceiver(it) }
         broadcastReceiver = null
         notificationDisposable?.dispose()
@@ -140,7 +138,7 @@ class FeedLoadService : Service() {
     override fun onDestroy() {
         feedRefresh?.cancel()
         disposeAll()
-        // Do not dispose loading: its final buffered results must still reach the database.
+        // The refresh owns draining buffered results independently of these observers.
         super.onDestroy()
     }
 
@@ -225,14 +223,5 @@ class FeedLoadService : Service() {
             IntentFilter(ACTION_CANCEL),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
-    }
-
-    // /////////////////////////////////////////////////////////////////////////
-    // Error handling
-    // /////////////////////////////////////////////////////////////////////////
-
-    private fun handleError(error: Throwable) {
-        postEvent(ErrorResultEvent(error))
-        stopService()
     }
 }

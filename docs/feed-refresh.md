@@ -25,13 +25,28 @@ means the collected batches and cleanup finished, rather than that every
 channel extraction succeeded. Cancellation stops admitting extractions where
 cooperative checks permit and lets already collected results reach storage.
 
-This structural phase deliberately keeps the existing cold result behavior.
-Repeated result observation repeats work, disposing the result observer can lose
-a partial batch, and fatal shared feed events still originate in the foreground
-caller. The foreground caller therefore retains its existing no-disposal drain
-workaround. Separate failure correction will make execution ownership consistent
-for both callers.
+The first result subscription accepts execution once. The refresh retains its
+complete pipeline through persistence and cleanup; disposing an observer only
+detaches presentation. Later observers receive the same success or failure
+without re-extracting or rewriting data. Progress remains a live stream, so
+callers that need all progress subscribe before observing the result.
+
+Cooperative cancellation prevents further extraction where checks permit. It
+does not interrupt an external request or throttle sleep already running. Those
+requests can finish, and their results join the final partial batch. The module
+publishes one terminal shared feed event independently of which caller started
+it or whether observers remain attached. Synchronous subscription-query errors
+also enter this terminal result.
+
+The foreground caller cancels and disposes its observers on destruction or
+timeout. The notification worker cancels its active refresh when stopped,
+including a stop racing refresh creation. Accepted work remains in-process;
+this interface does not promise completion after process death, prohibit
+concurrent refreshes, or change foreground notification IDs.
 
 Run `make ci` for all checks and APK builds. `FeedRefreshTest` exercises the
 refresh interface, including batching, cancellation, materialized failures,
-and the inherited disposal and repeated-observation defects.
+shared observation, retained completion, and independent run state.
+`FeedRefreshDatabaseTest` runs production queries, transactions, and cleanup
+against isolated in-memory Room, including actual foreground destruction and
+whole-batch rollback. Only external extraction is substituted.

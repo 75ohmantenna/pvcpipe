@@ -35,14 +35,20 @@ class FeedRefresh internal constructor(
         FeedLoadState(description, maxProgress.get(), currentProgress.get())
     }
 
+    /**
+     * One subscribed refresh, replayed to later observers. Disposing an observer detaches it;
+     * [cancel] cooperatively stops new extractions while allowing accepted results to drain.
+     */
     val result: Single<List<Notification<FeedUpdateInfo>>> = buildResult()
+        .doOnError { postEvent(FeedEventManager.Event.ErrorResultEvent(it)) }
+        .cache()
 
     private fun buildResult(): Single<List<Notification<FeedUpdateInfo>>> {
         // like `currentProgress`, but counts the number of YouTube extractions that have begun, so
         // they can be properly throttled every once in a while (see doOnNext below)
         val youtubeExtractionCount = AtomicInteger()
 
-        return operations.subscriptions(groupId, outdatedThreshold)
+        return Flowable.defer { operations.subscriptions(groupId, outdatedThreshold) }
             .take(1)
             .doOnNext {
                 currentProgress.set(0)
@@ -127,7 +133,7 @@ class FeedRefresh internal constructor(
         postEvent(FeedEventManager.Event.ProgressEvent(R.string.feed_processing_message))
         operations.trim()
 
-        postEvent(FeedEventManager.Event.SuccessResultEvent(itemsErrors))
+        postEvent(FeedEventManager.Event.SuccessResultEvent(itemsErrors.toList()))
     }.doOnSubscribe {
         currentProgress.set(-1)
         maxProgress.set(-1)

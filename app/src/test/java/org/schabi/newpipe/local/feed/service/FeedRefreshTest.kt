@@ -8,6 +8,10 @@ import io.reactivex.rxjava3.schedulers.Schedulers
 import io.reactivex.rxjava3.schedulers.TestScheduler
 import java.io.IOException
 import java.time.OffsetDateTime
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -101,12 +105,16 @@ class FeedRefreshTest {
         val cause = IOException("query failed")
         val operations = TestOperations(4).apply { queryError = cause }
         val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events)
 
-        refresh(operations, events).result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
 
+        assertEquals(1, operations.queries)
         assertTrue(operations.fetches.isEmpty())
         assertTrue(operations.effects.isEmpty())
         assertFalse(events.any { it is FeedEventManager.Event.SuccessResultEvent })
+        assertEquals(listOf(cause), events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().map { it.error })
     }
 
     @Test
@@ -114,28 +122,35 @@ class FeedRefreshTest {
         val cause = IOException("transaction failed")
         val operations = TestOperations(3).apply { storeError = cause }
         val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events)
 
-        refresh(operations, events).result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
 
+        assertEquals(1, operations.queries)
         assertEquals(1, operations.storeAttempts)
         assertTrue(operations.storedBatches.isEmpty())
         assertEquals(0, operations.trimCalls)
         assertFalse(events.any { it is FeedEventManager.Event.SuccessResultEvent })
+        assertEquals(listOf(cause), events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().map { it.error })
     }
 
     @Test
-    fun `legacy fatal trim error preserves storage but publishes no terminal feed event`() {
+    fun `fatal trim error publishes one terminal feed error`() {
         val cause = IOException("cleanup failed")
         val operations = TestOperations(3).apply { trimError = cause }
         val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events)
 
-        refresh(operations, events).result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
 
+        assertEquals(1, operations.queries)
         assertEquals(3, operations.storedBatches.single().size)
         assertEquals(listOf("store", "trim"), operations.effects)
         assertEquals(1, operations.trimCalls)
         assertFalse(events.any { it is FeedEventManager.Event.SuccessResultEvent })
-        assertFalse(events.any { it is FeedEventManager.Event.ErrorResultEvent })
+        assertEquals(listOf(cause), events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().map { it.error })
     }
 
     @Test
@@ -183,7 +198,7 @@ class FeedRefreshTest {
     }
 
     @Test
-    fun `legacy cold result resubscription repeats extraction storage and completion`() {
+    fun `result reobservation replays completion without repeating accepted work`() {
         val io = TestScheduler()
         val main = TestScheduler()
         val operations = TestOperations(3)
@@ -197,15 +212,15 @@ class FeedRefreshTest {
         drain(io, main)
         second.assertComplete()
 
-        assertEquals(2, operations.queries)
-        assertEquals(6, operations.fetches.size)
-        assertEquals(2, operations.storedBatches.size)
-        assertEquals(2, operations.trimCalls)
-        assertEquals(2, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+        assertEquals(1, operations.queries)
+        assertEquals(3, operations.fetches.size)
+        assertEquals(1, operations.storedBatches.size)
+        assertEquals(1, operations.trimCalls)
+        assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
     }
 
     @Test
-    fun `legacy observer disposal loses collected partial results and skips cleanup`() {
+    fun `observer disposal preserves collected partial results and cleanup`() {
         val io = TestScheduler()
         val main = TestScheduler()
         val operations = TestOperations(8)
@@ -221,10 +236,254 @@ class FeedRefreshTest {
 
         assertTrue(result.isDisposed)
         assertTrue(operations.fetches.size >= 5)
-        assertTrue(operations.storedBatches.isEmpty())
-        assertEquals(0, operations.trimCalls)
-        assertFalse(events.any { it is FeedEventManager.Event.SuccessResultEvent })
+        assertEquals(8, operations.storedBatches.single().size)
+        assertEquals(1, operations.trimCalls)
+        assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+        val replay = refresh.result.test().assertComplete().values().single()
+        assertEquals(operations.storedBatches.single(), replay)
+        assertEquals(1, operations.queries)
+        assertEquals(8, operations.fetches.size)
+        assertEquals(1, operations.storedBatches.size)
+        assertEquals(1, operations.trimCalls)
         progress.dispose()
+    }
+
+    @Test
+    fun `concurrent observers share one extraction persistence and terminal event`() {
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val operations = TestOperations(23)
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events, io, main)
+        val first = refresh.result.test()
+        val second = refresh.result.test()
+
+        drain(io, main)
+
+        first.assertComplete()
+        second.assertComplete()
+        assertEquals(first.values(), second.values())
+        assertEquals(1, operations.queries)
+        assertEquals(23, operations.fetches.size)
+        assertEquals(listOf(20, 3), operations.storedBatches.map { it.size })
+        assertEquals(1, operations.trimCalls)
+        assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+    }
+
+    @Test
+    fun `inflight cancellation and detach retain current extraction and partial batch`() {
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val operations = TestOperations(30)
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events, io, main)
+        val observer = refresh.result.test()
+        operations.afterFetch = {
+            if (operations.fetches.size == 5) {
+                refresh.cancel()
+                observer.dispose()
+            }
+        }
+
+        drain(io, main)
+
+        assertTrue(observer.isDisposed)
+        assertEquals(5, operations.fetches.size)
+        assertEquals(5, operations.storedBatches.single().size)
+        assertEquals(listOf("store", "trim"), operations.effects)
+        val replay = refresh.result.test().assertComplete().values().single()
+        assertEquals(operations.fetches.toSet(), replay.map { it.value!!.uid }.toSet())
+        assertEquals(1, operations.queries)
+        assertEquals(1, operations.storedBatches.size)
+        assertEquals(1, operations.trimCalls)
+        assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+    }
+
+    @Test
+    fun `synchronous subscription query throw becomes one observed and shared error`() {
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val cause = IOException("query construction failed")
+        val operations = TestOperations(3).apply { subscriptionError = cause }
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events, io, main)
+        assertEquals(0, operations.subscriptionCalls)
+        val observer = refresh.result.test()
+
+        drain(io, main)
+
+        observer.assertError(cause)
+        refresh.result.test().assertError(cause)
+        assertEquals(1, operations.subscriptionCalls)
+        assertEquals(0, operations.queries)
+        assertTrue(operations.fetches.isEmpty())
+        assertTrue(operations.effects.isEmpty())
+        assertEquals(listOf(cause), events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().map { it.error })
+    }
+
+    @Test
+    fun `creating refresh without observing result performs no query or execution`() {
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val operations = TestOperations(3)
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events, io, main)
+        val progress = refresh.progress.test()
+
+        drain(io, main)
+
+        assertEquals(0, operations.subscriptionCalls)
+        assertEquals(0, operations.queries)
+        assertTrue(operations.fetches.isEmpty())
+        assertTrue(operations.effects.isEmpty())
+        assertTrue(events.isEmpty())
+        progress.assertNoValues()
+        progress.cancel()
+    }
+
+    @Test
+    fun `fresh refresh inherits neither earlier channel errors nor cancellation`() {
+        val operations = TestOperations(2).apply { channelErrors[1L] = IOException("first run") }
+        val firstEvents = ArrayList<FeedEventManager.Event>()
+        val first = refresh(operations, firstEvents)
+        first.result.test().assertComplete()
+        val firstCompletion = firstEvents.last() as FeedEventManager.Event.SuccessResultEvent
+        assertEquals(1, firstCompletion.itemsErrors.size)
+        first.cancel()
+        operations.channelErrors.clear()
+        val nextEvents = ArrayList<FeedEventManager.Event>()
+
+        refresh(operations, nextEvents).result.test().assertComplete().assertValue { items ->
+            items.size == 2 && items.all { it.isOnNext }
+        }
+
+        val nextCompletion = nextEvents.last() as FeedEventManager.Event.SuccessResultEvent
+        assertTrue(nextCompletion.itemsErrors.isEmpty())
+        assertEquals(1, firstCompletion.itemsErrors.size)
+        assertEquals(4, operations.fetches.size)
+        assertEquals(2, operations.trimCalls)
+    }
+
+    @Test
+    fun `detached fatal trim still publishes one error and replays without repeating writes`() {
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val cause = IOException("detached cleanup failed")
+        val operations = TestOperations(7).apply { trimError = cause }
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events, io, main)
+        refresh.result.test().dispose()
+
+        drain(io, main)
+
+        refresh.result.test().assertError(cause)
+        refresh.result.test().assertError(cause)
+        assertEquals(1, operations.queries)
+        assertEquals(7, operations.storedBatches.single().size)
+        assertEquals(1, operations.trimCalls)
+        assertEquals(listOf(cause), events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().map { it.error })
+        assertFalse(events.any { it is FeedEventManager.Event.SuccessResultEvent })
+    }
+
+    @Test
+    fun `cancellation retains all three concurrent in flight extractions after observer detaches`() {
+        val started = CountDownLatch(3)
+        val release = CountDownLatch(1)
+        val terminal = CountDownLatch(1)
+        val fetches = ConcurrentLinkedQueue<Long>()
+        val batches = ConcurrentLinkedQueue<List<Notification<FeedUpdateInfo>>>()
+        val events = ConcurrentLinkedQueue<FeedEventManager.Event>()
+        val trims = AtomicInteger()
+        val subscriptions = (1..9).map { index ->
+            SubscriptionEntity(
+                uid = index.toLong(),
+                serviceId = 42,
+                url = "https://example.test/channel/$index",
+                name = "channel $index"
+            )
+        }
+        val operations = object : FeedRefresh.Operations {
+            override fun subscriptions(
+                groupId: Long,
+                outdatedThreshold: OffsetDateTime
+            ): Flowable<List<SubscriptionEntity>> = Flowable.just(subscriptions)
+
+            override fun fetch(subscriptionEntity: SubscriptionEntity, useFeedExtractor: Boolean): FeedUpdateInfo {
+                fetches.add(subscriptionEntity.uid)
+                started.countDown()
+                assertTrue("in-flight extraction was never released", release.await(10, TimeUnit.SECONDS))
+                return FeedUpdateInfo(
+                    uid = subscriptionEntity.uid,
+                    notificationMode = subscriptionEntity.notificationMode,
+                    name = subscriptionEntity.name!!,
+                    avatarUrl = null,
+                    url = subscriptionEntity.url!!,
+                    serviceId = subscriptionEntity.serviceId,
+                    description = null,
+                    subscriberCount = null,
+                    streams = emptyList(),
+                    errors = emptyList()
+                )
+            }
+
+            override fun storeBatch(list: List<Notification<FeedUpdateInfo>>): List<Throwable> {
+                batches.add(list.toList())
+                return emptyList()
+            }
+
+            override fun trim() {
+                trims.incrementAndGet()
+            }
+        }
+        val refresh = FeedRefresh(
+            7L,
+            threshold,
+            true,
+            operations,
+            "processing",
+            Schedulers.io(),
+            Schedulers.trampoline()
+        ) { event ->
+            events.add(event)
+            if (event is FeedEventManager.Event.SuccessResultEvent ||
+                event is FeedEventManager.Event.ErrorResultEvent
+            ) {
+                terminal.countDown()
+            }
+        }
+        val observer = refresh.result.test()
+
+        try {
+            assertTrue("three concurrent extractions did not start", started.await(10, TimeUnit.SECONDS))
+            assertEquals(3, fetches.size)
+            refresh.cancel()
+            observer.dispose()
+            release.countDown()
+            assertTrue("cancelled refresh did not finish", terminal.await(10, TimeUnit.SECONDS))
+
+            val replay = refresh.result.test().awaitDone(10, TimeUnit.SECONDS)
+                .assertComplete().assertNoErrors().values().single()
+            assertTrue(observer.isDisposed)
+            assertEquals(3, fetches.size)
+            assertEquals(3, replay.size)
+            assertTrue(replay.all { it.isOnNext })
+            assertEquals(fetches.toSet(), replay.map { it.value!!.uid }.toSet())
+            assertEquals(1, batches.size)
+            assertEquals(replay, batches.single())
+            assertEquals(1, trims.get())
+            assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+            assertTrue(events.none { it is FeedEventManager.Event.ErrorResultEvent })
+
+            refresh.result.test().awaitDone(10, TimeUnit.SECONDS).assertValue(replay).assertComplete()
+            assertEquals(3, fetches.size)
+            assertEquals(1, batches.size)
+            assertEquals(1, trims.get())
+            assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
+        } finally {
+            refresh.cancel()
+            release.countDown()
+            observer.dispose()
+        }
     }
 
     private fun refresh(
@@ -258,10 +517,12 @@ class FeedRefreshTest {
         var selectedGroup: Long? = null
         var selectedThreshold: OffsetDateTime? = null
         var queryError: Throwable? = null
+        var subscriptionError: Throwable? = null
         var storeError: Throwable? = null
         var trimError: Throwable? = null
         var afterFetch: (() -> Unit)? = null
         var queries = 0
+        var subscriptionCalls = 0
         var storeAttempts = 0
         var trimCalls = 0
 
@@ -269,6 +530,8 @@ class FeedRefreshTest {
             groupId: Long,
             outdatedThreshold: OffsetDateTime
         ): Flowable<List<SubscriptionEntity>> {
+            subscriptionCalls++
+            subscriptionError?.let { throw it }
             selectedGroup = groupId
             selectedThreshold = outdatedThreshold
             return Flowable.defer {
