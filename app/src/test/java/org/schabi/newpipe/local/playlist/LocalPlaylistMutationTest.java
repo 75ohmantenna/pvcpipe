@@ -12,7 +12,9 @@ import static org.mockito.Mockito.when;
 import org.junit.Before;
 import org.junit.Test;
 import org.schabi.newpipe.database.AppDatabase;
+import org.schabi.newpipe.database.playlist.dao.PlaylistDAO;
 import org.schabi.newpipe.database.playlist.dao.PlaylistStreamDAO;
+import org.schabi.newpipe.database.playlist.model.PlaylistEntity;
 import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity;
 import org.schabi.newpipe.database.stream.dao.StreamDAO;
 import org.schabi.newpipe.database.stream.model.StreamEntity;
@@ -22,12 +24,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 
 public class LocalPlaylistMutationTest {
     private final TestScheduler scheduler = new TestScheduler();
     private final AppDatabase database = mock(AppDatabase.class);
     private final PlaylistStreamDAO joins = mock(PlaylistStreamDAO.class);
+    private final PlaylistDAO playlists = mock(PlaylistDAO.class);
     private final StreamDAO streams = mock(StreamDAO.class);
     private final List<List<Long>> writes = new ArrayList<>();
     private LocalPlaylistManager manager;
@@ -37,6 +41,9 @@ public class LocalPlaylistMutationTest {
     @Before
     public void setUp() {
         when(database.playlistStreamDAO()).thenReturn(joins);
+        when(database.playlistDAO()).thenReturn(playlists);
+        when(playlists.getPlaylist(anyLong())).thenReturn(Flowable.just(
+                new ArrayList<>(List.of(new PlaylistEntity("playlist", false, 100L, 0L)))));
         when(database.streamDAO()).thenReturn(streams);
         manager = new LocalPlaylistManager(database, scheduler);
         when(database.runInTransaction(any(Callable.class))).thenAnswer(call -> {

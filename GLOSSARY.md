@@ -67,3 +67,14 @@ application process remains running.
 **Subscription transfer**:
 Importing subscriptions from a channel source or saved file, or exporting followed
 channels to a saved file.
+
+## Local playlists
+
+**Local playlist**:
+A saved ordered collection of streams. A stream may appear more than once.
+
+**Automatic playlist thumbnail**:
+A playlist image chosen from its current streams, or the default image when empty.
+
+**Permanent playlist thumbnail**:
+A fixed playlist image retained independently of playlist contents.

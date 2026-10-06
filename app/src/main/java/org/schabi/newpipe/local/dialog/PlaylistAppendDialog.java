@@ -1,7 +1,5 @@
 package org.schabi.newpipe.local.dialog;
 
-import static org.schabi.newpipe.database.playlist.model.PlaylistEntity.DEFAULT_THUMBNAIL_ID;
-
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,7 +26,6 @@ import java.util.List;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
-import io.reactivex.rxjava3.core.Maybe;
 
 public final class PlaylistAppendDialog extends PlaylistDialog {
     private static final String TAG = PlaylistAppendDialog.class.getCanonicalName();
@@ -169,11 +166,6 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
         final Toast successToast = Toast.makeText(getContext(), toastText, Toast.LENGTH_SHORT);
 
         playlistDisposables.add(manager.appendToPlaylist(playlist.getUid(), streams)
-                .flatMap(saved -> playlist.getThumbnailStreamId() != null
-                        && playlist.getThumbnailStreamId() == DEFAULT_THUMBNAIL_ID
-                        ? manager.changePlaylistThumbnail(playlist.getUid(),
-                                streams.get(0).getUid(), false).map(ignored -> saved)
-                        : Maybe.just(saved))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(ignored -> {
                     successToast.show();
