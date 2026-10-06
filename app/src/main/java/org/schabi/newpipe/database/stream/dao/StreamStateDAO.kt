@@ -21,6 +21,9 @@ interface StreamStateDAO : BasicDAO<StreamStateEntity> {
     @Query("SELECT * FROM " + StreamStateEntity.STREAM_STATE_TABLE)
     override fun getAll(): Flowable<List<StreamStateEntity>>
 
+    @Query("SELECT * FROM " + StreamStateEntity.STREAM_STATE_TABLE + " WHERE " + StreamStateEntity.JOIN_STREAM_ID + " = :streamId")
+    fun getStateSync(streamId: Long): StreamStateEntity?
+
     @Query("DELETE FROM " + StreamStateEntity.STREAM_STATE_TABLE)
     override fun deleteAll(): Int
 
