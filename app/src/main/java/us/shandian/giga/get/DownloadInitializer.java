@@ -167,7 +167,6 @@ public class DownloadInitializer extends Thread {
                     }
                 }
 
-                mMission.running = false;
                 break;
             } catch (InterruptedIOException | ClosedByInterruptException e) {
                 return;
@@ -176,7 +175,6 @@ public class DownloadInitializer extends Thread {
 
                 if (e instanceof DownloadMission.HttpError && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     // for youtube streams. The url has expired
-                    interrupt();
                     mMission.doRecover(ERROR_HTTP_FORBIDDEN);
                     return;
                 }
@@ -196,13 +194,13 @@ public class DownloadInitializer extends Thread {
             }
         }
 
-        mMission.start();
+        mMission.initializationFinished();
     }
 
     @Override
     public void interrupt() {
         super.interrupt();
-        dispose();
+        if (mConn != null) mConn.disconnect();
     }
 
     // the url parameter can be null if method was called the first time with an url
