@@ -32,15 +32,28 @@ use the same production browser with local HTML and HTTP fixtures, covering real
 JavaScript token conversion, initialization failure, and canceled initialization
 without network access.
 
-## Preserved behavior
+## Ownership and recovery
 
-The refactor keeps the existing blocking requests, lazily checked WebView support,
-expiry check, initialization lock, generator-identity check on forced recreation,
-recursive retry policy, and runtime-wrapper exception handling. Candidate streaming
-initialization failure retires that candidate and preserves the published session.
-Successful replacement immediately schedules retirement of its predecessor.
+Replacement publishes only after visitor data and the streaming token are ready.
+Every player attempt owns its selected session until success, failure, or timeout.
+A replaced generator retires exactly once after its final owner releases it. Short
+per-session ownership locks let completed requests return while another request
+waits for replacement initialization. External retirement runs outside both locks.
 
-Failures involving a predecessor's active requests, repeated retries after a
-concurrent replacement, or late WebView callbacks are separate corrections. They
-must first be reproduced through the module interface rather than folded into the
-structural change.
+Each request gets at most one recovery attempt. A stale failure may reuse a
+replacement published by another request, but failure of that recovery is terminal.
+An attempt on a newly initialized session also fails without another recreation.
+
+## Browser initialization and callbacks
+
+Initialization follows explicit phases on the main queue. Duplicate, premature,
+and closed-generation callbacks cannot start new transport work or publish a
+canceled generator. Nonfatal browser construction, loading, parsing, and JavaScript
+evaluation failures terminate initialization and close allocated resources.
+A fatal JavaScript initialization error still closes an already delivered generator.
+
+Each token request uses a unique callback ID independent of its input identifier.
+Canceled, duplicate, or reordered callbacks cannot consume a different request,
+including another request for the same identifier. JavaScript receives identifiers
+only as UTF-8 bytes and uses local variables; quotes and Unicode cannot alter the
+script or callback identity.

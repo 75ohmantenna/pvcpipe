@@ -79,6 +79,23 @@ class PoTokenWebViewIntegrationTest {
         observer.assertNoValues()
     }
 
+    @Test
+    fun quotedAndUnicodeIdentifiersSurviveRealJavaScript() {
+        val environment = FixtureEnvironment()
+        val observer = PoTokenWebView.newPoTokenGenerator(environment).test()
+            .awaitDone(20, TimeUnit.SECONDS).assertComplete().assertNoErrors()
+        val generator = observer.values().single()
+        try {
+            val identifier = "video-\"雪\\\n"
+            val expected = java.util.Base64.getUrlEncoder().encodeToString(identifier.toByteArray(Charsets.UTF_8))
+            generator.generatePoToken(identifier).test().awaitDone(10, TimeUnit.SECONDS)
+                .assertValue(expected).assertComplete().assertNoErrors()
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { generator.close() }
+        }
+        assertEquals(1, environment.closed.get())
+    }
+
     private class FixtureEnvironment(
         private val responseCode: Int = 200,
         private val pendingResponse: Boolean = false,
