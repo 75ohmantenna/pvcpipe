@@ -137,4 +137,36 @@ class BackupRestoreTest {
         assertEquals("settings", environment.values["original"])
         assertEquals(0, environment.restarts)
     }
+
+    @Test
+    fun `rejected restore replays one notification and new requests can retry`() {
+        val inspection = inspection("settings/db_ser_json.zip")
+        val destination = environment.documentUri(temporary.root.toPath().resolve("busy.zip"))
+        val export = backups.exportTo(destination).test()
+        val rejected = backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_ONLY)
+        rejected.test().dispose()
+        main.triggerActions()
+        assertEquals(1, environment.errors.size)
+        io.triggerActions()
+        export.assertComplete()
+        rejected.test().assertError(IllegalStateException::class.java)
+        assertEquals(1, environment.errors.size)
+        val retry = backups.inspect(environment.documents.keys.first()).test()
+        io.triggerActions()
+        retry.assertComplete()
+        assertEquals(0, environment.restarts)
+    }
+
+    @Test
+    fun `valid JSON takes precedence over unsafe serialized preferences`() {
+        val inspection = inspection("settings/db_vulnser_json.zip")
+        backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS).test().also {
+            io.triggerActions()
+            main.triggerActions()
+            it.assertComplete()
+        }
+        assertEquals(1, environment.restarts)
+        assertTrue(environment.errors.isEmpty())
+        assertFalse(environment.values.containsKey("original"))
+    }
 }
