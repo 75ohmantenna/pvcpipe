@@ -84,3 +84,9 @@ A fixed playlist image retained independently of playlist contents.
 **Proof-token session**:
 The shared visitor data, streaming proof token, and generator used to produce
 player proof tokens for individual video requests.
+
+## Playback
+
+**Playback source**:
+The selected remote media and stream metadata prepared for the player, including
+its chosen video quality and audio track.
