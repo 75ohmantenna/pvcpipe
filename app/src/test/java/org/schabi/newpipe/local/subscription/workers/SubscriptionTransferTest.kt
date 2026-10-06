@@ -5,9 +5,18 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -161,7 +170,7 @@ class SubscriptionTransferTest {
     }
 
     @Test
-    fun `import storage failure retains existing escaping exception behavior`() = runBlocking {
+    fun `import storage failure reports a failure outcome without successful progress`() = runBlocking {
         val cause = IOException("transaction unavailable")
         val operations = TestOperations().apply {
             source = items(2)
@@ -169,13 +178,9 @@ class SubscriptionTransferTest {
         }
         val progress = ArrayList<SubscriptionTransfer.Progress>()
 
-        try {
-            transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { progress.add(it) }
-            fail("Storage error should retain the worker's original exception path")
-        } catch (error: IOException) {
-            assertSame(cause, error)
-        }
+        val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { progress.add(it) }
 
+        assertSame(cause, (result as SubscriptionTransfer.Outcome.Failure).cause)
         assertEquals(2, operations.extracted.size)
         assertTrue(operations.stored.isEmpty())
         assertEquals(listOf(0), progress.filterIsInstance<SubscriptionTransfer.Progress.Importing>().map { it.current })
@@ -240,24 +245,293 @@ class SubscriptionTransferTest {
     }
 
     @Test
-    fun `unavailable input retains legacy successful empty import until correction`() = runBlocking {
-        val operations = TestOperations()
+    fun `unavailable import documents fail instead of importing an empty selection`() = runBlocking {
+        for (input in listOf(previousExport(), SubscriptionImportInput.InputStreamMode(17, "source"))) {
+            val operations = TestOperations()
+            val progress = ArrayList<SubscriptionTransfer.Progress>()
 
-        val result = transfer(operations).`import`(previousExport()) {}
+            val result = transfer(operations).`import`(input) { progress.add(it) }
 
-        assertEquals(0, (result as SubscriptionTransfer.Outcome.Success).count)
+            assertTrue(result is SubscriptionTransfer.Outcome.Failure)
+            assertTrue((result as SubscriptionTransfer.Outcome.Failure).cause is IOException)
+            assertTrue(operations.extracted.isEmpty())
+            assertTrue(operations.stored.isEmpty())
+            assertTrue(progress.isEmpty())
+        }
+    }
+
+    @Test
+    fun `unavailable export destination fails instead of reporting an unwritten export`() = runBlocking {
+        val operations = TestOperations().apply { subscriptions = items(2) }
+
+        val result = transfer(operations).export("destination") {}
+
+        assertTrue(result is SubscriptionTransfer.Outcome.Failure)
+        assertTrue((result as SubscriptionTransfer.Outcome.Failure).cause is IOException)
+        assertEquals(listOf("snapshot", "output"), operations.effects)
+    }
+
+    @Test
+    fun `cancelled source propagates cancellation without extraction or writes`() = runBlocking {
+        val cause = CancellationException("source cancelled")
+        val operations = TestOperations().apply { sourceError = cause }
+
+        assertCancellation(cause) {
+            transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+        }
+
         assertTrue(operations.extracted.isEmpty())
         assertTrue(operations.stored.isEmpty())
     }
 
     @Test
-    fun `unavailable output retains legacy successful export until correction`() = runBlocking {
+    fun `cancelled previous export read closes its input and propagates cancellation`() = runBlocking {
+        val cause = CancellationException("document read cancelled")
+        val input = object : TrackedInput(byteArrayOf()) {
+            override fun read(): Int {
+                throw cause
+            }
+
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                throw cause
+            }
+        }
+        val operations = TestOperations().apply { this.input = input }
+        val progress = ArrayList<SubscriptionTransfer.Progress>()
+
+        assertCancellation(cause) {
+            transfer(operations).`import`(previousExport()) { progress.add(it) }
+        }
+
+        assertTrue(input.closed)
+        assertTrue(operations.extracted.isEmpty())
+        assertTrue(operations.stored.isEmpty())
+        assertTrue(operations.effects.isEmpty())
+        assertTrue(progress.isEmpty())
+    }
+
+    @Test
+    fun `cancelled extraction propagates cancellation without writes`() = runBlocking {
+        val cause = CancellationException("extraction cancelled")
+        val operations = TestOperations().apply {
+            source = items(2)
+            extractError = cause
+        }
+
+        assertCancellation(cause) {
+            transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+        }
+
+        assertTrue(operations.stored.isEmpty())
+    }
+
+    @Test
+    fun `cancelled import storage propagates cancellation`() = runBlocking {
+        val cause = CancellationException("storage cancelled")
+        val operations = TestOperations().apply {
+            source = items(2)
+            storeError = cause
+        }
+
+        assertCancellation(cause) {
+            transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+        }
+
+        assertTrue(operations.stored.isEmpty())
+    }
+
+    @Test
+    fun `cancelled export snapshot propagates cancellation without opening destination`() = runBlocking {
+        val cause = CancellationException("snapshot cancelled")
+        val operations = TestOperations().apply { snapshotError = cause }
+
+        assertCancellation(cause) {
+            transfer(operations).export("destination") {}
+        }
+
+        assertEquals(listOf("snapshot"), operations.effects)
+    }
+
+    @Test
+    fun `cancelled export write closes its stream and propagates cancellation`() = runBlocking {
+        val cause = CancellationException("write cancelled")
+        var closed = false
+        val operations = TestOperations().apply {
+            subscriptions = items(2)
+            output = object : OutputStream() {
+                override fun write(value: Int) {
+                    throw cause
+                }
+
+                override fun close() {
+                    closed = true
+                }
+            }
+        }
+
+        assertCancellation(cause) {
+            transfer(operations).export("destination") {}
+        }
+
+        assertTrue(closed)
+    }
+
+    @Test
+    fun `cancelled import loading presentation propagates cancellation without writes`() = runBlocking {
+        val cause = CancellationException("loading presentation cancelled")
+        val operations = TestOperations().apply { source = items(2) }
+
+        assertCancellation(cause) {
+            transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { throw cause }
+        }
+
+        assertTrue(operations.stored.isEmpty())
+    }
+
+    @Test
+    fun `cancelled export presentation propagates cancellation without opening destination`() = runBlocking {
+        val cause = CancellationException("export presentation cancelled")
         val operations = TestOperations().apply { subscriptions = items(2) }
 
-        val result = transfer(operations).export("destination") {}
+        assertCancellation(cause) {
+            transfer(operations).export("destination") { throw cause }
+        }
 
-        assertEquals(2, (result as SubscriptionTransfer.Outcome.Success).count)
-        assertEquals(listOf("snapshot", "output"), operations.effects)
+        assertEquals(listOf("snapshot"), operations.effects)
+    }
+
+    @Test
+    fun `suspended extraction requests never exceed eight in flight`() = runBlocking {
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { dispatcher ->
+            val release = CompletableDeferred<Unit>()
+            val firstWave = CompletableDeferred<Unit>()
+            val active = AtomicInteger()
+            val maximum = AtomicInteger()
+            val started = AtomicInteger()
+            val operations = TestOperations().apply {
+                source = items(24)
+                beforeExtract = {
+                    val concurrent = active.incrementAndGet()
+                    maximum.updateAndGet { maxOf(it, concurrent) }
+                    if (started.incrementAndGet() == 8) firstWave.complete(Unit)
+                    try {
+                        release.await()
+                    } finally {
+                        active.decrementAndGet()
+                    }
+                }
+            }
+            val execution = async(dispatcher) {
+                SubscriptionTransfer(operations, dispatcher).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+            }
+
+            try {
+                withTimeout(10_000) { firstWave.await() }
+                // A queued sentinel lets the extraction dispatcher drain runnable requests.
+                withContext(dispatcher) {}
+                assertEquals("suspended external requests must retain their slots", 8, maximum.get())
+                assertTrue(operations.stored.isEmpty())
+                release.complete(Unit)
+                val outcome = withTimeout(10_000) { execution.await() }
+                assertEquals(24, (outcome as SubscriptionTransfer.Outcome.Success).count)
+                assertEquals(24, started.get())
+                assertEquals(8, maximum.get())
+                assertEquals(0, active.get())
+                assertEquals(24, operations.stored.single().size)
+            } finally {
+                release.complete(Unit)
+                execution.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test
+    fun `suspended loading presentation is serialized and progress never regresses`() = runBlocking {
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { dispatcher ->
+            val firstProgress = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val active = AtomicInteger()
+            val maximum = AtomicInteger()
+            val delivered = ArrayList<Int>()
+            val operations = TestOperations().apply { source = items(24) }
+            val execution = async(dispatcher) {
+                SubscriptionTransfer(operations, dispatcher).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {
+                    if (it is SubscriptionTransfer.Progress.Loading) {
+                        val concurrent = active.incrementAndGet()
+                        maximum.updateAndGet { previous -> maxOf(previous, concurrent) }
+                        if (it.current == 1) firstProgress.complete(Unit)
+                        try {
+                            release.await()
+                            delivered.add(it.current)
+                        } finally {
+                            active.decrementAndGet()
+                        }
+                    }
+                }
+            }
+
+            try {
+                withTimeout(10_000) { firstProgress.await() }
+                withContext(dispatcher) {}
+                assertEquals("foreground updates must not overlap", 1, maximum.get())
+                release.complete(Unit)
+                val outcome = withTimeout(10_000) { execution.await() }
+                assertEquals(24, (outcome as SubscriptionTransfer.Outcome.Success).count)
+                assertEquals((1..24).toList(), delivered)
+                assertEquals(1, maximum.get())
+                assertEquals(0, active.get())
+            } finally {
+                release.complete(Unit)
+                execution.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test
+    fun `cancelling a running import releases suspended requests without admitting waiting requests or writes`() = runBlocking {
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { dispatcher ->
+            val release = CompletableDeferred<Unit>()
+            val firstWave = CompletableDeferred<Unit>()
+            val active = AtomicInteger()
+            val started = AtomicInteger()
+            val operations = TestOperations().apply {
+                source = items(24)
+                beforeExtract = {
+                    active.incrementAndGet()
+                    if (started.incrementAndGet() == 8) firstWave.complete(Unit)
+                    try {
+                        release.await()
+                    } finally {
+                        active.decrementAndGet()
+                    }
+                }
+            }
+            val execution = async(dispatcher) {
+                SubscriptionTransfer(operations, dispatcher).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+            }
+            try {
+                withTimeout(10_000) { firstWave.await() }
+                withContext(dispatcher) {}
+                assertEquals(8, active.get())
+                withTimeout(10_000) { execution.cancelAndJoin() }
+                assertTrue(execution.isCancelled)
+                assertEquals(0, active.get())
+                assertEquals(8, started.get())
+                assertTrue(operations.stored.isEmpty())
+            } finally {
+                release.complete(Unit)
+                execution.cancelAndJoin()
+            }
+        }
+    }
+
+    private suspend fun assertCancellation(cause: CancellationException, action: suspend () -> Unit) {
+        try {
+            action()
+            fail("Cancellation must propagate rather than become a transfer outcome")
+        } catch (error: CancellationException) {
+            assertTrue("Original cancellation must be retained", generateSequence<Throwable>(error) { it.cause }.any { it === cause })
+        }
     }
 
     private fun transfer(operations: TestOperations) = SubscriptionTransfer(operations, ImmediateDispatcher)
@@ -268,7 +542,7 @@ class SubscriptionTransferTest {
 
     private fun ChannelInfo.toItem() = SubscriptionItem(serviceId, url, name)
 
-    private class TrackedInput(bytes: ByteArray) : ByteArrayInputStream(bytes) {
+    private open class TrackedInput(bytes: ByteArray) : ByteArrayInputStream(bytes) {
         var closed = false
 
         override fun close() {
@@ -293,6 +567,7 @@ class SubscriptionTransferTest {
         var subscriptions = emptyList<SubscriptionItem>()
         var sourceError: Exception? = null
         var extractError: Exception? = null
+        var beforeExtract: (suspend (SubscriptionItem) -> Unit)? = null
         var storeError: Exception? = null
         var snapshotError: Exception? = null
         var channelRequest: Pair<Int, String>? = null
@@ -329,6 +604,7 @@ class SubscriptionTransferTest {
             effects.add("extract")
             extracted.add(item)
             extractError?.let { throw it }
+            beforeExtract?.invoke(item)
             val channel = ChannelInfo(item.serviceId, item.url, item.url, item.url, item.name)
             val tab = ChannelTabInfo(
                 item.serviceId,

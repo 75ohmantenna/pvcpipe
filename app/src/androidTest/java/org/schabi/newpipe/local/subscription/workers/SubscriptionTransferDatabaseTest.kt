@@ -134,12 +134,9 @@ class SubscriptionTransferDatabaseTest {
         val transfer = transfer(subscriptionItems(52))
         val progress = ConcurrentLinkedQueue<SubscriptionTransfer.Progress>()
 
-        try {
-            transfer.`import`(SubscriptionImportInput.PreviousExportMode(INPUT)) { progress.add(it) }
-            throw AssertionError("The rejected stream must fail the transfer")
-        } catch (_: SQLiteException) {
-            // Room must roll back the subscription upserts and the earlier stream in this batch.
-        }
+        val result = transfer.`import`(SubscriptionImportInput.PreviousExportMode(INPUT)) { progress.add(it) }
+        assertTrue(result is SubscriptionTransfer.Outcome.Failure)
+        assertTrue((result as SubscriptionTransfer.Outcome.Failure).cause is SQLiteException)
 
         assertEquals(50, rowCount("subscriptions"))
         assertEquals(50, rowCount("streams"))

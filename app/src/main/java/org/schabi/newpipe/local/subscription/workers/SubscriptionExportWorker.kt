@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.BuildConfig
@@ -49,6 +50,7 @@ class SubscriptionExportWorker(
 
             Result.success()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             if (BuildConfig.DEBUG) {
                 Log.e(TAG, "Error while exporting subscriptions", e)
             }
