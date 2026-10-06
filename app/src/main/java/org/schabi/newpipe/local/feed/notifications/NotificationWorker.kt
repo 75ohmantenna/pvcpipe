@@ -40,10 +40,10 @@ class NotificationWorker(
     private val feedLoadManager = FeedLoadManager(appContext)
 
     override fun createWork(): Single<Result> = if (areNotificationsEnabled(applicationContext)) {
-        feedLoadManager.startLoading(
+        feedLoadManager.createRefresh(
             ignoreOutdatedThreshold = true,
             groupId = FeedLoadManager.GROUP_NOTIFICATION_ENABLED
-        )
+        ).result
             .doOnSubscribe { showLoadingFeedForegroundNotification() }
             .map { feed ->
                 // filter out feedUpdateInfo items (i.e. channels) with nothing new

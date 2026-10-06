@@ -40,3 +40,20 @@ A destination already used by an existing file or download.
 **Submitted download**:
 A prepared download handed off for background execution.
 Submission does not establish that the download has started or completed.
+
+## Subscription feeds
+
+**Subscription**:
+A channel the user follows for stream updates.
+
+**Feed refresh**:
+An attempt to load and store stream updates for selected subscriptions.
+A refresh may complete with failures for individual subscriptions.
+
+**Feed update**:
+The stream and channel information collected for one subscription during a
+feed refresh, including any extraction errors.
+
+**Refresh result**:
+The collected feed updates and subscription failures after the refresh has
+finished storing batches and cleaning up the feed.
