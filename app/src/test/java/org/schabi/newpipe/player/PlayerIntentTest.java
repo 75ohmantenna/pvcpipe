@@ -33,7 +33,7 @@ import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
-import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
+import org.schabi.newpipe.player.resolver.PlaybackSources;
 import org.schabi.newpipe.player.ui.MainPlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUiList;
 import org.schabi.newpipe.util.DependentPreferenceHelper;
@@ -60,7 +60,7 @@ public class PlayerIntentTest {
     private ExoPlayer exoPlayer;
     private SerializedCache cache;
     private PlayerUiList uis;
-    private VideoPlaybackResolver videoResolver;
+    private PlaybackSources playbackSources;
     private HistoryRecordManager history;
     private CompositeDisposable streamSubscriptions;
     private CompositeDisposable historySubscriptions;
@@ -80,7 +80,7 @@ public class PlayerIntentTest {
         exoPlayer = mock(ExoPlayer.class);
         cache = mock(SerializedCache.class);
         uis = spy(new PlayerUiList(mock(MainPlayerUi.class)));
-        videoResolver = mock(VideoPlaybackResolver.class);
+        playbackSources = mock(PlaybackSources.class);
         history = mock(HistoryRecordManager.class);
         streamSubscriptions = new CompositeDisposable();
         historySubscriptions = new CompositeDisposable();
@@ -89,7 +89,7 @@ public class PlayerIntentTest {
         setField("playerType", PlayerType.MAIN);
         setField("UIs", uis);
         setField("simpleExoPlayer", exoPlayer);
-        setField("videoResolver", videoResolver);
+        setField("playbackSources", playbackSources);
         setField("recordManager", history);
         setField("context", mock(Context.class));
         setField("streamItemDisposable", streamSubscriptions);
@@ -132,7 +132,7 @@ public class PlayerIntentTest {
     @Test
     public void missingIntentTypeDoesNotSetUpOrChangePlayback() {
         player.handleIntent(intent);
-        verifyNoInteractions(uis, exoPlayer, cache, videoResolver, history);
+        verifyNoInteractions(uis, exoPlayer, cache, playbackSources, history);
         assertSame(PlayerType.MAIN, player.getPlayerType());
     }
 
@@ -151,9 +151,9 @@ public class PlayerIntentTest {
         assertEquals(List.of("current", "last", "incoming"), urls(current));
         assertSame(current, player.getPlayQueue());
         assertEquals(0, current.getIndex());
-        final InOrder order = inOrder(uis, videoResolver, cache);
+        final InOrder order = inOrder(uis, playbackSources, cache);
         order.verify(uis).get(MainPlayerUi.class);
-        order.verify(videoResolver).setPlaybackQuality("720p");
+        order.verify(playbackSources).setPlaybackQuality("720p");
         order.verify(cache).take("queue", PlayQueue.class);
         verifyNoInteractions(exoPlayer, history);
     }

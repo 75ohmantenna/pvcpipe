@@ -29,7 +29,6 @@ import static com.google.android.exoplayer2.Player.REPEAT_MODE_OFF;
 import static com.google.android.exoplayer2.Player.REPEAT_MODE_ONE;
 import static com.google.android.exoplayer2.Player.RepeatMode;
 import static org.schabi.newpipe.extractor.ServiceList.YouTube;
-import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 import static org.schabi.newpipe.player.helper.PlayerHelper.retrievePlaybackParametersFromPrefs;
 import static org.schabi.newpipe.player.helper.PlayerHelper.retrieveSeekDurationFromPreferences;
 import static org.schabi.newpipe.player.helper.PlayerHelper.savePlaybackParametersToPrefs;
@@ -88,7 +87,6 @@ import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.fragments.detail.VideoDetailFragment;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -107,9 +105,7 @@ import org.schabi.newpipe.player.playback.PlaybackListener;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
-import org.schabi.newpipe.player.resolver.AudioPlaybackResolver;
-import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
-import org.schabi.newpipe.player.resolver.VideoPlaybackResolver.SourceType;
+import org.schabi.newpipe.player.resolver.PlaybackSources;
 import org.schabi.newpipe.player.ui.BackgroundPlayerUi;
 import org.schabi.newpipe.player.ui.MainPlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUi;
@@ -122,7 +118,6 @@ import org.schabi.newpipe.util.ListHelper;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.SerializedCache;
 import org.schabi.newpipe.util.SponsorBlockMode;
-import org.schabi.newpipe.util.StreamTypeUtil;
 
 import java.util.List;
 import java.util.Objects;
@@ -212,9 +207,7 @@ public final class Player implements PlaybackListener, Listener {
     private final DefaultRenderersFactory renderFactory;
 
     @NonNull
-    private final VideoPlaybackResolver videoResolver;
-    @NonNull
-    private final AudioPlaybackResolver audioResolver;
+    private final PlaybackSources playbackSources;
 
     private final PlayerService service; //TODO try to remove and replace everything with context
 
@@ -308,8 +301,7 @@ public final class Player implements PlaybackListener, Listener {
                         context.getString(
                                 R.string.use_exoplayer_decoder_fallback_key), false));
 
-        videoResolver = new VideoPlaybackResolver(context, dataSource, getQualityResolver());
-        audioResolver = new AudioPlaybackResolver(context, dataSource);
+        playbackSources = new PlaybackSources(context, dataSource, getQualityResolver());
 
         // The UIs added here should always be present. They will be initialized when the player
         // reaches the initialization step. Make sure the media session ui is before the
@@ -321,8 +313,8 @@ public final class Player implements PlaybackListener, Listener {
         );
     }
 
-    private VideoPlaybackResolver.QualityResolver getQualityResolver() {
-        return new VideoPlaybackResolver.QualityResolver() {
+    private PlaybackSources.QualityResolver getQualityResolver() {
+        return new PlaybackSources.QualityResolver() {
             @Override
             public int getDefaultResolutionIndex(final List<VideoStream> sortedVideos) {
                 return videoPlayerSelected()
@@ -361,7 +353,7 @@ public final class Player implements PlaybackListener, Listener {
         isAudioOnly = audioPlayerSelected();
 
         if (intent.hasExtra(PLAYBACK_QUALITY)) {
-            videoResolver.setPlaybackQuality(intent.getStringExtra(PLAYBACK_QUALITY));
+            playbackSources.setPlaybackQuality(intent.getStringExtra(PLAYBACK_QUALITY));
         }
 
         final boolean playWhenReady = intent.getBooleanExtra(PLAY_WHEN_READY, true);
@@ -1950,27 +1942,7 @@ public final class Player implements PlaybackListener, Listener {
     @Override // own playback listener
     @Nullable
     public MediaSource sourceOf(final PlayQueueItem item, final StreamInfo info) {
-        if (audioPlayerSelected()) {
-            return audioResolver.resolve(info);
-        }
-
-        if (isAudioOnly && videoResolver.getStreamSourceType().orElse(
-                SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY)
-                == SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY) {
-            // If the current info has only video streams with audio and if the stream is played as
-            // audio, we need to use the audio resolver, otherwise the video stream will be played
-            // in background.
-            return audioResolver.resolve(info);
-        }
-
-        // Even if the stream is played in background, we need to use the video resolver if the
-        // info played is separated video-only and audio-only streams; otherwise, if the audio
-        // resolver was called when the app was in background, the app will only stream audio when
-        // the user come back to the app and will never fetch the video stream.
-        // Note that the video is not fetched when the app is in background because the video
-        // renderer is fully disabled (see useVideoAndSubtitles method), except for HLS streams
-        // (see https://github.com/google/ExoPlayer/issues/9282).
-        return videoResolver.resolve(info);
+        return playbackSources.resolve(info, audioPlayerSelected(), isAudioOnly);
     }
 
     public void disablePreloadingOfCurrentTrack() {
@@ -2152,10 +2124,8 @@ public final class Player implements PlaybackListener, Listener {
             // Preserve pending recovery until a timeline exists.
             setRecovery();
         }
-        final boolean reloadNeeded = getCurrentStreamInfo().map(info ->
-                playQueueManagerReloadingNeeded(videoResolver.getStreamSourceType()
-                        .orElse(SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY),
-                        info, getVideoRendererIndex())).orElse(true);
+        final boolean reloadNeeded = playbackSources.requiresReload(currentMetadata,
+                getVideoRendererIndex() != RENDERER_UNAVAILABLE);
         if (reloadNeeded) {
             reloadPlayQueueManager();
         }
@@ -2167,68 +2137,6 @@ public final class Player implements PlaybackListener, Listener {
                 .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, !videoAndSubtitlesEnabled));
     }
 
-    /**
-     * Return whether the play queue manager needs to be reloaded when switching player type.
-     *
-     * <p>
-     * The play queue manager needs to be reloaded if the video renderer index is not known and if
-     * the content is not an audio content, but also if none of the following cases is met:
-     *
-     * <ul>
-     *     <li>the content is an {@link StreamType#AUDIO_STREAM audio stream}, an
-     *     {@link StreamType#AUDIO_LIVE_STREAM audio live stream}, or a
-     *     {@link StreamType#POST_LIVE_AUDIO_STREAM ended audio live stream};</li>
-     *     <li>the content is a {@link StreamType#LIVE_STREAM live stream} and the source type is a
-     *     {@link SourceType#LIVE_STREAM live source};</li>
-     *     <li>the content's source is {@link SourceType#VIDEO_WITH_SEPARATED_AUDIO a video stream
-     *     with a separated audio source} or has no audio-only streams available <b>and</b> is a
-     *     {@link StreamType#VIDEO_STREAM video stream}, an
-     *     {@link StreamType#POST_LIVE_STREAM ended live stream}, or a
-     *     {@link StreamType#LIVE_STREAM live stream}.
-     *     </li>
-     * </ul>
-     * </p>
-     *
-     * @param sourceType         the {@link SourceType} of the stream
-     * @param streamInfo         the {@link StreamInfo} of the stream
-     * @param videoRendererIndex the video renderer index of the video source, if that's a video
-     *                           source (or {@link #RENDERER_UNAVAILABLE})
-     * @return whether the play queue manager needs to be reloaded
-     */
-    private boolean playQueueManagerReloadingNeeded(final SourceType sourceType,
-                                                    @NonNull final StreamInfo streamInfo,
-                                                    final int videoRendererIndex) {
-        final StreamType streamType = streamInfo.getStreamType();
-        final boolean isStreamTypeAudio = StreamTypeUtil.isAudio(streamType);
-
-        if (videoRendererIndex == RENDERER_UNAVAILABLE && !isStreamTypeAudio) {
-            return true;
-        }
-
-        // The content is an audio stream, an audio live stream, or a live stream with a live
-        // source: it's not needed to reload the play queue manager because the stream source will
-        // be the same
-        if (isStreamTypeAudio || (streamType == StreamType.LIVE_STREAM
-                && sourceType == SourceType.LIVE_STREAM)) {
-            return false;
-        }
-
-        // The content's source is a video with separated audio or a video with audio -> the video
-        // and its fetch may be disabled
-        // The content's source is a video with embedded audio and the content has no separated
-        // audio stream available: it's probably not needed to reload the play queue manager
-        // because the stream source will be probably the same as the current played
-        if (sourceType == SourceType.VIDEO_WITH_SEPARATED_AUDIO
-                || (sourceType == SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY
-                && isNullOrEmpty(streamInfo.getAudioStreams()))) {
-            // It's not needed to reload the play queue manager only if the content's stream type
-            // is a video stream, a live stream or an ended live stream
-            return !StreamTypeUtil.isVideo(streamType);
-        }
-
-        // Other cases: the play queue manager reload is needed
-        return true;
-    }
     //endregion
 
 
@@ -2284,15 +2192,14 @@ public final class Player implements PlaybackListener, Listener {
     public void setPlaybackQuality(@Nullable final String quality) {
         saveStreamProgressState();
         setRecovery();
-        videoResolver.setPlaybackQuality(quality);
+        playbackSources.setPlaybackQuality(quality);
         reloadPlayQueueManager();
     }
 
     public void setAudioTrack(@Nullable final String audioTrackId) {
         saveStreamProgressState();
         setRecovery();
-        videoResolver.setAudioTrack(audioTrackId);
-        audioResolver.setAudioTrack(audioTrackId);
+        playbackSources.setAudioTrack(audioTrackId);
         reloadPlayQueueManager();
     }
 

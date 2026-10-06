@@ -470,7 +470,7 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                     }
                 } else {
                     // Legacy progressive streams, subtitles are handled by
-                    // VideoPlaybackResolver
+                    // PlaybackSources
                     return buildYoutubeProgressiveMediaSource(dataSource, stream, cacheKey,
                             metadata);
                 }
