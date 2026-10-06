@@ -119,8 +119,11 @@ object PoTokenProviderImpl : PoTokenProvider {
                 // this might happen for example if NewPipe goes in the background and the WebView
                 // content is lost
                 Log.e(TAG, "Failed to obtain poToken, retrying")
-                return getWebClientPoToken(videoId = videoId, forceRecreate = true,
-                    failedGenerator = poTokenGenerator)
+                return getWebClientPoToken(
+                    videoId = videoId,
+                    forceRecreate = true,
+                    failedGenerator = poTokenGenerator
+                )
             }
         }
 

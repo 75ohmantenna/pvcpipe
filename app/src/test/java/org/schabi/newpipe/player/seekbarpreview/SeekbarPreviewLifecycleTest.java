@@ -34,7 +34,8 @@ public class SeekbarPreviewLifecycleTest {
             return mock(Future.class);
         });
         try (var log = mockStatic(Log.class)) {
-            final SeekbarPreviewThumbnailHolder holder = new SeekbarPreviewThumbnailHolder(executor);
+            final SeekbarPreviewThumbnailHolder holder =
+                    new SeekbarPreviewThumbnailHolder(executor);
             holder.resetFrom(SeekbarPreviewThumbnailHelper.SeekbarPreviewThumbnailType.NONE,
                     List.of());
             final Field identifier = field("currentUpdateRequestIdentifier");

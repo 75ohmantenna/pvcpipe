@@ -29,7 +29,10 @@ class PoTokenWebView private constructor(
     private val disposables = CompositeDisposable() // used only during initialization
     private val poTokenEmitters = mutableListOf<Pair<String, SingleEmitter<String>>>()
     private lateinit var expirationInstant: Instant
-    private var closed = false // accessed only on the main thread
+
+    // Accessed only on the main thread.
+    private var closed = false
+
     @Volatile private var initializationComplete = false
 
     //region Initialization
@@ -203,7 +206,7 @@ class PoTokenWebView private constructor(
             val u8Identifier = stringToU8(identifier)
             try {
                 webView.evaluateJavascript(
-                """try {
+                    """try {
                         identifier = "$identifier"
                         u8Identifier = $u8Identifier
                         poTokenU8 = obtainPoToken(webPoSignalOutput, integrityToken, u8Identifier)
@@ -416,8 +419,9 @@ class PoTokenWebView private constructor(
             runnable: Runnable
         ) {
             if (!Handler(Looper.getMainLooper()).post {
-                if (!emitterIfPostFails.isDisposed) runnable.run()
-            }) {
+                    if (!emitterIfPostFails.isDisposed) runnable.run()
+                }
+            ) {
                 emitterIfPostFails.onError(PoTokenException("Could not run on main thread"))
             }
         }
