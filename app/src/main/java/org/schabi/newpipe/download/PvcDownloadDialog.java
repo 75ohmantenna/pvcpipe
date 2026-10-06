@@ -8,11 +8,9 @@ import android.view.View;
 import org.schabi.newpipe.databinding.DownloadDialogBinding;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
-import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.SponsorBlock;
 import org.schabi.newpipe.util.SponsorBlockSegment;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import androidx.fragment.app.DialogFragment;
@@ -20,8 +18,6 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
-import us.shandian.giga.get.MissionRecoveryInfo;
-import us.shandian.giga.service.DownloadManagerService;
 
 import static org.schabi.newpipe.extractor.stream.DeliveryMethod.HLS;
 import static org.schabi.newpipe.ktx.ViewUtils.animate;
@@ -84,19 +80,7 @@ public abstract class PvcDownloadDialog extends DialogFragment {
         dialogBinding.fileName.setVisibility(View.VISIBLE);
     }
 
-    @SuppressWarnings("checkstyle:ParameterNumber")
-    protected void pvcDownloadStartMissionWrapper(
-            final Context context,
-            final String[] urls,
-            final StoredFileHelper storage,
-            final char kind,
-            final int threads,
-            final StreamInfo streamInfo,
-            final String psName,
-            final String[] psArgs,
-            final long nearLength,
-            final ArrayList<MissionRecoveryInfo> recoveryInfo) {
-        DownloadManagerService.startMission(context, urls, storage, kind, threads,
-                streamInfo, psName, psArgs, nearLength, recoveryInfo, sponsorBlockSegments);
+    protected SponsorBlockSegment[] pvcSponsorBlockSegments() {
+        return sponsorBlockSegments.clone();
     }
 }
