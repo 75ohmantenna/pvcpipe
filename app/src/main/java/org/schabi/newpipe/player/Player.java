@@ -17,11 +17,6 @@ import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING
 import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_TIMEOUT;
 import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_UNSPECIFIED;
 import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_INTERNAL;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SKIP;
 import static com.google.android.exoplayer2.Player.DiscontinuityReason;
 import static com.google.android.exoplayer2.Player.Listener;
 import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
@@ -89,7 +84,7 @@ import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.fragments.detail.VideoDetailFragment;
-import org.schabi.newpipe.local.history.HistoryRecordManager;
+import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.event.PlayerEventListener;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.helper.AudioReactor;
@@ -240,8 +235,6 @@ public final class Player implements PlaybackListener, Listener {
     @NonNull
     private final SerialDisposable progressUpdateDisposable = new SerialDisposable();
     @NonNull
-    private final CompositeDisposable databaseUpdateDisposable = new CompositeDisposable();
-    @NonNull
     private final CompositeDisposable streamItemDisposable = new CompositeDisposable();
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -253,7 +246,7 @@ public final class Player implements PlaybackListener, Listener {
     @NonNull
     private final SharedPreferences prefs;
     @NonNull
-    private final HistoryRecordManager recordManager;
+    private final PlaybackHistory playbackHistory;
 
     private boolean screenOn = true;
     private final SerialDisposable playbackDecision = new SerialDisposable();
@@ -282,7 +275,7 @@ public final class Player implements PlaybackListener, Listener {
         this.service = service;
         context = service;
         prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        recordManager = new HistoryRecordManager(context);
+        playbackHistory = new PlaybackHistory(context);
 
         setupBroadcastReceiver();
 
@@ -492,31 +485,14 @@ public final class Player implements PlaybackListener, Listener {
                                           final boolean playWhenReady) {
         final SerialDisposable request = new SerialDisposable();
         playbackDecision.set(request);
-        request.set(recordManager.loadStreamState(newQueue.getItem())
+        request.set(playbackHistory.resumePosition(newQueue.getItem())
                 .observeOn(AndroidSchedulers.mainThread())
-                // Do not place initPlayback() in doFinally() because
-                // it restarts playback after destroy()
-                .subscribe(
-                        state -> {
-                            if (!state.isFinished(newQueue.getItem().getDuration())) {
-                                // resume playback only if the stream was not played to the end
-                                newQueue.setRecovery(newQueue.getIndex(),
-                                        state.getProgressMillis());
-                            }
-                            initPlayback(newQueue, playWhenReady);
-                        },
-                        error -> {
-                            if (DEBUG) {
-                                Log.w(TAG, "Failed to start playback", error);
-                            }
-                            // In case any error we can start playback without history
-                            initPlayback(newQueue, playWhenReady);
-                        },
-                        () -> {
-                            // Completed but not found in history
-                            initPlayback(newQueue, playWhenReady);
-                        }
-                ));
+                .subscribe(position -> {
+                    if (position != PlayQueueItem.RECOVERY_UNSET) {
+                        newQueue.setRecovery(newQueue.getIndex(), position);
+                    }
+                    initPlayback(newQueue, playWhenReady);
+                }));
     }
 
     private void prepareIfIdle() {
@@ -682,7 +658,7 @@ public final class Player implements PlaybackListener, Listener {
         unregisterBroadcastReceiver();
 
         playbackDecision.set(null);
-        databaseUpdateDisposable.clear();
+        playbackHistory.reset();
         progressUpdateDisposable.set(null);
         streamItemDisposable.clear();
 
@@ -1379,33 +1355,9 @@ public final class Player implements PlaybackListener, Listener {
         if (discontinuityReason == DISCONTINUITY_REASON_AUTO_TRANSITION) {
             sponsorBlock.resetPlayback();
         }
-        switch (discontinuityReason) {
-            case DISCONTINUITY_REASON_AUTO_TRANSITION:
-            case DISCONTINUITY_REASON_REMOVE:
-                // When player is in single repeat mode and a period transition occurs,
-                // we need to register a view count here since no metadata has changed
-                if (getRepeatMode() == REPEAT_MODE_ONE && newIndex == playQueue.getIndex()) {
-                    registerStreamViewed();
-                    break;
-                }
-            case DISCONTINUITY_REASON_SEEK:
-                if (DEBUG) {
-                    Log.d(TAG, "ExoPlayer - onSeekProcessed() called");
-                }
-                if (isPrepared) {
-                    saveStreamProgressState();
-                }
-            case DISCONTINUITY_REASON_SEEK_ADJUSTMENT:
-            case DISCONTINUITY_REASON_INTERNAL:
-                // Player index may be invalid when playback is blocked
-                if (getCurrentState() != STATE_BLOCKED && newIndex != playQueue.getIndex()) {
-                    saveStreamProgressStateCompleted(); // current stream has ended
-                    playQueue.setIndex(newIndex);
-                }
-                break;
-            case DISCONTINUITY_REASON_SKIP:
-                break; // only makes Android Studio linter happy, as there are no ads
-        }
+        playbackHistory.onDiscontinuity(historySnapshot(),
+                new PlaybackHistory.Discontinuity(discontinuityReason, newIndex, getRepeatMode(),
+                        isPrepared, getCurrentState() == STATE_BLOCKED));
     }
 
     @Override
@@ -1782,51 +1734,24 @@ public final class Player implements PlaybackListener, Listener {
     //////////////////////////////////////////////////////////////////////////*/
     //region StreamInfo history: views and progress
 
-    private void registerStreamViewed() {
-        getCurrentStreamInfo().ifPresent(info -> databaseUpdateDisposable
-                .add(recordManager.onViewed(info).onErrorComplete().subscribe()));
+    private PlaybackHistory.Snapshot historySnapshot() {
+        return new PlaybackHistory.Snapshot(getCurrentStreamInfo().orElse(null), playQueue,
+                exoPlayerIsNull() || currentMetadata == null
+                        ? -1 : simpleExoPlayer.getCurrentMediaItemIndex(),
+                exoPlayerIsNull() ? 0 : simpleExoPlayer.getContentPosition(),
+                exoPlayerIsNull() ? 0 : simpleExoPlayer.getCurrentPosition());
     }
 
-    private void saveStreamProgressState(final long progressMillis) {
-        getCurrentStreamInfo().ifPresent(info -> {
-            if (!prefs.getBoolean(context.getString(R.string.enable_watch_history_key), true)) {
-                return;
-            }
-            if (DEBUG) {
-                Log.d(TAG, "saveStreamProgressState() called with: progressMillis=" + progressMillis
-                        + ", currentMetadata=[" + info.getName() + "]");
-            }
-
-            databaseUpdateDisposable.add(recordManager.saveStreamState(info, progressMillis)
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .doOnError(e -> {
-                        if (DEBUG) {
-                            e.printStackTrace();
-                        }
-                    })
-                    .onErrorComplete()
-                    .subscribe());
-        });
+    private void registerStreamViewed() {
+        playbackHistory.record(PlaybackHistory.Event.VIEWED, historySnapshot());
     }
 
     public void saveStreamProgressState() {
-        if (exoPlayerIsNull() || currentMetadata == null || playQueue == null
-                || playQueue.getIndex() != simpleExoPlayer.getCurrentMediaItemIndex()) {
-            // Make sure play queue and current window index are equal, to prevent saving state for
-            // the wrong stream on discontinuity (e.g. when the stream just changed but the
-            // playQueue index and currentMetadata still haven't updated)
-            return;
-        }
-        // Save current position. It will help to restore this position once a user
-        // wants to play prev or next stream from the queue
-        playQueue.setRecovery(playQueue.getIndex(), simpleExoPlayer.getContentPosition());
-        saveStreamProgressState(simpleExoPlayer.getCurrentPosition());
+        playbackHistory.record(PlaybackHistory.Event.PROGRESS, historySnapshot());
     }
 
     public void saveStreamProgressStateCompleted() {
-        // current stream has ended, so the progress is its duration (+1 to overcome rounding)
-        getCurrentStreamInfo().ifPresent(info ->
-                saveStreamProgressState((info.getDuration() + 1) * 1000));
+        playbackHistory.record(PlaybackHistory.Event.COMPLETED, historySnapshot());
     }
     //endregion
 
