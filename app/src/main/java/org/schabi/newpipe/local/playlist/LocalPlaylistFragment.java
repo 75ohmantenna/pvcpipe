@@ -17,7 +17,6 @@ import android.os.Parcelable;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Log;
-import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -40,9 +39,7 @@ import org.reactivestreams.Subscription;
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.LocalItem;
-import org.schabi.newpipe.database.history.model.StreamHistoryEntry;
 import org.schabi.newpipe.database.playlist.PlaylistStreamEntry;
-import org.schabi.newpipe.database.playlist.model.PlaylistEntity;
 import org.schabi.newpipe.database.stream.model.StreamEntity;
 import org.schabi.newpipe.databinding.DialogEditTextBinding;
 import org.schabi.newpipe.databinding.LocalPlaylistHeaderBinding;
@@ -55,7 +52,6 @@ import org.schabi.newpipe.fragments.list.playlist.PlaylistControlViewHolder;
 import org.schabi.newpipe.info_list.dialog.InfoItemDialog;
 import org.schabi.newpipe.info_list.dialog.StreamDialogDefaultEntry;
 import org.schabi.newpipe.local.BaseLocalListFragment;
-import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -72,13 +68,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistStreamEntry>, Void>
         implements PlaylistControlViewHolder, DebounceSavable {
@@ -427,70 +421,24 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         isRewritingPlaylist = true;
         showLoading();
 
-        final var recordManager = new HistoryRecordManager(getContext());
-        final var historyIdsMaybe = recordManager.getStreamHistorySortedById()
-                .firstElement()
-                // already sorted by ^ getStreamHistorySortedById(), binary search can be used
-                .map(historyList -> historyList.stream().map(StreamHistoryEntry::getStreamId)
-                        .collect(Collectors.toList()));
-        final var streamsMaybe = playlistManager.getPlaylistStreams(playlistId)
-                .firstElement()
-                .zipWith(historyIdsMaybe, (playlist, historyStreamIds) -> {
-                    // Remove Watched, Functionality data
-                    final List<PlaylistStreamEntry> itemsToKeep = new ArrayList<>();
-                    final boolean isThumbnailPermanent = playlistManager
-                            .getIsPlaylistThumbnailPermanent(playlistId);
-                    boolean thumbnailVideoRemoved = false;
-
-                    final var streamStates = recordManager
-                            .loadLocalStreamStateBatch(playlist).blockingGet();
-
-                    for (int i = 0; i < playlist.size(); i++) {
-                        final var playlistItem = playlist.get(i);
-                        final var streamStateEntity = streamStates.get(i);
-                        final int indexInHistory = Collections.binarySearch(historyStreamIds,
-                                playlistItem.getStreamId());
-                        final long duration = playlistItem.toStreamInfoItem().getDuration();
-
-                        if (indexInHistory < 0 // stream is not in history
-                                // stream is in history but the streamStateEntity is null
-                                // if the stream was played for less than 5 seconds, see
-                                // StreamStateEntity#PLAYBACK_SAVE_THRESHOLD_START_MILLISECONDS
-                                || streamStateEntity == null
-                                || (!removePartiallyWatched
-                                        && !streamStateEntity.isFinished(duration))) {
-                            itemsToKeep.add(playlistItem);
-                        } else if (!isThumbnailPermanent && !thumbnailVideoRemoved
-                                && playlistManager.getPlaylistThumbnailStreamId(playlistId)
-                                == playlistItem.getStreamEntity().getUid()) {
-                            thumbnailVideoRemoved = true;
+        final DebounceSaver saver = debounceSaver;
+        final long revision = saver.getRevision();
+        final LocalPlaylistManager.Removal removal = removePartiallyWatched
+                ? LocalPlaylistManager.Removal.WATCHED_AND_PARTIALLY_WATCHED
+                : LocalPlaylistManager.Removal.WATCHED;
+        disposables.add(playlistManager.removeStreams(playlistId, removal)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(itemsToKeep -> {
+                    if (debounceSaver == saver && saver.getRevision() == revision) {
+                        itemListAdapter.clearStreamItemList();
+                        itemListAdapter.addItems(itemsToKeep);
+                        saver.setNoChangesToSave(revision);
+                        final long videoCount = itemListAdapter.getItemsList().size();
+                        setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
+                        if (videoCount == 0) {
+                            showEmptyState();
                         }
                     }
-
-                    return new Pair<>(itemsToKeep, thumbnailVideoRemoved);
-                });
-
-        disposables.add(streamsMaybe.subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(flow -> {
-                    final List<PlaylistStreamEntry> itemsToKeep = flow.first;
-                    final boolean thumbnailVideoRemoved = flow.second;
-
-                    itemListAdapter.clearStreamItemList();
-                    itemListAdapter.addItems(itemsToKeep);
-                    debounceSaver.setHasChangesToSave();
-                    saveImmediate();
-
-                    if (thumbnailVideoRemoved) {
-                        updateThumbnailUrl();
-                    }
-
-                    final long videoCount = itemListAdapter.getItemsList().size();
-                    setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
-                    if (videoCount == 0) {
-                        showEmptyState();
-                    }
-
                     hideLoading();
                     isRewritingPlaylist = false;
                 }, throwable -> showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
@@ -582,8 +530,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     }
 
     private void changeThumbnailStreamId(final long thumbnailStreamId, final boolean isPermanent) {
-        if (playlistManager == null || (!isPermanent && playlistManager
-                .getIsPlaylistThumbnailPermanent(playlistId))) {
+        if (playlistManager == null) {
             return;
         }
 
@@ -605,23 +552,6 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         disposables.add(disposable);
     }
 
-    private void updateThumbnailUrl() {
-        if (playlistManager.getIsPlaylistThumbnailPermanent(playlistId)) {
-            return;
-        }
-
-        final long thumbnailStreamId;
-
-        if (!itemListAdapter.getItemsList().isEmpty()) {
-            thumbnailStreamId = ((PlaylistStreamEntry) itemListAdapter.getItemsList().get(0))
-                    .getStreamEntity().getUid();
-        } else {
-            thumbnailStreamId = PlaylistEntity.DEFAULT_THUMBNAIL_ID;
-        }
-
-        changeThumbnailStreamId(thumbnailStreamId, false);
-    }
-
     private void openRemoveDuplicatesDialog() {
         new AlertDialog.Builder(this.getActivity())
                 .setTitle(R.string.remove_duplicates_title)
@@ -639,19 +569,18 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         isRewritingPlaylist = true;
         showLoading();
 
-        final var streamsMaybe = playlistManager
-                .getDistinctPlaylistStreams(playlistId).firstElement();
-
-
-        disposables.add(streamsMaybe.subscribeOn(Schedulers.io())
+        final DebounceSaver saver = debounceSaver;
+        final long revision = saver.getRevision();
+        disposables.add(playlistManager.removeStreams(playlistId,
+                        LocalPlaylistManager.Removal.DUPLICATES)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(itemsToKeep -> {
-                    itemListAdapter.clearStreamItemList();
-                    itemListAdapter.addItems(itemsToKeep);
-                    setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
-                    debounceSaver.setHasChangesToSave();
-                    saveImmediate();
-
+                    if (debounceSaver == saver && saver.getRevision() == revision) {
+                        itemListAdapter.clearStreamItemList();
+                        itemListAdapter.addItems(itemsToKeep);
+                        saver.setNoChangesToSave(revision);
+                        setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
+                    }
                     hideLoading();
                     isRewritingPlaylist = false;
                 }, throwable -> showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
@@ -664,10 +593,6 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         }
 
         itemListAdapter.removeItem(item);
-        if (playlistManager.getPlaylistThumbnailStreamId(playlistId) == item.getStreamId()) {
-            updateThumbnailUrl();
-        }
-
         setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
         debounceSaver.setHasChangesToSave();
         saveImmediate();

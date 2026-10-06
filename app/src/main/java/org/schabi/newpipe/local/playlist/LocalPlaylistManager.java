@@ -3,6 +3,7 @@ package org.schabi.newpipe.local.playlist;
 import androidx.annotation.Nullable;
 
 import org.schabi.newpipe.database.AppDatabase;
+import org.schabi.newpipe.database.history.model.StreamHistoryEntry;
 import org.schabi.newpipe.database.playlist.PlaylistDuplicatesEntry;
 import org.schabi.newpipe.database.playlist.PlaylistMetadataEntry;
 import org.schabi.newpipe.database.playlist.PlaylistStreamEntry;
@@ -12,10 +13,13 @@ import org.schabi.newpipe.database.playlist.model.PlaylistEntity;
 import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity;
 import org.schabi.newpipe.database.stream.dao.StreamDAO;
 import org.schabi.newpipe.database.stream.model.StreamEntity;
+import org.schabi.newpipe.database.stream.model.StreamStateEntity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Flowable;
@@ -25,6 +29,12 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class LocalPlaylistManager {
     private static final long THUMBNAIL_ID_LEAVE_UNCHANGED = -2;
+
+    public enum Removal {
+        DUPLICATES,
+        WATCHED,
+        WATCHED_AND_PARTIALLY_WATCHED
+    }
 
     // Application-owned ordering for accepted playlist mutations, across manager instances.
     private static final Scheduler WRITES = Schedulers.from(
@@ -73,11 +83,20 @@ public class LocalPlaylistManager {
 
     public Maybe<List<Long>> appendToPlaylist(final long playlistId,
                                               final List<StreamEntity> streams) {
-        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
+        final Maybe<List<Long>> saved = Maybe.fromCallable(() -> database.runInTransaction(() -> {
             final int maxJoinIndex = playlistStreamTable.getMaximumIndexOfSync(playlistId);
             final List<Long> streamIds = streamTable.upsertAll(streams);
             return insertJoinEntities(playlistId, streamIds, maxJoinIndex + 1);
         })).subscribeOn(writes).cache();
+        return saved.flatMap(joinIds -> playlistTable.getPlaylist(playlistId).firstElement()
+                .flatMap(playlists -> {
+                    if (!playlists.isEmpty() && playlists.get(0).getThumbnailStreamId()
+                            == PlaylistEntity.DEFAULT_THUMBNAIL_ID) {
+                        return changePlaylistThumbnail(playlistId, streams.get(0).getUid(), false)
+                                .map(ignored -> joinIds);
+                    }
+                    return Maybe.just(joinIds);
+                }));
     }
 
     private List<Long> insertJoinEntities(final long playlistId, final List<Long> streamIds,
@@ -98,10 +117,71 @@ public class LocalPlaylistManager {
             joinEntities.add(new PlaylistStreamEntity(playlistId, streamIds.get(i), i));
         }
 
-        return Completable.fromRunnable(() -> database.runInTransaction(() -> {
+        final Completable saved = Completable.fromRunnable(() -> database.runInTransaction(() -> {
             playlistStreamTable.deleteBatch(playlistId);
             playlistStreamTable.insertAll(joinEntities);
         })).subscribeOn(writes).cache();
+        return saved.andThen(Completable.defer(
+                () -> refreshAutomaticThumbnail(playlistId, streamIds)));
+    }
+
+    private Completable refreshAutomaticThumbnail(final long playlistId,
+                                                   final List<Long> streamIds) {
+        return playlistTable.getPlaylist(playlistId).firstElement()
+                .flatMap(playlists -> {
+                    if (playlists.isEmpty()) {
+                        return Maybe.<Integer>empty();
+                    }
+                    final PlaylistEntity playlist = playlists.get(0);
+                    if (playlist.isThumbnailPermanent()
+                            || streamIds.contains(playlist.getThumbnailStreamId())) {
+                        return Maybe.just(0);
+                    }
+                    final long thumbnailId = streamIds.isEmpty()
+                            ? PlaylistEntity.DEFAULT_THUMBNAIL_ID : streamIds.get(0);
+                    return changePlaylistThumbnail(playlistId, thumbnailId, false);
+                }).ignoreElement().subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Remove selected streams and return the saved ordered contents.
+     *
+     * @param playlistId the playlist whose contents are changed
+     * @param removal the rule used to select streams for removal
+     * @return the saved ordered contents
+     */
+    public Maybe<List<PlaylistStreamEntry>> removeStreams(final long playlistId,
+                                                         final Removal removal) {
+        final Maybe<List<PlaylistStreamEntry>> selected;
+        if (removal == Removal.DUPLICATES) {
+            selected = getDistinctPlaylistStreams(playlistId).firstElement();
+        } else {
+            final var historyIds = database.streamHistoryDAO().getHistorySortedById()
+                    .firstElement()
+                    .map(history -> history.stream().map(StreamHistoryEntry::getStreamId)
+                            .collect(Collectors.toList()));
+            selected = getPlaylistStreams(playlistId).firstElement()
+                    .zipWith(historyIds, (playlist, watchedIds) -> {
+                        final List<PlaylistStreamEntry> kept = new ArrayList<>();
+                        for (final PlaylistStreamEntry item : playlist) {
+                            final List<StreamStateEntity> states = database.streamStateDAO()
+                                    .getState(item.getStreamId()).blockingFirst();
+                            if (Collections.binarySearch(watchedIds, item.getStreamId()) < 0
+                                    || states.isEmpty()
+                                    || (removal == Removal.WATCHED && !states.get(0)
+                                            .isFinished(item.toStreamInfoItem().getDuration()))) {
+                                kept.add(item);
+                            }
+                        }
+                        return kept;
+                    });
+        }
+        return selected.subscribeOn(Schedulers.io()).flatMap(items -> {
+            final List<Long> ids = items.stream().map(PlaylistStreamEntry::getStreamId)
+                    .collect(Collectors.toList());
+            return updateJoin(playlistId, ids)
+                    .andThen(getPlaylistStreams(playlistId).firstElement());
+        });
     }
 
     public Completable updatePlaylists(final List<PlaylistMetadataEntry> updateItems,
