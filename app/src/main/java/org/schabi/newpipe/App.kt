@@ -32,6 +32,8 @@ import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.ktx.hasAssignableCause
 import org.schabi.newpipe.settings.NewPipeSettings
+import org.schabi.newpipe.settings.export.BackupFileLocator
+import org.schabi.newpipe.settings.export.PendingDatabaseRestore
 import org.schabi.newpipe.util.BridgeStateSaverInitializer
 import org.schabi.newpipe.util.Localization
 import org.schabi.newpipe.util.ServiceHelper
@@ -71,6 +73,10 @@ open class App :
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
+        if (!ProcessPhoenix.isPhoenixProcess(this)) {
+            // Content providers (including WorkManager) initialize before Application.onCreate.
+            PendingDatabaseRestore.install(getDatabasePath(BackupFileLocator.FILE_NAME_DB).toPath())
+        }
         initACRA()
     }
 

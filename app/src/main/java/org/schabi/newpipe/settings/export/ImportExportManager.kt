@@ -85,6 +85,18 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
         return success
     }
 
+    /** Stages a complete database without modifying the database used by this process. */
+    fun stageDb(file: StoredFileHelper): Boolean {
+        val temporary = PendingDatabaseRestore.temporaryPath(fileLocator.db)
+        try {
+            val success = ZipHelper.extractFileFromZip(file, BackupFileLocator.FILE_NAME_DB, temporary)
+            if (success) PendingDatabaseRestore.commit(fileLocator.db)
+            return success
+        } finally {
+            temporary.deleteIfExists()
+        }
+    }
+
     @Deprecated(
         "Serializing preferences with Java's ObjectOutputStream is vulnerable to injections",
         replaceWith = ReplaceWith("exportHasJsonPrefs")
