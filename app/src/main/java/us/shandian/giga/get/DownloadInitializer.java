@@ -175,7 +175,6 @@ public class DownloadInitializer extends Thread {
 
                 if (e instanceof DownloadMission.HttpError && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     // for youtube streams. The url has expired
-                    interrupt();
                     mMission.doRecover(ERROR_HTTP_FORBIDDEN);
                     return;
                 }

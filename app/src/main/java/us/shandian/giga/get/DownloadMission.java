@@ -618,7 +618,7 @@ public class DownloadMission extends Mission {
         errCode = errorCode;
         errObject = null;
         unknownLength = false;
-        threads = new Thread[0];
+        // Retain handles until their owners exit, including recovery resetting stale state.
         fallbackResumeOffset = 0;
         blocks = null;
         blockAcquired = null;
@@ -810,6 +810,7 @@ public class DownloadMission extends Mission {
      * @param errorCode error code which trigger the recovery procedure
      */
     synchronized void doRecover(int errorCode) {
+        if (!running) return;
         Log.i(TAG, "Attempting to recover the mission: " + storage.getName());
 
         if (recoveryInfo == null) {
