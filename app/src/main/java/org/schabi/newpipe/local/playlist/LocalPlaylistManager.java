@@ -15,21 +15,36 @@ import org.schabi.newpipe.database.stream.model.StreamEntity;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class LocalPlaylistManager {
     private static final long THUMBNAIL_ID_LEAVE_UNCHANGED = -2;
 
+    // Application-owned ordering for accepted playlist mutations, across manager instances.
+    private static final Scheduler WRITES = Schedulers.from(
+            Executors.newSingleThreadExecutor(runnable -> {
+                final Thread thread = new Thread(runnable, "PlaylistWrites");
+                thread.setDaemon(true);
+                return thread;
+            }));
+    private final Scheduler writes;
     private final AppDatabase database;
     private final StreamDAO streamTable;
     private final PlaylistDAO playlistTable;
     private final PlaylistStreamDAO playlistStreamTable;
 
     public LocalPlaylistManager(final AppDatabase db) {
+        this(db, WRITES);
+    }
+
+    LocalPlaylistManager(final AppDatabase db, final Scheduler writeScheduler) {
+        writes = writeScheduler;
         database = db;
         streamTable = db.streamDAO();
         playlistTable = db.playlistDAO();
@@ -58,13 +73,11 @@ public class LocalPlaylistManager {
 
     public Maybe<List<Long>> appendToPlaylist(final long playlistId,
                                               final List<StreamEntity> streams) {
-        return playlistStreamTable.getMaximumIndexOf(playlistId)
-                .firstElement()
-                .map(maxJoinIndex -> database.runInTransaction(() -> {
-                            final List<Long> streamIds = streamTable.upsertAll(streams);
-                            return insertJoinEntities(playlistId, streamIds, maxJoinIndex + 1);
-                        }
-                )).subscribeOn(Schedulers.io());
+        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
+            final int maxJoinIndex = playlistStreamTable.getMaximumIndexOfSync(playlistId);
+            final List<Long> streamIds = streamTable.upsertAll(streams);
+            return insertJoinEntities(playlistId, streamIds, maxJoinIndex + 1);
+        })).subscribeOn(writes).cache();
     }
 
     private List<Long> insertJoinEntities(final long playlistId, final List<Long> streamIds,
@@ -88,7 +101,7 @@ public class LocalPlaylistManager {
         return Completable.fromRunnable(() -> database.runInTransaction(() -> {
             playlistStreamTable.deleteBatch(playlistId);
             playlistStreamTable.insertAll(joinEntities);
-        })).subscribeOn(Schedulers.io());
+        })).subscribeOn(writes).cache();
     }
 
     public Completable updatePlaylists(final List<PlaylistMetadataEntry> updateItems,

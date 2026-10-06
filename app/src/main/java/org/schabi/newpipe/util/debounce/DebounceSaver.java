@@ -5,6 +5,7 @@ import org.schabi.newpipe.error.UserAction;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -20,6 +21,7 @@ public class DebounceSaver {
 
     // Has the object been modified
     private final AtomicBoolean isModified;
+    private final AtomicLong revision = new AtomicLong();
 
     // Default 10 seconds
     private static final long DEFAULT_SAVE_DEBOUNCE_MILLIS = 10000;
@@ -57,6 +59,16 @@ public class DebounceSaver {
         isModified.set(false);
     }
 
+    public long getRevision() {
+        return revision.get();
+    }
+
+    public void setNoChangesToSave(final long savedRevision) {
+        if (revision.get() == savedRevision) {
+            isModified.set(false);
+        }
+    }
+
     public PublishSubject<Long> getDebouncedSaveSignal() {
         return debouncedSaveSignal;
     }
@@ -75,6 +87,7 @@ public class DebounceSaver {
             return;
         }
 
+        revision.incrementAndGet();
         isModified.set(true);
         debouncedSaveSignal.onNext(System.currentTimeMillis());
     }

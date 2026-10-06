@@ -16,6 +16,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.error.ErrorInfo;
+import org.schabi.newpipe.error.ErrorUtil;
+import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.database.playlist.PlaylistDuplicatesEntry;
 import org.schabi.newpipe.database.stream.model.StreamEntity;
 import org.schabi.newpipe.local.LocalItemListAdapter;
@@ -25,6 +28,7 @@ import java.util.List;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.core.Maybe;
 
 public final class PlaylistAppendDialog extends PlaylistDialog {
     private static final String TAG = PlaylistAppendDialog.class.getCanonicalName();
@@ -33,6 +37,7 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
     private LocalItemListAdapter playlistAdapter;
     private TextView playlistDuplicateIndicator;
 
+    private boolean appending;
     private final CompositeDisposable playlistDisposables = new CompositeDisposable();
 
     /**
@@ -60,6 +65,7 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
     @Override
     public void onViewCreated(@NonNull final View view, @Nullable final Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        appending = false;
 
         final LocalPlaylistManager playlistManager =
                 new LocalPlaylistManager(NewPipeDatabase.getInstance(requireContext()));
@@ -95,12 +101,12 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        playlistDisposables.dispose();
+        playlistDisposables.clear();
         if (playlistAdapter != null) {
             playlistAdapter.unsetSelectedListener();
         }
 
-        playlistDisposables.clear();
+        playlistDuplicateIndicator = null;
         playlistRecyclerView = null;
         playlistAdapter = null;
     }
@@ -146,6 +152,10 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
                                     @NonNull final PlaylistDuplicatesEntry playlist,
                                     @NonNull final List<StreamEntity> streams) {
 
+        if (appending) {
+            return;
+        }
+        appending = true;
         final String toastText;
         final long duplicateCount = playlist.getTimesStreamIsContained();
         if (duplicateCount > 0) {
@@ -159,21 +169,21 @@ public final class PlaylistAppendDialog extends PlaylistDialog {
         final Toast successToast = Toast.makeText(getContext(), toastText, Toast.LENGTH_SHORT);
 
         playlistDisposables.add(manager.appendToPlaylist(playlist.getUid(), streams)
+                .flatMap(saved -> playlist.getThumbnailStreamId() != null
+                        && playlist.getThumbnailStreamId() == DEFAULT_THUMBNAIL_ID
+                        ? manager.changePlaylistThumbnail(playlist.getUid(),
+                                streams.get(0).getUid(), false).map(ignored -> saved)
+                        : Maybe.just(saved))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(ignored -> {
                     successToast.show();
-
-                    if (playlist.getThumbnailStreamId() != null
-                            && playlist.getThumbnailStreamId() == DEFAULT_THUMBNAIL_ID
-                    ) {
-                        playlistDisposables.add(manager
-                                .changePlaylistThumbnail(playlist.getUid(), streams.get(0).getUid(),
-                                        false)
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(ignore -> successToast.show()));
-                    }
+                    dismiss();
+                }, error -> {
+                    appending = false;
+                    ErrorUtil.showSnackbar(this,
+                            new ErrorInfo(error,
+                                    UserAction.REQUESTED_BOOKMARK,
+                                    "Appending to playlist"));
                 }));
-
-        requireDialog().dismiss();
     }
 }
