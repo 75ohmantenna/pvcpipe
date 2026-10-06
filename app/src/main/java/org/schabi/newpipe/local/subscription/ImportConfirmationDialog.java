@@ -9,18 +9,12 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.os.BundleCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
-import androidx.work.Constraints;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.NetworkType;
-import androidx.work.OneTimeWorkRequest;
-import androidx.work.OutOfQuotaPolicy;
-import androidx.work.WorkManager;
 
 import com.livefront.bridge.Bridge;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.local.subscription.workers.SubscriptionImportInput;
-import org.schabi.newpipe.local.subscription.workers.SubscriptionImportWorker;
+import org.schabi.newpipe.local.subscription.workers.SubscriptionTransfer;
 
 public class ImportConfirmationDialog extends DialogFragment {
     private static final String INPUT = "input";
@@ -42,21 +36,9 @@ public class ImportConfirmationDialog extends DialogFragment {
                 .setCancelable(true)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.ok, (dialogInterface, i) -> {
-                    final var constraints = new Constraints.Builder()
-                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                            .build();
                     final var input = BundleCompat.getParcelable(requireArguments(), INPUT,
                             SubscriptionImportInput.class);
-
-                    final var req = new OneTimeWorkRequest.Builder(SubscriptionImportWorker.class)
-                            .setInputData(input.toData())
-                            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                            .setConstraints(constraints)
-                            .build();
-
-                    WorkManager.getInstance(context)
-                            .enqueueUniqueWork(SubscriptionImportWorker.WORK_NAME,
-                                    ExistingWorkPolicy.APPEND_OR_REPLACE, req);
+                    SubscriptionTransfer.enqueueImport(context, input);
 
                     dismiss();
                 })
