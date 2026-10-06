@@ -29,6 +29,9 @@ interface PlaylistDAO : BasicDAO<PlaylistEntity> {
     @Query("SELECT * FROM playlists WHERE uid = :playlistId")
     fun getPlaylist(playlistId: Long): Flowable<MutableList<PlaylistEntity>>
 
+    @Query("SELECT * FROM playlists WHERE uid = :playlistId")
+    fun getPlaylistSync(playlistId: Long): PlaylistEntity?
+
     @Query("DELETE FROM playlists WHERE uid = :playlistId")
     fun deletePlaylist(playlistId: Long): Int
 

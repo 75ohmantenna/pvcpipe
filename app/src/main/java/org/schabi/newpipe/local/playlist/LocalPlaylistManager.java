@@ -3,7 +3,6 @@ package org.schabi.newpipe.local.playlist;
 import androidx.annotation.Nullable;
 
 import org.schabi.newpipe.database.AppDatabase;
-import org.schabi.newpipe.database.history.model.StreamHistoryEntry;
 import org.schabi.newpipe.database.playlist.PlaylistDuplicatesEntry;
 import org.schabi.newpipe.database.playlist.PlaylistMetadataEntry;
 import org.schabi.newpipe.database.playlist.PlaylistStreamEntry;
@@ -16,10 +15,10 @@ import org.schabi.newpipe.database.stream.model.StreamEntity;
 import org.schabi.newpipe.database.stream.model.StreamStateEntity;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Flowable;
@@ -83,20 +82,27 @@ public class LocalPlaylistManager {
 
     public Maybe<List<Long>> appendToPlaylist(final long playlistId,
                                               final List<StreamEntity> streams) {
-        final Maybe<List<Long>> saved = Maybe.fromCallable(() -> database.runInTransaction(() -> {
-            final int maxJoinIndex = playlistStreamTable.getMaximumIndexOfSync(playlistId);
-            final List<Long> streamIds = streamTable.upsertAll(streams);
-            return insertJoinEntities(playlistId, streamIds, maxJoinIndex + 1);
+        final List<StreamEntity> snapshot = copyStreams(streams);
+        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
+            requirePlaylist(playlistId);
+            final int maximum = playlistStreamTable.getMaximumIndexOfSync(playlistId);
+            final List<Long> streamIds = streamTable.upsertAll(snapshot);
+            final List<Long> inserted = insertJoinEntities(playlistId, streamIds, maximum + 1);
+            refreshAutomaticThumbnailSync(playlistId);
+            return inserted;
         })).subscribeOn(writes).cache();
-        return saved.flatMap(joinIds -> playlistTable.getPlaylist(playlistId).firstElement()
-                .flatMap(playlists -> {
-                    if (!playlists.isEmpty() && playlists.get(0).getThumbnailStreamId()
-                            == PlaylistEntity.DEFAULT_THUMBNAIL_ID) {
-                        return changePlaylistThumbnail(playlistId, streams.get(0).getUid(), false)
-                                .map(ignored -> joinIds);
-                    }
-                    return Maybe.just(joinIds);
-                }));
+    }
+
+    private static List<StreamEntity> copyStreams(final List<StreamEntity> streams) {
+        final List<StreamEntity> snapshot = new ArrayList<>(streams.size());
+        for (final StreamEntity stream : streams) {
+            snapshot.add(stream.copy(stream.getUid(), stream.getServiceId(), stream.getUrl(),
+                    stream.getTitle(), stream.getStreamType(), stream.getDuration(),
+                    stream.getUploader(), stream.getUploaderUrl(), stream.getThumbnailUrl(),
+                    stream.getViewCount(), stream.getTextualUploadDate(), stream.getUploadDate(),
+                    stream.isUploadDateApproximation()));
+        }
+        return snapshot;
     }
 
     private List<Long> insertJoinEntities(final long playlistId, final List<Long> streamIds,
@@ -112,35 +118,47 @@ public class LocalPlaylistManager {
     }
 
     public Completable updateJoin(final long playlistId, final List<Long> streamIds) {
-        final List<PlaylistStreamEntity> joinEntities = new ArrayList<>(streamIds.size());
-        for (int i = 0; i < streamIds.size(); i++) {
-            joinEntities.add(new PlaylistStreamEntity(playlistId, streamIds.get(i), i));
-        }
-
-        final Completable saved = Completable.fromRunnable(() -> database.runInTransaction(() -> {
-            playlistStreamTable.deleteBatch(playlistId);
-            playlistStreamTable.insertAll(joinEntities);
+        final List<Long> snapshot = new ArrayList<>(streamIds);
+        return Completable.fromRunnable(() -> database.runInTransaction(() -> {
+            requirePlaylist(playlistId);
+            replaceContents(playlistId, snapshot);
+            refreshAutomaticThumbnailSync(playlistId);
         })).subscribeOn(writes).cache();
-        return saved.andThen(Completable.defer(
-                () -> refreshAutomaticThumbnail(playlistId, streamIds)));
     }
 
-    private Completable refreshAutomaticThumbnail(final long playlistId,
-                                                   final List<Long> streamIds) {
-        return playlistTable.getPlaylist(playlistId).firstElement()
-                .flatMap(playlists -> {
-                    if (playlists.isEmpty()) {
-                        return Maybe.<Integer>empty();
-                    }
-                    final PlaylistEntity playlist = playlists.get(0);
-                    if (playlist.isThumbnailPermanent()
-                            || streamIds.contains(playlist.getThumbnailStreamId())) {
-                        return Maybe.just(0);
-                    }
-                    final long thumbnailId = streamIds.isEmpty()
-                            ? PlaylistEntity.DEFAULT_THUMBNAIL_ID : streamIds.get(0);
-                    return changePlaylistThumbnail(playlistId, thumbnailId, false);
-                }).ignoreElement().subscribeOn(Schedulers.io());
+    private void requirePlaylist(final long playlistId) {
+        if (playlistTable.getPlaylistSync(playlistId) == null) {
+            throw new IllegalArgumentException("Playlist does not exist: " + playlistId);
+        }
+    }
+
+    private void replaceContents(final long playlistId, final List<Long> streamIds) {
+        playlistStreamTable.deleteBatch(playlistId);
+        insertJoinEntities(playlistId, streamIds, 0);
+        // Reject deferred foreign-key failures before commit, while rollback is still reliable.
+        if (playlistStreamTable.getOrderedStreamsOfSync(playlistId).size() != streamIds.size()) {
+            throw new IllegalArgumentException("Playlist contents contain unknown streams");
+        }
+    }
+
+    private void refreshAutomaticThumbnailSync(final long playlistId) {
+        final PlaylistEntity playlist = playlistTable.getPlaylistSync(playlistId);
+        if (playlist == null || playlist.isThumbnailPermanent()) {
+            return;
+        }
+        final List<PlaylistStreamEntry> streams =
+                playlistStreamTable.getOrderedStreamsOfSync(playlistId);
+        for (final PlaylistStreamEntry stream : streams) {
+            if (stream.getStreamId() == playlist.getThumbnailStreamId()) {
+                return;
+            }
+        }
+        final long thumbnailId = streams.isEmpty() ? PlaylistEntity.DEFAULT_THUMBNAIL_ID
+                : streams.get(0).getStreamId();
+        if (playlist.getThumbnailStreamId() != thumbnailId) {
+            playlist.setThumbnailStreamId(thumbnailId);
+            playlistTable.update(playlist);
+        }
     }
 
     /**
@@ -152,36 +170,53 @@ public class LocalPlaylistManager {
      */
     public Maybe<List<PlaylistStreamEntry>> removeStreams(final long playlistId,
                                                          final Removal removal) {
-        final Maybe<List<PlaylistStreamEntry>> selected;
-        if (removal == Removal.DUPLICATES) {
-            selected = getDistinctPlaylistStreams(playlistId).firstElement();
-        } else {
-            final var historyIds = database.streamHistoryDAO().getHistorySortedById()
-                    .firstElement()
-                    .map(history -> history.stream().map(StreamHistoryEntry::getStreamId)
-                            .collect(Collectors.toList()));
-            selected = getPlaylistStreams(playlistId).firstElement()
-                    .zipWith(historyIds, (playlist, watchedIds) -> {
-                        final List<PlaylistStreamEntry> kept = new ArrayList<>();
-                        for (final PlaylistStreamEntry item : playlist) {
-                            final List<StreamStateEntity> states = database.streamStateDAO()
-                                    .getState(item.getStreamId()).blockingFirst();
-                            if (Collections.binarySearch(watchedIds, item.getStreamId()) < 0
-                                    || states.isEmpty()
-                                    || (removal == Removal.WATCHED && !states.get(0)
-                                            .isFinished(item.toStreamInfoItem().getDuration()))) {
-                                kept.add(item);
-                            }
-                        }
-                        return kept;
-                    });
-        }
-        return selected.subscribeOn(Schedulers.io()).flatMap(items -> {
-            final List<Long> ids = items.stream().map(PlaylistStreamEntry::getStreamId)
-                    .collect(Collectors.toList());
-            return updateJoin(playlistId, ids)
-                    .andThen(getPlaylistStreams(playlistId).firstElement());
-        });
+        return removeStreams(playlistId, removal, null);
+    }
+
+    /**
+     * Apply removal to stored contents or a supplied pending snapshot in one transaction.
+     *
+     * @param playlistId the playlist whose contents are changed
+     * @param removal the rule used to select streams for removal
+     * @param pendingStreamIds replacement contents before removal; null uses stored contents,
+     *                         while an empty list clears the playlist
+     * @return the saved ordered contents
+     * @throws IllegalArgumentException if the playlist or a pending stream does not exist
+     */
+    public Maybe<List<PlaylistStreamEntry>> removeStreams(
+            final long playlistId,
+            final Removal removal,
+            @Nullable final List<Long> pendingStreamIds) {
+        final List<Long> snapshot = pendingStreamIds == null
+                ? null : new ArrayList<>(pendingStreamIds);
+        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
+            requirePlaylist(playlistId);
+            if (snapshot != null) {
+                replaceContents(playlistId, snapshot);
+            }
+            final List<PlaylistStreamEntry> streams =
+                    playlistStreamTable.getOrderedStreamsOfSync(playlistId);
+            final List<Long> kept = new ArrayList<>(streams.size());
+            final Set<Long> seen = new HashSet<>();
+            for (final PlaylistStreamEntry stream : streams) {
+                if (removal == Removal.DUPLICATES) {
+                    if (seen.add(stream.getStreamId())) {
+                        kept.add(stream.getStreamId());
+                    }
+                } else {
+                    final StreamStateEntity state = database.streamStateDAO()
+                            .getStateSync(stream.getStreamId());
+                    if (database.streamHistoryDAO().getLatestEntry(stream.getStreamId()) == null
+                            || state == null || (removal == Removal.WATCHED
+                                    && !state.isFinished(stream.getStreamEntity().getDuration()))) {
+                        kept.add(stream.getStreamId());
+                    }
+                }
+            }
+            replaceContents(playlistId, kept);
+            refreshAutomaticThumbnailSync(playlistId);
+            return playlistStreamTable.getOrderedStreamsOfSync(playlistId);
+        })).subscribeOn(writes).cache();
     }
 
     public Completable updatePlaylists(final List<PlaylistMetadataEntry> updateItems,
@@ -190,14 +225,19 @@ public class LocalPlaylistManager {
         for (final PlaylistMetadataEntry item : updateItems) {
             items.add(new PlaylistEntity(item));
         }
+        final List<Long> deleted = new ArrayList<>(deletedItems);
         return Completable.fromRunnable(() -> database.runInTransaction(() -> {
-            for (final Long uid : deletedItems) {
+            for (final Long uid : deleted) {
                 playlistTable.deletePlaylist(uid);
             }
             for (final PlaylistEntity item : items) {
-                playlistTable.upsertPlaylist(item);
+                final PlaylistEntity current = playlistTable.getPlaylistSync(item.getUid());
+                if (current != null) {
+                    current.setDisplayIndex(item.getDisplayIndex());
+                    playlistTable.update(current);
+                }
             }
-        })).subscribeOn(Schedulers.io());
+        })).subscribeOn(writes).cache();
     }
 
     public Flowable<List<PlaylistStreamEntry>> getDistinctPlaylistStreams(final long playlistId) {
@@ -257,20 +297,20 @@ public class LocalPlaylistManager {
                                           @Nullable final String name,
                                           final long thumbnailStreamId,
                                           final boolean isPermanent) {
-        return playlistTable.getPlaylist(playlistId)
-                .firstElement()
-                .filter(playlistEntities -> !playlistEntities.isEmpty())
-                .map(playlistEntities -> {
-                    final PlaylistEntity playlist = playlistEntities.get(0);
-                    if (name != null) {
-                        playlist.setName(name);
-                    }
-                    if (thumbnailStreamId != THUMBNAIL_ID_LEAVE_UNCHANGED) {
-                        playlist.setThumbnailStreamId(thumbnailStreamId);
-                        playlist.setThumbnailPermanent(isPermanent);
-                    }
-                    return playlistTable.update(playlist);
-                }).subscribeOn(Schedulers.io());
+        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
+            final PlaylistEntity playlist = playlistTable.getPlaylistSync(playlistId);
+            if (playlist == null) {
+                return null;
+            }
+            if (name != null) {
+                playlist.setName(name);
+            }
+            if (thumbnailStreamId != THUMBNAIL_ID_LEAVE_UNCHANGED) {
+                playlist.setThumbnailStreamId(thumbnailStreamId);
+                playlist.setThumbnailPermanent(isPermanent);
+            }
+            return playlistTable.update(playlist);
+        })).subscribeOn(writes).cache();
     }
 
     public Maybe<Boolean> hasPlaylists() {

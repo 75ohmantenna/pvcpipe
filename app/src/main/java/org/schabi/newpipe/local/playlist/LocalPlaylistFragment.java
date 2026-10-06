@@ -272,6 +272,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
 
     @Override
     public void onDestroyView() {
+        finishPlaylistRewrite();
         super.onDestroyView();
 
         if (itemListAdapter != null) {
@@ -334,7 +335,8 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
             @Override
             public void onNext(final List<PlaylistStreamEntry> streams) {
                 // Skip handling the result after it has been modified
-                if (debounceSaver == null || !debounceSaver.getIsModified()) {
+                if (!isRewritingPlaylist
+                        && (debounceSaver == null || !debounceSaver.getIsModified())) {
                     handleResult(streams);
                     isLoadingComplete.set(true);
                 }
@@ -415,7 +417,8 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     }
 
     public void removeWatchedStreams(final boolean removePartiallyWatched) {
-        if (isRewritingPlaylist) {
+        if (isRewritingPlaylist || itemListAdapter == null || isLoadingComplete == null
+                || !isLoadingComplete.get()) {
             return;
         }
         isRewritingPlaylist = true;
@@ -423,12 +426,14 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
 
         final DebounceSaver saver = debounceSaver;
         final long revision = saver.getRevision();
+        final List<Long> pending = saver.getIsModified() ? currentStreamIds() : null;
         final LocalPlaylistManager.Removal removal = removePartiallyWatched
                 ? LocalPlaylistManager.Removal.WATCHED_AND_PARTIALLY_WATCHED
                 : LocalPlaylistManager.Removal.WATCHED;
-        disposables.add(playlistManager.removeStreams(playlistId, removal)
+        disposables.add(playlistManager.removeStreams(playlistId, removal, pending)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(itemsToKeep -> {
+                    finishPlaylistRewrite();
                     if (debounceSaver == saver && saver.getRevision() == revision) {
                         itemListAdapter.clearStreamItemList();
                         itemListAdapter.addItems(itemsToKeep);
@@ -439,10 +444,12 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
                             showEmptyState();
                         }
                     }
-                    hideLoading();
-                    isRewritingPlaylist = false;
-                }, throwable -> showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
-                        "Removing watched videos, partially watched=" + removePartiallyWatched))));
+                }, throwable -> {
+                    finishPlaylistRewrite();
+                    showUiErrorSnackbar(this,
+                            "Removing watched videos, partially watched=" + removePartiallyWatched,
+                            throwable);
+                }));
     }
 
     @Override
@@ -477,6 +484,14 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
 
     @Override
     protected void resetFragment() {
+        if (isLoadingComplete != null) {
+            isLoadingComplete.set(false);
+        }
+        isRewritingPlaylist = false;
+        if (disposables != null) {
+            // Detach presentation while accepted manager writes continue independently.
+            disposables.clear();
+        }
         super.resetFragment();
         if (databaseSubscription != null) {
             databaseSubscription.cancel();
@@ -524,8 +539,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         final Disposable disposable = playlistManager.renamePlaylist(playlistId, title)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(longs -> { /*Do nothing on success*/ }, throwable ->
-                        showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
-                                "Renaming playlist")));
+                        showUiErrorSnackbar(this, "Renaming playlist", throwable));
         disposables.add(disposable);
     }
 
@@ -547,8 +561,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
                 .changePlaylistThumbnail(playlistId, thumbnailStreamId, isPermanent)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(ignore -> successToast.show(), throwable ->
-                        showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
-                                "Changing playlist thumbnail")));
+                        showUiErrorSnackbar(this, "Changing playlist thumbnail", throwable));
         disposables.add(disposable);
     }
 
@@ -563,7 +576,8 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     }
 
     private void removeDuplicatesInPlaylist() {
-        if (isRewritingPlaylist) {
+        if (isRewritingPlaylist || itemListAdapter == null || isLoadingComplete == null
+                || !isLoadingComplete.get()) {
             return;
         }
         isRewritingPlaylist = true;
@@ -571,24 +585,44 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
 
         final DebounceSaver saver = debounceSaver;
         final long revision = saver.getRevision();
+        final List<Long> pending = saver.getIsModified() ? currentStreamIds() : null;
         disposables.add(playlistManager.removeStreams(playlistId,
-                        LocalPlaylistManager.Removal.DUPLICATES)
+                        LocalPlaylistManager.Removal.DUPLICATES, pending)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(itemsToKeep -> {
+                    finishPlaylistRewrite();
                     if (debounceSaver == saver && saver.getRevision() == revision) {
                         itemListAdapter.clearStreamItemList();
                         itemListAdapter.addItems(itemsToKeep);
                         saver.setNoChangesToSave(revision);
                         setStreamCountAndOverallDuration(itemListAdapter.getItemsList());
+                        if (itemListAdapter.getItemsList().isEmpty()) {
+                            showEmptyState();
+                        }
                     }
-                    hideLoading();
-                    isRewritingPlaylist = false;
-                }, throwable -> showError(new ErrorInfo(throwable, UserAction.REQUESTED_BOOKMARK,
-                        "Removing duplicated streams"))));
+                }, throwable -> {
+                    finishPlaylistRewrite();
+                    showUiErrorSnackbar(this, "Removing duplicated streams", throwable);
+                }));
+    }
+
+    private void finishPlaylistRewrite() {
+        isRewritingPlaylist = false;
+        hideLoading();
+    }
+
+    private List<Long> currentStreamIds() {
+        final List<Long> streamIds = new ArrayList<>();
+        for (final LocalItem item : itemListAdapter.getItemsList()) {
+            if (item instanceof PlaylistStreamEntry entry) {
+                streamIds.add(entry.getStreamId());
+            }
+        }
+        return streamIds;
     }
 
     private void deleteItem(final PlaylistStreamEntry item) {
-        if (itemListAdapter == null) {
+        if (isRewritingPlaylist || itemListAdapter == null) {
             return;
         }
 
@@ -605,7 +639,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
      */
     @Override
     public void saveImmediate() {
-        if (playlistManager == null || itemListAdapter == null) {
+        if (isRewritingPlaylist || playlistManager == null || itemListAdapter == null) {
             return;
         }
 
@@ -615,13 +649,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
             return;
         }
 
-        final List<LocalItem> items = itemListAdapter.getItemsList();
-        final List<Long> streamIds = new ArrayList<>(items.size());
-        for (final LocalItem item : items) {
-            if (item instanceof PlaylistStreamEntry entry) {
-                streamIds.add(entry.getStreamId());
-            }
-        }
+        final List<Long> streamIds = currentStreamIds();
 
         if (DEBUG) {
             Log.d(TAG, "Updating playlist id=[" + playlistId + "] "
@@ -638,8 +666,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
                                 saver.setNoChangesToSave(revision);
                             }
                         },
-                        throwable -> showError(new ErrorInfo(throwable,
-                                UserAction.REQUESTED_BOOKMARK, "Saving playlist"))
+                        throwable -> showUiErrorSnackbar(this, "Saving playlist", throwable)
                 );
         disposables.add(disposable);
     }
@@ -669,7 +696,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
             public boolean onMove(@NonNull final RecyclerView recyclerView,
                                   @NonNull final RecyclerView.ViewHolder source,
                                   @NonNull final RecyclerView.ViewHolder target) {
-                if (source.getItemViewType() != target.getItemViewType()
+                if (isRewritingPlaylist || source.getItemViewType() != target.getItemViewType()
                         || itemListAdapter == null) {
                     return false;
                 }
