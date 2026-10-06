@@ -19,19 +19,27 @@ import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
-import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.subjects.CompletableSubject;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 /** Owns playback history interpretation, resume outcomes and recording subscriptions. */
 public final class PlaybackHistory {
     private final Environment environment;
-    private final CompositeDisposable writes = new CompositeDisposable();
+    private final WriteQueue writes;
 
     public PlaybackHistory(final Context context) {
-        this(new AndroidPlaybackHistoryEnvironment(context));
+        this(new AndroidPlaybackHistoryEnvironment(context),
+                AndroidPlaybackHistoryEnvironment.WRITES);
     }
 
     PlaybackHistory(final Environment environment) {
+        this(environment, new WriteQueue());
+    }
+
+    PlaybackHistory(final Environment environment, final WriteQueue writes) {
         this.environment = environment;
+        this.writes = writes;
     }
 
     public enum Event {
@@ -55,12 +63,12 @@ public final class PlaybackHistory {
             return;
         }
         if (event == Event.VIEWED) {
-            writes.add(environment.viewed(snapshot.info).onErrorComplete().subscribe());
+            writes.add(environment.viewed(snapshot.info).ignoreElement());
         } else if (environment.saveEnabled()) {
             final long position = event == Event.COMPLETED
                     ? (snapshot.info.getDuration() + 1) * 1000 : snapshot.position;
             writes.add(environment.save(snapshot.info, position)
-                    .doOnError(environment::logError).onErrorComplete().subscribe());
+                    .doOnError(environment::logError));
         }
     }
 
@@ -100,22 +108,20 @@ public final class PlaybackHistory {
     }
 
     /**
-     * Emits RECOVERY_UNSET for absent, finished or failed history; disposal cancels delivery.
+     * Waits for earlier accepted recordings before lookup, then emits an unfinished position.
+     * Absent, finished or failed history yields RECOVERY_UNSET. Disposal cancels lookup/delivery
+     * without canceling recordings; extraction runs outside the recording queue.
      * @param item the stream to resume
      * @return its unfinished saved position, or RECOVERY_UNSET
      */
     public Single<Long> resumePosition(final PlayQueueItem item) {
-        return environment.load(item)
+        return Single.defer(() -> writes.afterPrevious()
+                .andThen(Maybe.defer(() -> environment.load(item)))
                 .map(state -> state.isFinished(item.getDuration())
                         ? PlayQueueItem.RECOVERY_UNSET : state.getProgressMillis())
                 .defaultIfEmpty(PlayQueueItem.RECOVERY_UNSET)
                 .doOnError(environment::logError)
-                .onErrorReturnItem(PlayQueueItem.RECOVERY_UNSET);
-    }
-
-    /** Cancels recording subscriptions while permitting reuse, matching the player reset. */
-    public void reset() {
-        writes.clear();
+                .onErrorReturnItem(PlayQueueItem.RECOVERY_UNSET));
     }
 
     public static final class Snapshot {
@@ -151,6 +157,26 @@ public final class PlaybackHistory {
             this.repeatMode = repeatMode;
             this.prepared = prepared;
             this.blocked = blocked;
+        }
+    }
+
+    /** Application-owned ordering; queued records never retain a Player or its UI. */
+    static final class WriteQueue {
+        private final Subject<Completable> operations =
+                PublishSubject.<Completable>create().toSerialized();
+
+        WriteQueue() {
+            operations.concatMapCompletable(operation -> operation.onErrorComplete()).subscribe();
+        }
+
+        void add(final Completable operation) {
+            operations.onNext(operation);
+        }
+
+        Completable afterPrevious() {
+            final CompletableSubject ready = CompletableSubject.create();
+            add(Completable.fromAction(ready::onComplete));
+            return ready;
         }
     }
 

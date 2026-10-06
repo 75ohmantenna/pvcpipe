@@ -18,6 +18,7 @@ import io.reactivex.rxjava3.core.Maybe;
 
 /** Android preferences and the existing Room-backed stream-history implementation. */
 final class AndroidPlaybackHistoryEnvironment implements PlaybackHistory.Environment {
+    static final PlaybackHistory.WriteQueue WRITES = new PlaybackHistory.WriteQueue();
     private final HistoryRecordManager records;
     private final SharedPreferences preferences;
     private final String watchHistoryKey;

@@ -28,6 +28,7 @@ final class PlaybackHistoryTestEnvironment implements PlaybackHistory.Environmen
     Maybe<StreamStateEntity> load = Maybe.empty();
     PlayQueue observedQueue;
     Long persistedPosition;
+    int persistedViews;
 
     @Override
     public boolean saveEnabled() {
@@ -37,7 +38,8 @@ final class PlaybackHistoryTestEnvironment implements PlaybackHistory.Environmen
     @Override
     public Maybe<Long> viewed(final StreamInfo info) {
         viewed.add(info);
-        return views.isEmpty() ? Maybe.just(1L) : views.removeFirst();
+        final Maybe<Long> operation = views.isEmpty() ? Maybe.just(1L) : views.removeFirst();
+        return operation.doOnSuccess(ignored -> persistedViews++);
     }
 
     @Override
