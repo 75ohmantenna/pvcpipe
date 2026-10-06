@@ -117,8 +117,7 @@ public class DownloadMissionRecover extends Thread {
 
         if (!mMission.running || super.isInterrupted()) return;
 
-        mMission.running = false;
-        mMission.start();
+        mMission.recoveryFinished();
     }
 
     private void resolveStream() throws IOException, ExtractionException, HttpError {
@@ -239,8 +238,7 @@ public class DownloadMissionRecover extends Thread {
 
         if (!mMission.running || super.isInterrupted()) return;
 
-        mMission.running = false;
-        mMission.start();
+        mMission.recoveryFinished();
     }
 
     private long[] parseContentRange(String value) {

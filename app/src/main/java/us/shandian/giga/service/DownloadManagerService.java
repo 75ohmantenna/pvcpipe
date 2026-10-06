@@ -167,12 +167,18 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         mNetworkStateListenerL = new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
-                handleConnectivityState(false);
+                final Handler handler = mHandler;
+                if (handler != null) handler.post(() -> {
+                    if (mHandler != null) handleConnectivityState(false);
+                });
             }
 
             @Override
             public void onLost(Network network) {
-                handleConnectivityState(false);
+                final Handler handler = mHandler;
+                if (handler != null) handler.post(() -> {
+                    if (mHandler != null) handleConnectivityState(false);
+                });
             }
         };
         mConnectivityManager.registerNetworkCallback(new NetworkRequest.Builder().build(), mNetworkStateListenerL);
@@ -242,6 +248,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         if (icDownloadFailed != null) icDownloadFailed.recycle();
         if (icLauncher != null) icLauncher.recycle();
 
+        cancelHlsPreparation();
         mHandler = null;
         mManager.pauseAllMissions(true);
     }
@@ -329,7 +336,13 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         }
     }
 
+    @Override
+    protected void onHlsPreparationFinished() {
+        updateForegroundState(mManager.getRunningMissionsCount() > 0);
+    }
+
     public void updateForegroundState(boolean state) {
+        state |= hasHlsPreparation();
         if (state == mForeground) return;
 
         if (state) {
@@ -428,6 +441,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         if (Postprocessing.ALGORITHM_PVC_HLS_REMUXER.equals(psName)) {
             pvcLaunchHlsPreProcessor(mission, mManager);
+            updateForegroundState(true);
             return;
         }
 

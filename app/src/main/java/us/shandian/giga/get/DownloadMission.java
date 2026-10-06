@@ -158,8 +158,12 @@ public class DownloadMission extends Mission {
     final Object LOCK = new Lock();
 
     @NonNull
-    public transient Thread[] threads = new Thread[0];
-    public transient Thread init = null;
+    public transient volatile Thread[] threads = new Thread[0];
+    public transient volatile Thread init = null;
+    private transient Thread starter;
+    private transient boolean starting;
+    private transient long startGeneration;
+    private transient boolean reinitialize;
 
     public DownloadMission(String[] urls, StoredFileHelper storage, char kind, Postprocessing psInstance) {
         if (Objects.requireNonNull(urls).length < 1)
@@ -387,9 +391,8 @@ public class DownloadMission extends Mission {
         }
 
         if (psAlgorithm != null && psState == 0) {
-            threads = new Thread[]{
-                    runAsync(1, this::doPostprocessing)
-            };
+            threads = new Thread[]{new Thread(this::doPostprocessing)};
+            runAsync(1, threads[0]);
             return;
         }
 
@@ -435,12 +438,53 @@ public class DownloadMission extends Mission {
     /**
      * Start downloading with multiple threads.
      */
-    public void start() {
-        if (running || isFinished() || urls.length < 1) return;
+    public synchronized void start() {
+        if (running || starting || isFinished() || urls.length < 1) return;
 
-        // ensure that the previous state is completely paused.
-        joinForThreads(10000);
+        final Thread previousInitializer = init;
+        final Thread[] previousWorkers = threads;
+        boolean waiting = previousInitializer != null && previousInitializer.isAlive();
+        for (Thread worker : previousWorkers) {
+            waiting |= worker.isAlive();
+        }
+        if (!waiting) {
+            startDownload();
+            return;
+        }
 
+        // Keep running false until old workers have stopped. Never join under the mission
+        // monitor: workers acquire it to report progress, failures and completion.
+        starting = true;
+        final long generation = ++startGeneration;
+        starter = new Thread(() -> {
+            try {
+                awaitStopped(previousInitializer);
+                for (Thread worker : previousWorkers) awaitStopped(worker);
+                synchronized (DownloadMission.this) {
+                    if (!starting || generation != startGeneration) return;
+                    starting = false;
+                    starter = null;
+                    startDownload();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "DownloadRestart");
+        starter.start();
+    }
+
+    private static void awaitStopped(Thread worker) throws InterruptedException {
+        if (worker == null) return;
+        worker.interrupt();
+        worker.join();
+    }
+
+    // Called under the mission monitor, after all previous workers have stopped.
+    private void startDownload() {
+        if (reinitialize) {
+            resetState(false, true, ERROR_NOTHING);
+            reinitialize = false;
+        }
         running = true;
         errCode = ERROR_NOTHING;
 
@@ -471,7 +515,8 @@ public class DownloadMission extends Mission {
         blockAcquired = new boolean[blocks.length];
 
         if (blocks.length < 1) {
-            threads = new Thread[]{runAsync(1, new DownloadRunnableFallback(this))};
+            threads = new Thread[]{new DownloadRunnableFallback(this)};
+            runAsync(1, threads[0]);
         } else {
             int remainingBlocks = 0;
             for (int block : blocks) if (block >= 0) remainingBlocks++;
@@ -484,15 +529,33 @@ public class DownloadMission extends Mission {
             threads = new Thread[Math.min(threadCount, remainingBlocks)];
 
             for (int i = 0; i < threads.length; i++) {
-                threads[i] = runAsync(i + 1, new DownloadRunnable(this, i));
+                threads[i] = createDownloadWorker(i);
             }
+            for (int i = 0; i < threads.length; i++) runAsync(i + 1, threads[i]);
         }
+    }
+
+    synchronized void initializationFinished() {
+        if (!running || init != Thread.currentThread() || init.isInterrupted()) return;
+        startDownload();
+    }
+
+    synchronized void recoveryFinished() {
+        if (!running || Thread.currentThread().isInterrupted() || threads.length != 1
+                || threads[0] != Thread.currentThread()) return;
+        startDownload();
     }
 
     /**
      * Pause the mission
      */
-    public void pause() {
+    public synchronized void pause() {
+        starting = false;
+        ++startGeneration;
+        if (starter != null) {
+            starter.interrupt();
+            starter = null;
+        }
         if (!running) return;
 
         if (isPsRunning()) {
@@ -507,10 +570,9 @@ public class DownloadMission extends Mission {
 
         if (init != null && init.isAlive()) {
             // NOTE: if start() method is running ¡will no have effect!
+            reinitialize = init instanceof DownloadInitializer;
             init.interrupt();
-            synchronized (LOCK) {
-                resetState(false, true, ERROR_NOTHING);
-            }
+            // Initialization owns its state until it exits; reset on the next initialization.
             return;
         }
 
@@ -524,6 +586,7 @@ public class DownloadMission extends Mission {
 
     private void pauseThreads() {
         running = false;
+        reinitialize |= init instanceof DownloadInitializer && init.isAlive();
         joinForThreads(-1);
         writeThisToFile();
     }
@@ -565,7 +628,16 @@ public class DownloadMission extends Mission {
     }
 
     private void initializer() {
-        init = runAsync(DownloadInitializer.mId, new DownloadInitializer(this));
+        init = createInitializer();
+        runAsync(DownloadInitializer.mId, init);
+    }
+
+    Thread createInitializer() {
+        return new DownloadInitializer(this);
+    }
+
+    Thread createDownloadWorker(int index) {
+        return new DownloadRunnable(this, index);
     }
 
     private void writeThisToFileAsync() {
@@ -737,7 +809,7 @@ public class DownloadMission extends Mission {
      *
      * @param errorCode error code which trigger the recovery procedure
      */
-    void doRecover(int errorCode) {
+    synchronized void doRecover(int errorCode) {
         Log.i(TAG, "Attempting to recover the mission: " + storage.getName());
 
         if (recoveryInfo == null) {
@@ -746,11 +818,14 @@ public class DownloadMission extends Mission {
             return;
         }
 
-        joinForThreads(0);
-
-        threads = new Thread[]{
-                runAsync(DownloadMissionRecover.mID, new DownloadMissionRecover(this, errorCode))
-        };
+        if (urls[current] == null) {
+            threads = new Thread[]{new DownloadMissionRecover(this, errorCode)};
+            runAsync(DownloadMissionRecover.mID, threads[0]);
+            return;
+        }
+        urls[current] = null;
+        pauseThreads();
+        start();
     }
 
     private boolean deleteThisFromFile() {
@@ -827,7 +902,7 @@ public class DownloadMission extends Mission {
 
         try {
             for (Thread thread : threads) {
-                if (!thread.isAlive()) continue;
+                if (thread == currentThread || !thread.isAlive()) continue;
                 if (DEBUG) {
                     Log.w(TAG, "thread alive: " + thread.getName());
                 }

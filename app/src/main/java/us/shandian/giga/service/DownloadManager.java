@@ -420,13 +420,7 @@ public class DownloadManager {
     public void pauseAllMissions(boolean force) {
         synchronized (this) {
             for (DownloadMission mission : mMissionsPending) {
-                if (!mission.running || mission.isPsRunning() || mission.isFinished()) continue;
-
-                if (force) {
-                    // avoid waiting for threads
-                    mission.init = null;
-                    mission.threads = new Thread[0];
-                }
+                if (mission.isPsRunning() || mission.isFinished()) continue;
 
                 mission.pause();
             }
