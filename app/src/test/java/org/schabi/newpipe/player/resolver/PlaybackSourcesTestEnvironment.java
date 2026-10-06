@@ -16,12 +16,12 @@ import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
-import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /** Scripts preference decisions and ExoPlayer construction, retaining real selection logic. */
 final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environment {
@@ -32,11 +32,13 @@ final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environmen
     final List<MediaSource> subtitles = new ArrayList<>();
     final List<String> errors = new ArrayList<>();
     final List<String> warnings = new ArrayList<>();
+    final List<String> liveManifests = new ArrayList<>();
     final Set<StreamInfo> liveInfos = new HashSet<>();
     final Set<Stream> failedStreams = new HashSet<>();
     int selectedAudioIndex;
     int fallbackVideoIndex;
     int subtitleRequests;
+    Consumer<Stream> onStreamConstruction;
 
     @Override
     public List<VideoStream> sortedVideoStreams(final StreamInfo info) {
@@ -67,8 +69,10 @@ final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environmen
     }
 
     @Override
-    public MediaSource liveSource(final StreamInfo info) {
-        return liveInfos.contains(info) ? source(StreamInfoTag.of(info)) : null;
+    public MediaSource liveSource(final StreamInfo info, final String hlsOverride,
+                                 final MediaItemTag tag) {
+        liveManifests.add(hlsOverride == null ? info.getHlsUrl() : hlsOverride);
+        return liveInfos.contains(info) ? source(tag) : null;
     }
 
     @Override
@@ -77,6 +81,9 @@ final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environmen
             throws PlaybackResolver.ResolverException {
         streams.add(stream);
         streamTags.add(tag);
+        if (onStreamConstruction != null) {
+            onStreamConstruction.accept(stream);
+        }
         if (failedStreams.contains(stream)) {
             throw new PlaybackResolver.ResolverException("scripted construction failure");
         }

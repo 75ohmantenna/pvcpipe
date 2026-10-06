@@ -61,6 +61,17 @@ public interface MediaItemTag {
         return Optional.empty();
     }
 
+    enum SourceType {
+        LIVE_STREAM,
+        VIDEO_WITH_SEPARATED_AUDIO,
+        VIDEO_WITH_AUDIO_OR_AUDIO_ONLY
+    }
+
+    @NonNull
+    default Optional<SourceType> getMaybeSourceType() {
+        return Optional.empty();
+    }
+
     <T> Optional<T> getMaybeExtras(@NonNull Class<T> type);
 
     <T> MediaItemTag withExtras(@NonNull T extra);

@@ -183,6 +183,124 @@ class PlaybackSourcesIntegrationTest {
         assertNull(sources.resolve(info("empty-audio"), true, true))
     }
 
+    @Test
+    fun neighborCannotChangeReloadDecisionOfLoadedEmbeddedVideo() {
+        val current = info("current-embedded").apply {
+            videoStreams = listOf(video("embedded", videoOnly = false))
+            audioStreams = listOf(audio("english"))
+        }
+        val currentSource = requireNotNull(sources.resolve(current, false, false))
+        val loaded = LoadedMediaSource(currentSource, tag(currentSource), PlayQueueItem(current), Long.MAX_VALUE)
+        val currentTag = tag(loaded)
+        assertSame(loaded, currentTag.getMaybeExtras(LoadedMediaSource::class.java).get())
+        assertTrue(sources.requiresReload(currentTag, true))
+
+        val neighbor = info("neighbor-separate").apply {
+            videoOnlyStreams = listOf(video("separate", videoOnly = true))
+            audioStreams = listOf(audio("english"))
+        }
+        requireNotNull(sources.resolve(neighbor, false, false))
+
+        assertTrue(sources.requiresReload(currentTag, true))
+    }
+
+    @Test
+    fun neighborCannotChangeReloadDecisionOfLoadedSeparateVideo() {
+        val current = info("current-separate").apply {
+            videoOnlyStreams = listOf(video("separate", videoOnly = true))
+            audioStreams = listOf(audio("english"))
+        }
+        val currentSource = requireNotNull(sources.resolve(current, false, false))
+        val loaded = LoadedMediaSource(currentSource, tag(currentSource), PlayQueueItem(current), Long.MAX_VALUE)
+        val currentTag = tag(loaded)
+        assertSame(loaded, currentTag.getMaybeExtras(LoadedMediaSource::class.java).get())
+        assertFalse(sources.requiresReload(currentTag, true))
+
+        val neighbor = info("neighbor-embedded").apply {
+            videoStreams = listOf(video("embedded", videoOnly = false))
+            audioStreams = listOf(audio("english"))
+        }
+        requireNotNull(sources.resolve(neighbor, false, false))
+
+        assertFalse(sources.requiresReload(currentTag, true))
+    }
+
+    @Test
+    fun rumbleLiveSelectionUsesQualityManifestWithoutChangingCachedInfo() {
+        val original = "https://example.invalid/rumble/original.m3u8"
+        val selected = "https://example.invalid/rumble/720.m3u8"
+        val stream = VideoStream.Builder()
+            .setId("rumble-720")
+            .setContent(selected, true)
+            .setManifestUrl(selected)
+            .setMediaFormat(MediaFormat.MPEG_4)
+            .setDeliveryMethod(DeliveryMethod.HLS)
+            .setIsVideoOnly(false)
+            .setResolution("720p")
+            .build()
+        val info = info("rumble", StreamType.LIVE_STREAM, ServiceList.Rumble.serviceId).apply {
+            hlsUrl = original
+            videoStreams = listOf(stream)
+        }
+        val source = requireNotNull(sources.resolve(info, false, false))
+
+        assertTrue(source is HlsMediaSource)
+        assertEquals(selected, source.mediaItem.localConfiguration!!.uri.toString())
+        assertEquals(original, info.hlsUrl)
+    }
+
+    @Test
+    fun rumbleLiveWithoutQualityStreamsUsesItsOriginalManifest() {
+        val original = "https://example.invalid/rumble/original.m3u8"
+        val info = info("rumble-empty", StreamType.LIVE_STREAM, ServiceList.Rumble.serviceId).apply {
+            hlsUrl = original
+        }
+        val source = requireNotNull(sources.resolve(info, false, false))
+
+        assertTrue(source is HlsMediaSource)
+        assertEquals(original, source.mediaItem.localConfiguration!!.uri.toString())
+        assertEquals(original, info.hlsUrl)
+    }
+
+    @Test
+    fun rumblePreferredLiveManifestSurvivesVideoDisablingAndNeighborResolution() {
+        val original = "https://example.invalid/rumble/original.m3u8"
+        val preferred = "https://example.invalid/rumble/720.m3u8"
+        val preferredVideo = VideoStream.Builder()
+            .setId("rumble-720")
+            .setContent(preferred, true)
+            .setManifestUrl(preferred)
+            .setMediaFormat(MediaFormat.MPEG_4)
+            .setDeliveryMethod(DeliveryMethod.HLS)
+            .setIsVideoOnly(false)
+            .setResolution("720p")
+            .build()
+        val current = info("rumble-background", StreamType.LIVE_STREAM, ServiceList.Rumble.serviceId).apply {
+            hlsUrl = original
+            videoStreams = listOf(preferredVideo)
+            audioStreams = listOf(audio("english"))
+        }
+        val foreground = requireNotNull(sources.resolve(current, false, false))
+        assertTrue(foreground is HlsMediaSource)
+        assertEquals(preferred, foreground.mediaItem.localConfiguration!!.uri.toString())
+        assertEquals(original, current.hlsUrl)
+
+        val background = requireNotNull(sources.resolve(current, false, true))
+        assertTrue(background is HlsMediaSource)
+        assertEquals(preferred, background.mediaItem.localConfiguration!!.uri.toString())
+        assertEquals(original, current.hlsUrl)
+
+        val neighbor = info("neighbor-embedded").apply {
+            videoStreams = listOf(video("embedded", videoOnly = false))
+            audioStreams = listOf(audio("english"))
+        }
+        requireNotNull(sources.resolve(neighbor, false, false))
+
+        assertFalse(sources.requiresReload(tag(foreground), true))
+        assertFalse(sources.requiresReload(tag(background), true))
+        assertEquals(original, current.hlsUrl)
+    }
+
     private fun tag(source: MediaSource): MediaItemTag = MediaItemTag.from(source.mediaItem).get()
 
     private fun info(
