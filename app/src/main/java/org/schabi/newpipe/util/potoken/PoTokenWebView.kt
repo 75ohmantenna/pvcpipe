@@ -65,7 +65,7 @@ class PoTokenWebView private constructor(
                     Log.e(TAG, "This WebView implementation reported an uncaught error")
 
                     onInitializationErrorCloseAndCancel(exception)
-                    popAllPoTokenEmitters().forEach { (_, emitter) -> emitter.onError(exception) }
+                    popAllPoTokenEmitters().forEach { (_, emitter) -> emitter.tryOnError(exception) }
                 }
                 return super.onConsoleMessage(m)
             }
@@ -235,7 +235,7 @@ class PoTokenWebView private constructor(
         if (BuildConfig.DEBUG) {
             Log.e(TAG, "obtainPoToken error from JavaScript")
         }
-        popPoTokenEmitter(identifier)?.onError(buildExceptionForJsError(error))
+        popPoTokenEmitter(identifier)?.tryOnError(buildExceptionForJsError(error))
     }
 
     /**
@@ -250,7 +250,7 @@ class PoTokenWebView private constructor(
         val poToken = try {
             u8ToBase64(poTokenU8)
         } catch (t: Throwable) {
-            popPoTokenEmitter(identifier)?.onError(t)
+            popPoTokenEmitter(identifier)?.tryOnError(t)
             return
         }
 
@@ -358,7 +358,7 @@ class PoTokenWebView private constructor(
      * to [generatorEmitter].
      */
     private fun onInitializationErrorCloseAndCancel(error: Throwable) {
-        runOnMainThread(generatorEmitter) {
+        runOnMainThread(generatorEmitter, runWhenDisposed = true) {
             generatorEmitter.tryOnError(error)
             close()
         }
@@ -416,13 +416,14 @@ class PoTokenWebView private constructor(
          */
         private fun runOnMainThread(
             emitterIfPostFails: SingleEmitter<out Any>,
+            runWhenDisposed: Boolean = false,
             runnable: Runnable
         ) {
             if (!Handler(Looper.getMainLooper()).post {
-                    if (!emitterIfPostFails.isDisposed) runnable.run()
+                    if (runWhenDisposed || !emitterIfPostFails.isDisposed) runnable.run()
                 }
             ) {
-                emitterIfPostFails.onError(PoTokenException("Could not run on main thread"))
+                emitterIfPostFails.tryOnError(PoTokenException("Could not run on main thread"))
             }
         }
     }
