@@ -106,7 +106,6 @@ public final class BitchuteFilters extends BaseSearchFilters {
                 groupsFactory.createFilterGroup(ID_SF_SENSITIVITY_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SENSITIVITY, true,
                         ID_SF_SENSITIVITY_NORMAL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVITY_SAFE),
                                 groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NORMAL),
                                 groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NSFW),
                                 groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NSFL),
@@ -152,7 +151,7 @@ public final class BitchuteFilters extends BaseSearchFilters {
     @Override
     public String evaluateSelectedFilters(final String searchString) {
 
-        if (selectedContentFilter.isEmpty()) {
+        if (selectedContentFilter == null || selectedContentFilter.isEmpty()) {
             // load default search filter configuration as having a URL alone
             // will not work for the new API
             setDefaultContentAndSortFilters();

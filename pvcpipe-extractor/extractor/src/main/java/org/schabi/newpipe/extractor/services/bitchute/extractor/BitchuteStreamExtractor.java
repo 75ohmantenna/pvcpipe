@@ -117,6 +117,9 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nullable
     @Override
     public DateWrapper getUploadDate() throws ParsingException {
+        if (getTextualUploadDate() == null || getTextualUploadDate().isEmpty()) {
+            return null;
+        }
         return new DateWrapper(PvcParsingHelper.parseDateFrom(getTextualUploadDate()));
     }
 
@@ -140,11 +143,11 @@ public class BitchuteStreamExtractor extends StreamExtractor {
                 return StreamExtractor.NO_AGE_LIMIT;
             case "normal":
             default:
-                return 16;
+                return 12;
             case "nsfw":
-                return 18;
+                return 15;
             case "nsfl":
-                return 21;
+                return 18;
         }
     }
 

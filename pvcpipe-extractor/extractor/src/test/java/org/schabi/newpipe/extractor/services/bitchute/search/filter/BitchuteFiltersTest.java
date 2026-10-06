@@ -145,7 +145,7 @@ class BitchuteFiltersTest extends DefaultFiltersTest {
                 singletonList(BitchuteFilters.ID_CF_MAIN_VIDEOS),
                 getAllSortFiltersIdsList(),
                 "&kind=video&sort=new&sort=old&duration=short&duration=medium&duration=long"
-                        + "&duration=feature&sensitivity_id=safe&sensitivity_id=normal"
+                        + "&duration=feature&sensitivity_id=normal"
                         + "&sensitivity_id=nsfw&sensitivity_id=nsfl",
                 null,
                 null,
@@ -156,7 +156,7 @@ class BitchuteFiltersTest extends DefaultFiltersTest {
                 singletonList(BitchuteFilters.ID_CF_MAIN_CHANNELS),
                 getAllSortFiltersIdsList(),
                 "&kind=channel&sort=new&sort=old&duration=short&duration=medium&duration=long"
-                        + "&duration=feature&sensitivity_id=safe&sensitivity_id=normal"
+                        + "&duration=feature&sensitivity_id=normal"
                         + "&sensitivity_id=nsfw&sensitivity_id=nsfl",
                 null,
                 null,

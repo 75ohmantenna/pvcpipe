@@ -7,14 +7,13 @@ import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
 import com.grack.nanojson.JsonWriter;
 
-import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
+import org.schabi.newpipe.extractor.pvc.PvcCloudFlareChallengeException;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
@@ -28,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -120,24 +118,15 @@ public final class BitchuteParserHelper {
                                         @Nonnull final String url,
                                         final int commentCount)
             throws IOException, ExtractionException {
-        final String cfAuth = getCfAuth(id);
-        final JsonArray jsonArray;
-
-        if (cfAuth != null) {
-            jsonArray = getComments(cfAuth, commentCount);
-        } else {
-            final Downloader downloader = NewPipe.getDownloader();
-            final Response response = downloader.get(url);
-
-            if (extractAndStoreCfAuth(id, response.responseBody())) {
-                jsonArray = getComments(Objects.requireNonNull(getCfAuth(id)), commentCount);
-            } else {
-                // could not find anything so empty array
-                jsonArray = new JsonArray();
-            }
+        // The current website is a SPA: its HTML no longer contains cf_auth.
+        // Obtain a fresh anonymous token, as the API's signed tokens can expire.
+        final JsonObject auth = callJsonApi(JsonObject.builder().value("video_id", id),
+                "https://api.bitchute.com/api/beta/apps/commentfreely/video/");
+        final String cfAuth = auth.getString("auth");
+        if (Utils.isNullOrEmpty(cfAuth)) {
+            throw new ParsingException("BitChute comments response contains no auth token");
         }
-
-        return jsonArray;
+        return getComments(cfAuth, commentCount);
     }
 
     @Nonnull
@@ -169,10 +158,6 @@ public final class BitchuteParserHelper {
             @Nonnull final String apiEndpoint,
             @Nonnull final String cfAuth,
             @Nonnull final String moreHeaders) throws IOException, ExtractionException {
-        if (!isInitDone()) {
-            init();
-        }
-
         final String dataWithPlaceholders = "cf_auth=%s" + moreHeaders;
 
         final String urlEncodeCfAuth = Utils.encodeUrlUtf8(cfAuth);
@@ -181,13 +166,21 @@ public final class BitchuteParserHelper {
 
         final Response response = getDownloader().post(
                 String.format(BITCHUTE_LOCALE, "%s%s", BitchuteConstants.COMMENTS_URL, apiEndpoint),
-                getPostHeader(data.length),
+                Map.of("Content-Type", List.of("application/x-www-form-urlencoded"),
+                        "Referer", List.of(BITCHUTE_LINK)),
                 data
         );
 
+        if (response.responseCode() != 200) {
+            throw new ExtractionException("BitChute comments request failed: HTTP "
+                    + response.responseCode());
+        }
         try {
             final Object jsonObject = JsonParser.any().from(response.responseBody());
-            return Objects.requireNonNull(jsonObject);
+            if (!(jsonObject instanceof JsonArray)) {
+                throw new ParsingException("BitChute comments response is not an array");
+            }
+            return jsonObject;
         } catch (final JsonParserException e) {
             throw new ParsingException("Could not parse BitChute comments response", e);
         }
@@ -197,15 +190,34 @@ public final class BitchuteParserHelper {
             final JsonBuilder<JsonObject> sortQueryJson,
             final String endpoint)
             throws IOException, ExtractionException {
+        return getJsonObject(postJsonApi(sortQueryJson, endpoint));
+    }
+
+    public static JsonArray callJsonArrayApi(final JsonBuilder<JsonObject> query,
+                                             final String endpoint)
+            throws IOException, ExtractionException {
+        final Response response = postJsonApi(query, endpoint);
+        if (response.responseCode() != 200) {
+            getJsonObject(response); // Raise the same API errors as object endpoints.
+        }
+        try {
+            return JsonParser.array().from(response.responseBody());
+        } catch (final JsonParserException e) {
+            throw new ParsingException("Could not parse BitChute API array response", e);
+        }
+    }
+
+    private static Response postJsonApi(final JsonBuilder<JsonObject> sortQueryJson,
+                                         final String endpoint)
+            throws IOException, ExtractionException {
         final JsonObject thing = sortQueryJson.done();
         final byte[] data = JsonWriter.string(thing).getBytes(StandardCharsets.UTF_8);
 
-        final Response response = getDownloader().post(
+        return getDownloader().post(
                 endpoint,
                 getJsonApiHeaders(),
                 data
         );
-        return getJsonObject(response);
     }
 
     private static JsonObject getJsonObject(final Response response) throws ExtractionException {
@@ -217,21 +229,33 @@ public final class BitchuteParserHelper {
                 return jsonObject;
             }
         } catch (final JsonParserException e) {
+            if (response.responseCode() == 403
+                    && (response.responseBody().contains("challenge-platform")
+                    || response.responseBody().contains("Just a moment"))) {
+                throw new PvcCloudFlareChallengeException(
+                        "BitChute Cloudflare challenge: " + response.latestUrl());
+            }
+            if (response.responseCode() >= 400) {
+                throw new ContentNotAvailableException("BitChute API request failed: HTTP "
+                        + response.responseCode(), e);
+            }
             throw new ParsingException("Could not parse BitChute API response", e);
         }
 
         final String errorsKey = "errors";
         if (jsonObject.has(errorsKey)) {
             if (!jsonObject.getArray(errorsKey).isEmpty()) {
-                final JsonObject error = (JsonObject) jsonObject.getArray(errorsKey).get(0);
-                final String reason = error.getString("message", "BitChute API request failed");
-                if (response.responseCode() == 403
-                        && "reason".equals(error.getString("context"))
-                        && reason.toLowerCase(Locale.ROOT).contains("location")) {
-                    throw new GeographicRestrictionException(reason);
-                }
-                if (response.responseCode() == 404 && reason.contains("Not Found")) {
-                    throw new ContentNotAvailableException(reason);
+                for (final Object entry : jsonObject.getArray(errorsKey)) {
+                    final JsonObject error = (JsonObject) entry;
+                    final String reason = error.getString("message", "BitChute API request failed");
+                    if (response.responseCode() == 403
+                            && "reason".equals(error.getString("context"))
+                            && reason.toLowerCase(Locale.ROOT).contains("location")) {
+                        throw new GeographicRestrictionException(reason);
+                    }
+                    if (response.responseCode() == 404 && reason.contains("Not Found")) {
+                        throw new ContentNotAvailableException(reason);
+                    }
                 }
             }
         }
@@ -301,6 +325,12 @@ public final class BitchuteParserHelper {
     }
 
     public static String prependBaseUrl(final String urlPath) {
-        return BASE_URL + urlPath;
+        if (Utils.isNullOrEmpty(urlPath)) {
+            return "";
+        }
+        if (urlPath.startsWith("https://") || urlPath.startsWith("http://")) {
+            return urlPath;
+        }
+        return urlPath.startsWith("//") ? "https:" + urlPath : BASE_URL + urlPath;
     }
 }

@@ -40,6 +40,11 @@ public class BitchuteChannelTabExtractor extends ChannelTabExtractor {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
+        if (channelData == null) {
+            channelData = new ResultsStreamChannel(BitchuteParserHelper.callJsonApi(
+                    JsonObject.builder().value("channel_id", getId()),
+                    ResultsStreamChannel.ENDPOINT));
+        }
     }
 
     @Nonnull
@@ -56,6 +61,9 @@ public class BitchuteChannelTabExtractor extends ChannelTabExtractor {
 
     private InfoItemsPage<InfoItem> getInfoItemsPage(final String pageNo)
             throws ExtractionException, IOException {
+        if (channelData == null) {
+            fetchPage();
+        }
         int currentPageNo = Integer.parseInt(pageNo);
         final ResultsStreamChannelVideos document =
                 getChannelVideos(channelData.getChannelId(), currentPageNo);

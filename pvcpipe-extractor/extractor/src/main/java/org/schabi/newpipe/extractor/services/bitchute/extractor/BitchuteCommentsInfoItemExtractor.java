@@ -1,17 +1,21 @@
 package org.schabi.newpipe.extractor.services.bitchute.extractor;
 
 import com.grack.nanojson.JsonObject;
+import com.grack.nanojson.JsonArray;
+import com.grack.nanojson.JsonWriter;
 
 import org.schabi.newpipe.extractor.Image;
+import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItemExtractor;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
-import org.schabi.newpipe.extractor.services.bitchute.BitchuteConstants;
+import org.schabi.newpipe.extractor.services.bitchute.BitchuteParserHelper;
 import org.schabi.newpipe.extractor.stream.Description;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -19,10 +23,35 @@ import javax.annotation.Nullable;
 public class BitchuteCommentsInfoItemExtractor implements CommentsInfoItemExtractor {
     private final JsonObject json;
     private final String url;
+    private final JsonArray comments;
 
     public BitchuteCommentsInfoItemExtractor(final JsonObject json, final String url) {
+        this(json, url, new JsonArray());
+    }
+
+    public BitchuteCommentsInfoItemExtractor(final JsonObject json, final String url,
+                                            final JsonArray comments) {
         this.json = json;
         this.url = url;
+        this.comments = comments;
+    }
+
+    @Override
+    public int getReplyCount() {
+        int count = 0;
+        for (final Object entry : comments) {
+            if (getCommentId().equals(((JsonObject) entry).getString("parent"))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    @Nullable
+    @Override
+    public Page getReplies() {
+        return getReplyCount() == 0 ? null : new Page(url, getCommentId(),
+                JsonWriter.string(comments).getBytes(StandardCharsets.UTF_8));
     }
 
     @Override
@@ -44,7 +73,10 @@ public class BitchuteCommentsInfoItemExtractor implements CommentsInfoItemExtrac
     @Override
     public List<Image> getUploaderAvatars() throws ParsingException {
         final String avatarUrl =
-                BitchuteConstants.BASE_URL + json.getString("profile_picture_url");
+                BitchuteParserHelper.prependBaseUrl(json.getString("profile_picture_url"));
+        if (avatarUrl.isEmpty()) {
+            return List.of();
+        }
         return List.of(new Image(avatarUrl,
                 Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
@@ -65,9 +97,16 @@ public class BitchuteCommentsInfoItemExtractor implements CommentsInfoItemExtrac
     @Nullable
     @Override
     public DateWrapper getUploadDate() throws ParsingException {
-        final var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSXXX");
-        final var datetime = ZonedDateTime.parse(getTextualUploadDate(), formatter);
-        return new DateWrapper(datetime.toOffsetDateTime(), false);
+        final String date = getTextualUploadDate();
+        if (date == null || date.isEmpty()) {
+            return null;
+        }
+        try {
+            return new DateWrapper(ZonedDateTime.parse(date.replace(' ', 'T'),
+                    DateTimeFormatter.ISO_OFFSET_DATE_TIME).toOffsetDateTime(), false);
+        } catch (final java.time.format.DateTimeParseException e) {
+            throw new ParsingException("Could not parse BitChute comment date", e);
+        }
     }
 
     @Override

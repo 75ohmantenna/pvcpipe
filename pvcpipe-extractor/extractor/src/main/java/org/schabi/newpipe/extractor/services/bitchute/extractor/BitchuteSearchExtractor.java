@@ -6,6 +6,7 @@ import com.github.pvcpipe.json2java4nanojson.bitchute.api.results.search.videos.
 import com.github.pvcpipe.json2java4nanojson.bitchute.api.results.search.videos.Videos;
 import com.grack.nanojson.JsonBuilder;
 import com.grack.nanojson.JsonObject;
+import org.jsoup.Jsoup;
 
 import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
@@ -22,6 +23,7 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
+import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteConstants;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteParserHelper;
 import org.schabi.newpipe.extractor.services.bitchute.misc.BitchuteHelpers;
@@ -74,32 +76,33 @@ public class BitchuteSearchExtractor extends SearchExtractor {
         return getPage(new Page(getUrl(), BitchuteConstants.INITIAL_PAGE_NO));
     }
 
-    private BitchuteFilters.BitchuteKindContentFilterItem getContentFilterWithQueryData() {
-        final BitchuteFilters.BitchuteKindContentFilterItem filter =
-                getService().getSearchQHFactory().getSearchFilters().getFirstContentFilterItem();
-        if (!(filter instanceof BitchuteFilters.BitchuteKindContentFilterItem)) {
-            throw new RuntimeException("Somehow this is no valid BitChute content filter: "
-                    + filter);
-        }
-        return filter;
-    }
-
     @Override
     public InfoItemsPage<InfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
 
-        final String sortQuery;
-        JsonBuilder<JsonObject> sortQueryJson = null;
-        final String endpoint;
+        // Build each request from this search's filters, not the mutable singleton factory.
+        final JsonBuilder<JsonObject> sortQueryJson = JsonObject.builder();
         final String searchString = getLinkHandler().getId();
         int currentPageNumber = Integer.parseInt(page.getId());
-        final BitchuteFilters.BitchuteKindContentFilterItem contentFilter =
-                getContentFilterWithQueryData();
-
-
-        sortQuery = contentFilter.getDataParams();
-        sortQueryJson = contentFilter.getDataParamsNew();
-        endpoint = contentFilter.endpoint;
+        final boolean channels = getLinkHandler().getContentFilters().stream()
+                .anyMatch(item -> item.getIdentifier() == BitchuteFilters.ID_CF_MAIN_CHANNELS);
+        final String endpoint = channels
+                ? ResultsSearchChannels.ENDPOINT : ResultsSearchVideos.ENDPOINT;
+        sortQueryJson.value("sensitivity_id", "normal");
+        if (getLinkHandler().getSortFilter() != null) {
+            for (final FilterItem item : getLinkHandler().getSortFilter()) {
+                if (item instanceof BitchuteFilters.BitchuteKeyValueFilterItem) {
+                    final BitchuteFilters.BitchuteKeyValueFilterItem filter =
+                            (BitchuteFilters.BitchuteKeyValueFilterItem) item;
+                    if (!filter.query.isEmpty()
+                            && (!channels || "sensitivity_id".equals(filter.key))) {
+                        // Safe was retired by BitChute; normal is now its lowest sensitivity.
+                        sortQueryJson.value(filter.key,
+                                "safe".equals(filter.query) ? "normal" : filter.query);
+                    }
+                }
+            }
+        }
 
         // request and retrieve the results via json
         final JsonObject jsonResponse = getSearchResultForQuery(
@@ -126,9 +129,9 @@ public class BitchuteSearchExtractor extends SearchExtractor {
                 extractVideosFromSearchResult(resultsy, collector);
         }
 
-        final int maxPages =
-                (noOfCurrentResults != 0) ? (int) (total / LIMIT_RESULTS_PER_QUERY) : 0;
-        if (maxPages > currentPageNumber) {
+        if (noOfCurrentResults > 0
+                && (long) currentPageNumber * LIMIT_RESULTS_PER_QUERY
+                + noOfCurrentResults < total) {
             return new InfoItemsPage<>(collector,
                     new Page(getUrl(), String.valueOf(++currentPageNumber)));
         } else {
@@ -146,7 +149,8 @@ public class BitchuteSearchExtractor extends SearchExtractor {
                             result.getChannelName(),
                             BitchuteParserHelper.prependBaseUrl(result.getChannelUrl()),
                             result.getThumbnailUrl(),
-                            result.getDescription()
+                            Jsoup.parse(result.getDescription() == null
+                                    ? "" : result.getDescription()).text()
                     );
 
             collector.commit(infoItemExtractor);

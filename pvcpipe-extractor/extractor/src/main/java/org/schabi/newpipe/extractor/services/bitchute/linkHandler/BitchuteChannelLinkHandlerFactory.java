@@ -10,6 +10,8 @@ import org.schabi.newpipe.extractor.utils.Utils;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
 
@@ -26,7 +28,12 @@ public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
         try {
             url = Utils.stringToURL(urlString);
         } catch (final MalformedURLException e) {
-            throw new IllegalArgumentException("The given URL is not valid");
+            throw new ParsingException("The given URL is not valid", e);
+        }
+
+        if (!Utils.isHTTP(url) || !Set.of("www.bitchute.com", "bitchute.com", "old.bitchute.com")
+                .contains(url.getHost().toLowerCase(Locale.ROOT))) {
+            throw new ParsingException("URL is not hosted by BitChute: " + urlString);
         }
 
         String path = url.getPath();
@@ -48,7 +55,7 @@ public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
     }
 
     private String validateId(final String id) throws ParsingException {
-        if (!id.contains("/")) {
+        if (id != null && id.matches("[a-zA-Z0-9_-]+")) {
             return id;
         } else {
             throw new ParsingException("Id is not suitable: " + id);

@@ -34,6 +34,16 @@ public final class DownloaderImpl extends Downloader {
     public static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     + "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36";
+    private static final String BITCHUTE_MEDIA_USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
+
+    public static String getMediaUserAgent(final String url) {
+        final HttpUrl parsed = HttpUrl.parse(url);
+        // BitChute's seed CDN closes Chrome/145 connections without an HTTP response.
+        // Keep this workaround confined to its media hosts.
+        return parsed != null && parsed.host().matches("seed[0-9]+[a-z]*\\.bitchute\\.com")
+                ? BITCHUTE_MEDIA_USER_AGENT : USER_AGENT;
+    }
     public static final String YOUTUBE_RESTRICTED_MODE_COOKIE_KEY =
             "youtube_restricted_mode_key";
     public static final String YOUTUBE_RESTRICTED_MODE_COOKIE = "PREF=f2=8000000";
