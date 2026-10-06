@@ -257,7 +257,6 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
                 throw new IOException("Backup does not contain a database");
             }
             preferences.edit().putString(pathKey, uri.toString()).apply();
-            NewPipeDatabase.close();
             return true;
         }).observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(ignored -> ProcessPhoenix.triggerRebirth(context))
