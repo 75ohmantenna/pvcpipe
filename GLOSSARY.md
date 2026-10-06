@@ -57,3 +57,7 @@ feed refresh, including any extraction errors.
 **Refresh result**:
 The collected feed updates and subscription failures after the refresh has
 finished storing batches and cleaning up the feed.
+
+**Accepted feed refresh**:
+A feed refresh admitted for completion independently of its observers while the
+application process remains running.

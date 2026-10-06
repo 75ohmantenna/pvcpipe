@@ -24,6 +24,7 @@ import org.schabi.newpipe.error.ErrorUtil
 import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.local.feed.service.FeedLoadManager
 import org.schabi.newpipe.local.feed.service.FeedLoadService
+import org.schabi.newpipe.local.feed.service.FeedRefresh
 
 /*
  * Worker which checks for new streams of subscribed channels
@@ -39,11 +40,22 @@ class NotificationWorker(
     }
     private val feedLoadManager = FeedLoadManager(appContext)
 
+    @Volatile
+    private var activeRefresh: FeedRefresh? = null
+
+    @Volatile
+    private var stopped = false
+
     override fun createWork(): Single<Result> = if (areNotificationsEnabled(applicationContext)) {
-        feedLoadManager.createRefresh(
+        val refresh = feedLoadManager.createRefresh(
             ignoreOutdatedThreshold = true,
             groupId = FeedLoadManager.GROUP_NOTIFICATION_ENABLED
-        ).result
+        )
+        activeRefresh = refresh
+        if (stopped) {
+            refresh.cancel()
+        }
+        refresh.result
             .doOnSubscribe { showLoadingFeedForegroundNotification() }
             .map { feed ->
                 // filter out feedUpdateInfo items (i.e. channels) with nothing new
@@ -72,6 +84,12 @@ class NotificationWorker(
     } else {
         // the user can disable streams notifications in the device's app settings
         Single.just(Result.success())
+    }
+
+    override fun onStopped() {
+        stopped = true
+        activeRefresh?.cancel()
+        super.onStopped()
     }
 
     @SuppressLint("InlinedApi") // WorkManager handles the service type on older APIs.

@@ -6,6 +6,7 @@ import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.schedulers.Schedulers
 import org.schabi.newpipe.NewPipeDatabase
+import org.schabi.newpipe.database.AppDatabase
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.database.subscription.NotificationMode
@@ -19,10 +20,10 @@ import org.schabi.newpipe.local.feed.service.FeedUpdateInfo
 import org.schabi.newpipe.util.ExtractorHelper
 import org.schabi.newpipe.util.image.ImageStrategy
 
-class SubscriptionManager(context: Context) {
-    private val database = NewPipeDatabase.getInstance(context)
+class SubscriptionManager internal constructor(private val database: AppDatabase) {
+    constructor(context: Context) : this(NewPipeDatabase.getInstance(context))
     private val subscriptionTable = database.subscriptionDAO()
-    private val feedDatabaseManager = FeedDatabaseManager(context)
+    private val feedDatabaseManager = FeedDatabaseManager(database)
 
     fun subscriptionTable(): SubscriptionDAO = subscriptionTable
     fun subscriptions() = subscriptionTable.getAll()
