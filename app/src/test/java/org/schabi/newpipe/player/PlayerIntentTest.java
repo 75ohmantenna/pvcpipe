@@ -325,7 +325,8 @@ public class PlayerIntentTest {
         when(history.loadStreamState(oldQueue.getItem())).thenReturn(old);
         player.handleIntent(intent);
         assertTrue(old.hasObservers());
-        when(cache.take("queue", PlayQueue.class)).thenReturn(queue("current"));
+        final PlayQueue incoming = queue("current");
+        when(cache.take("queue", PlayQueue.class)).thenReturn(incoming);
         player.handleIntent(intent);
         assertFalse(old.hasObservers());
         old.onSuccess(new StreamStateEntity(1, 45_000));
