@@ -90,3 +90,11 @@ player proof tokens for individual video requests.
 **Playback source**:
 The selected remote media and stream metadata prepared for the player, including
 its chosen video quality and audio track.
+
+**Playback history**:
+The recorded views and progress of played streams, including the saved position
+used to resume unfinished playback.
+
+**Playback snapshot**:
+Stream metadata, queue identity and player positions captured together for a
+playback-history decision.

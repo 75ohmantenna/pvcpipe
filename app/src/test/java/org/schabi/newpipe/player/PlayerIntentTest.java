@@ -26,10 +26,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
-import org.schabi.newpipe.database.stream.model.StreamStateEntity;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
-import org.schabi.newpipe.local.history.HistoryRecordManager;
+import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
@@ -51,7 +50,6 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.Schedulers;
-import io.reactivex.rxjava3.subjects.MaybeSubject;
 import io.reactivex.rxjava3.subjects.SingleSubject;
 
 public class PlayerIntentTest {
@@ -61,9 +59,8 @@ public class PlayerIntentTest {
     private SerializedCache cache;
     private PlayerUiList uis;
     private PlaybackSources playbackSources;
-    private HistoryRecordManager history;
+    private PlaybackHistory history;
     private CompositeDisposable streamSubscriptions;
-    private CompositeDisposable historySubscriptions;
     private SerialDisposable playbackDecision;
     private MockedStatic<IntentCompat> intentCompat;
     private MockedStatic<SerializedCache> serializedCache;
@@ -81,19 +78,17 @@ public class PlayerIntentTest {
         cache = mock(SerializedCache.class);
         uis = spy(new PlayerUiList(mock(MainPlayerUi.class)));
         playbackSources = mock(PlaybackSources.class);
-        history = mock(HistoryRecordManager.class);
+        history = mock(PlaybackHistory.class);
         streamSubscriptions = new CompositeDisposable();
-        historySubscriptions = new CompositeDisposable();
         playbackDecision = new SerialDisposable();
         setField("playbackDecision", playbackDecision);
         setField("playerType", PlayerType.MAIN);
         setField("UIs", uis);
         setField("simpleExoPlayer", exoPlayer);
         setField("playbackSources", playbackSources);
-        setField("recordManager", history);
+        setField("playbackHistory", history);
         setField("context", mock(Context.class));
         setField("streamItemDisposable", streamSubscriptions);
-        setField("databaseUpdateDisposable", historySubscriptions);
         intentCompat = mockStatic(IntentCompat.class);
         serializedCache = mockStatic(SerializedCache.class);
         extractorHelper = mockStatic(ExtractorHelper.class);
@@ -119,7 +114,6 @@ public class PlayerIntentTest {
     public void tearDown() {
         playbackDecision.dispose();
         streamSubscriptions.dispose();
-        historySubscriptions.dispose();
         schedulers.close();
         androidSchedulers.close();
         preferences.close();
@@ -279,17 +273,17 @@ public class PlayerIntentTest {
         type(PlayerIntentType.AllOthers);
         setField("simpleExoPlayer", null);
         final PlayQueue incoming = queue("incoming");
-        final MaybeSubject<StreamStateEntity> pending = MaybeSubject.create();
+        final SingleSubject<Long> pending = SingleSubject.create();
         when(cache.take("queue", PlayQueue.class)).thenReturn(incoming);
         when(intent.getBooleanExtra(Player.RESUME_PLAYBACK, false)).thenReturn(true);
         preferences.when(() -> DependentPreferenceHelper.getResumePlaybackEnabled(
                 player.getContext())).thenReturn(true);
-        when(history.loadStreamState(incoming.getItem())).thenReturn(pending);
+        when(history.resumePosition(incoming.getItem())).thenReturn(pending);
         player.handleIntent(intent);
         assertTrue(pending.hasObservers());
 
         playbackDecision.set(null);
-        pending.onSuccess(new StreamStateEntity(1, 45_000));
+        pending.onSuccess(45_000L);
 
         assertFalse(pending.hasObservers());
         assertEquals(PlayQueueItem.RECOVERY_UNSET, incoming.getItem().getRecoveryPosition());
@@ -317,19 +311,19 @@ public class PlayerIntentTest {
         final PlayQueue current = queue("current");
         final PlayQueue oldQueue = queue("old");
         setField("playQueue", current);
-        final MaybeSubject<StreamStateEntity> old = MaybeSubject.create();
+        final SingleSubject<Long> old = SingleSubject.create();
         when(cache.take("queue", PlayQueue.class)).thenReturn(oldQueue);
         when(intent.getBooleanExtra(Player.RESUME_PLAYBACK, false)).thenReturn(true);
         preferences.when(() -> DependentPreferenceHelper.getResumePlaybackEnabled(
                 player.getContext())).thenReturn(true);
-        when(history.loadStreamState(oldQueue.getItem())).thenReturn(old);
+        when(history.resumePosition(oldQueue.getItem())).thenReturn(old);
         player.handleIntent(intent);
         assertTrue(old.hasObservers());
         final PlayQueue incoming = queue("current");
         when(cache.take("queue", PlayQueue.class)).thenReturn(incoming);
         player.handleIntent(intent);
         assertFalse(old.hasObservers());
-        old.onSuccess(new StreamStateEntity(1, 45_000));
+        old.onSuccess(45_000L);
         assertSame(current, player.getPlayQueue());
         assertEquals(PlayQueueItem.RECOVERY_UNSET, oldQueue.getItem().getRecoveryPosition());
     }
