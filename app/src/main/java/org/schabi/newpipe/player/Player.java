@@ -263,6 +263,7 @@ public final class Player implements PlaybackListener, Listener {
     private final HistoryRecordManager recordManager;
 
     private boolean screenOn = true;
+    private final SerialDisposable playbackDecision = new SerialDisposable();
 
     /*//////////////////////////////////////////////////////////////////////////
     // SponsorBlock
@@ -399,6 +400,7 @@ public final class Player implements PlaybackListener, Listener {
             return;
         }
 
+        playbackDecision.set(null);
         // branching parameters for below
         final boolean samePlayQueue = playQueue != null && playQueue.equalStreamsAndIndex(newQueue);
 
@@ -448,7 +450,9 @@ public final class Player implements PlaybackListener, Listener {
                 PLAYER_INTENT_DATA, TimestampChangeData.class));
         final Single<StreamInfo> single =
                 ExtractorHelper.getStreamInfo(data.getServiceId(), data.getUrl(), false);
-        streamItemDisposable.add(single.subscribeOn(Schedulers.io())
+        final SerialDisposable request = new SerialDisposable();
+        playbackDecision.set(request);
+        request.set(single.subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(info -> playFromTimestamp(info, data.getSeconds(), playWhenReady),
                         throwable -> {
@@ -494,7 +498,9 @@ public final class Player implements PlaybackListener, Listener {
 
     private void resumePlaybackFromHistory(@NonNull final PlayQueue newQueue,
                                           final boolean playWhenReady) {
-        databaseUpdateDisposable.add(recordManager.loadStreamState(newQueue.getItem())
+        final SerialDisposable request = new SerialDisposable();
+        playbackDecision.set(request);
+        request.set(recordManager.loadStreamState(newQueue.getItem())
                 .observeOn(AndroidSchedulers.mainThread())
                 // Do not place initPlayback() in doFinally() because
                 // it restarts playback after destroy()
@@ -683,6 +689,7 @@ public final class Player implements PlaybackListener, Listener {
         destroyPlayer();
         unregisterBroadcastReceiver();
 
+        playbackDecision.set(null);
         databaseUpdateDisposable.clear();
         progressUpdateDisposable.set(null);
         streamItemDisposable.clear();

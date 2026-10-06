@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 public class SeekbarPreviewThumbnailHolder {
@@ -37,54 +38,74 @@ public class SeekbarPreviewThumbnailHolder {
     // This ensures that if the reset is still undergoing
     // and another reset starts, only the last reset is processed
     private UUID currentUpdateRequestIdentifier = UUID.randomUUID();
+    private final ExecutorService executorService;
+    private Future<?> pending;
+    private boolean closed;
+
+    public SeekbarPreviewThumbnailHolder() {
+        this(Executors.newSingleThreadExecutor());
+    }
+
+    SeekbarPreviewThumbnailHolder(final ExecutorService executor) {
+        executorService = executor;
+    }
 
     public void resetFrom(@NonNull final Context context, final List<Frameset> framesets) {
         final int seekbarPreviewType = getSeekbarPreviewThumbnailType(context);
 
-        final UUID updateRequestIdentifier = UUID.randomUUID();
-        this.currentUpdateRequestIdentifier = updateRequestIdentifier;
+        resetFrom(seekbarPreviewType, framesets);
+    }
 
-        final ExecutorService executorService = Executors.newSingleThreadExecutor();
-        executorService.submit(() -> {
-            try {
-                resetFromAsync(seekbarPreviewType, framesets, updateRequestIdentifier);
-            } catch (final Exception ex) {
-                Log.e(TAG, "Failed to execute async", ex);
+    void resetFrom(final int seekbarPreviewType, final List<Frameset> framesets) {
+        synchronized (seekbarPreviewData) {
+            if (closed) {
+                return;
             }
-        });
-        // ensure that the executorService stops/destroys it's threads
-        // after the task is finished
-        executorService.shutdown();
+            final UUID updateRequestIdentifier = UUID.randomUUID();
+            currentUpdateRequestIdentifier = updateRequestIdentifier;
+            seekbarPreviewData.clear();
+            if (pending != null) {
+                pending.cancel(true);
+            }
+            pending = executorService.submit(() -> {
+                try {
+                    resetFromAsync(seekbarPreviewType, framesets, updateRequestIdentifier);
+                } catch (final Exception ex) {
+                    Log.e(TAG, "Failed to execute async", ex);
+                }
+            });
+        }
     }
 
     private void resetFromAsync(final int seekbarPreviewType, final List<Frameset> framesets,
                                 final UUID updateRequestIdentifier) {
-        Log.d(TAG, "Clearing seekbarPreviewData");
-        synchronized (seekbarPreviewData) {
-            seekbarPreviewData.clear();
-        }
-
-        if (seekbarPreviewType == SeekbarPreviewThumbnailType.NONE) {
-            Log.d(TAG, "Not processing seekbarPreviewData due to settings");
+        if (seekbarPreviewType == SeekbarPreviewThumbnailType.NONE
+                || !isRequestIdentifierCurrent(updateRequestIdentifier)) {
             return;
         }
-
         final Frameset frameset = getFrameSetForType(framesets, seekbarPreviewType);
-        if (frameset == null) {
-            Log.d(TAG, "No frameset was found to fill seekbarPreviewData");
-            return;
+        if (frameset != null) {
+            generateDataFrom(frameset, updateRequestIdentifier);
         }
+    }
 
-        Log.d(TAG, "Frameset quality info: "
-                + "[width=" + frameset.getFrameWidth()
-                + ", height=" + frameset.getFrameHeight() + "]");
-
-        // Abort method execution if we are not the latest request
-        if (!isRequestIdentifierCurrent(updateRequestIdentifier)) {
-            return;
+    public void clear() {
+        synchronized (seekbarPreviewData) {
+            currentUpdateRequestIdentifier = UUID.randomUUID();
+            seekbarPreviewData.clear();
+            if (pending != null) {
+                pending.cancel(true);
+                pending = null;
+            }
         }
+    }
 
-        generateDataFrom(frameset, updateRequestIdentifier);
+    public void close() {
+        synchronized (seekbarPreviewData) {
+            closed = true;
+            clear();
+            executorService.shutdownNow();
+        }
     }
 
     private Frameset getFrameSetForType(final List<Frameset> framesets,
@@ -113,6 +134,9 @@ public class SeekbarPreviewThumbnailHolder {
 
         // Process each url in the frameset
         for (final String url : frameset.getUrls()) {
+            if (!isRequestIdentifierCurrent(updateRequestIdentifier)) {
+                break;
+            }
             // get the bitmap
             final Bitmap srcBitMap = getBitMapFrom(url);
 
@@ -137,15 +161,12 @@ public class SeekbarPreviewThumbnailHolder {
                 pos++;
             }
 
-            // Check if we are still the latest request
-            // If not abort method execution
-            if (isRequestIdentifierCurrent(updateRequestIdentifier)) {
-                synchronized (seekbarPreviewData) {
+            synchronized (seekbarPreviewData) {
+                if (!closed && currentUpdateRequestIdentifier.equals(updateRequestIdentifier)) {
                     seekbarPreviewData.putAll(generatedDataForUrl);
+                } else {
+                    break;
                 }
-            } else {
-                Log.d(TAG, "Aborted of generation of seekbarPreviewData");
-                break;
             }
         }
 
@@ -222,7 +243,10 @@ public class SeekbarPreviewThumbnailHolder {
     }
 
     private boolean isRequestIdentifierCurrent(final UUID requestIdentifier) {
-        return this.currentUpdateRequestIdentifier.equals(requestIdentifier);
+        synchronized (seekbarPreviewData) {
+            return !closed && !Thread.currentThread().isInterrupted()
+                    && currentUpdateRequestIdentifier.equals(requestIdentifier);
+        }
     }
 
     public Optional<Bitmap> getBitmapAt(final int positionInMs) {

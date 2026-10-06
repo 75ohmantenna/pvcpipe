@@ -425,12 +425,14 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     @Override
     public void destroyPlayer() {
         super.destroyPlayer();
+        seekbarPreviewThumbnailHolder.clear();
         clearVideoSurface();
     }
 
     @Override
     public void destroy() {
         super.destroy();
+        seekbarPreviewThumbnailHolder.close();
         binding.endScreen.setImageDrawable(null);
         deinitPlayerSeekOverlay();
         deinitListeners();

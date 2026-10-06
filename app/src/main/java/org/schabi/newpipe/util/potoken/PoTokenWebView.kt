@@ -29,6 +29,8 @@ class PoTokenWebView private constructor(
     private val disposables = CompositeDisposable() // used only during initialization
     private val poTokenEmitters = mutableListOf<Pair<String, SingleEmitter<String>>>()
     private lateinit var expirationInstant: Instant
+    private var closed = false // accessed only on the main thread
+    @Volatile private var initializationComplete = false
 
     //region Initialization
     init {
@@ -175,6 +177,7 @@ class PoTokenWebView private constructor(
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "initialization finished, expiration=${expirationTimeInSeconds}s")
                 }
+                initializationComplete = true
                 generatorEmitter.onSuccess(this)
             }
         }
@@ -187,9 +190,19 @@ class PoTokenWebView private constructor(
             Log.d(TAG, "generatePoToken() called")
         }
         runOnMainThread(emitter) {
+            if (closed) {
+                emitter.tryOnError(PoTokenException("PoToken generator is closed"))
+                return@runOnMainThread
+            }
             addPoTokenEmitter(identifier, emitter)
+            emitter.setCancellable {
+                synchronized(poTokenEmitters) {
+                    poTokenEmitters.removeAll { it.second === emitter }
+                }
+            }
             val u8Identifier = stringToU8(identifier)
-            webView.evaluateJavascript(
+            try {
+                webView.evaluateJavascript(
                 """try {
                         identifier = "$identifier"
                         u8Identifier = $u8Identifier
@@ -203,7 +216,10 @@ class PoTokenWebView private constructor(
                     } catch (error) {
                         $JS_INTERFACE.onObtainPoTokenError(identifier, error + "\n" + error.stack)
                     }"""
-            ) {}
+                ) {}
+            } catch (error: Exception) {
+                popPoTokenEmitter(identifier)?.tryOnError(error)
+            }
         }
     }
 
@@ -340,8 +356,8 @@ class PoTokenWebView private constructor(
      */
     private fun onInitializationErrorCloseAndCancel(error: Throwable) {
         runOnMainThread(generatorEmitter) {
+            generatorEmitter.tryOnError(error)
             close()
-            generatorEmitter.onError(error)
         }
     }
 
@@ -350,6 +366,11 @@ class PoTokenWebView private constructor(
      */
     @MainThread
     override fun close() {
+        if (closed) return
+        closed = true
+        val error = PoTokenException("PoToken generator is closed")
+        popAllPoTokenEmitters().forEach { (_, emitter) -> emitter.tryOnError(error) }
+        generatorEmitter.tryOnError(error)
         disposables.dispose()
 
         webView.clearHistory()
@@ -377,7 +398,12 @@ class PoTokenWebView private constructor(
             runOnMainThread(emitter) {
                 val potWv = PoTokenWebView(context, emitter)
                 potWv.loadHtmlAndObtainBotguard(context)
-                emitter.setDisposable(potWv.disposables)
+                emitter.setCancellable {
+                    potWv.disposables.dispose()
+                    if (!potWv.initializationComplete) {
+                        Handler(Looper.getMainLooper()).post { potWv.close() }
+                    }
+                }
             }
         }
 
@@ -389,7 +415,9 @@ class PoTokenWebView private constructor(
             emitterIfPostFails: SingleEmitter<out Any>,
             runnable: Runnable
         ) {
-            if (!Handler(Looper.getMainLooper()).post(runnable)) {
+            if (!Handler(Looper.getMainLooper()).post {
+                if (!emitterIfPostFails.isDisposed) runnable.run()
+            }) {
                 emitterIfPostFails.onError(PoTokenException("Could not run on main thread"))
             }
         }
