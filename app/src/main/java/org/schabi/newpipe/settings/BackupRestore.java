@@ -17,8 +17,13 @@ import org.schabi.newpipe.settings.export.BackupFileLocator;
 import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.ZipHelper;
+import org.schabi.newpipe.util.DeviceUtils;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
@@ -61,11 +66,22 @@ final class BackupRestore {
     interface Platform {
         StoredFileHelper document(Uri uri);
         void checkpoint();
-        void cleanImportedPreferences();
+        void normalizeImportedPreferences(Map<String, Object> values);
         void restart();
         void reportRestoreFailure(Throwable error);
     }
 
+    private static BackupRestore applicationInstance;
+
+    static synchronized BackupRestore forApplication(final Context context) {
+        if (applicationInstance == null) {
+            applicationInstance = new BackupRestore(context.getApplicationContext());
+        }
+        return applicationInstance;
+    }
+
+    // Retained by the application instance if a preference rollback itself fails.
+    private Map<String, Object> recoveryPreferences;
     private final BackupOperations operations;
     private final ImportExportManager archives;
     private final SharedPreferences preferences;
@@ -73,7 +89,7 @@ final class BackupRestore {
     private final Platform platform;
     private final Scheduler main;
 
-    BackupRestore(final Context context) {
+    private BackupRestore(final Context context) {
         this(BackupOperations.INSTANCE, new ImportExportManager(new BackupFileLocator(context)),
                 PreferenceManager.getDefaultSharedPreferences(context),
                 context.getString(R.string.import_export_data_path),
@@ -94,6 +110,10 @@ final class BackupRestore {
 
     Completable exportTo(final Uri destination) {
         return operations.submit(() -> {
+            recoverPreferencesIfNeeded();
+            if (archives.hasPendingRestore()) {
+                throw new IOException("A restored database is awaiting restart");
+            }
             platform.checkpoint();
             archives.exportDatabase(preferences, platform.document(destination));
             preferences.edit().putString(pathKey, destination.toString()).apply();
@@ -103,6 +123,7 @@ final class BackupRestore {
 
     Single<Inspection> inspect(final Uri source) {
         return operations.submit(() -> {
+            recoverPreferencesIfNeeded();
             final StoredFileHelper file = platform.document(source);
             if (!ZipHelper.isValidZipFile(file)) {
                 return new Inspection(file, source, false, PreferenceFormat.NONE);
@@ -122,24 +143,74 @@ final class BackupRestore {
      */
     Completable restore(final Inspection inspection, final RestoreChoice choice) {
         return operations.submit(() -> {
-            if (choice == RestoreChoice.DATABASE_AND_SETTINGS) {
-                if (inspection.preferenceFormat == PreferenceFormat.JSON) {
-                    archives.loadJsonPrefs(inspection.source, preferences);
-                } else {
-                    archives.loadSerializedPrefs(inspection.source, preferences);
+            recoverPreferencesIfNeeded();
+            final String settingsEntry = choice == RestoreChoice.DATABASE_ONLY ? null
+                    : inspection.preferenceFormat == PreferenceFormat.JSON
+                    ? BackupFileLocator.FILE_NAME_JSON_PREFS
+                    : BackupFileLocator.FILE_NAME_SERIALIZED_PREFS;
+            try (var prepared = archives.prepareRestore(inspection.source, settingsEntry)) {
+                final Map<String, Object> previous = copyPreferences(preferences.getAll());
+                final Map<String, Object> replacement = prepared.getPreferences() == null
+                        ? copyPreferences(previous) : prepared.getPreferences();
+                if (prepared.getPreferences() != null) {
+                    platform.normalizeImportedPreferences(replacement);
                 }
-                platform.cleanImportedPreferences();
+                replacement.put(pathKey, inspection.uri.toString());
+                try {
+                    ImportExportManager.replacePreferences(preferences, replacement);
+                    prepared.publish();
+                } catch (final Exception failure) {
+                    recoveryPreferences = previous;
+                    try {
+                        recoverPreferencesIfNeeded();
+                    } catch (final RestoreRecoveryRequiredException recovery) {
+                        recovery.addSuppressed(failure);
+                        throw recovery;
+                    }
+                    throw failure;
+                }
             }
-            archives.ensureDbDirectoryExists();
-            if (!archives.stageDb(inspection.source)) {
-                throw new IOException("Backup does not contain a database");
-            }
-            preferences.edit().putString(pathKey, inspection.uri.toString()).apply();
             return true;
         }).observeOn(main)
-                .doOnSuccess(ignored -> platform.restart())
+                .doOnSuccess(ignored -> {
+                    try {
+                        platform.restart();
+                    } catch (final RuntimeException failure) {
+                        throw new RestoreCommittedException(failure);
+                    }
+                })
                 .doOnError(platform::reportRestoreFailure)
                 .cache().ignoreElement();
+    }
+
+    private void recoverPreferencesIfNeeded() throws RestoreRecoveryRequiredException {
+        if (recoveryPreferences != null) {
+            try {
+                ImportExportManager.replacePreferences(preferences, recoveryPreferences);
+                recoveryPreferences = null;
+            } catch (final Exception failure) {
+                throw new RestoreRecoveryRequiredException(failure);
+            }
+        }
+    }
+
+    private static Map<String, Object> copyPreferences(final Map<String, ?> values) {
+        final Map<String, Object> copy = new HashMap<>();
+        values.forEach((key, value) -> copy.put(key,
+                value instanceof Set<?> ? new HashSet<>((Set<?>) value) : value));
+        return copy;
+    }
+
+    static final class RestoreRecoveryRequiredException extends IOException {
+        RestoreRecoveryRequiredException(final Throwable cause) {
+            super("Restore failed and settings recovery is incomplete; retry recovery", cause);
+        }
+    }
+
+    static final class RestoreCommittedException extends IOException {
+        RestoreCommittedException(final Throwable cause) {
+            super("Backup is prepared; restart the application to finish restoring", cause);
+        }
     }
 
     private static final class AndroidPlatform implements Platform {
@@ -160,15 +231,20 @@ final class BackupRestore {
         }
 
         @Override
-        public void cleanImportedPreferences() {
-            final SharedPreferences prefs =
-                    PreferenceManager.getDefaultSharedPreferences(context);
+        public void normalizeImportedPreferences(final Map<String, Object> values) {
             final String tunnelingKey = context.getString(R.string.disable_media_tunneling_key);
             final String automaticKey =
                     context.getString(R.string.disabled_media_tunneling_automatically_key);
-            if (prefs.getInt(automaticKey, -1) == 1 && prefs.getBoolean(tunnelingKey, false)) {
-                prefs.edit().putInt(automaticKey, -1).putBoolean(tunnelingKey, false).apply();
-                NewPipeSettings.setMediaTunneling(context);
+            if (Integer.valueOf(1).equals(values.get(automaticKey))
+                    && Boolean.TRUE.equals(values.get(tunnelingKey))) {
+                values.put(automaticKey, -1);
+                values.put(tunnelingKey, false);
+                if (!DeviceUtils.shouldSupportMediaTunneling()) {
+                    values.put(tunnelingKey, true);
+                    values.put(automaticKey, 1);
+                }
+                values.put(context.getString(R.string.media_tunneling_device_blacklist_version),
+                        DeviceUtils.MEDIA_TUNNELING_DEVICE_BLACKLIST_VERSION);
             }
         }
 

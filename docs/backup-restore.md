@@ -17,9 +17,26 @@ Inspection is advisory: the current stream probe is not database validation and
 a document can change after inspection. JSON preferences take precedence over
 legacy serialized preferences; the fragment retains the legacy warning.
 
-The structural refactor preserves preference import and device cleanup before
-database staging. A staging failure can therefore leave changed settings. Its
-correction is a separate change.
+An accepted restore first makes a private archive snapshot, decodes selected
+settings without writing them, and extracts a nonempty database to a unique
+unpublished file. A changed settings format requires another inspection rather
+than silently switching to legacy deserialization. Preparation errors leave the
+live database and preferences untouched.
+
+Commit captures a copy of existing preferences, including string sets. It writes
+normalized settings and the remembered URI together, then publishes the database
+without replacing an existing pending restore. Preference or publication failure
+attempts rollback. Failed rollback reports recovery-required state, retained by
+the application-owned module; subsequent operations retry recovery before doing
+new work. Restart failure after publication reports that activation still needs
+a restart and preserves the pending database. While activation is pending, new
+restores and exports are rejected; exporting would pair the old live database
+with the newly restored settings.
+
+The preference and filesystem writes are not a cross-store transaction. This
+change handles reported errors and retains the existing startup retry behavior;
+it adds no process-death consistency guarantee. Archive/database extraction does
+not prove compatibility with a future Room schema migration.
 
 Staging leaves the live database and WAL untouched. `PendingDatabaseRestore`
 activates the pending database in `App.attachBaseContext`, before content
@@ -28,5 +45,8 @@ providers can open a database connection.
 Workflow tests use real ZIP fixtures and temporary files with controlled
 preferences, scheduling, and platform effects. `BackupRestoreTest` covers
 admission, detached observers, replay, format selection, export, and staging.
-`PendingDatabaseRestoreTest` covers the startup lifecycle. Run `make ci` for the
+`BackupRestoreFailureTest` covers preparation, failed commits and rollback,
+source changes, cleanup, and failed restart. `BackupRestoreIntegrationTest` uses
+isolated files and real Android preferences. `PendingDatabaseRestoreTest` covers
+the startup lifecycle. Run `make ci` for the
 application and deterministic extractor checks and both APK builds.

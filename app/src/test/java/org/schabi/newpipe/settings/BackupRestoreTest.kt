@@ -92,14 +92,14 @@ class BackupRestoreTest {
     }
 
     @Test
-    fun `staging failure retains existing preference behavior and reports once`() {
+    fun `preparation failure preserves preferences and reports once`() {
         val inspection = inspection("settings/nodb_noser_json.zip")
         val restore = backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS)
         restore.test().dispose()
         io.triggerActions()
         main.triggerActions()
         restore.test().assertError(java.io.IOException::class.java)
-        assertFalse(environment.values.containsKey("original"))
+        assertEquals("settings", environment.values["original"])
         assertEquals(1, environment.errors.size)
         assertEquals(0, environment.restarts)
         assertEquals("live database", Files.readString(environment.database))

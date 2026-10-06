@@ -2,6 +2,7 @@ package org.schabi.newpipe.settings;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Rule;
@@ -22,8 +23,9 @@ public class PendingDatabaseRestoreTest {
         final Path wal = database.resolveSibling("newpipe.db-wal");
         Files.writeString(database, "live database");
         Files.writeString(wal, "live WAL");
-        Files.writeString(PendingDatabaseRestore.temporaryPath(database), "restored database");
-        PendingDatabaseRestore.commit(database);
+        final Path prepared = directory.newFile("prepared.tmp").toPath();
+        Files.writeString(prepared, "restored database");
+        PendingDatabaseRestore.publish(database, prepared);
         assertEquals("live database", Files.readString(database));
         assertTrue(Files.exists(wal));
         PendingDatabaseRestore.install(database);
@@ -34,10 +36,27 @@ public class PendingDatabaseRestoreTest {
     }
 
     @Test
+    public void failedActivationRetainsPendingDatabaseForRetry() throws Exception {
+        final Path database = directory.newFolder("newpipe.db").toPath();
+        final Path blocker = database.resolve("blocker");
+        Files.writeString(blocker, "prevent directory replacement");
+        final Path prepared = directory.newFile("prepared.tmp").toPath();
+        Files.writeString(prepared, "restored database");
+        PendingDatabaseRestore.publish(database, prepared);
+        assertThrows(java.io.IOException.class, () -> PendingDatabaseRestore.install(database));
+        assertTrue(PendingDatabaseRestore.hasPending(database));
+        Files.delete(blocker);
+        Files.delete(database);
+        PendingDatabaseRestore.install(database);
+        assertEquals("restored database", Files.readString(database));
+        assertFalse(PendingDatabaseRestore.hasPending(database));
+    }
+
+    @Test
     public void incompleteStagingDoesNotReplaceTheDatabase() throws Exception {
         final Path database = directory.newFile("newpipe.db").toPath();
         Files.writeString(database, "live database");
-        Files.writeString(PendingDatabaseRestore.temporaryPath(database), "incomplete");
+        Files.writeString(directory.newFile("prepared.tmp").toPath(), "incomplete");
         PendingDatabaseRestore.install(database);
         assertEquals("live database", Files.readString(database));
     }

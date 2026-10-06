@@ -9,17 +9,17 @@ import java.nio.file.StandardCopyOption;
 public final class PendingDatabaseRestore {
     private PendingDatabaseRestore() { }
 
-    public static Path temporaryPath(final Path database) {
-        return database.resolveSibling(database.getFileName() + ".restore.tmp");
-    }
-
     private static Path pendingPath(final Path database) {
         return database.resolveSibling(database.getFileName() + ".restore");
     }
 
-    public static void commit(final Path database) throws IOException {
-        Files.move(temporaryPath(database), pendingPath(database),
-                StandardCopyOption.REPLACE_EXISTING);
+    public static boolean hasPending(final Path database) {
+        return Files.exists(pendingPath(database));
+    }
+
+    public static void publish(final Path database, final Path prepared) throws IOException {
+        // Do not replace a previously accepted restore, even if one appears during preparation.
+        Files.move(prepared, pendingPath(database));
     }
 
     public static void install(final Path database) throws IOException {

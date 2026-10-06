@@ -23,6 +23,9 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
     var failCheckpoint = false
     var failRestart = false
     var failedCommits = 0
+    var afterPreferenceCommit: (() -> Unit)? = null
+    var reads = 0
+    var sourceStream: org.schabi.newpipe.streams.io.SharpStream? = null
     val preferences: SharedPreferences = mock(SharedPreferences::class.java) { call ->
         when (call.method.name) {
             "getAll" -> HashMap(values)
@@ -41,7 +44,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
         `when`(it.dbWal).thenReturn(directory.resolve("newpipe.db-wal"))
         `when`(it.dbShm).thenReturn(directory.resolve("newpipe.db-shm"))
     }
-    val archives = ImportExportManager(locator)
+    val archives = org.mockito.Mockito.spy(ImportExportManager(locator))
 
     init {
         Files.writeString(database, "live database")
@@ -66,7 +69,10 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
     override fun document(uri: Uri): StoredFileHelper {
         val path = documents.getValue(uri)
         return mock(StoredFileHelper::class.java).also {
-            `when`(it.stream).thenAnswer { FileStream(path.toFile()) }
+            `when`(it.stream).thenAnswer {
+                reads++
+                sourceStream ?: FileStream(path.toFile())
+            }
             `when`(it.openAndTruncateStream()).thenAnswer {
                 FileStream(path.toFile()).also { stream -> stream.setLength(0) }
             }
@@ -78,7 +84,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
         if (failCheckpoint) throw java.io.IOException("checkpoint failed")
     }
 
-    override fun cleanImportedPreferences() {
+    override fun normalizeImportedPreferences(values: MutableMap<String, Any>) {
         cleanups++
     }
 
@@ -109,6 +115,9 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
                 "commit", "apply" -> {
                     values.clear()
                     values.putAll(pending)
+                    val callback = afterPreferenceCommit
+                    afterPreferenceCommit = null
+                    callback?.invoke()
                     if (call.method.name == "apply") {
                         null
                     } else if (failedCommits > 0) {

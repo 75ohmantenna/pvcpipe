@@ -63,7 +63,7 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
     @Override
     public void onCreatePreferences(@Nullable final Bundle savedInstanceState,
                                     @Nullable final String rootKey) {
-        backups = new BackupRestore(requireContext().getApplicationContext());
+        backups = BackupRestore.forApplication(requireContext());
 
         importExportDataPathKey = getString(R.string.import_export_data_path);
 
