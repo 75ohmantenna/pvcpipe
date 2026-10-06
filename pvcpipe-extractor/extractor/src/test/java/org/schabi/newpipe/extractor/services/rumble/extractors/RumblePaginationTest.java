@@ -21,7 +21,8 @@ class RumblePaginationTest {
 
     @Test
     void stopsPaginationWhenThereAreNoResults() {
-        final Document doc = Jsoup.parse("<link rel='next' href='?page=2'>");
+        final Document doc = Jsoup.parse("<link rel='next' href='?page=2'>",
+                "https://rumble.com/browse");
         assertNull(helper.getNewPageIfThereAreMoreThanOnePageResults(0, doc));
         assertNull(helper.getNewPageIfThereAreMoreThanOnePageResults(0, null));
     }
@@ -35,13 +36,18 @@ class RumblePaginationTest {
     }
 
     @Test
-    void preservesNextLinkWithoutResolvingOrRebuildingItsUrl() {
-        for (final String url : new String[]{"?page=2&sort=date", "/browse?page=2",
-                "https://rumble.com/browse?page=2&sort=date"}) {
-            final Document doc = Jsoup.parse("<link rel='next' href='" + url + "'>",
+    void resolvesNextLinksAgainstTheCurrentPage() {
+        final String[][] links = {
+                {"?page=2&sort=date", "https://rumble.com/browse?page=2&sort=date"},
+                {"/browse?page=2", "https://rumble.com/browse?page=2"},
+                {"https://rumble.com/browse?page=2&sort=date",
+                        "https://rumble.com/browse?page=2&sort=date"}
+        };
+        for (final String[] link : links) {
+            final Document doc = Jsoup.parse("<link rel='next' href='" + link[0] + "'>",
                     "https://rumble.com/browse");
             final Page page = helper.getNewPageIfThereAreMoreThanOnePageResults(1, doc);
-            assertEquals(url, page.getUrl());
+            assertEquals(link[1], page.getUrl());
         }
     }
 
@@ -57,14 +63,15 @@ class RumblePaginationTest {
         };
         final RumbleCommonCodeTrendingAndChannel shared = new RumbleCommonCodeTrendingAndChannel(
                 ServiceList.Rumble.getServiceId(), itemsExtractor);
-        final Document doc = Jsoup.parse("<link rel='next' href='?page=2'>");
+        final Document doc = Jsoup.parse("<link rel='next' href='?page=2'>",
+                "https://rumble.com/browse");
 
         final var streamPage = shared.extractAndGetStreamInfoItemsFromPage(doc);
         assertTrue(streamPage.getItems().isEmpty());
-        assertEquals("?page=2", streamPage.getNextPage().getUrl());
+        assertEquals("https://rumble.com/browse?page=2", streamPage.getNextPage().getUrl());
 
         final var mixedPage = shared.extractAndGetInfoItemsFromPage(doc);
         assertTrue(mixedPage.getItems().isEmpty());
-        assertEquals("?page=2", mixedPage.getNextPage().getUrl());
+        assertEquals("https://rumble.com/browse?page=2", mixedPage.getNextPage().getUrl());
     }
 }

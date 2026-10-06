@@ -1,6 +1,5 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.schabi.newpipe.extractor.Image;
@@ -11,6 +10,7 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.rumble.RumbleChannelParsingHelper;
@@ -33,6 +33,7 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     private Document doc;
     private Document about;
+    private ParsingException aboutError;
 
     public RumbleChannelExtractor(final StreamingService service,
                                   final ListLinkHandler linkHandler) {
@@ -55,18 +56,15 @@ public class RumbleChannelExtractor extends ChannelExtractor {
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
         doc = RumbleParsingHelper.fetchParseValidate(downloader, getUrl());
-        final String aboutLink = RumbleParsingHelper.extractSafely(false,
-            "",
-            () -> doc.selectFirst("[href*='about']").attr("href")
-        );
-        if (null != aboutLink) {
-            // somehow it is flawed within rumbles code. Some pages have complete url some not
-            if (aboutLink.startsWith("http")) {
-                about = Jsoup.parse(getDownloader().get(aboutLink).responseBody());
-            } else {
-                about = Jsoup.parse(getDownloader()
-                        .get(getService().getBaseUrl() + aboutLink)
-                        .responseBody());
+        final String aboutLink = RumbleParsingHelper.extractSafely(false, "",
+                () -> doc.selectFirst("[href*='about']").absUrl("href"));
+        if (aboutLink != null && !aboutLink.isEmpty()) {
+            try {
+                about = RumbleParsingHelper.fetchParseValidate(downloader, aboutLink);
+            } catch (final ParsingException e) {
+                aboutError = e;
+            } catch (final IOException | ReCaptchaException e) {
+                aboutError = new ParsingException("Could not fetch channel About page", e);
             }
         }
     }
@@ -121,7 +119,7 @@ public class RumbleChannelExtractor extends ChannelExtractor {
         final String url = RumbleParsingHelper.extractSafely(false,
                 "Could not get banner url",
                 this::extractBannerUrl);
-        return List.of(new Image(url,
+        return url == null || url.isEmpty() ? List.of() : List.of(new Image(url,
                 Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
 
@@ -162,6 +160,9 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Override
     public String getDescription() throws ParsingException {
+        if (aboutError != null) {
+            throw aboutError;
+        }
         if (null != about) {
             try {
                 StringBuilder sb = new StringBuilder();

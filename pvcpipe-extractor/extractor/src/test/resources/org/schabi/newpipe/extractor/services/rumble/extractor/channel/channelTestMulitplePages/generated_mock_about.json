@@ -1,0 +1,22 @@
+{
+  "request": {
+    "httpMethod": "GET",
+    "url": "https://rumble.com/c/Bongino/about",
+    "headers": {
+      "Accept-Language": [
+        "en-GB, en;q=0.9"
+      ]
+    },
+    "localization": {
+      "languageCode": "en",
+      "countryCode": "GB"
+    }
+  },
+  "response": {
+    "responseCode": 200,
+    "responseMessage": "OK",
+    "responseBody": "<html><div class='channel-about--description'></div></html>",
+    "latestUrl": "https://rumble.com/c/Bongino/about",
+    "responseHeaders": {}
+  }
+}

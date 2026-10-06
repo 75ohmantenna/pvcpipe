@@ -1,6 +1,5 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -112,6 +111,10 @@ public class RumbleSearchExtractor extends SearchExtractor {
         final List<RumbleChannelSearchInfoItemExtractor> extractors = new ArrayList<>();
 
         for (final Element element : elements) {
+            if (element.selectFirst("div[class*=media-subscribe-and-notify], "
+                    + "a[href*='/c/']:has(h3), a[href*='/user/']:has(h3)") == null) {
+                continue;
+            }
             final RumbleChannelSearchInfoItemExtractor infoItem =
                     new RumbleChannelSearchInfoItemExtractor(element, doc);
             extractors.add(infoItem);
@@ -127,7 +130,7 @@ public class RumbleSearchExtractor extends SearchExtractor {
             return null;
         }
 
-        doc = Jsoup.parse(getDownloader().get(page.getUrl()).responseBody());
+        doc = RumbleParsingHelper.fetchParseValidate(getDownloader(), page.getUrl());
         return extractAndGetInfoItemsFromPage();
     }
 }

@@ -7,6 +7,7 @@ import org.schabi.newpipe.extractor.pvc.AttachException;
 import org.schabi.newpipe.extractor.pvc.PvcCloudFlareChallengeException;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
@@ -265,24 +266,37 @@ public final class RumbleParsingHelper {
         final String content;
         try {
             content = contentProvider.call();
+        } catch (final ParsingException e) {
+            throw e;
         } catch (final Exception e) {
-            throw new ParsingException("Could not extract the embed id due to missing content");
+            throw new ParsingException("Could not extract the embed id due to missing content", e);
         }
 
         Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            // Remove v (first character) from the id
-            final String result = matcher.group(1).substring(1);
+        String embedId = matcher.find() ? matcher.group(1) : null;
+        if (embedId == null) {
+            pattern = Pattern.compile("\\bRumble\\(\\s*[\"']play[\"']\\s*,\\s*\\{[^}]*"
+                    + "[\"']?video[\"']?\\s*:\\s*[\"'](v[0-9a-z]+)[\"']");
+            for (final Element script : Jsoup.parse(content).select("script")) {
+                matcher = pattern.matcher(script.data());
+                if (matcher.find()) {
+                    embedId = matcher.group(1);
+                    break;
+                }
+            }
+        }
+        if (embedId != null) {
+            // Remove v (first character) from the id.
+            final String result = embedId.substring(1);
             EMBED_VIDEO_IDS_CACHE.put(url, result);
             return result;
-        } else {
-            throw AttachException.createAttachException(
-                    "Could not extract the embed id due to missing context. URL: " + url,
-                    content,
-                    "internalVideoId",
-                    "(.{0,100}(<title>|embed|\"video\":).{0,100})"
-            );
         }
+        throw AttachException.createAttachException(
+                "Could not extract the embed id due to missing context. URL: " + url,
+                content,
+                "internalVideoId",
+                "(.{0,100}(<title>|embed|\"video\":).{0,100})"
+        );
     }
 
     public static void checkIfContentIsAccessible(
@@ -302,10 +316,10 @@ public final class RumbleParsingHelper {
                 throw new ContentNotAvailableException(errMsg);
             }
 
-        } else if (code == 404) {
+        } else if (code >= 400) {
             String errMsg = getErrFromTitle(doc);
             if (errMsg == null) {
-                errMsg = "unknown, guess the video/channel/... is missing";
+                errMsg = "Rumble request failed";
             }
             throw new ContentNotAvailableException(code + " - " + errMsg);
         }
@@ -315,10 +329,36 @@ public final class RumbleParsingHelper {
             final Downloader downloader,
             final String url)
             throws IOException, ReCaptchaException, ParsingException {
-        final Response response = downloader.get(url);
-        final String rb = response.responseBody();
-        final Document doc = Jsoup.parse(rb, url);
-        checkIfContentIsAccessible(response, doc);
-        return doc;
+        return fetchParseValidate(downloader, url, null, null);
+    }
+
+    public static Document fetchParseValidate(
+            final Downloader downloader,
+            final String url,
+            @Nullable final Map<String, List<String>> headers,
+            @Nullable final Localization localization)
+            throws IOException, ReCaptchaException, ParsingException {
+        final Response response = fetchResponse(downloader, url, headers, localization);
+        return Jsoup.parse(response.responseBody(), response.latestUrl());
+    }
+
+    public static Response fetchResponse(final Downloader downloader, final String url)
+            throws IOException, ReCaptchaException, ParsingException {
+        return fetchResponse(downloader, url, null, null);
+    }
+
+    public static Response fetchResponse(
+            final Downloader downloader,
+            final String url,
+            @Nullable final Map<String, List<String>> headers,
+            @Nullable final Localization localization)
+            throws IOException, ReCaptchaException, ParsingException {
+        final Response response = localization == null
+                ? downloader.get(url, headers) : downloader.get(url, headers, localization);
+        if (response.responseCode() >= 400) {
+            checkIfContentIsAccessible(response,
+                    Jsoup.parse(response.responseBody(), response.latestUrl()));
+        }
+        return response;
     }
 }

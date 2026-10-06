@@ -80,8 +80,6 @@ public class RumbleStreamExtractorTest {
             expectedHasAudioStreams = true;
             expectedHasVideoStreams = true;
             expectedLength = 12948;
-            System.setProperty("downloader", "MOCK");
-            // System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/streamExtractor"));
 
             extractor = (RumbleStreamExtractor) Rumble
@@ -295,8 +293,6 @@ public class RumbleStreamExtractorTest {
             expectedHasVideoStreams = true;
             expectedArtistProfilePictureInfix = ".rumble.com/live/channel_images/"; // TODO
             expectedLength = 0;
-            System.setProperty("downloader", "MOCK");
-            //System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH
                     + "/streamExtractorLiveStream"));
 

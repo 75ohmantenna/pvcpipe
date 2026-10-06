@@ -7,6 +7,7 @@ import org.schabi.newpipe.extractor.channel.ChannelInfoItemExtractor;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.services.rumble.RumbleChannelParsingHelper;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
+import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleChannelLinkHandlerFactory;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.util.List;
@@ -31,26 +32,29 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
     }
 
     private void extractData(final Element element, final Document doc) throws ParsingException {
-        final Element data = element.select("div[class*=\"media-subscribe-and-notify\"]").first();
+        final Element data = element.selectFirst("div[class*=media-subscribe-and-notify]");
         if (data == null) {
-            return; // skip this "<article>" as it does not contain any channel/user
+            final Element link = element.selectFirst(
+                    "a[href*='/c/']:has(h3), a[href*='/user/']:has(h3)");
+            if (link == null) {
+                throw new ParsingException("Channel link not found");
+            }
+            this.url = RumbleChannelLinkHandlerFactory.getInstance()
+                    .fromUrl(link.absUrl("href")).getUrl();
+            final Element title = link.selectFirst("h3").clone();
+            title.select("svg").remove();
+            this.name = title.text();
+        } else {
+            this.name = data.attr("data-title");
+            this.url = Rumble.getBaseUrl() + "/"
+                    + RumbleChannelParsingHelper.getChannelIdAlreadySelected(data);
         }
-
-        // most channels have no description here
-        this.description = RumbleParsingHelper.extractSafely(false,
-                "",
-                () -> element.select("p[class*=\"text-sm text-fjord\"]").first().text());
-
-        this.name = RumbleParsingHelper.extractSafely(true,
-                "Could not extract the channel name",
-                () -> data.attr("data-title"));
-
+        this.description = RumbleParsingHelper.extractSafely(false, "",
+                () -> element.selectFirst("p[class*='text-sm text-fjord']").text());
+        if (this.description == null) {
+            this.description = "";
+        }
         this.subscriberCount = extractSubscriberCount(element, doc);
-
-        this.url = RumbleParsingHelper.extractSafely(true,
-                "Could not extract the stream url",
-                () -> Rumble.getBaseUrl() + "/"
-                        + RumbleChannelParsingHelper.getChannelIdAlreadySelected(data));
 
         this.thumbUrl = extractTheThumbnailOfAChannelInASearchForChannels(element, doc);
 
@@ -61,9 +65,11 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
             throws ParsingException {
 
         final String errorMsg = "Could not get subscriber count";
-        final String amountOfSubscribers = RumbleParsingHelper.extractSafely(true,
+        final String amountOfSubscribers = RumbleParsingHelper.extractSafely(false,
                 errorMsg,
-                () -> element.select("span[class*=\"text-sm text-fjord\"]").first().text());
+                () -> element.selectFirst(
+                        ".channel-item--subscribers, span[class*='text-sm text-fjord']")
+                        .text());
 
         if (null != amountOfSubscribers) {
             try {
@@ -80,6 +86,9 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
     private String extractTheThumbnailOfAChannelInASearchForChannels(final Element element,
                                                                      final Document document)
             throws ParsingException {
+        if (element.selectFirst("i.user-image") == null) {
+            return null;
+        }
         return RumbleParsingHelper.extractThumbnail(document, element.toString(),
                 () -> {
                     final String thumbUrlIdentifier = "i." + element
@@ -123,7 +132,7 @@ class RumbleChannelSearchInfoItemExtractor implements ChannelInfoItemExtractor {
     @Nonnull
     @Override
     public List<Image> getThumbnails() throws ParsingException {
-        return List.of(new Image(thumbUrl,
+        return thumbUrl == null || thumbUrl.isEmpty() ? List.of() : List.of(new Image(thumbUrl,
                 Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
 }

@@ -40,6 +40,13 @@ class RumbleEmbedCacheTest {
         assertEquals(2, firstCalls.get());
     }
 
+    @Test
+    void extractsInlinePlayerIdsWhenThereIsNoIframe() throws Exception {
+        assertEquals("inline123", RumbleParsingHelper.getEmbedVideoId(
+                "https://rumble.com/inline-player-test.html",
+                () -> "<script>Rumble(\"play\", {video: 'vinline123', div: 'player'});</script>"));
+    }
+
     private static String embedPage(final String id, final AtomicInteger calls) {
         calls.incrementAndGet();
         return "<iframe src=\"https://rumble.com/embed/" + id + "\"></iframe>";

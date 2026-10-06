@@ -28,7 +28,8 @@ public class RumbleCommonCodeTrendingAndSearching {
         if (nextLink == null || nextLink.attr("href").isEmpty()) {
             return null;
         }
-        return new Page(nextLink.attr("href"));
+        final String nextUrl = nextLink.absUrl("href");
+        return nextUrl.isEmpty() ? null : new Page(nextUrl);
     }
 
     @SuppressWarnings("checkstyle:InvalidJavadocPosition")

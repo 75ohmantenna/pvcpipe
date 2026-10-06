@@ -6,6 +6,7 @@ import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
 
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
@@ -34,9 +35,9 @@ public final class RumbleSuggestionExtractor extends SuggestionExtractor {
             return List.of();
         }
 
-        final String response = NewPipe.getDownloader()
-                .get(getService().getBaseUrl() + AUTOCOMPLETE_PATH + Utils.encodeUrlUtf8(query),
-                        getExtractorLocalization())
+        final String response = RumbleParsingHelper.fetchResponse(NewPipe.getDownloader(),
+                        getService().getBaseUrl() + AUTOCOMPLETE_PATH + Utils.encodeUrlUtf8(query),
+                        null, getExtractorLocalization())
                 .responseBody();
         return parseSuggestions(response);
     }

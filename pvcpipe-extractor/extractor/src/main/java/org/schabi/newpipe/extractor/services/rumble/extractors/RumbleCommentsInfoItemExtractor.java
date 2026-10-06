@@ -140,12 +140,8 @@ public class RumbleCommentsInfoItemExtractor implements CommentsInfoItemExtracto
     }
 
     @Override
-    public String getUrl() {
-        try {
-            return extractor.getUrl();
-        } catch (ParsingException e) {
-            return null;
-        }
+    public String getUrl() throws ParsingException {
+        return extractor.getOriginalUrl();
     }
 
     @Nonnull
