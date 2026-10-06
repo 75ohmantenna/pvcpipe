@@ -17,6 +17,7 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
+import org.schabi.newpipe.player.mediaitem.MediaItemTag.SourceType;
 import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.player.resolver.PlaybackResolver.ResolverException;
 import org.schabi.newpipe.util.StreamTypeUtil;
@@ -32,14 +33,6 @@ public final class PlaybackSources {
     private final QualityResolver qualityResolver;
     @NonNull
     private volatile Settings settings = new Settings(null, null);
-    @Nullable
-    private SourceType lastVideoSourceType;
-
-    private enum SourceType {
-        LIVE_STREAM,
-        VIDEO_WITH_SEPARATED_AUDIO,
-        VIDEO_WITH_AUDIO_OR_AUDIO_ONLY
-    }
 
     public PlaybackSources(@NonNull final Context context,
                            @NonNull final PlayerDataSource dataSource,
@@ -67,11 +60,16 @@ public final class PlaybackSources {
                                final boolean audioPlayer,
                                final boolean audioOnly) {
         final Settings selection = settings;
-        if (audioPlayer || (audioOnly && sourceType()
-                == SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY)) {
+        if (audioPlayer) {
             return resolveAudio(info, selection);
         }
-        return resolveVideo(info, selection);
+        final MediaSource live = resolveLiveVideo(info);
+        if (live != null) {
+            return live;
+        }
+        final VideoSelection video = selectVideo(info, selection);
+        return audioOnly && !video.separateAudio
+                ? buildAudio(info, selection) : buildVideo(info, video);
     }
 
     public synchronized void setPlaybackQuality(@Nullable final String quality) {
@@ -92,44 +90,48 @@ public final class PlaybackSources {
     public boolean requiresReload(@Nullable final MediaItemTag currentTag,
                                   final boolean videoRendererAvailable) {
         return currentTag == null || currentTag.getMaybeStreamInfo()
-                .map(info -> requiresReload(info, videoRendererAvailable)).orElse(true);
+                .map(info -> requiresReload(info, currentTag, videoRendererAvailable)).orElse(true);
     }
 
     private boolean requiresReload(@NonNull final StreamInfo info,
+                                   @NonNull final MediaItemTag currentTag,
                                    final boolean videoRendererAvailable) {
         final StreamType streamType = info.getStreamType();
-        final boolean audio = StreamTypeUtil.isAudio(streamType);
-        final SourceType sourceType = sourceType();
-        if (!videoRendererAvailable && !audio) {
-            return true;
-        }
-        if (audio || (streamType == StreamType.LIVE_STREAM
-                && sourceType == SourceType.LIVE_STREAM)) {
+        if (StreamTypeUtil.isAudio(streamType)) {
             return false;
         }
-        if (sourceType == SourceType.VIDEO_WITH_SEPARATED_AUDIO
-                || (sourceType == SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY
+        if (!videoRendererAvailable) {
+            return true;
+        }
+        final SourceType type = currentTag.getMaybeSourceType().orElse(null);
+        if (type == null) {
+            return true;
+        }
+        if (streamType == StreamType.LIVE_STREAM && type == SourceType.LIVE_STREAM) {
+            return false;
+        }
+        if (type == SourceType.VIDEO_WITH_SEPARATED_AUDIO
+                || (type == SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY
                 && isNullOrEmpty(info.getAudioStreams()))) {
             return !StreamTypeUtil.isVideo(streamType);
         }
         return true;
     }
 
-    private SourceType sourceType() {
-        return lastVideoSourceType == null
-                ? SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY : lastVideoSourceType;
-    }
-
     @Nullable
     private MediaSource resolveAudio(@NonNull final StreamInfo info,
                                      @NonNull final Settings selection) {
-        final MediaSource liveSource = environment.liveSource(info);
-        if (liveSource != null) {
-            return liveSource;
-        }
+        final MediaSource liveSource = environment.liveSource(info, null,
+                StreamInfoTag.of(info).withSourceType(SourceType.LIVE_STREAM));
+        return liveSource == null ? buildAudio(info, selection) : liveSource;
+    }
+
+    @Nullable
+    private MediaSource buildAudio(@NonNull final StreamInfo info,
+                                   @NonNull final Settings selection) {
         final List<AudioStream> audioStreams = environment.audioStreams(info);
         final Stream stream;
-        final MediaItemTag tag;
+        final StreamInfoTag tag;
         if (!audioStreams.isEmpty()) {
             final int index = environment.audioIndex(audioStreams, selection.audioTrack);
             stream = streamForIndex(index, audioStreams);
@@ -143,7 +145,8 @@ public final class PlaybackSources {
             tag = StreamInfoTag.of(info);
         }
         try {
-            return environment.streamSource(info, stream, tag);
+            return environment.streamSource(info, stream,
+                    tag.withSourceType(SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY));
         } catch (final ResolverException error) {
             environment.logError("Unable to create audio source", error);
             return null;
@@ -151,15 +154,13 @@ public final class PlaybackSources {
     }
 
     @Nullable
-    private MediaSource resolveVideo(@NonNull final StreamInfo info,
-                                     @NonNull final Settings selection) {
-        changeRumbleLiveQuality(info);
-        final MediaSource liveSource = environment.liveSource(info);
-        if (liveSource != null) {
-            lastVideoSourceType = SourceType.LIVE_STREAM;
-            return liveSource;
-        }
-        final List<MediaSource> sources = new ArrayList<>();
+    private MediaSource resolveLiveVideo(@NonNull final StreamInfo info) {
+        return environment.liveSource(info, rumbleLiveManifest(info),
+                StreamInfoTag.of(info).withSourceType(SourceType.LIVE_STREAM));
+    }
+
+    private VideoSelection selectVideo(@NonNull final StreamInfo info,
+                                       @NonNull final Settings selection) {
         final List<VideoStream> videos = environment.sortedVideoStreams(info);
         final List<AudioStream> audios = environment.audioStreams(info);
         final int videoIndex;
@@ -171,30 +172,37 @@ public final class PlaybackSources {
             videoIndex = qualityResolver.getOverrideResolutionIndex(videos, selection.quality);
         }
         final int audioIndex = environment.audioIndex(audios, selection.audioTrack);
-        final MediaItemTag tag = StreamInfoTag.of(info, videos, videoIndex, audios, audioIndex);
+        final StreamInfoTag tag = StreamInfoTag.of(info, videos, videoIndex, audios, audioIndex);
         final VideoStream video = tag.getMaybeQuality()
                 .map(MediaItemTag.Quality::getSelectedVideoStream).orElse(null);
         final AudioStream audio = tag.getMaybeAudioTrack()
                 .map(MediaItemTag.AudioTrack::getSelectedAudioStream).orElse(null);
-        if (video != null) {
+        final boolean separateAudio = audio != null && (video == null || video.isVideoOnly()
+                || selection.audioTrack != null);
+        return new VideoSelection(video, audio, separateAudio, tag.withSourceType(separateAudio
+                ? SourceType.VIDEO_WITH_SEPARATED_AUDIO
+                : SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY));
+    }
+
+    @Nullable
+    private MediaSource buildVideo(@NonNull final StreamInfo info,
+                                   @NonNull final VideoSelection selection) {
+        final List<MediaSource> sources = new ArrayList<>();
+        if (selection.video != null) {
             try {
-                sources.add(environment.streamSource(info, video, tag));
+                sources.add(environment.streamSource(info, selection.video, selection.tag));
             } catch (final ResolverException error) {
                 environment.logError("Unable to create video source", error);
                 return null;
             }
         }
-        if (audio != null && (video == null || video.isVideoOnly()
-                || selection.audioTrack != null)) {
+        if (selection.separateAudio) {
             try {
-                sources.add(environment.streamSource(info, audio, tag));
-                lastVideoSourceType = SourceType.VIDEO_WITH_SEPARATED_AUDIO;
+                sources.add(environment.streamSource(info, selection.audio, selection.tag));
             } catch (final ResolverException error) {
                 environment.logError("Unable to create audio source", error);
                 return null;
             }
-        } else {
-            lastVideoSourceType = SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY;
         }
         if (sources.isEmpty()) {
             return null;
@@ -203,16 +211,45 @@ public final class PlaybackSources {
         return sources.size() == 1 ? sources.get(0) : environment.merge(sources);
     }
 
-    private void changeRumbleLiveQuality(@NonNull final StreamInfo info) {
-        if (info.getStreamType() == StreamType.LIVE_STREAM
-                && info.getServiceId() == ServiceList.Rumble.getServiceId()) {
-            final int index = qualityResolver.getDefaultResolutionIndex(info.getVideoStreams());
-            final String manifest = info.getVideoStreams().get(index).getManifestUrl();
-            if (manifest != null && !manifest.isBlank()) {
-                info.setHlsUrl(manifest);
-            } else {
-                environment.logWarning("could not set set hls url according to select quality");
-            }
+    @Nullable
+    private String rumbleLiveManifest(@NonNull final StreamInfo info) {
+        if (info.getStreamType() != StreamType.LIVE_STREAM
+                || info.getServiceId() != ServiceList.Rumble.getServiceId()) {
+            return null;
+        }
+        final List<VideoStream> videos = info.getVideoStreams();
+        if (videos.isEmpty()) {
+            return null;
+        }
+        final int index = qualityResolver.getDefaultResolutionIndex(videos);
+        if (index < 0 || index >= videos.size()) {
+            return null;
+        }
+        final String manifest = videos.get(index).getManifestUrl();
+        if (manifest != null && !manifest.isBlank()) {
+            return manifest;
+        }
+        environment.logWarning("could not set set hls url according to select quality");
+        return null;
+    }
+
+    private static final class VideoSelection {
+        @Nullable
+        private final VideoStream video;
+        @Nullable
+        private final AudioStream audio;
+        private final boolean separateAudio;
+        @NonNull
+        private final StreamInfoTag tag;
+
+        private VideoSelection(@Nullable final VideoStream video,
+                               @Nullable final AudioStream audio,
+                               final boolean separateAudio,
+                               @NonNull final StreamInfoTag tag) {
+            this.video = video;
+            this.audio = audio;
+            this.separateAudio = separateAudio;
+            this.tag = tag;
         }
     }
 
@@ -252,7 +289,7 @@ public final class PlaybackSources {
         int audioFallbackIndex(List<VideoStream> streams);
 
         @Nullable
-        MediaSource liveSource(StreamInfo info);
+        MediaSource liveSource(StreamInfo info, @Nullable String hlsOverride, MediaItemTag tag);
 
         MediaSource streamSource(StreamInfo info, @Nullable Stream stream, MediaItemTag tag)
                 throws ResolverException;

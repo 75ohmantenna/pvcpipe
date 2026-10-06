@@ -75,8 +75,10 @@ final class AndroidPlaybackEnvironment implements PlaybackSources.Environment {
 
     @Override
     @Nullable
-    public MediaSource liveSource(final StreamInfo info) {
-        return PlaybackResolver.maybeBuildLiveMediaSource(dataSource, info);
+    public MediaSource liveSource(final StreamInfo info,
+                                  @Nullable final String hlsOverride,
+                                  final MediaItemTag tag) {
+        return PlaybackResolver.maybeBuildLiveMediaSource(dataSource, info, hlsOverride, tag);
     }
 
     @Override

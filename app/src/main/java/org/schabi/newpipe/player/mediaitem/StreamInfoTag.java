@@ -29,15 +29,19 @@ public final class StreamInfoTag implements MediaItemTag {
     @Nullable
     private final MediaItemTag.AudioTrack audioTrack;
     @Nullable
+    private final MediaItemTag.SourceType sourceType;
+    @Nullable
     private final Object extras;
 
     private StreamInfoTag(@NonNull final StreamInfo streamInfo,
                           @Nullable final MediaItemTag.Quality quality,
                           @Nullable final MediaItemTag.AudioTrack audioTrack,
+                          @Nullable final MediaItemTag.SourceType sourceType,
                           @Nullable final Object extras) {
         this.streamInfo = streamInfo;
         this.quality = quality;
         this.audioTrack = audioTrack;
+        this.sourceType = sourceType;
         this.extras = extras;
     }
 
@@ -49,7 +53,7 @@ public final class StreamInfoTag implements MediaItemTag {
         final Quality quality = Quality.of(sortedVideoStreams, selectedVideoStreamIndex);
         final AudioTrack audioTrack =
                 AudioTrack.of(audioStreams, selectedAudioStreamIndex);
-        return new StreamInfoTag(streamInfo, quality, audioTrack, null);
+        return new StreamInfoTag(streamInfo, quality, audioTrack, null, null);
     }
 
     public static StreamInfoTag of(@NonNull final StreamInfo streamInfo,
@@ -57,11 +61,11 @@ public final class StreamInfoTag implements MediaItemTag {
                                    final int selectedAudioStreamIndex) {
         final AudioTrack audioTrack =
                 AudioTrack.of(audioStreams, selectedAudioStreamIndex);
-        return new StreamInfoTag(streamInfo, null, audioTrack, null);
+        return new StreamInfoTag(streamInfo, null, audioTrack, null, null);
     }
 
     public static StreamInfoTag of(@NonNull final StreamInfo streamInfo) {
-        return new StreamInfoTag(streamInfo, null, null, null);
+        return new StreamInfoTag(streamInfo, null, null, null, null);
     }
 
     @Override
@@ -127,6 +131,16 @@ public final class StreamInfoTag implements MediaItemTag {
         return Optional.ofNullable(audioTrack);
     }
 
+    @NonNull
+    @Override
+    public Optional<SourceType> getMaybeSourceType() {
+        return Optional.ofNullable(sourceType);
+    }
+
+    public StreamInfoTag withSourceType(@NonNull final SourceType type) {
+        return new StreamInfoTag(streamInfo, quality, audioTrack, type, extras);
+    }
+
     @Override
     public <T> Optional<T> getMaybeExtras(@NonNull final Class<T> type) {
         return Optional.ofNullable(extras).map(type::cast);
@@ -134,6 +148,6 @@ public final class StreamInfoTag implements MediaItemTag {
 
     @Override
     public StreamInfoTag withExtras(@NonNull final Object extra) {
-        return new StreamInfoTag(streamInfo, quality, audioTrack, extra);
+        return new StreamInfoTag(streamInfo, quality, audioTrack, sourceType, extra);
     }
 }

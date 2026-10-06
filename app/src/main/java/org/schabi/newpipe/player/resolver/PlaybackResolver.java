@@ -37,7 +37,6 @@ import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.datasource.NonUriHlsDataSourceFactory;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
-import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.util.StreamTypeUtil;
 
 import java.io.ByteArrayInputStream;
@@ -194,21 +193,23 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
     //region Live media sources
     @Nullable
     static MediaSource maybeBuildLiveMediaSource(final PlayerDataSource dataSource,
-                                                 final StreamInfo info) {
+                                                 final StreamInfo info,
+                                                 @Nullable final String hlsOverride,
+                                                 final MediaItemTag tag) {
         if (!StreamTypeUtil.isLiveStream(info.getStreamType())) {
             return null;
         }
 
         try {
-            final StreamInfoTag tag = StreamInfoTag.of(info);
             // Prefer DASH over HLS because of an exoPlayer bug that causes the background player to
             // also fetch the video stream even if it is supposed to just fetch the audio stream.
             if (!info.getDashMpdUrl().isEmpty()) {
                 return buildLiveMediaSource(
                         dataSource, info.getDashMpdUrl(), C.CONTENT_TYPE_DASH, tag);
             }
-            if (!info.getHlsUrl().isEmpty()) {
-                return buildLiveMediaSource(dataSource, info.getHlsUrl(), C.CONTENT_TYPE_HLS, tag);
+            final String hlsUrl = hlsOverride == null ? info.getHlsUrl() : hlsOverride;
+            if (!hlsUrl.isEmpty()) {
+                return buildLiveMediaSource(dataSource, hlsUrl, C.CONTENT_TYPE_HLS, tag);
             }
         } catch (final Exception e) {
             Log.w(TAG, "Error when generating live media source, falling back to standard sources",
