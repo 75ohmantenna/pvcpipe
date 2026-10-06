@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
@@ -110,6 +111,21 @@ public class DownloadMissionLifecycleTest {
         release.countDown(); old.join(5000);
         verify(mission, never()).createInitializer();
         assertFalse(mission.running);
+    }
+
+    @Test
+    public void resettingStaleRecoveryStateKeepsItsOwnerForHandoff() {
+        try (var logging = mockStatic(Log.class)) {
+            final DownloadMission mission = spy(mission());
+            final Thread[] owners = new Thread[]{Thread.currentThread()};
+            mission.threads = owners;
+            mission.running = true;
+            doAnswer(call -> new Thread()).when(mission).createInitializer();
+            mission.resetState(false, false, DownloadMission.ERROR_NOTHING);
+            assertSame(owners, mission.threads);
+            mission.recoveryFinished();
+            verify(mission).createInitializer();
+        }
     }
 
     private static void await(final CountDownLatch latch) {
