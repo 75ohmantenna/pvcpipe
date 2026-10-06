@@ -46,7 +46,8 @@ public class DownloaderImplTest {
     @Test
     public void bitChuteSeedRequestsUseCompatibleMediaIdentity() {
         for (final String url : List.of("https://seed131b.bitchute.com/channel/video.mp4",
-                "https://SEED125.BITCHUTE.COM/video.m3u8")) {
+                "https://SEED125.BITCHUTE.COM/video.m3u8",
+                "https://seedp29xb.bitchute.com/channel/video.mp4")) {
             assertTrue(DownloaderImpl.getMediaUserAgent(url).contains("Firefox/128.0"));
         }
     }

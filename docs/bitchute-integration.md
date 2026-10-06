@@ -68,7 +68,7 @@ or post comments on the website.
   an HTTP response. This reproduced in Android's player and in desktop curl/requests probes;
   Firefox/128, mobile Chrome/124, Chrome/146, and the default requests user agent returned HTTP
   206 for the same media URL. Playback and download requests now use the verified Firefox
-  identity on exact `seed[0-9]+[a-z]*.bitchute.com` hosts. Other hosts retain the app's existing
+  identity on exact `seed[a-z0-9]+.bitchute.com` hosts. Other hosts retain the app's existing
   identity. Player headers are resolved for each media request, including HLS segments.
 
 ## Verification
@@ -111,9 +111,12 @@ READY/PLAYING with overlay permission temporarily enabled; that permission was r
 The emulator used the media-fix build. The final BBFC age-label adjustment was checked with
 parameterized tests and included in the final APK build.
 
-Verification results: 169 deterministic extractor tests and 283 app unit tests passed, extractor
-Checkstyle passed, and `assembleDebug` produced the debug APK. The broader BitChute run passed
-123 tests with one existing disabled test and no failures.
+Initial workspace verification passed 169 deterministic extractor tests and 283 app unit tests,
+including the separately preserved Rumble changes. The initial broader BitChute run contained
+123 tests with one existing disabled test and no failures. After the adversarial fixes, the clean
+PR tree passed 166 deterministic extractor tests and 283 app unit tests, both app and extractor
+Checkstyle, and the debug APK build. The final broader BitChute suite contained 137 tests with
+one existing disabled test and no failures.
 
 The deterministic regression suite covers search isolation and pagination, channel-tab metadata
 recovery, autocomplete, current embeds, invalid hosts, retired sensitivity values, comment auth,
@@ -124,7 +127,7 @@ filter test remains disabled.
 Run the reproducible checks and APK build:
 
 ```sh
-./gradlew :pvcpipe-extractor:extractor:forkCiTest :app:testDebugUnitTest :app:assembleDebug
+./gradlew :pvcpipe-extractor:extractor:forkCiTest :app:testDebugUnitTest :app:runCheckstyle :app:assembleDebug
 ```
 
 Run the broader BitChute suite separately (it includes live requests):
@@ -132,6 +135,26 @@ Run the broader BitChute suite separately (it includes live requests):
 ```sh
 ./gradlew :pvcpipe-extractor:extractor:test --tests '*services.bitchute*'
 ```
+
+## Adversarial review
+
+The PR review added regressions for these compatibility gaps:
+
+- A torrent URL contains the channel ID followed by the video filename. Extracting the first
+  ID opened the wrong video. The handler now extracts the video ID from `.webtorrent` filenames,
+  and the earlier test that expected the channel ID was corrected.
+- The media-host match excluded the documented `seedp29xb.bitchute.com` CDN host. The match now
+  accepts alphanumeric seed names on the exact BitChute domain and still rejects lookalike hosts.
+- Counts and Suggested were mandatory during stream extraction. A 503 from either endpoint
+  prevented playback despite successful video/media requests. Those failures now surface through
+  the optional metadata getters, which `StreamInfo` records without discarding playable streams.
+- The SPA also supports root channel slugs such as `/bitchute`. Shared and pasted root slug URLs
+  now resolve to channels, while the SPA's reserved root routes are rejected. Channel identifiers
+  accept URI unreserved characters, including dots. Android link interception retains the specific
+  video/embed/torrent/channel prefixes rather than claiming every BitChute web page.
+
+The review checks use a clean PR tree with the separate Rumble work preserved outside it.
+The root `bitchute` slug was also resolved through the live channel API (HTTP 200).
 
 ## Sources
 

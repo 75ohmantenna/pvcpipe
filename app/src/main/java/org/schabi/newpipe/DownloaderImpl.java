@@ -41,7 +41,7 @@ public final class DownloaderImpl extends Downloader {
         final HttpUrl parsed = HttpUrl.parse(url);
         // BitChute's seed CDN closes Chrome/145 connections without an HTTP response.
         // Keep this workaround confined to its media hosts.
-        return parsed != null && parsed.host().matches("seed[0-9]+[a-z]*\\.bitchute\\.com")
+        return parsed != null && parsed.host().matches("seed[a-z0-9]+\\.bitchute\\.com")
                 ? BITCHUTE_MEDIA_USER_AGENT : USER_AGENT;
     }
     public static final String YOUTUBE_RESTRICTED_MODE_COOKIE_KEY =

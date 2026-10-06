@@ -235,6 +235,65 @@ class BitchuteWebsiteInteractionTest {
                 .getPage(child.getReplies()).getItems().get(0).getCommentId());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"https://www.bitchute.com/bitchute",
+            "https://bitchute.com/bitchute/", "https://bitchute.com/channel/space.science"})
+    void acceptsChannelSlugs(final String url) throws Exception {
+        assertEquals(url.contains("space.science") ? "space.science" : "bitchute",
+                Bitchute.getChannelLHFactory().fromUrl(url).getId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://bitchute.com/", "https://bitchute.com/search",
+            "https://bitchute.com/popular", "https://bitchute.com/SETTINGS",
+            "https://bitchute.com/api", "https://bitchute.com/video",
+            "https://bitchute.com/.", "https://bitchute.com/..",
+            "https://bitchute.com/channel/.."})
+    void rejectsReservedWebsiteRoutesAsChannels(final String url) throws Exception {
+        assertFalse(Bitchute.getChannelLHFactory().acceptUrl(url));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"counts", "suggested"})
+    void optionalApiFailuresDoNotPreventPlayback(final String failedEndpoint) throws Exception {
+        final RecordingDownloader downloader = new RecordingDownloader() {
+            @Override public Response execute(@Nonnull final Request request) {
+                final String endpoint = request.url();
+                code = 200;
+                if (("counts".equals(failedEndpoint) && endpoint.endsWith("/counts"))
+                        || ("suggested".equals(failedEndpoint) && endpoint.endsWith("/videos"))) {
+                    code = 503;
+                    body = "<html>Unavailable</html>";
+                } else if (endpoint.endsWith("/media")) {
+                    body = "{\"media_url\":\"https://seed131b.bitchute.com/channel/video.mp4\","
+                            + "\"media_type\":\"video/mp4\"}";
+                } else if (endpoint.endsWith("/counts")) {
+                    body = "{\"view_count\":12,\"like_count\":1,\"dislike_count\":0}";
+                } else if (endpoint.endsWith("/videos")) {
+                    body = "{\"videos\":[]}";
+                } else {
+                    body = "{\"video_name\":\"Space\",\"duration\":\"2:55\","
+                            + "\"sensitivity_id\":\"normal\",\"hashtags\":[],\"channel\":{}}";
+                }
+                return super.execute(request);
+            }
+        };
+        NewPipe.init(downloader);
+        final var extractor = Bitchute.getStreamExtractor(VIDEO);
+        extractor.fetchPage();
+        assertEquals("Space", extractor.getName());
+        assertEquals(1, extractor.getVideoStreams().size());
+        if ("counts".equals(failedEndpoint)) {
+            assertThrows(ParsingException.class, extractor::getViewCount);
+            assertThrows(ParsingException.class, extractor::getLikeCount);
+            assertThrows(ParsingException.class, extractor::getDislikeCount);
+            assertTrue(extractor.getRelatedItems().getItems().isEmpty());
+        } else {
+            assertEquals(12, extractor.getViewCount());
+            assertThrows(ExtractionException.class, extractor::getRelatedItems);
+        }
+    }
+
     private static String comment(final String id, final String parent) {
         return "{\"id\":\"" + id + "\",\"parent\":" + (parent == null ? "null" : "\"" + parent + "\"")
                 + ",\"fullname\":\"Person\",\"content\":\"Example\",\"created\":\"2026-10-05 23:53:52Z\","

@@ -15,6 +15,18 @@ import java.util.Set;
 
 public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
 
+    // The SPA reserves these root routes; all other single segments can be channel slugs.
+    private static final Set<String> RESERVED_ROOT_PATHS = Set.of(
+            "1776", "accounts", "affiliate", "all", "analytics", "bitseek", "careers",
+            "category", "channel", "channelsetting", "channels", "chat", "comments",
+            "communication", "content", "feedback", "founder", "fresh", "hashtag",
+            "interface", "live", "livenow", "logout", "manage", "manage_comment",
+            "memberpicked", "membership", "monetization", "notifications", "personalinfo",
+            "playlist", "popchat", "popular", "profile", "profilecontent", "referrals",
+            "search", "settings", "shorts", "socialmedia", "subscribed", "subscriptions",
+            "subtitles", "suggested", "trending", "ukregulation", "update_playlist",
+            "update_video", "upload_video", "video", "vpn", "api", "embed", "torrent");
+
     private static final BitchuteChannelLinkHandlerFactory INSTANCE =
             new BitchuteChannelLinkHandlerFactory();
 
@@ -48,6 +60,10 @@ public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
             if (splitPath[0].equalsIgnoreCase("channel")) {
                 return validateId(splitPath[1]);
             }
+            if (splitPath.length == 1
+                    && !RESERVED_ROOT_PATHS.contains(splitPath[0].toLowerCase(Locale.ROOT))) {
+                return validateId(splitPath[0]);
+            }
         } catch (final ArrayIndexOutOfBoundsException e) {
             throw new ParsingException("Error getting ID");
         }
@@ -55,7 +71,8 @@ public class BitchuteChannelLinkHandlerFactory extends ListLinkHandlerFactory {
     }
 
     private String validateId(final String id) throws ParsingException {
-        if (id != null && id.matches("[a-zA-Z0-9_-]+")) {
+        if (id != null && !".".equals(id) && !"..".equals(id)
+                && id.matches("[a-zA-Z0-9._~-]+")) {
             return id;
         } else {
             throw new ParsingException("Id is not suitable: " + id);
