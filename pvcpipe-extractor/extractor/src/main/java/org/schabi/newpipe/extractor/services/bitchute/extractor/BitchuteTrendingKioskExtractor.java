@@ -67,7 +67,8 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
         }
 
         // Only popular/suggested results are paginated; trending is a single snapshot.
-        if (results.getVideos().isEmpty() || !"popular".equals(category)) {
+        if (results.getVideos().isEmpty()
+                || !("popular".equals(category) || "suggested".equals(category))) {
             return new InfoItemsPage<>(collector, null);
         } else {
             return new InfoItemsPage<>(collector, new Page(
@@ -97,6 +98,7 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
     private String getApiSelection() {
         switch (getId()) {
             case SUGGESTED:
+                return "suggested";
             case POPULAR:
                 return "popular";
             case TRENDING_MONTH:

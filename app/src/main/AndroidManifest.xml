@@ -349,9 +349,13 @@
                 <data android:scheme="https"/>
                 <data android:host="www.bitchute.com"/>
                 <data android:host="bitchute.com"/>
+                <data android:host="old.bitchute.com"/>
                 <!-- video prefix -->
                 <data android:pathPrefix="/video/"/>
                 <data android:pathPrefix="/embed/"/>
+                <data android:pathPrefix="/torrent/"/>
+                <data android:pathPrefix="/api/beta9/embed/"/>
+                <data android:pathPrefix="/api/beta9/selfembed/"/>
                 <!-- channel prefix-->
                 <data android:pathPrefix="/channel/"/>
             </intent-filter>

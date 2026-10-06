@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.upstream.ResolvingDataSource;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
@@ -31,6 +32,7 @@ import org.schabi.newpipe.player.datasource.NonUriHlsDataSourceFactory;
 import org.schabi.newpipe.player.datasource.YoutubeHttpDataSource;
 
 import java.io.File;
+import java.util.Map;
 
 public class PlayerDataSource {
     public static final String TAG = PlayerDataSource.class.getSimpleName();
@@ -86,12 +88,12 @@ public class PlayerDataSource {
         // make sure the static cache was created: needed by CacheFactories below
         instantiateCacheIfNeeded(context);
 
-        // generic data source factories use DefaultHttpDataSource.Factory
+        // Resolve media headers for every URL, including HLS segment requests.
         cachelessDataSourceFactory = new DefaultDataSource.Factory(context,
-                new DefaultHttpDataSource.Factory().setUserAgent(DownloaderImpl.USER_AGENT))
+                getMediaHttpDataSourceFactory())
                 .setTransferListener(transferListener);
         cacheDataSourceFactory = new CacheFactory(context, transferListener, cache,
-                new DefaultHttpDataSource.Factory().setUserAgent(DownloaderImpl.USER_AGENT));
+                getMediaHttpDataSourceFactory());
 
         // YouTube-specific data source factories use getYoutubeHttpDataSourceFactory()
         ytHlsCacheDataSourceFactory = new CacheFactory(context, transferListener, cache,
@@ -192,6 +194,13 @@ public class PlayerDataSource {
 
 
     //region Static methods
+    private static DataSource.Factory getMediaHttpDataSourceFactory() {
+        // User-Agent is supplied through DataSpec so DefaultHttpDataSource must not override it.
+        return new ResolvingDataSource.Factory(new DefaultHttpDataSource.Factory(),
+                dataSpec -> dataSpec.withAdditionalHeaders(Map.of("User-Agent",
+                        DownloaderImpl.getMediaUserAgent(dataSpec.uri.toString()))));
+    }
+
     private static DefaultDashChunkSource.Factory getDefaultDashChunkSourceFactory(
             final DataSource.Factory dataSourceFactory) {
         return new DefaultDashChunkSource.Factory(dataSourceFactory);

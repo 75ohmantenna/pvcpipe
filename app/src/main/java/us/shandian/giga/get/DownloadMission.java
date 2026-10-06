@@ -229,7 +229,7 @@ public class DownloadMission extends Mission {
     HttpURLConnection openConnection(String url, boolean headRequest, long rangeStart, long rangeEnd) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setInstanceFollowRedirects(true);
-        conn.setRequestProperty("User-Agent", DownloaderImpl.USER_AGENT);
+        conn.setRequestProperty("User-Agent", DownloaderImpl.getMediaUserAgent(url));
         conn.setRequestProperty("Accept", "*/*");
         conn.setRequestProperty("Accept-Encoding", "*");
 

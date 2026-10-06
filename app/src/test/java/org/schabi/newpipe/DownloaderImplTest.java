@@ -43,6 +43,25 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 public class DownloaderImplTest {
+    @Test
+    public void bitChuteSeedRequestsUseCompatibleMediaIdentity() {
+        for (final String url : List.of("https://seed131b.bitchute.com/channel/video.mp4",
+                "https://SEED125.BITCHUTE.COM/video.m3u8",
+                "https://seedp29xb.bitchute.com/channel/video.mp4")) {
+            assertTrue(DownloaderImpl.getMediaUserAgent(url).contains("Firefox/128.0"));
+        }
+    }
+
+    @Test
+    public void mediaIdentityDoesNotChangeApiOrOtherWebsiteRequests() {
+        for (final String url : List.of("https://api.bitchute.com/api/beta/video/media",
+                "https://www.bitchute.com/video/id", "https://rumble.com/video.mp4",
+                "https://seed131b.bitchute.com.evil.example/video.mp4",
+                "https://example.org/seed131b.bitchute.com/video.mp4", "not a URL")) {
+            assertEquals(DownloaderImpl.USER_AGENT, DownloaderImpl.getMediaUserAgent(url));
+        }
+    }
+
     private final DownloaderImpl downloader = DownloaderImpl.getInstance();
     private String previousRestrictedCookie;
     private String previousCaptchaCookie;

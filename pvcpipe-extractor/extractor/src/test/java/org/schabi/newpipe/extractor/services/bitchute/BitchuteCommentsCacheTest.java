@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BitchuteCommentsCacheTest {
 
     @Test
-    void reusesAuthTokenExtractedFromVideoPage() throws Exception {
+    void getsFreshAuthFromApiWithoutFetchingWebsite() throws Exception {
         final String id = "cache-test-video";
         final String videoUrl = "https://www.bitchute.com/video/" + id + "/";
         final CommentsDownloader downloader = new CommentsDownloader(videoUrl);
@@ -32,7 +32,8 @@ class BitchuteCommentsCacheTest {
         BitchuteParserHelper.getComments(id, videoUrl, 0);
         BitchuteParserHelper.getComments(id, videoUrl, 20);
 
-        assertEquals(1, downloader.videoPageRequests);
+        assertEquals(0, downloader.videoPageRequests);
+        assertEquals(2, downloader.authRequests);
         assertEquals(2, downloader.commentsRequests);
         assertTrue(downloader.allCommentsRequestsUsedToken);
     }
@@ -53,6 +54,7 @@ class BitchuteCommentsCacheTest {
         private final String videoUrl;
         private int videoPageRequests;
         private int commentsRequests;
+        private int authRequests;
         private boolean allCommentsRequestsUsedToken = true;
 
         private CommentsDownloader(final String videoUrl) {
@@ -62,6 +64,10 @@ class BitchuteCommentsCacheTest {
         @Override
         public Response execute(@Nonnull final Request request)
                 throws IOException, ReCaptchaException {
+            if (request.url().endsWith("/apps/commentfreely/video/")) {
+                authRequests++;
+                return response(request, "{\"auth\":\"cached-token\"}", Map.of());
+            }
             if (videoUrl.equals(request.url())) {
                 videoPageRequests++;
                 return response(request, "<script>{cf_auth: 'cached-token'}</script>", Map.of());

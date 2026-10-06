@@ -31,7 +31,7 @@ class BitchuteKioskPaginationTest {
     @ParameterizedTest
     @CsvSource({
             "Popular, popular, true",
-            "Suggested, popular, true",
+            "Suggested, suggested, true",
             "Trending Today, trending-day, false",
             "Trending This Week, trending-week, false",
             "Trending This Month, trending-month, false",

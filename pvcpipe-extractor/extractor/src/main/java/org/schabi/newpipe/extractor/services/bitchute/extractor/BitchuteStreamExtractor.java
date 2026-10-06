@@ -47,6 +47,8 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     private ResultsStreamVideoCounts streamVideoViewCounts = null;
 
     private ResultsStreamVideos streamVideosSuggested;
+    private ParsingException countsError;
+    private ExtractionException suggestedError;
 
     public BitchuteStreamExtractor(final StreamingService service, final LinkHandler linkHandler) {
         super(service, linkHandler);
@@ -57,8 +59,19 @@ public class BitchuteStreamExtractor extends StreamExtractor {
             throws IOException, ExtractionException {
         streamVideoResults = callApiAndGetResultsStreamVideo();
         streamVideoMediaResults = callApiAndGetResultsStreamVideoMedia();
-        streamVideoViewCounts = callApiAndGetResultsStreamVideoCounts();
-        streamVideosSuggested = callApiAndGetResultsStreamVideos();
+        // Counts and recommendations must not prevent an available video from playing.
+        countsError = null;
+        suggestedError = null;
+        try {
+            streamVideoViewCounts = callApiAndGetResultsStreamVideoCounts();
+        } catch (final IOException | ExtractionException e) {
+            countsError = new ParsingException("Could not load BitChute video counts", e);
+        }
+        try {
+            streamVideosSuggested = callApiAndGetResultsStreamVideos();
+        } catch (final IOException | ExtractionException e) {
+            suggestedError = new ExtractionException("Could not load BitChute suggestions", e);
+        }
     }
 
     private ResultsStreamVideos callApiAndGetResultsStreamVideos()
@@ -117,6 +130,9 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nullable
     @Override
     public DateWrapper getUploadDate() throws ParsingException {
+        if (getTextualUploadDate() == null || getTextualUploadDate().isEmpty()) {
+            return null;
+        }
         return new DateWrapper(PvcParsingHelper.parseDateFrom(getTextualUploadDate()));
     }
 
@@ -140,11 +156,11 @@ public class BitchuteStreamExtractor extends StreamExtractor {
                 return StreamExtractor.NO_AGE_LIMIT;
             case "normal":
             default:
-                return 16;
+                return 12;
             case "nsfw":
-                return 18;
+                return 15;
             case "nsfl":
-                return 21;
+                return 18;
         }
     }
 
@@ -159,23 +175,35 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     }
 
     @Override
-    public long getViewCount() {
+    public long getViewCount() throws ParsingException {
+        if (countsError != null) {
+            throw countsError;
+        }
         return streamVideoViewCounts.getViewCount();
     }
 
     @Override
-    public long getLikeCount() {
+    public long getLikeCount() throws ParsingException {
+        if (countsError != null) {
+            throw countsError;
+        }
         return streamVideoViewCounts.getLikeCount();
     }
 
     @Override
-    public long getDislikeCount() {
+    public long getDislikeCount() throws ParsingException {
+        if (countsError != null) {
+            throw countsError;
+        }
         return streamVideoViewCounts.getDislikeCount();
     }
 
     @Nullable
     @Override
     public StreamInfoItemsCollector getRelatedItems() throws ExtractionException {
+        if (suggestedError != null) {
+            throw suggestedError;
+        }
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final Videos video : streamVideosSuggested.getVideos()) {
             collector.commit(new BitchuteVideoInfoItemExtractor(video));

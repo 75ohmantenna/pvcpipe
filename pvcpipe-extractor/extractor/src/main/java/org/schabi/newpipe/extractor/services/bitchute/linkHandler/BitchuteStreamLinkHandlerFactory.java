@@ -49,13 +49,20 @@ public class BitchuteStreamLinkHandlerFactory extends LinkHandlerFactory {
         }
 
         final String[] pathSegments = url.getPath().split("/");
+        if (pathSegments.length == 5 && "api".equals(pathSegments[1])
+                && "beta9".equals(pathSegments[2])
+                && ("embed".equals(pathSegments[3]) || "selfembed".equals(pathSegments[3]))) {
+            return assertId(pathSegments[4]);
+        }
         if (pathSegments.length >= 3
                 && ("video".equalsIgnoreCase(pathSegments[1])
                 || "embed".equalsIgnoreCase(pathSegments[1]))) {
             return assertId(pathSegments[2]);
         }
-        if (pathSegments.length >= 4 && "torrent".equalsIgnoreCase(pathSegments[1])) {
-            return assertId(pathSegments[2]);
+        if (pathSegments.length == 4 && "torrent".equalsIgnoreCase(pathSegments[1])
+                && pathSegments[3].endsWith(".webtorrent")) {
+            final String filename = pathSegments[3];
+            return assertId(filename.substring(0, filename.length() - ".webtorrent".length()));
         }
         throw new ParsingException("Unsupported BitChute video URL: " + urlString);
     }

@@ -53,6 +53,9 @@ public abstract class BitchuteChannelStreamInfoItemExtractor implements StreamIn
     @Nullable
     @Override
     public DateWrapper getUploadDate() throws ParsingException {
+        if (getTextualUploadDate() == null || getTextualUploadDate().isEmpty()) {
+            return null;
+        }
         return new DateWrapper(PvcParsingHelper.parseDateFrom(getTextualUploadDate()));
     }
 
