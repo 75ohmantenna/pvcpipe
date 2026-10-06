@@ -111,6 +111,9 @@ final class BackupRestore {
     Completable exportTo(final Uri destination) {
         return operations.submit(() -> {
             recoverPreferencesIfNeeded();
+            if (archives.hasPendingRestore()) {
+                throw new IOException("A restored database is awaiting restart");
+            }
             platform.checkpoint();
             archives.exportDatabase(preferences, platform.document(destination));
             preferences.edit().putString(pathKey, destination.toString()).apply();

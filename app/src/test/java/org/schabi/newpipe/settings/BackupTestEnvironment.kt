@@ -25,6 +25,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
     var failedCommits = 0
     var afterPreferenceCommit: (() -> Unit)? = null
     var reads = 0
+    var sourceStream: org.schabi.newpipe.streams.io.SharpStream? = null
     val preferences: SharedPreferences = mock(SharedPreferences::class.java) { call ->
         when (call.method.name) {
             "getAll" -> HashMap(values)
@@ -70,7 +71,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
         return mock(StoredFileHelper::class.java).also {
             `when`(it.stream).thenAnswer {
                 reads++
-                FileStream(path.toFile())
+                sourceStream ?: FileStream(path.toFile())
             }
             `when`(it.openAndTruncateStream()).thenAnswer {
                 FileStream(path.toFile()).also { stream -> stream.setLength(0) }

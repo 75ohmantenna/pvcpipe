@@ -29,7 +29,9 @@ without replacing an existing pending restore. Preference or publication failure
 attempts rollback. Failed rollback reports recovery-required state, retained by
 the application-owned module; subsequent operations retry recovery before doing
 new work. Restart failure after publication reports that activation still needs
-a restart and preserves the pending database.
+a restart and preserves the pending database. While activation is pending, new
+restores and exports are rejected; exporting would pair the old live database
+with the newly restored settings.
 
 The preference and filesystem writes are not a cross-store transaction. This
 change handles reported errors and retains the existing startup retry behavior;

@@ -59,12 +59,18 @@ class BackupRestoreFailureTest {
         }
     }
 
-    private fun archive(path: Path, json: String) {
+    private fun archive(path: Path, json: String, database: ByteArray? = null) {
         ZipOutputStream(Files.newOutputStream(path)).use { zip ->
-            zip.putNextEntry(ZipEntry("newpipe.db"))
-            javaClass.classLoader!!.getResourceAsStream("settings/newpipe.db")!!.use {
-                it.copyTo(zip)
-            }
+            val bytes = database ?: javaClass.classLoader!!
+                .getResourceAsStream("settings/newpipe.db")!!.use { it.readBytes() }
+            zip.putNextEntry(
+                ZipEntry("newpipe.db").also {
+                    it.method = ZipEntry.STORED
+                    it.size = bytes.size.toLong()
+                    it.crc = java.util.zip.CRC32().also { crc -> crc.update(bytes) }.value
+                }
+            )
+            zip.write(bytes)
             zip.closeEntry()
             zip.putNextEntry(ZipEntry("preferences.json"))
             zip.write(json.toByteArray())
@@ -165,6 +171,61 @@ class BackupRestoreFailureTest {
         assertEquals(reads + 1, environment.reads)
         assertPreparationCleaned()
         assertTrue(PendingDatabaseRestore.hasPending(environment.database))
+    }
+
+    @Test
+    fun `pending activation blocks export before truncation or checkpoint`() {
+        val uri = environment.source("settings/db_ser_json.zip")
+        val inspection = inspect(uri)
+        environment.failRestart = true
+        restore(inspection).assertError(BackupRestore.RestoreCommittedException::class.java)
+        val path = temporary.root.toPath().resolve("export.zip")
+        Files.writeString(path, "existing backup")
+        val destination = environment.documentUri(path)
+        backups.exportTo(destination).test().also {
+            io.triggerActions()
+            it.assertError(java.io.IOException::class.java)
+        }
+        assertEquals("existing backup", Files.readString(path))
+        assertEquals(0, environment.checkpoints)
+        assertEquals(uri.toString(), environment.values["location"])
+        assertTrue(PendingDatabaseRestore.hasPending(environment.database))
+    }
+
+    @Test
+    fun `database CRC corruption after inspection leaves live data unchanged`() {
+        val path = temporary.root.toPath().resolve("corrupt.zip")
+        archive(path, "{}", "candidate database".toByteArray())
+        val inspection = inspect(environment.documentUri(path))
+        val bytes = Files.readAllBytes(path)
+        val offset = 30 + "newpipe.db".length
+        assertEquals('c'.code.toByte(), bytes[offset])
+        bytes[offset] = (bytes[offset].toInt() xor 1).toByte()
+        Files.write(path, bytes)
+        restore(inspection).assertError(java.util.zip.ZipException::class.java)
+        assertLiveDataUnchanged()
+        assertPreparationCleaned()
+        assertFalse(PendingDatabaseRestore.hasPending(environment.database))
+    }
+
+    @Test
+    fun `empty database fails preparation without changing live data`() {
+        val path = temporary.root.toPath().resolve("empty.zip")
+        archive(path, "{}", byteArrayOf())
+        restore(inspect(environment.documentUri(path))).assertError(java.io.IOException::class.java)
+        assertLiveDataUnchanged()
+        assertPreparationCleaned()
+    }
+
+    @Test
+    fun `unreadable provider stream is closed and preparation is cleaned`() {
+        val inspection = inspect(environment.source("settings/db_ser_json.zip"))
+        val stream = org.mockito.Mockito.mock(org.schabi.newpipe.streams.io.SharpStream::class.java)
+        environment.sourceStream = stream
+        restore(inspection).assertError(java.io.IOException::class.java)
+        org.mockito.Mockito.verify(stream).close()
+        assertLiveDataUnchanged()
+        assertPreparationCleaned()
     }
 
     @Test
