@@ -1,6 +1,5 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.Page;
@@ -55,7 +54,7 @@ public class RumbleChannelTabExtractor extends ChannelTabExtractor {
             return null;
         }
 
-        doc = Jsoup.parse(getDownloader().get(page.getUrl()).responseBody());
+        doc = RumbleParsingHelper.fetchParseValidate(getDownloader(), page.getUrl());
         return getInitialPage();
     }
 }

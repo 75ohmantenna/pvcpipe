@@ -588,8 +588,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         final String queryUrl = "https://rumble.com/embedJS/u3/?request=video&ver=2&v="
                 + embedVideoId;
 
-        final Response response2 = downloader.get(
-                queryUrl);
+        final Response response2 = RumbleParsingHelper.fetchResponse(downloader, queryUrl);
 
         // TODO keep some cookies to be more browser like
         //curl 'https://rumble.com/embedJS/u3/?request=video&ver=2&v=vb294t&ext=%7B%22ad_count%22%3Anull%7D&ad_wt=0'

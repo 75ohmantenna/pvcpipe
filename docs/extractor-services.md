@@ -31,6 +31,11 @@ The source behavior was reviewed from the local yt-dlp checkout. Relevant upstre
 include `1d0f6539c` (BitChute API), `58d0c8345` (Rumble formats), `5d5b634d8` (YouTube web-embed
 fallbacks), `5d6b8c8cd` (collaborator follower counts), and `c7fb478d2` (Safari web-embed identity).
 
+## Rumble website verification
+
+[Rumble integration and verification](rumble-integration.md) records the request paths,
+compatibility corrections, emulator observations, and remaining live acceptance checks.
+
 ## BitChute website verification
 
 [BitChute integration and verification](bitchute-integration.md) records the current website API,

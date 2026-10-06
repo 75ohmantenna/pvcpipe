@@ -55,8 +55,6 @@ public class RumbleChannelExtractorTest {
                 put(KeysForTestDataMap.mockPath, "channelTest");
                 put(KeysForTestDataMap.isVerified, "true");
             }};
-            System.setProperty("downloader", "MOCK");
-            // System.setProperty("downloader", "RECORDING");
             TestChannel.setUp();
             /** more info see: {@link RumbleSharedTests#infoItemsResultsTest} */
             someExpectedResults = new String[]{
@@ -89,8 +87,6 @@ public class RumbleChannelExtractorTest {
                 put(KeysForTestDataMap.mockPath, "channelTestMulitplePages");
                 put(KeysForTestDataMap.isVerified, "true");
             }};
-            System.setProperty("downloader", "MOCK");
-            //System.setProperty("downloader", "RECORDING");
             TestChannel.setUp();
             /** more info see: {@link RumbleSharedTests#infoItemsResultsTest} */
             someExpectedResults = new String[]{
@@ -116,8 +112,6 @@ public class RumbleChannelExtractorTest {
                 put(KeysForTestDataMap.mockPath, "userTestMulitplePages");
                 put(KeysForTestDataMap.isVerified, "false");
             }};
-            System.setProperty("downloader", "MOCK");
-            //System.setProperty("downloader", "RECORDING");
             TestChannel.setUp();
             /** more info see: {@link RumbleSharedTests#infoItemsResultsTest} */
             someExpectedResults = new String[]{

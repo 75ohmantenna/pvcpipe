@@ -376,8 +376,10 @@
                 <!-- video prefix -->
                 <data android:pathPrefix="/v"/>
                 <data android:pathPrefix="/embed/"/>
+                <data android:pathPrefix="/shorts/"/>
                 <!-- channel prefix-->
                 <data android:pathPrefix="/c/"/>
+                <data android:pathPrefix="/user/"/>
             </intent-filter>
 
             <!-- media.ccc.de filter -->

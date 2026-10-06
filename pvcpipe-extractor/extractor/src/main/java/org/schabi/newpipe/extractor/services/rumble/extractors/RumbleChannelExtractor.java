@@ -1,6 +1,5 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.schabi.newpipe.extractor.Image;
@@ -55,19 +54,10 @@ public class RumbleChannelExtractor extends ChannelExtractor {
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
         doc = RumbleParsingHelper.fetchParseValidate(downloader, getUrl());
-        final String aboutLink = RumbleParsingHelper.extractSafely(false,
-            "",
-            () -> doc.selectFirst("[href*='about']").attr("href")
-        );
-        if (null != aboutLink) {
-            // somehow it is flawed within rumbles code. Some pages have complete url some not
-            if (aboutLink.startsWith("http")) {
-                about = Jsoup.parse(getDownloader().get(aboutLink).responseBody());
-            } else {
-                about = Jsoup.parse(getDownloader()
-                        .get(getService().getBaseUrl() + aboutLink)
-                        .responseBody());
-            }
+        final String aboutLink = RumbleParsingHelper.extractSafely(false, "",
+                () -> doc.selectFirst("[href*='about']").absUrl("href"));
+        if (aboutLink != null && !aboutLink.isEmpty()) {
+            about = RumbleParsingHelper.fetchParseValidate(downloader, aboutLink);
         }
     }
 
@@ -121,7 +111,7 @@ public class RumbleChannelExtractor extends ChannelExtractor {
         final String url = RumbleParsingHelper.extractSafely(false,
                 "Could not get banner url",
                 this::extractBannerUrl);
-        return List.of(new Image(url,
+        return url == null || url.isEmpty() ? List.of() : List.of(new Image(url,
                 Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
 

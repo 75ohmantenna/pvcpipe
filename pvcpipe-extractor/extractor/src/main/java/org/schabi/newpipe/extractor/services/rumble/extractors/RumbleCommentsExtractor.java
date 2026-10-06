@@ -1,5 +1,6 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
+import com.grack.nanojson.JsonArray;
 import com.grack.nanojson.JsonObject;
 import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
@@ -9,7 +10,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.comments.CommentsExtractor;
@@ -18,11 +18,13 @@ import org.schabi.newpipe.extractor.comments.CommentsInfoItemsCollector;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +38,8 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     private Map<String, String> imageMap;
 
     private Document doc;
+    private byte[] initialResponseBody;
+    private String commentsUrl;
 
     public RumbleCommentsExtractor(
             final StreamingService service,
@@ -46,12 +50,54 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     @Nonnull
     @Override
     public String getUrl() throws ParsingException {
-        final String videoUrl = super.getUrl();
-        final String id = RumbleParsingHelper.getEmbedVideoId(
-                videoUrl,
-                () -> getDownloader().get(videoUrl).responseBody()
-        );
-        return "https://rumble.com/service.php?video=" + id + "&name=comment.list";
+        if (commentsUrl != null) {
+            return commentsUrl;
+        }
+        final String videoUrl = getOriginalUrl();
+        final String id;
+        if (videoUrl.contains("/embed/")) {
+            id = getId().substring(1);
+        } else if (videoUrl.contains("/shorts/")) {
+            id = getShortsVideoId(videoUrl);
+        } else {
+            id = RumbleParsingHelper.getEmbedVideoId(videoUrl,
+                    () -> RumbleParsingHelper.fetchResponse(getDownloader(), videoUrl)
+                            .responseBody());
+        }
+        commentsUrl = "https://rumble.com/service.php?video=" + id + "&name=comment.list";
+        return commentsUrl;
+    }
+
+    private String getShortsVideoId(final String url) throws ParsingException {
+        final Document shortsDoc;
+        try {
+            shortsDoc = RumbleParsingHelper.fetchParseValidate(getDownloader(), url);
+        } catch (final IOException | ReCaptchaException e) {
+            throw new ParsingException("Could not fetch Rumble shorts page", e);
+        }
+        final Element script = shortsDoc.selectFirst("rum-shorts script[type=application/json]");
+        if (script == null) {
+            throw new ParsingException("Rumble shorts JSON not found");
+        }
+        try {
+            final JsonObject root = JsonParser.object().from(script.data());
+            final JsonArray items = root.getArray("items");
+            if (items == null) {
+                throw new ParsingException("Rumble shorts items not found");
+            }
+            for (final Object item : items) {
+                if (item instanceof JsonObject) {
+                    final JsonObject video = (JsonObject) item;
+                    if (getId().equals(video.getString("permalink_id"))
+                            && video.getLong("id") > 0) {
+                        return Long.toString(video.getLong("id"), 36);
+                    }
+                }
+            }
+        } catch (final JsonParserException e) {
+            throw new ParsingException("Could not parse Rumble shorts JSON", e);
+        }
+        throw new ParsingException("Short video not found in JSON");
     }
 
     @Override
@@ -63,9 +109,8 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     @Override
     public InfoItemsPage<CommentsInfoItem> getInitialPage()
             throws IOException, ExtractionException {
-        Downloader downloader = NewPipe.getDownloader();
-        byte[] responseBody = downloader.get(getUrl()).responseBody().getBytes();
-        return getPage(new Page("1", responseBody));
+        assertPageFetched();
+        return getPage(new Page("1", initialResponseBody));
     }
 
     @Override
@@ -97,6 +142,9 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
+        initialResponseBody = RumbleParsingHelper.fetchResponse(downloader, getUrl())
+                .responseBody().getBytes(StandardCharsets.UTF_8);
+        loadFromResponseBody(initialResponseBody);
     }
 
     public Elements getComments(int[] id) {
@@ -171,7 +219,8 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
             if (responseBody == null) {
                 return;
             }
-            JsonObject info = JsonParser.object().from(new String(responseBody));
+            JsonObject info = JsonParser.object().from(
+                    new String(responseBody, StandardCharsets.UTF_8));
             if (info.has("html") && info.has("css_libs")) {
                 doc = Jsoup.parse(info.get("html").toString());
                 if (doc.selectFirst("ul.comments-1") == null) {

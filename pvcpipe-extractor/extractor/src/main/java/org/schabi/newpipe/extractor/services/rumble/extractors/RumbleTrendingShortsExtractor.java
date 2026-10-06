@@ -9,6 +9,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.kiosk.KioskExtractor;
@@ -41,7 +42,7 @@ public class RumbleTrendingShortsExtractor extends KioskExtractor<StreamInfoItem
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
         try {
-            String responseData = downloader.get(
+            String responseData = RumbleParsingHelper.fetchResponse(downloader,
                             createEndpoint(0),
                             Collections.emptyMap(),
                             NewPipe.getPreferredLocalization())
@@ -63,14 +64,15 @@ public class RumbleTrendingShortsExtractor extends KioskExtractor<StreamInfoItem
     @Override
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
-        return extractItems(videos, createPage(0));
+        return extractItems(videos, new Page(createEndpoint(0), "0"));
     }
 
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
         try {
-            String responseBody = getDownloader().get(page.getUrl()).responseBody();
+            String responseBody = RumbleParsingHelper.fetchResponse(getDownloader(), page.getUrl())
+                    .responseBody();
             parseVideosFromResponse(responseBody);
         } catch (final JsonParserException e) {
             throw new ParsingException("Could not parse Rumble shorts API response", e);
@@ -93,7 +95,7 @@ public class RumbleTrendingShortsExtractor extends KioskExtractor<StreamInfoItem
             }
         }
 
-        return new InfoItemsPage<>(collector, getNextPageFrom(page));
+        return new InfoItemsPage<>(collector, shorts.isEmpty() ? null : getNextPageFrom(page));
     }
 
     /**

@@ -47,8 +47,6 @@ public class RumbleSearchExtractorTest {
             expectedSearchBaseUrl = "rumble.com/search/video?q=";
             expectedSearchOriginalBaseUrl = "rumble.com/search/video?q=";
 
-            System.setProperty("downloader", "MOCK");
-//            System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH
                     + "/MultiplePagesResults"));
             final FilterItem videoFilterItem = DefaultSearchExtractorTest
@@ -78,9 +76,9 @@ public class RumbleSearchExtractorTest {
 
             /** more info see: {@link RumbleSharedTests#infoItemsResultsTest} */
             final String[] someExpectedResults = {
-                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='Rand Paul', textualUploadDate='2023-01-08T17:45:00-04:00', viewCount=5990, duration=97, uploaderUrl='https://rumble.com/c/RandPaul', infoType=STREAM, serviceId=6, url='https://rumble.com/v242kwk-dr.-paul-breaks-ground-for-cumberland-family-medical-center-october-18-2022.html', name='Dr. Paul Breaks Ground For Cumberland Family Medical Center - October 18, 2022', thumbnailUrl='https://sp.rmbl.ws/s8/6/u/j/A/N/ujANh.oq1b.1.jpg', uploaderVerified='false'}",
-                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='Rand Paul', textualUploadDate='2023-01-03T16:28:50-04:00', viewCount=5500, duration=145, uploaderUrl='https://rumble.com/c/RandPaul', infoType=STREAM, serviceId=6, url='https://rumble.com/v23r4ye-senator-rand-paul-officially-sworn-in-as-member-of-the-118th-congress.html', name='Senator Rand Paul Officially Sworn in as Member of the 118th Congress', thumbnailUrl='https://sp.rmbl.ws/s8/6/w/Z/x/L/wZxLh.oq1b.jpg', uploaderVerified='false'}",
-                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='The Ron Paul Liberty Report', textualUploadDate='2022-12-28T12:41:53-04:00', viewCount=5070, duration=1152, uploaderUrl='https://rumble.com/c/RonPaulLibertyReport', infoType=STREAM, serviceId=6, url='https://rumble.com/v22sow6-flashback-2017-julian-assange-speaks-out-at-ron-paul-institute-conference.html', name='Flashback 2017: Julian Assange Speaks Out At Ron Paul Institute Conference', thumbnailUrl='https://sp.rmbl.ws/s8/1/g/C/p/F/gCpFh.gq1b.2-small-Flashback-2017-Julian-Assan.jpg', uploaderVerified='false'}"
+                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='Rand Paul', textualUploadDate='2023-01-08T17:45:00-04:00', viewCount=5990, duration=97, uploaderUrl='https://rumble.com/c/RandPaul', infoType=STREAM, serviceId=6, url='https://rumble.com/v242kwk-dr.-paul-breaks-ground-for-cumberland-family-medical-center-october-18-2022.html', name='Dr. Paul Breaks Ground For Cumberland Family Medical Center - October 18, 2022', thumbnails='[Image {url=https://sp.rmbl.ws/s8/6/u/j/A/N/ujANh.oq1b.1.jpg, height=-1, width=-1, estimatedResolutionLevel=UNKNOWN}]', uploaderVerified='false'}",
+                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='Rand Paul', textualUploadDate='2023-01-03T16:28:50-04:00', viewCount=5500, duration=145, uploaderUrl='https://rumble.com/c/RandPaul', infoType=STREAM, serviceId=6, url='https://rumble.com/v23r4ye-senator-rand-paul-officially-sworn-in-as-member-of-the-118th-congress.html', name='Senator Rand Paul Officially Sworn in as Member of the 118th Congress', thumbnails='[Image {url=https://sp.rmbl.ws/s8/6/w/Z/x/L/wZxLh.oq1b.jpg, height=-1, width=-1, estimatedResolutionLevel=UNKNOWN}]', uploaderVerified='false'}",
+                    "StreamInfoItem{streamType=VIDEO_STREAM, uploaderName='The Ron Paul Liberty Report', textualUploadDate='2022-12-28T12:41:53-04:00', viewCount=5070, duration=1152, uploaderUrl='https://rumble.com/c/RonPaulLibertyReport', infoType=STREAM, serviceId=6, url='https://rumble.com/v22sow6-flashback-2017-julian-assange-speaks-out-at-ron-paul-institute-conference.html', name='Flashback 2017: Julian Assange Speaks Out At Ron Paul Institute Conference', thumbnails='[Image {url=https://sp.rmbl.ws/s8/1/g/C/p/F/gCpFh.gq1b.2-small-Flashback-2017-Julian-Assan.jpg, height=-1, width=-1, estimatedResolutionLevel=UNKNOWN}]', uploaderVerified='false'}"
             };
 
             RumbleSharedTests.infoItemsResultsTest(extractor.getService(),
@@ -99,8 +97,6 @@ public class RumbleSearchExtractorTest {
             expectedSearchBaseUrl = "rumble.com/search/video?q=";
             expectedSearchOriginalBaseUrl = "rumble.com/search/video?q=";
 
-            System.setProperty("downloader", "MOCK");
-//            System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/OnlyOnePageResults"));
             final FilterItem videoFilterItem = DefaultSearchExtractorTest
                     .getFilterItem(Rumble, RumbleFilters.ID_CF_MAIN_VIDEOS);
@@ -127,8 +123,6 @@ public class RumbleSearchExtractorTest {
             expectedSearchBaseUrl = "rumble.com/search/video?q=";
             expectedSearchOriginalBaseUrl = "rumble.com/search/video?q=";
 
-            System.setProperty("downloader", "MOCK");
-//            System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/NoResultsAtAll"));
             final FilterItem videoFilterItem = DefaultSearchExtractorTest
                     .getFilterItem(Rumble, RumbleFilters.ID_CF_MAIN_VIDEOS);
@@ -162,8 +156,6 @@ public class RumbleSearchExtractorTest {
             expectedSearchBaseUrl = "rumble.com/search/channel?q=";
             expectedSearchOriginalBaseUrl = "rumble.com/search/channel?q=";
 
-            System.setProperty("downloader", "MOCK");
-            // System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/channel"));
             final FilterItem channelFilterItem = DefaultSearchExtractorTest
                     .getFilterItem(Rumble, RumbleFilters.ID_CF_MAIN_CHANNELS);
@@ -185,8 +177,6 @@ public class RumbleSearchExtractorTest {
     public static class PagingTest {
         @Test
         public void duplicatedItemsCheck() throws Exception {
-            System.setProperty("downloader", "MOCK");
-//            System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/paging"));
             final FilterItem videoFilterItem = DefaultSearchExtractorTest
                     .getFilterItem(Rumble, RumbleFilters.ID_CF_MAIN_VIDEOS);
@@ -209,8 +199,6 @@ public class RumbleSearchExtractorTest {
             expectedSearchBaseUrl = "rumble.com/search/channel?q=";
             expectedSearchOriginalBaseUrl = "rumble.com/search/channel?q=";
 
-            System.setProperty("downloader", "MOCK");
-//            System.setProperty("downloader", "RECORDING");
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "verified"));
 
             final FilterItem channelFilterItem = DefaultSearchExtractorTest

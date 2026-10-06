@@ -1,6 +1,5 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
@@ -43,11 +42,9 @@ public class RumbleTrendingExtractor extends KioskExtractor<StreamInfoItem> {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
-        doc = Jsoup.parse(getDownloader().get(
-                        getUrl(),
-                        RumbleParsingHelper.getMinimalHeaders(),
-                        NewPipe.getPreferredLocalization())
-                .responseBody());
+        doc = RumbleParsingHelper.fetchParseValidate(downloader,
+                getUrl(), RumbleParsingHelper.getMinimalHeaders(),
+                NewPipe.getPreferredLocalization());
     }
 
     @Nonnull
@@ -63,11 +60,9 @@ public class RumbleTrendingExtractor extends KioskExtractor<StreamInfoItem> {
             return null;
         }
 
-        doc = Jsoup.parse(getDownloader().get(
-                        page.getUrl(),
-                        RumbleParsingHelper.getMinimalHeaders(),
-                        NewPipe.getPreferredLocalization())
-                .responseBody());
+        doc = RumbleParsingHelper.fetchParseValidate(getDownloader(),
+                page.getUrl(), RumbleParsingHelper.getMinimalHeaders(),
+                NewPipe.getPreferredLocalization());
 
         return sharedTrendingAndChannelCode.extractAndGetStreamInfoItemsFromPage(doc);
     }

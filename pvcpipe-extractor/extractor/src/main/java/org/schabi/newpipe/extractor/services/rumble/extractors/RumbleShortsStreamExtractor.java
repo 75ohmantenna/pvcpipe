@@ -5,13 +5,13 @@ import com.grack.nanojson.JsonObject;
 import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
@@ -49,8 +49,7 @@ public class RumbleShortsStreamExtractor extends StreamExtractor {
     public void onFetchPage(@Nonnull Downloader downloader)
             throws IOException, ExtractionException {
 
-        final String html = downloader.get(getUrl()).responseBody();
-        final Document doc = Jsoup.parse(html);
+        final Document doc = RumbleParsingHelper.fetchParseValidate(downloader, getUrl());
 
         Element jsonScript = doc.selectFirst("rum-shorts script[type=application/json]");
         if (jsonScript == null) {

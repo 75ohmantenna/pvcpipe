@@ -2,12 +2,12 @@ package org.schabi.newpipe.extractor.services.rumble.linkHandler;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.schabi.newpipe.downloader.DownloaderTestImpl;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandlerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,22 +20,20 @@ import static org.schabi.newpipe.extractor.ServiceList.Rumble;
  * Test for {@link RumbleTrendingLinkHandlerFactory}
  */
 
+@Tag("offline")
 public class RumbleTrendingLinkHandlerFactoryTest {
     private static LinkHandlerFactory linkHandlerFactory;
 
-    private static final String LIVE_KEY = "https://rumble.com/live-videos";
+    private static final String LIVE_KEY = "https://rumble.com/browse/live";
     private static final String BATTLE_LEADERBOARD_KEY = "https://rumble.com/battle-leaderboard";
 
 
-    private static Map<String, String> expectedTrendingUrl2IdMap = new HashMap() {{
-        put(LIVE_KEY,                                 "Live");
-        put("https://rumble.com/editor-picks",      "Editor Picks");
-        put("https://rumble.com/category/news",     "News");
-        put("https://rumble.com/category/viral",    "Viral");
-        put("https://rumble.com/category/podcasts", "Podcasts");
-        put(BATTLE_LEADERBOARD_KEY, "Today's Battle Leaderboard Top 50");
-        put("https://rumble.com/category/sports",   "Sports");
-    }};
+    private static final Map<String, String> expectedTrendingUrl2IdMap = Map.of(
+            LIVE_KEY, "Live",
+            "https://rumble.com/editor-picks", "Editor Picks",
+            BATTLE_LEADERBOARD_KEY, "Today's Battle Leaderboard Top 50",
+            "https://rumble.com/videos?sort=views&date=today", "Trending Today",
+            "https://rumble.com/videos?date=this-week", "Latest");
 
     @BeforeAll
     public static void setUp() throws Exception {
