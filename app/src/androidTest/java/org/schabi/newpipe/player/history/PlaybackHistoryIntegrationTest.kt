@@ -13,7 +13,10 @@ import com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION
 import com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK
 import com.google.android.exoplayer2.Player.REPEAT_MODE_OFF
 import com.google.android.exoplayer2.Player.REPEAT_MODE_ONE
+import io.reactivex.rxjava3.plugins.RxJavaPlugins
+import io.reactivex.rxjava3.schedulers.TestScheduler
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -39,6 +42,7 @@ class PlaybackHistoryIntegrationTest {
     val trampolineScheduler = TrampolineSchedulerRule()
 
     private lateinit var application: Context
+    private lateinit var context: Context
     private lateinit var preferenceName: String
     private lateinit var preferences: SharedPreferences
     private lateinit var database: AppDatabase
@@ -52,7 +56,7 @@ class PlaybackHistoryIntegrationTest {
         preferenceName = "playback-history-test-${UUID.randomUUID()}"
         preferences = application.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
         watchHistoryKey = application.getString(R.string.enable_watch_history_key)
-        val context = object : ContextWrapper(application) {
+        context = object : ContextWrapper(application) {
             override fun getSharedPreferences(name: String, mode: Int): SharedPreferences = preferences
         }
         database = TestDatabase.createReplacingNewPipeDatabase()
@@ -61,7 +65,6 @@ class PlaybackHistoryIntegrationTest {
 
     @After
     fun tearDown() {
-        history.reset()
         cachedInfos.forEach {
             InfoCache.getInstance().removeInfo(it.serviceId, it.url, InfoCache.Type.STREAM)
         }
@@ -202,6 +205,122 @@ class PlaybackHistoryIntegrationTest {
 
         assertEquals(8500L, queue.item!!.recoveryPosition)
         assertEquals(9000L, state(info)!!.progressMillis)
+    }
+
+    @Test
+    fun acceptedCheckpointRemainsOwnedAfterHistoryInstanceReplacement() {
+        setRecordingEnabled(true)
+        val info = info("replacement-checkpoint")
+        val queue = SinglePlayQueue(info)
+        val scheduler = TestScheduler()
+        val previousHandler = RxJavaPlugins.getIoSchedulerHandler()
+        RxJavaPlugins.setIoSchedulerHandler { scheduler }
+        try {
+            history.record(PlaybackHistory.Event.PROGRESS, snapshot(info, queue, 8000))
+            history = PlaybackHistory(context)
+            scheduler.triggerActions()
+
+            assertEquals(8000L, state(info)?.progressMillis)
+        } finally {
+            scheduler.triggerActions()
+            RxJavaPlugins.setIoSchedulerHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun completionCannotBeOverwrittenByAnEarlierDelayedCheckpoint() {
+        setRecordingEnabled(true)
+        val info = info("ordered-completion")
+        val queue = SinglePlayQueue(info)
+        val earlierScheduler = TestScheduler()
+        val laterScheduler = TestScheduler()
+        var schedulerSelections = 0
+        val previousHandler = RxJavaPlugins.getIoSchedulerHandler()
+        RxJavaPlugins.setIoSchedulerHandler {
+            if (schedulerSelections++ == 0) earlierScheduler else laterScheduler
+        }
+        try {
+            history.record(PlaybackHistory.Event.PROGRESS, snapshot(info, queue, 8000))
+            history.record(PlaybackHistory.Event.COMPLETED, snapshot(info, queue, 8000))
+
+            // Give the later write an opportunity to run before the earlier checkpoint.
+            laterScheduler.triggerActions()
+            earlierScheduler.triggerActions()
+            laterScheduler.triggerActions()
+
+            assertEquals(121000L, state(info)?.progressMillis)
+        } finally {
+            earlierScheduler.triggerActions()
+            laterScheduler.triggerActions()
+            RxJavaPlugins.setIoSchedulerHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun replacementHistorySharesOrderingWithEarlierAcceptedWrites() {
+        setRecordingEnabled(true)
+        val info = info("shared-write-order")
+        val queue = SinglePlayQueue(info)
+        val replacement = PlaybackHistory(context)
+        val earlierScheduler = TestScheduler()
+        val laterScheduler = TestScheduler()
+        var schedulerSelections = 0
+        val previousHandler = RxJavaPlugins.getIoSchedulerHandler()
+        RxJavaPlugins.setIoSchedulerHandler {
+            if (schedulerSelections++ == 0) earlierScheduler else laterScheduler
+        }
+        try {
+            history.record(PlaybackHistory.Event.PROGRESS, snapshot(info, queue, 8000))
+            replacement.record(PlaybackHistory.Event.PROGRESS, snapshot(info, queue, 9000))
+
+            laterScheduler.triggerActions()
+            earlierScheduler.triggerActions()
+            laterScheduler.triggerActions()
+
+            assertEquals(9000L, state(info)?.progressMillis)
+        } finally {
+            earlierScheduler.triggerActions()
+            laterScheduler.triggerActions()
+            RxJavaPlugins.setIoSchedulerHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun replacementResumeWaitsForEarlierAcceptedRoomCheckpoint() {
+        setRecordingEnabled(true)
+        val info = info("shared-read-order")
+        val queue = SinglePlayQueue(info)
+        val replacement = PlaybackHistory(context)
+        val writeScheduler = TestScheduler()
+        val readScheduler = TestScheduler()
+        var schedulerSelections = 0
+        val previousHandler = RxJavaPlugins.getIoSchedulerHandler()
+        RxJavaPlugins.setIoSchedulerHandler {
+            if (schedulerSelections++ == 0) writeScheduler else readScheduler
+        }
+        try {
+            history.record(PlaybackHistory.Event.PROGRESS, snapshot(info, queue, 8000))
+            val resume = replacement.resumePosition(queue.item!!).test()
+            try {
+                readScheduler.triggerActions()
+                resume.assertNoValues().assertNotComplete()
+                // Resume loading upserts stream metadata before observing Room state. No lookup
+                // may begin while the earlier accepted checkpoint is still waiting to execute.
+                assertTrue(database.streamDAO().getAll().blockingFirst().isEmpty())
+
+                writeScheduler.triggerActions()
+                readScheduler.triggerActions()
+
+                assertTrue(resume.await(5, TimeUnit.SECONDS))
+                resume.assertValue(8000L).assertComplete().assertNoErrors()
+            } finally {
+                resume.dispose()
+            }
+        } finally {
+            writeScheduler.triggerActions()
+            readScheduler.triggerActions()
+            RxJavaPlugins.setIoSchedulerHandler(previousHandler)
+        }
     }
 
     private fun setRecordingEnabled(enabled: Boolean) {

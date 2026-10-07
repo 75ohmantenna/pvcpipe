@@ -10,6 +10,7 @@ import static com.google.android.exoplayer2.Player.REPEAT_MODE_OFF;
 import static com.google.android.exoplayer2.Player.REPEAT_MODE_ONE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.schabi.newpipe.player.history.PlaybackHistoryTestEnvironment.info;
 import static org.schabi.newpipe.player.history.PlaybackHistoryTestEnvironment.queue;
@@ -25,10 +26,12 @@ import org.schabi.newpipe.player.history.PlaybackHistory.Snapshot;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.observers.TestObserver;
+import io.reactivex.rxjava3.schedulers.TestScheduler;
 import io.reactivex.rxjava3.subjects.CompletableSubject;
 import io.reactivex.rxjava3.subjects.MaybeSubject;
 
@@ -278,26 +281,7 @@ public class PlaybackHistoryTest {
     }
 
     @Test
-    public void resetCancelsCurrentWritesButAllowsFollowingWrites() {
-        final CompletableSubject save = CompletableSubject.create();
-        final MaybeSubject<Long> view = MaybeSubject.create();
-        environment.saves.add(save);
-        environment.views.add(view);
-        history.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
-        history.record(Event.VIEWED, snapshot(0, 31_000, 33_000));
-        assertTrue(save.hasObservers());
-        assertTrue(view.hasObservers());
-
-        history.reset();
-
-        assertFalse(save.hasObservers());
-        assertFalse(view.hasObservers());
-        history.record(Event.PROGRESS, snapshot(0, 41_000, 43_000));
-        assertEquals(Long.valueOf(43_000), environment.persistedPosition);
-    }
-
-    @Test
-    public void existingIndependentSubscriptionsAllowConcurrentPendingWrites() {
+    public void laterWriteWaitsUntilEarlierAcceptedWriteCompletes() {
         final CompletableSubject first = CompletableSubject.create();
         final CompletableSubject second = CompletableSubject.create();
         environment.saves.add(first);
@@ -307,7 +291,174 @@ public class PlaybackHistoryTest {
         history.record(Event.PROGRESS, snapshot(0, 41_000, 43_000));
 
         assertTrue(first.hasObservers());
+        assertFalse(second.hasObservers());
+        assertNull(environment.persistedPosition);
+        first.onComplete();
+        assertEquals(Long.valueOf(33_000), environment.persistedPosition);
         assertTrue(second.hasObservers());
+        second.onComplete();
+        assertEquals(Long.valueOf(43_000), environment.persistedPosition);
+    }
+
+    @Test
+    public void slowEarlierWriteCannotOverwriteTheLatestAcceptedPosition() {
+        final TestScheduler io = new TestScheduler();
+        environment.saves.add(Completable.timer(2, TimeUnit.SECONDS, io));
+        environment.saves.add(Completable.timer(1, TimeUnit.SECONDS, io));
+
+        history.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
+        history.record(Event.PROGRESS, snapshot(0, 41_000, 43_000));
+        io.advanceTimeBy(3, TimeUnit.SECONDS);
+
+        assertEquals(Long.valueOf(43_000), environment.persistedPosition);
+    }
+
+    @Test
+    public void failedAcceptedWritesDoNotDiscardLaterQueuedWrites() {
+        final CompletableSubject first = CompletableSubject.create();
+        final Throwable firstError = new IllegalStateException("first save failed");
+        final Throwable secondError = new IllegalStateException("second save failed");
+        environment.saves.add(first);
+        environment.saves.add(Completable.error(secondError));
+
+        history.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
+        history.record(Event.PROGRESS, snapshot(0, 41_000, 43_000));
+        history.record(Event.PROGRESS, snapshot(0, 51_000, 53_000));
+        first.onError(firstError);
+
+        assertEquals(List.of(firstError, secondError), environment.errors);
+        assertEquals(Long.valueOf(53_000), environment.persistedPosition);
+    }
+
+    @Test
+    public void acceptedViewWaitsForPreviousSaveAndThenPersists() {
+        final CompletableSubject save = CompletableSubject.create();
+        final MaybeSubject<Long> view = MaybeSubject.create();
+        environment.saves.add(save);
+        environment.views.add(view);
+
+        history.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
+        history.record(Event.VIEWED, snapshot(0, 31_000, 33_000));
+
+        assertFalse(view.hasObservers());
+        assertEquals(0, environment.persistedViews);
+        save.onComplete();
+        assertEquals(Long.valueOf(33_000), environment.persistedPosition);
+        assertTrue(view.hasObservers());
+        view.onSuccess(1L);
+        assertEquals(1, environment.persistedViews);
+    }
+
+    @Test
+    public void cancellingResumeDoesNotCancelAnAcceptedWrite() {
+        final TestScheduler io = new TestScheduler();
+        final MaybeSubject<StreamStateEntity> lookup = MaybeSubject.create();
+        environment.load = lookup;
+        environment.saves.add(Completable.complete().subscribeOn(io));
+        history.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
+        final TestObserver<Long> resume = history.resumePosition(queue.getItem()).test();
+
+        resume.dispose();
+        io.triggerActions();
+        lookup.onSuccess(new StreamStateEntity(1, 45_000));
+
+        assertEquals(Long.valueOf(33_000), environment.persistedPosition);
+        assertFalse(lookup.hasObservers());
+        resume.assertNoValues();
+    }
+
+    @Test
+    public void replacementPlayerSharesOrderingWithPreviousPlayersPendingWrite() {
+        final PlaybackHistory.WriteQueue writes = new PlaybackHistory.WriteQueue();
+        final PlaybackHistory previousPlayer = new PlaybackHistory(environment, writes);
+        final PlaybackHistory replacementPlayer = new PlaybackHistory(environment, writes);
+        final TestScheduler io = new TestScheduler();
+        environment.saves.add(Completable.timer(2, TimeUnit.SECONDS, io));
+        environment.saves.add(Completable.timer(1, TimeUnit.SECONDS, io));
+
+        previousPlayer.record(Event.PROGRESS, snapshot(0, 31_000, 33_000));
+        replacementPlayer.record(Event.PROGRESS, snapshot(0, 41_000, 43_000));
+        io.advanceTimeBy(2, TimeUnit.SECONDS);
+
+        assertEquals(Long.valueOf(33_000), environment.persistedPosition);
+        io.advanceTimeBy(1, TimeUnit.SECONDS);
+        assertEquals(Long.valueOf(43_000), environment.persistedPosition);
+    }
+
+    @Test
+    public void replacementResumeWaitsForPreviousPlayersAcceptedCheckpoint() {
+        final PlaybackHistory.WriteQueue writes = new PlaybackHistory.WriteQueue();
+        final PlaybackHistory previousPlayer = new PlaybackHistory(environment, writes);
+        final PlaybackHistory replacementPlayer = new PlaybackHistory(environment, writes);
+        final TestScheduler io = new TestScheduler();
+        environment.saves.add(Completable.complete().subscribeOn(io));
+        environment.load = Maybe.defer(() -> environment.persistedPosition == null
+                ? Maybe.empty()
+                : Maybe.just(new StreamStateEntity(1, environment.persistedPosition)));
+
+        previousPlayer.record(Event.PROGRESS, snapshot(0, 8_000, 8_000));
+        final TestObserver<Long> resume = replacementPlayer.resumePosition(queue.getItem()).test();
+
+        resume.assertNoValues();
+        io.triggerActions();
+        resume.assertResult(8_000L);
+    }
+
+    @Test
+    public void replacementResumeDoesNotReturnOlderPersistedProgress() {
+        final PlaybackHistory.WriteQueue writes = new PlaybackHistory.WriteQueue();
+        final PlaybackHistory previousPlayer = new PlaybackHistory(environment, writes);
+        final PlaybackHistory replacementPlayer = new PlaybackHistory(environment, writes);
+        final TestScheduler io = new TestScheduler();
+        environment.persistedPosition = 6_000L;
+        environment.saves.add(Completable.complete().subscribeOn(io));
+        environment.load = Maybe.defer(() ->
+                Maybe.just(new StreamStateEntity(1, environment.persistedPosition)));
+
+        previousPlayer.record(Event.PROGRESS, snapshot(0, 8_000, 8_000));
+        final TestObserver<Long> resume = replacementPlayer.resumePosition(queue.getItem()).test();
+
+        resume.assertNoValues();
+        io.triggerActions();
+        resume.assertResult(8_000L);
+    }
+
+    @Test
+    public void cancellingResumeBeforeAcceptedWritesFinishPreventsItsLookup() {
+        final TestScheduler io = new TestScheduler();
+        final MaybeSubject<StreamStateEntity> lookup = MaybeSubject.create();
+        environment.load = lookup;
+        environment.saves.add(Completable.complete().subscribeOn(io));
+        history.record(Event.PROGRESS, snapshot(0, 8_000, 8_000));
+
+        final TestObserver<Long> resume = history.resumePosition(queue.getItem()).test();
+        assertFalse(lookup.hasObservers());
+        resume.dispose();
+        io.triggerActions();
+
+        assertEquals(Long.valueOf(8_000), environment.persistedPosition);
+        assertFalse(lookup.hasObservers());
+        resume.assertNoValues();
+    }
+
+    @Test
+    public void pendingResumeLookupDoesNotBlockLaterAcceptedWrites() {
+        final CompletableSubject firstSave = CompletableSubject.create();
+        final MaybeSubject<StreamStateEntity> lookup = MaybeSubject.create();
+        environment.saves.add(firstSave);
+        environment.load = lookup;
+        history.record(Event.PROGRESS, snapshot(0, 8_000, 8_000));
+        final TestObserver<Long> resume = history.resumePosition(queue.getItem()).test();
+        assertFalse(lookup.hasObservers());
+
+        firstSave.onComplete();
+        assertTrue(lookup.hasObservers());
+        history.record(Event.PROGRESS, snapshot(0, 9_000, 9_000));
+
+        assertEquals(Long.valueOf(9_000), environment.persistedPosition);
+        resume.assertNoValues();
+        lookup.onSuccess(new StreamStateEntity(1, 8_000));
+        resume.assertResult(8_000L);
     }
 
     private Snapshot snapshot(final int mediaIndex, final long contentPosition,

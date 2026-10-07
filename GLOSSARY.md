@@ -98,3 +98,7 @@ used to resume unfinished playback.
 **Playback snapshot**:
 Stream metadata, queue identity and player positions captured together for a
 playback-history decision.
+
+**Accepted playback recording**:
+A view or progress update admitted for ordered database storage independently
+of the player's lifetime while the application process remains running.

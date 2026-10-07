@@ -658,7 +658,6 @@ public final class Player implements PlaybackListener, Listener {
         unregisterBroadcastReceiver();
 
         playbackDecision.set(null);
-        playbackHistory.reset();
         progressUpdateDisposable.set(null);
         streamItemDisposable.clear();
 
