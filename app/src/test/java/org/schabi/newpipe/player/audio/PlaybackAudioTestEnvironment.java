@@ -9,6 +9,10 @@ final class PlaybackAudioTestEnvironment implements PlaybackAudio.Environment {
     boolean getAvailable = true;
     boolean setAvailable = true;
     boolean resume;
+    boolean playing;
+    boolean focusGranted = true;
+    Runnable onRequest;
+    Runnable onAnimate;
     int systemVolume = 5;
     final List<String> effects = new ArrayList<>();
     final List<Fade> fades = new ArrayList<>();
@@ -24,12 +28,11 @@ final class PlaybackAudioTestEnvironment implements PlaybackAudio.Environment {
     }
 
     @Override
-    public float internalVolume() {
+    public boolean canReadVolume() {
         if (!getAvailable) {
             effects.add("get-unavailable");
-            return 1;
         }
-        return volume;
+        return getAvailable;
     }
 
     @Override
@@ -54,8 +57,12 @@ final class PlaybackAudioTestEnvironment implements PlaybackAudio.Environment {
     }
 
     @Override
-    public void requestFocus() {
+    public boolean requestFocus() {
         effects.add("request-focus");
+        if (onRequest != null) {
+            onRequest.run();
+        }
+        return focusGranted;
     }
 
     @Override
@@ -69,12 +76,19 @@ final class PlaybackAudioTestEnvironment implements PlaybackAudio.Environment {
     }
 
     @Override
+    public boolean playWhenReady() {
+        return playing;
+    }
+
+    @Override
     public void play() {
+        playing = true;
         effects.add("play");
     }
 
     @Override
     public void pause() {
+        playing = false;
         effects.add("pause");
     }
 
@@ -83,6 +97,9 @@ final class PlaybackAudioTestEnvironment implements PlaybackAudio.Environment {
         final Fade fade = new Fade(to, output);
         fades.add(fade);
         output.accept(from);
+        if (onAnimate != null) {
+            onAnimate.run();
+        }
         return fade::cancel;
     }
 

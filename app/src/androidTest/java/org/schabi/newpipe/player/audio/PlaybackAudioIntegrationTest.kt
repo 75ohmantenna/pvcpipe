@@ -140,6 +140,7 @@ class PlaybackAudioIntegrationTest {
                 .commit()
         )
         onMain {
+            player.playWhenReady = true
             environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
             gainFocus()
             assertTrue(player.playWhenReady)
@@ -170,7 +171,7 @@ class PlaybackAudioIntegrationTest {
         replaceCommandAvailability(com.google.android.exoplayer2.Player.COMMAND_GET_VOLUME) { false }
         assertEquals(1f, audio.internalVolume, 0f)
         assertFalse(audio.isMuted)
-        player.volume = 0f
+        audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE)
         assertEquals(1f, audio.internalVolume, 0f)
         assertTrue(audio.isMuted)
     }
@@ -210,6 +211,152 @@ class PlaybackAudioIntegrationTest {
         } as ExoPlayer
         environment = AndroidPlaybackAudioEnvironment(context, commandFilteredPlayer)
         audio = PlaybackAudio(environment)
+    }
+
+    @Test
+    fun focusGainCannotMakeMutedPlaybackAudible() {
+        onMain {
+            audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE)
+            gainFocus()
+            assertEquals(0f, player.volume, 0f)
+        }
+        awaitAnimation()
+        onMain { assertEquals(0f, player.volume, 0f) }
+    }
+
+    @Test
+    fun repeatedDuckingCannotOverwriteTheRememberedUserLevel() {
+        onMain {
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            gainFocus()
+        }
+        awaitAnimation()
+        onMain { assertEquals(0.65f, player.volume, 0.001f) }
+    }
+
+    @Test
+    fun focusLossAfterDuckingCannotReplaceTheRestoreTarget() {
+        onMain {
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            gainFocus()
+        }
+        awaitAnimation()
+        onMain { assertEquals(0.65f, player.volume, 0.001f) }
+    }
+
+    @Test
+    fun gestureDuringRestorationSupersedesTheOlderAnimation() {
+        requireEnabledAnimations()
+        onMain {
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            gainFocus()
+            audio.internalVolume = 0.4f
+            assertEquals(0.4f, player.volume, 0.001f)
+        }
+        awaitAnimation()
+        onMain { assertEquals(0.4f, player.volume, 0.001f) }
+    }
+
+    @Test
+    fun mutingDuringRestorationSupersedesTheOlderAnimation() {
+        requireEnabledAnimations()
+        onMain {
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            gainFocus()
+            audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE)
+            assertEquals(0f, player.volume, 0f)
+        }
+        awaitAnimation()
+        onMain { assertEquals(0f, player.volume, 0f) }
+    }
+
+    @Test
+    fun disposalEndsTheRealRestorationAnimationLifetime() {
+        requireEnabledAnimations()
+        var volumeAtDisposal = 0f
+        onMain {
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            gainFocus()
+            volumeAtDisposal = player.volume
+            disposeAudio()
+        }
+        awaitAnimation()
+        onMain { assertEquals(volumeAtDisposal, player.volume, 0.001f) }
+    }
+
+    @Test
+    fun focusCallbacksAfterDisposalCannotMutateThePlayer() = onMain {
+        disposeAudio()
+        player.playWhenReady = true
+        environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+        assertTrue(player.playWhenReady)
+        environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+        assertEquals(0.65f, player.volume, 0.001f)
+        gainFocus()
+        assertEquals(0.65f, player.volume, 0.001f)
+    }
+
+    @Test
+    fun disposingTwiceSendsOnlyOneClosingAudioEffectSession() = onMain {
+        disposeAudio()
+        audio.dispose()
+        assertEquals(
+            1,
+            broadcasts.count {
+                it.action == AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION
+            }
+        )
+    }
+
+    private fun requireEnabledAnimations() {
+        val scale = animationScale()
+        org.junit.Assume.assumeTrue("Requires an active Android restoration animation", scale > 0f)
+    }
+
+    @Test
+    fun focusGainDoesNotResumeAnAlreadyPausedPlayer() {
+        preferences.edit().putBoolean(
+            application.getString(R.string.resume_on_audio_focus_gain_key),
+            true
+        ).commit()
+        onMain {
+            assertFalse(player.playWhenReady)
+            gainFocus()
+            assertFalse(player.playWhenReady)
+        }
+        awaitAnimation()
+        onMain { assertFalse(player.playWhenReady) }
+    }
+
+    @Test
+    fun manualPauseAfterFocusLossPreventsResume() {
+        preferences.edit().putBoolean(
+            application.getString(R.string.resume_on_audio_focus_gain_key),
+            true
+        ).commit()
+        onMain {
+            player.playWhenReady = true
+            environment.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            audio.onPlaybackEvent(PlaybackAudio.Event.PAUSE_REQUESTED)
+            player.pause()
+            gainFocus()
+            assertFalse(player.playWhenReady)
+        }
+        awaitAnimation()
+        onMain { assertFalse(player.playWhenReady) }
+    }
+
+    @Test
+    fun sessionCallbacksAfterDisposalCannotReopenAudioEffects() = onMain {
+        disposeAudio()
+        val count = broadcasts.size
+        val eventTime = AnalyticsListener.EventTime(
+            0, Timeline.EMPTY, 0, null, 0, Timeline.EMPTY, 0, null, 0, 0
+        )
+        environment.onAudioSessionIdChanged(eventTime, 37)
+        assertEquals(count, broadcasts.size)
     }
 
     private fun assertSessionIntent(intent: Intent, action: String, sessionId: Int) {

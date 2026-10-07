@@ -1,12 +1,14 @@
 package org.schabi.newpipe.player;
 
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.content.Context;
 import android.util.Log;
 
 import com.google.android.exoplayer2.ExoPlayer;
@@ -20,6 +22,9 @@ import org.schabi.newpipe.player.ui.PlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUiList;
 
 import java.lang.reflect.Field;
+
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.SerialDisposable;
 
 public class PlayerAudioTest {
     @Test
@@ -64,7 +69,7 @@ public class PlayerAudioTest {
     }
 
     @Test
-    public void muteRoutesIntentAndReportsRequestedMuteToUi() throws Exception {
+    public void refusedMuteReportsTheActualAudioStateToUi() throws Exception {
         try (var log = mockStatic(Log.class)) {
             final Player player = mock(Player.class, CALLS_REAL_METHODS);
             final PlaybackAudio audio = mock(PlaybackAudio.class);
@@ -76,7 +81,33 @@ public class PlayerAudioTest {
             player.toggleMute();
 
             verify(audio).onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
-            verify(ui).onMuteUnmuteChanged(true);
+            verify(ui).onMuteUnmuteChanged(false);
+        }
+    }
+
+    @Test
+    public void destructionDisposesAudioBeforeReleasingThePlayer() throws Exception {
+        try (var log = mockStatic(Log.class)) {
+            final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            final ExoPlayer exo = mock(ExoPlayer.class);
+            final PlaybackAudio audio = mock(PlaybackAudio.class);
+            doReturn(false).when(player).isProgressLoopRunning();
+            set(player, "simpleExoPlayer", exo);
+            set(player, "playbackAudio", audio);
+            set(player, "playbackHistory", mock(PlaybackHistory.class));
+            set(player, "context", mock(Context.class));
+            set(player, "UIs", mock(PlayerUiList.class));
+            set(player, "playbackDecision", new SerialDisposable());
+            set(player, "progressUpdateDisposable",
+                    new SerialDisposable());
+            set(player, "streamItemDisposable",
+                    new CompositeDisposable());
+
+            player.destroy();
+
+            final InOrder order = inOrder(audio, exo);
+            order.verify(audio).dispose();
+            order.verify(exo).release();
         }
     }
 
