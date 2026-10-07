@@ -14,9 +14,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-/**
- * Test for {@link YoutubeStreamLinkHandlerFactory}
- */
+/** Tests stream extraction for a controversial YouTube video. */
 
 public class YoutubeStreamExtractorControversialTest extends DefaultStreamExtractorTest
     implements InitYoutubeTest {

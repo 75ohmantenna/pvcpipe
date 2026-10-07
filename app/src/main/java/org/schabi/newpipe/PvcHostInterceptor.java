@@ -11,8 +11,9 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 
 /**
- * This interceptor allows to replace a hostname with another on the fly.
- * Useful to get around stupid censorship.
+ * Applies the configured hostname replacements to requests using the app's OkHttp client.
+ * This is an application interceptor; it does not rewrite media connections made
+ * directly by the player or download manager.
  */
 public class PvcHostInterceptor implements Interceptor {
     private volatile Map<String, String> replaceHosts;

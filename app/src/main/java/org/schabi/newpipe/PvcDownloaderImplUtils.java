@@ -32,10 +32,7 @@ import okhttp3.OkHttpClient;
 
 import static org.schabi.newpipe.DownloaderImpl.USER_AGENT;
 
-/**
- * Used for code that only exists in PVCPipe and is used
- * within the {@link DownloaderImpl}.
- */
+/** PVCPipe networking helpers for downloader configuration and custom-endpoint checks. */
 public final class PvcDownloaderImplUtils {
     public static final Config CONFIG = new Config();
 
@@ -73,11 +70,12 @@ public final class PvcDownloaderImplUtils {
     }
 
     /**
-     * Resolves whether a custom endpoint host targets the local network.
+     * Checks whether a custom endpoint host targets the local network by hostname, numeric
+     * address, or DNS lookup.
      * Callers must run this off the main thread.
      *
      * @param host the endpoint host to resolve
-     * @return true when the host resolves to a local network address
+     * @return true for local hostnames or addresses, including hosts with a local DNS answer
      */
     public static boolean requiresLocalNetwork(final String host) throws UnknownHostException {
         if (isLocalHost(host)) {

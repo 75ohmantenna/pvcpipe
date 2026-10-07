@@ -29,12 +29,8 @@ public final class BitchuteHelpers {
     }
 
     /**
-     * As the {@link BitchuteStreamExtractor} is not able to extract the duration from html
-     * because it is later added to the html that we cannot extract.
-     *
-     * This {@link VideoDurationCache} provides the following:
-     * - methods to extract the video id
-     * - a map to store the videoId and duration
+     * Legacy duration cache populated by search results. {@link BitchuteStreamExtractor}
+     * reads stream duration directly from the video API instead of using this cache.
      */
     public static final class VideoDurationCache {
 

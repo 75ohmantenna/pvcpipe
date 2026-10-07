@@ -161,9 +161,9 @@ public final class PlayerService extends MediaBrowserServiceCompat {
             return START_NOT_STICKY;
         }
 
-        // All internal NewPipe intents used to interact with the player, that are sent to the
-        // PlayerService using startForegroundService(), will have SHOULD_START_FOREGROUND_EXTRA,
-        // to ensure startForeground() is called (otherwise Android will force-crash the app).
+        // Playback-start intents carry SHOULD_START_FOREGROUND_EXTRA so starts made through
+        // startForegroundService() create a notification and enter the foreground. Timestamp
+        // intents do not carry this flag and do not initialize a player here.
         if (intent.getBooleanExtra(SHOULD_START_FOREGROUND_EXTRA, false)) {
             final boolean playerWasNull = (player == null);
             if (playerWasNull) {
@@ -173,9 +173,8 @@ public final class PlayerService extends MediaBrowserServiceCompat {
 
             // Be sure that the player notification is set and the service is started in foreground,
             // otherwise, the app may crash on Android 8+ as the service would never be put in the
-            // foreground while we said to the system we would do so. The service is always
-            // requested to be started in foreground, so always creating a notification if there is
-            // no one already and starting the service in foreground should not create any issues.
+            // foreground while we said to the system we would do so. For requests bearing this
+            // flag, ensure a notification exists and start the service in the foreground.
             // If the service is already started in foreground, requesting it to be started
             // shouldn't do anything.
             player.UIs().get(NotificationPlayerUi.class)

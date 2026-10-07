@@ -109,8 +109,8 @@ public final class PlaybackHistory {
 
     /**
      * Waits for earlier accepted recordings before lookup, then emits an unfinished position.
-     * Absent, finished or failed history yields RECOVERY_UNSET. Disposal cancels lookup/delivery
-     * without canceling recordings; extraction runs outside the recording queue.
+     * Absent, finished or failed history yields RECOVERY_UNSET. Disposing the subscription
+     * cancels lookup/delivery, not recordings; extraction runs outside the write queue.
      * @param item the stream to resume
      * @return its unfinished saved position, or RECOVERY_UNSET
      */

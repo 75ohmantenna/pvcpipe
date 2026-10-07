@@ -52,9 +52,9 @@ public class Pair<F extends Serializable, S extends Serializable> implements Ser
     }
 
     /**
-     * Sets the first object, which must be of the {@link S} type.
+     * Sets the second object, which must be of the {@link S} type.
      *
-     * @param second the new first object of the pair
+     * @param second the new second object of the pair
      */
     public void setSecond(final S second) {
         secondObject = second;

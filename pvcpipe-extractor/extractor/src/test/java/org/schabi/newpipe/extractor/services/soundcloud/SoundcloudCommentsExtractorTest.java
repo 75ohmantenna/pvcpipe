@@ -18,15 +18,10 @@ import java.io.IOException;
 public class SoundcloudCommentsExtractorTest {
 
     /**
-     * Regression test for <a href="https://github.com/TeamNewPipe/NewPipeExtractor/issues/1243">
-     * issue #1243</a>: when the SoundCloud API returns {@code "next_href": null} (no more pages),
-     * a subsequent call to {@link CommentsExtractor#getPage(Page)} with a null URL must not throw
-     * {@link IllegalArgumentException} ("Page doesn't contain an URL"). Instead the extractor
-     * must return {@link InfoItemsPage#emptyPage()}.
-     *
-     * <p>The crash manifests during pagination: the last page of comments stores
-     * {@code new Page(null)} as the next page, and when Paging 3 tries to fetch it the
-     * exception propagates and kills the app.</p>
+     * Regression coverage for <a href="https://github.com/TeamNewPipe/NewPipeExtractor/issues/1243">
+     * issue #1243</a>: a page with a null URL (as can result from a null
+     * {@code next_href}) should yield no items or next page instead of throwing.
+     * This class also checks that an ordinary initial page has no extractor errors.
      */
     @Nested
     class TrackWithComments extends DefaultSimpleExtractorTest<CommentsExtractor> {
@@ -45,17 +40,13 @@ public class SoundcloudCommentsExtractorTest {
         @Test
         void testGetInitialPageSucceeds() throws IOException, ExtractionException {
             final InfoItemsPage<CommentsInfoItem> page = extractor().getInitialPage();
-            // The track has comments; we only assert the call itself does not throw
-            // and that the result is a valid (non-null) page.
+            // The call must succeed and the returned page must have no extractor errors.
             assertTrue(page.getErrors().isEmpty(),
                     "Expected no extractor errors on initial page");
         }
 
         /**
-         * Regression test for issue #1243: calling {@link CommentsExtractor#getPage(Page)} with a
-         * {@link Page} whose URL is null (which is what gets stored when {@code next_href} is
-         * absent in the API response) must return {@link InfoItemsPage#emptyPage()} rather than
-         * throw {@link IllegalArgumentException}.
+         * A null-URL page yields no items and no next page instead of throwing.
          */
         @Test
         void testGetPageWithNullUrlReturnsEmptyPage() throws IOException, ExtractionException {

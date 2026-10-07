@@ -11,7 +11,7 @@ public final class BitchuteConstants {
     public static final String SEARCH_AUTH_URL = BASE_URL + "/search";
     public static final String SEARCH_URL_PREFIX =
             "https://www.bitchute.com/search/?query=";
-    // TODO get automation url if there is one
+    // Search URLs are user-facing links; API searches use the JSON endpoint separately.
     public static final String SEARCH_URL_AUTOM = SEARCH_URL_PREFIX;
     public static final Locale BITCHUTE_LOCALE = Locale.ENGLISH;
     public static final String COMMENTS_URL = "https://commentfreely.bitchute.com";

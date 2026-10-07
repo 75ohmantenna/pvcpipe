@@ -260,7 +260,7 @@ public class RouterActivity extends AppCompatActivity {
                         // return whether the url was found to be supported or not
                         return currentLinkType != LinkType.NONE;
                     } catch (final ExtractionException e) {
-                        // this can be reached only when the url is completely unsupported
+                        // Treat failures to identify the service or link type as unsupported.
                         return false;
                     }
                 })

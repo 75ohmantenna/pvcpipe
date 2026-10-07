@@ -35,18 +35,15 @@ public final class NoFileManagerSafeGuard {
     }
 
     /**
-     * Launches the file manager safely.
-     *
-     * If no file manager is found (which is normally only the case when the user uninstalled
-     * the default file manager or the OS lacks one) an alert dialog shows up, asking the user
-     * to fix the situation.
+     * Attempts to launch a file or directory picker. If no activity handles the launch,
+     * shows an alert dialog.
      *
      * @param activityResultLauncher see {@link ActivityResultLauncher#launch(Object)}
      * @param input see {@link ActivityResultLauncher#launch(Object)}
      * @param tag Tag used for logging
      * @param context Context
      * @param <I> see {@link ActivityResultLauncher#launch(Object)}
-     * @return whether the file manager was launched
+     * @return whether the launch request completed without {@link ActivityNotFoundException}
      */
     public static <I> boolean launchSafe(
             final ActivityResultLauncher<I> activityResultLauncher,

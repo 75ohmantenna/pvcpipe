@@ -123,8 +123,8 @@ public final class Image implements Serializable {
      * {@code width} and {@code estimatedResolutionLevel} represent the corresponding properties:
      * <br>
      * <br>
-     * {@code Image {url=url, height='height, width=width,
-     * estimatedResolutionLevel=estimatedResolutionLevel}'}
+     * {@code Image {url=url, height=height, width=width,
+     * estimatedResolutionLevel=estimatedResolutionLevel}}
      * </p>
      *
      * @return a string representation of this {@link Image} instance

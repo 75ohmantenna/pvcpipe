@@ -75,8 +75,8 @@ public class SrtFromTtmlWriter {
      *   "&#x9;"          → "\t" (TAB)
      *   "&#xA;" (&#10;)  → "\n" (LINE FEED)
      *
-     * XML files cannot contain characters like "<", ">", "&" directly,
-     * so they must be represented using their entity-encoded forms.
+     * XML text must escape "&" and "<"; ">" may appear literally except in the
+     * sequence "]]>".
      *
      * Jsoup sometimes leaves nested or encoded entities unresolved
      * (e.g. inside <p> text nodes in TTML files), so this function
@@ -91,8 +91,8 @@ public class SrtFromTtmlWriter {
      *   - Numeric entities: &#xA0;, &#x9;, &#xD;
      *       → appear mainly in XML/TTML files (also valid in HTML)
      *         for non-printable or special characters
-     *   - Unicode escapes: \u00A0 (Java/Unicode internal form)
-     *       → appear only in Java source code (NOT valid in XML)
+     *   - Java Unicode escapes: \u00A0
+     *       → Java source notation, not XML character-reference syntax
      *
      * XML entities include both named (&amp;, &lt;) and numeric
      * (&#xA0;, &#160;) forms.
@@ -115,7 +115,7 @@ public class SrtFromTtmlWriter {
      * are represented as <br/> tags instead.
      * As a defensive approach, we normalize them:
      *
-     * - Windows (\r\n), macOS (\r), and Unix (\n) → unified SRT NEW_LINE (\r\n)
+     * - CRLF (\r\n), CR (\r), and LF (\n) → unified SRT NEW_LINE (\r\n)
      *
      * Although well-formed TTML normally encodes line breaks
      * as <br/> tags, some auto-generated or malformed TTML files

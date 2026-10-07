@@ -93,8 +93,8 @@ public abstract class PlayQueue implements Serializable {
     /**
      * Checks if the queue is complete.
      * <p>
-     * A queue is complete if it has loaded all items in an external playlist
-     * single stream or local queues are always complete.
+     * A queue is complete when all items in an external playlist have been loaded.
+     * Single-stream and local queues are complete from the start.
      * </p>
      *
      * @return whether the queue is complete
@@ -123,7 +123,8 @@ public abstract class PlayQueue implements Serializable {
      * This method is guarded using in a circular manner for index exceeding the play queue size.
      * </p>
      * <p>
-     * Will emit a {@link SelectEvent} if the index is not the current playing index.
+     * Emits a {@link SelectEvent} even if the resolved index has not changed; only a changed
+     * index adds an item to the play history.
      * </p>
      *
      * @param index the index to be set
@@ -156,11 +157,6 @@ public abstract class PlayQueue implements Serializable {
             history.add(streams.get(newIndex));
         }
 
-        /*
-        TODO: Documentation states that a SelectEvent will only be emitted if the new index is...
-        different from the old one but this is emitted regardless? Not sure what this what it does
-        exactly so I won't touch it
-         */
         broadcast(new SelectEvent(oldIndex, newIndex));
     }
 
@@ -453,7 +449,7 @@ public abstract class PlayQueue implements Serializable {
         if (backup == null) {
             backup = new ArrayList<>(streams);
         }
-        // Can't shuffle a list that's empty or only has one element
+        // Keep the current order for a queue of at most two items.
         if (size() <= 2) {
             return;
         }

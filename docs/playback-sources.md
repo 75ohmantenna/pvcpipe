@@ -21,12 +21,12 @@ HLS sources and queue wrappers without preparing or fetching media.
 
 ## Source-local decisions
 
-Each successful source carries immutable classification in its StreamInfoTag.
-Classification describes the source actually constructed, including ordinary
-fallback after unavailable live construction. withExtras preserves this field
-when LoadedMediaSource installs its queue-management extras. Failed and overlapping
-resolutions cannot change an existing source's reload decision. Unknown video
-source facts conservatively require reconstruction.
+Each successful source carries immutable selection-path classification in its
+`StreamInfoTag`. This reflects live construction or its ordinary fallback; a
+separated-audio path can also have no selected video stream. `withExtras`
+preserves the classification when `LoadedMediaSource` installs queue extras.
+Failed and overlapping resolutions cannot change an existing source's reload
+decision. Unknown video source facts conservatively require reconstruction.
 
 For incoming background resolution, the module uses the selected video and audio
 for that request, including explicit alternate audio. An unselected video-only

@@ -44,8 +44,7 @@ class LocalPlaylistManagerTest {
 
         val result = manager.createPlaylist("name", listOf(stream))
 
-        // This should not behave like this.
-        // Currently list of all stream ids is returned instead of playlist id
+        // createPlaylist returns inserted playlist-stream join-row IDs, not the playlist ID.
         result.test().await().assertValue(listOf(1L))
     }
 
@@ -53,8 +52,7 @@ class LocalPlaylistManagerTest {
     fun createPlaylist_emptyPlaylistMustReturnEmpty() {
         val result = manager.createPlaylist("name", emptyList())
 
-        // This should not behave like this.
-        // It should throw an error because currently the result is null
+        // Empty input produces a Maybe with no value and creates no playlist.
         result.test().await().assertComplete()
         manager.playlists.test().awaitCount(1).assertValue(emptyList())
     }
