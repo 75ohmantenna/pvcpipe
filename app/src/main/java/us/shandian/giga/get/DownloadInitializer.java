@@ -1,6 +1,5 @@
 package us.shandian.giga.get;
 
-import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -62,7 +61,17 @@ public class DownloadInitializer extends Thread {
                         headRequest = httpSession(mMission.urls[i], headRequest, 0, 0);
 
                         if (Thread.interrupted()) return;
-                        long length = Utility.getTotalContentLength(mConn);
+                        final long length;
+                        if (mConn.getResponseCode() == 206) {
+                            final ValidatedRange range = ValidatedRange.from(mConn, 0, -1, -1);
+                            if (range.total < 0) {
+                                throw new ValidatedRange.InvalidRangeException(
+                                        "Partial response does not specify resource length");
+                            }
+                            length = range.total;
+                        } else {
+                            length = Utility.getTotalContentLength(mConn);
+                        }
 
                         if (i == 0) {
                             httpCode = mConn.getResponseCode();
@@ -92,7 +101,16 @@ public class DownloadInitializer extends Thread {
                     if (!mMission.running || Thread.interrupted()) return;
 
                     httpCode = mConn.getResponseCode();
-                    mMission.length = Utility.getTotalContentLength(mConn);
+                    if (httpCode == 206) {
+                        final ValidatedRange range = ValidatedRange.from(mConn, 0, -1, -1);
+                        if (range.total < 0) {
+                            throw new ValidatedRange.InvalidRangeException(
+                                    "Partial response does not specify resource length");
+                        }
+                        mMission.length = range.total;
+                    } else {
+                        mMission.length = Utility.getTotalContentLength(mConn);
+                    }
                 }
 
                 if (mMission.length == 0 || httpCode == 204) {
@@ -110,14 +128,18 @@ public class DownloadInitializer extends Thread {
                         Log.d(TAG, "falling back (unknown length)");
                     }
                 } else {
-                    // Open again
-                    headRequest = httpSession(null, headRequest, mMission.length - 10, mMission.length);
+                    // Probe the last bytes without constructing a negative start for short files.
+                    final long probeStart = Math.max(0, mMission.length - 10);
+                    headRequest = httpSession(null, headRequest, probeStart, mMission.length);
 
                     if (!mMission.running || Thread.interrupted()) return;
 
+                    if (mConn.getResponseCode() == 206) {
+                        ValidatedRange.from(mConn, probeStart, mMission.length,
+                                mMission.length);
+                    }
                     synchronized (mMission.LOCK) {
                         if (mConn.getResponseCode() == 206) {
-
                             if (mMission.threadCount > 1) {
                                 int count = (int) (mMission.length / DownloadMission.BLOCK_SIZE);
                                 if ((count * DownloadMission.BLOCK_SIZE) < mMission.length) count++;
@@ -153,25 +175,18 @@ public class DownloadInitializer extends Thread {
 
                 if (!mMission.running || Thread.interrupted()) return;
 
-                if (!mMission.unknownLength && mMission.recoveryInfo != null) {
-                    String entityTag = mConn.getHeaderField("ETAG");
-                    String lastModified = mConn.getHeaderField("Last-Modified");
-                    MissionRecoveryInfo recovery = mMission.recoveryInfo[mMission.current];
-
-                    if (!TextUtils.isEmpty(entityTag)) {
-                        recovery.setValidateCondition(entityTag);
-                    } else if (!TextUtils.isEmpty(lastModified)) {
-                        recovery.setValidateCondition(lastModified);// Note: this is less precise
-                    } else {
-                        recovery.setValidateCondition(null);
-                    }
-                }
+                mMission.bindInitializedRepresentation(mConn);
 
                 break;
             } catch (InterruptedIOException | ClosedByInterruptException e) {
                 return;
             } catch (Exception e) {
                 if (!mMission.running || super.isInterrupted()) return;
+
+                if (e instanceof ValidatedRange.InvalidRangeException) {
+                    mMission.notifyError(e);
+                    return;
+                }
 
                 if (e instanceof DownloadMission.HttpError && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     // for youtube streams. The url has expired

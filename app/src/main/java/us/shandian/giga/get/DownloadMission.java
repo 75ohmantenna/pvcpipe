@@ -142,6 +142,10 @@ public class DownloadMission extends Mission {
      */
     public MissionRecoveryInfo[] recoveryInfo;
 
+    /** Serialized with the partial bytes for the current resource; absent on older missions. */
+    volatile ResourceIdentity resourceIdentity;
+    private volatile boolean unverifiedCurrentBytes;
+
     private transient int finishCount;
     public transient volatile boolean running;
     public boolean enqueued;
@@ -235,7 +239,7 @@ public class DownloadMission extends Mission {
         conn.setInstanceFollowRedirects(true);
         conn.setRequestProperty("User-Agent", DownloaderImpl.getMediaUserAgent(url));
         conn.setRequestProperty("Accept", "*/*");
-        conn.setRequestProperty("Accept-Encoding", "*");
+        conn.setRequestProperty("Accept-Encoding", "identity");
 
         if (headRequest) conn.setRequestMethod("HEAD");
 
@@ -248,9 +252,86 @@ public class DownloadMission extends Mission {
             if (rangeEnd > 0) req += rangeEnd;
 
             conn.setRequestProperty("Range", req);
+            applyIfRange(conn, url);
         }
 
         return conn;
+    }
+
+    void applyIfRange(HttpURLConnection conn, String url) {
+        final ResourceIdentity identity = resourceIdentity;
+        if (identity != null && identity.requestUrl.equals(url)
+                && conn.getRequestProperty("Range") != null) {
+            conn.setRequestProperty("If-Range", identity.condition);
+        }
+    }
+
+    synchronized void bindInitializedRepresentation(HttpURLConnection response)
+            throws IOException {
+        final ResourceIdentity candidate = ResourceIdentity.from(response, urls[current]);
+        if (hasCurrentBytes() && (candidate != null || resourceIdentity != null)) {
+            throw new ValidatedRange.InvalidRangeException(
+                    "Cannot associate an initializer validator with existing bytes");
+        }
+        resourceIdentity = candidate;
+        unverifiedCurrentBytes = false;
+        updateRecoveryCondition();
+    }
+
+    synchronized void validatePartialRepresentation(HttpURLConnection response,
+                                                     String sentIfRange) throws IOException {
+        final ResourceIdentity identity = resourceIdentity;
+        if (identity != null) {
+            identity.verify(response, urls[current], sentIfRange);
+            return;
+        }
+        final ResourceIdentity candidate = ResourceIdentity.from(response, urls[current]);
+        if (candidate != null) {
+            if (unverifiedCurrentBytes || hasCurrentBytes()) {
+                throw new ValidatedRange.InvalidRangeException(
+                        "Saved bytes have no associated validator; restart required");
+            }
+            resourceIdentity = candidate;
+            updateRecoveryCondition();
+        } else {
+            // Reserve the unvalidated representation before a concurrent worker can bind
+            // a new validator. The response body may start being written after this returns.
+            unverifiedCurrentBytes = true;
+        }
+    }
+
+    synchronized void discardCurrentIdentity() {
+        resourceIdentity = null;
+        unverifiedCurrentBytes = true;
+        updateRecoveryCondition();
+    }
+
+    synchronized void beginFullRepresentation(HttpURLConnection response) {
+        resourceIdentity = ResourceIdentity.from(response, urls[current]);
+        unverifiedCurrentBytes = resourceIdentity == null;
+        updateRecoveryCondition();
+    }
+
+    private boolean hasCurrentBytes() {
+        if (fallbackResumeOffset > 0 || done > offsets[current] - offsets[0]) {
+            return true;
+        }
+        if (blocks != null) {
+            for (int block : blocks) {
+                if (block != 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void updateRecoveryCondition() {
+        if (recoveryInfo != null && current < recoveryInfo.length
+                && recoveryInfo[current] != null) {
+            recoveryInfo[current].setValidateCondition(
+                    resourceIdentity == null ? null : resourceIdentity.condition);
+        }
     }
 
     /**
@@ -261,6 +342,10 @@ public class DownloadMission extends Mission {
      */
     void establishConnection(int threadId, HttpURLConnection conn) throws IOException, HttpError {
         int statusCode = conn.getResponseCode();
+        if (statusCode == 200 || statusCode == 206) {
+            ValidatedRange.requireIdentityEncoding(conn);
+        }
+
 
         if (DEBUG) {
             Log.d(TAG, threadId + ":[request]  Range=" + conn.getRequestProperty("Range"));
@@ -622,8 +707,12 @@ public class DownloadMission extends Mission {
         fallbackResumeOffset = 0;
         blocks = null;
         blockAcquired = null;
+        resourceIdentity = null;
+        unverifiedCurrentBytes = false;
 
         if (rollback) current = 0;
+        done = offsets[current] - offsets[0];
+        updateRecoveryCondition();
         if (persistChanges) writeThisToFile();
     }
 

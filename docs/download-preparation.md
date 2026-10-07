@@ -57,6 +57,34 @@ reporting a false submission failure. Existing file bytes may already have been
 truncated when dispatch fails; the workflow does not promise rollback of that
 file or durable mission registration.
 
+Media requests ask for identity encoding; a compressed response is rejected
+because its body cannot safely be written at the requested byte offsets. Ranged
+responses are checked against the requested offset, interval, declared size, and
+known total before any body is written. Workers stop at the validated interval
+and reject truncated bodies; invalid ranges fail the mission rather than
+restarting a file shared with other workers. A single-worker resume may restart
+from zero on an ignored range (HTTP 200) or unsatisfiable range (HTTP 416),
+truncating stale destination bytes. An unknown-length restart reads to EOF
+instead of treating earlier progress as the resource length. Local-server
+coverage lives in `DownloadRangeIntegrityTest`; successful submission remains
+distinct from successful transfer.
+
+For progressive HTTP ranges, a strong ETag (or a Last-Modified date qualified
+by a sufficiently later server Date when no ETag exists) binds partial bytes
+to one resource URI. Workers and resumed requests send `If-Range` and check
+response validators before writing. A changed parallel response fails the
+mission without truncating its shared destination; the single-worker fallback
+can replace a complete response only when no other workers write to the file.
+Re-extraction to a different URL discards partial progress even if its ETag
+text is identical: ETags are not globally unique. A saved mission with old,
+unbound partial progress refuses to adopt a newly encountered strong validator.
+Weak ETags and unqualified timestamps are not used for conditional ranges.
+Without a usable validator, range/body checks still apply, but equal-sized
+versions can be mixed if the server changes them between requests. The server
+must also honor the validator's semantics; a falsely reused strong ETag is
+not detectable from headers. Mission metadata writes are not transactional
+with destination writes, so power-loss durability is not guaranteed.
+
 Run `make ci` for formatting checks, lint, application unit tests, the extractor's
 deterministic offline tests, and debug/release APK builds. Focused unit tests
 include `DownloadPreparationTest` and `DownloadDialogPreparationTest`; neighboring
