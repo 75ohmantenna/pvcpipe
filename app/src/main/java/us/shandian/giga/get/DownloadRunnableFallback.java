@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 
 import org.schabi.newpipe.streams.io.SharpStream;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -36,107 +37,152 @@ public class DownloadRunnableFallback extends Thread {
 
     private void dispose() {
         try {
-            try {
-                if (mIs != null) mIs.close();
-            } finally {
-                mConn.disconnect();
-            }
-        } catch (IOException e) {
-            // nothing to do
+            if (mIs != null) mIs.close();
+        } catch (IOException ignored) {
+            // Closing the connection below also stops an in-flight request.
+        } finally {
+            mIs = null;
+            if (mConn != null) mConn.disconnect();
+            mConn = null;
+            if (mF != null) mF.close();
+            mF = null;
         }
-
-        if (mF != null) mF.close();
     }
 
     @Override
     public void run() {
-        boolean done;
         long start = mMission.fallbackResumeOffset;
 
         if (DEBUG && !mMission.unknownLength && start > 0) {
             Log.i(TAG, "Resuming a single-thread download at " + start);
         }
 
-        try {
-            long rangeStart = (mMission.unknownLength || start < 1) ? -1 : start;
+        while (mMission.running) {
+            try {
+                final long rangeStart = mMission.unknownLength || start < 1 ? -1 : start;
+                mConn = mMission.openConnection(false, rangeStart, -1);
+                if (mRetryCount == 0 && rangeStart == -1) {
+                    // workaround: bypass android connection pool
+                    mConn.setRequestProperty("Range", "bytes=0-");
+                }
+                mMission.applyIfRange(mConn, mMission.urls[mMission.current]);
+                final String sentIfRange = mConn.getRequestProperty("If-Range");
+                mMission.establishConnection(1, mConn);
+                final int status = mConn.getResponseCode();
 
-            int mId = 1;
-            mConn = mMission.openConnection(false, rangeStart, -1);
+                if (status == 416) {
+                    if (start > 0) {
+                        mMission.notifyProgress(-start);
+                        start = 0;
+                        mMission.fallbackResumeOffset = 0;
+                        dispose();
+                        continue;
+                    }
+                    throw new HttpError(416);
+                }
 
-            if (mRetryCount == 0 && rangeStart == -1) {
-                // workaround: bypass android connection pool
-                mConn.setRequestProperty("Range", "bytes=0-");
-            }
+                final ValidatedRange range;
+                if (status == 206) {
+                    range = ValidatedRange.from(mConn, rangeStart < 0 ? 0 : rangeStart,
+                            -1, mMission.unknownLength ? -1 : mMission.length);
+                    mMission.validatePartialRepresentation(mConn, sentIfRange);
+                    if (range.total < 0) {
+                        throw new ValidatedRange.InvalidRangeException(
+                                "Partial response has no resource length");
+                    }
+                    if (mMission.unknownLength || mMission.length < 1) {
+                        mMission.length = range.total;
+                    }
+                    mMission.unknownLength = false;
+                } else if (status == 200) {
+                    range = null;
+                    final long responseLength = Utility.getContentLength(mConn);
+                    if (responseLength == 0) {
+                        throw new IOException("Empty full response");
+                    }
+                    if (!mMission.unknownLength && mMission.length > 0
+                            && responseLength >= 0 && responseLength != mMission.length) {
+                        throw new IOException("Full response length changed while downloading");
+                    }
+                    if (responseLength >= 0) {
+                        mMission.length = responseLength;
+                        mMission.unknownLength = false;
+                    } else if (mMission.unknownLength || mMission.length < 1) {
+                        // An unknown-length mission counts downloaded bytes in length.
+                        // Retried full responses must start counting again from zero.
+                        mMission.length = 0;
+                        mMission.unknownLength = true;
+                    }
+                    // A full response safely replaces a partial one only in this single-worker
+                    // fallback mode. Drop any old tail before accepting its bytes.
+                } else {
+                    throw new HttpError(status);
+                }
 
-            mMission.establishConnection(mId, mConn);
+                final boolean restart = status == 200 || rangeStart < 0;
+                if (restart) {
+                    mMission.done = mMission.offsets[mMission.current] - mMission.offsets[0];
+                    start = 0;
+                }
+                if (status == 200) {
+                    mMission.discardCurrentIdentity();
+                }
+                mF = mMission.storage.getStream();
+                if (restart) {
+                    mF.setLength(mMission.offsets[mMission.current]);
+                }
+                mF.seek(mMission.offsets[mMission.current] + start);
+                if (status == 200) {
+                    mMission.beginFullRepresentation(mConn);
+                }
+                mIs = mConn.getInputStream();
 
-            // check if the download can be resumed
-            if (mConn.getResponseCode() == 416 && start > 0) {
-                mMission.notifyProgress(-start);
-                start = 0;
-                mRetryCount--;
-                throw new DownloadMission.HttpError(416);
-            }
-
-            // secondary check for the file length
-            if (!mMission.unknownLength)
-                mMission.unknownLength = Utility.getContentLength(mConn) == -1;
-
-            if (mMission.unknownLength || mConn.getResponseCode() == 200) {
-                // restart amount of bytes downloaded
-                mMission.done = mMission.offsets[mMission.current] - mMission.offsets[0];
-                start = 0; // reset position to avoid writing at wrong offset
-            }
-
-            mF = mMission.storage.getStream();
-            mF.seek(mMission.offsets[mMission.current] + start);
-
-            mIs = mConn.getInputStream();
-
-            byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
-            int len = 0;
-
-            while (mMission.running && (len = mIs.read(buf, 0, buf.length)) != -1) {
-                mF.write(buf, 0, len);
-                start += len;
-                mMission.notifyProgress(len);
-            }
-
-            dispose();
-
-            // if thread goes interrupted check if the last part is written. This avoid re-download the whole file
-            done = len == -1;
-        } catch (Exception e) {
-            dispose();
-
-            mMission.fallbackResumeOffset = start;
-
-            if (!mMission.running || e instanceof ClosedByInterruptException) return;
-
-            if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
-                // for youtube streams. The url has expired, recover
+                final byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
+                final long endExclusive = range == null ? mMission.length : range.end + 1;
+                while (mMission.running) {
+                    final long remaining = endExclusive > 0 ? endExclusive - start : buf.length;
+                    if (endExclusive > 0 && remaining == 0) break;
+                    final int limit = (int) Math.min(buf.length, remaining);
+                    final int len = mIs.read(buf, 0, limit);
+                    if (len < 0) {
+                        if (range != null || (mMission.length > 0 && start < mMission.length)) {
+                            throw new EOFException("Truncated response at byte " + start);
+                        }
+                        break;
+                    }
+                    if (len == 0) throw new IOException("No progress reading media");
+                    mF.write(buf, 0, len);
+                    start += len;
+                    mMission.notifyProgress(len);
+                }
+                if (mMission.running && range == null && endExclusive > 0
+                        && mIs.read() != -1) {
+                    throw new IOException("Full response exceeds expected length");
+                }
                 dispose();
-                mMission.doRecover(ERROR_HTTP_FORBIDDEN);
+                mMission.fallbackResumeOffset = start;
+                if (!mMission.running) return;
+                if (range != null && start < range.total) {
+                    // Servers may return a valid range shorter than requested.
+                    continue;
+                }
+                mMission.notifyFinished();
                 return;
+            } catch (Exception e) {
+                dispose();
+                mMission.fallbackResumeOffset = start;
+                if (!mMission.running || e instanceof ClosedByInterruptException) return;
+                if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
+                    mMission.doRecover(ERROR_HTTP_FORBIDDEN);
+                    return;
+                }
+                if (e instanceof ValidatedRange.InvalidRangeException
+                        || mRetryCount++ >= mMission.maxRetry) {
+                    mMission.notifyError(e);
+                    return;
+                }
+                if (DEBUG) Log.e(TAG, "got exception, retrying...", e);
             }
-
-            if (mRetryCount++ >= mMission.maxRetry) {
-                mMission.notifyError(e);
-                return;
-            }
-
-            if (DEBUG) {
-                Log.e(TAG, "got exception, retrying...", e);
-            }
-
-            run();// try again
-            return;
-        }
-
-        if (done) {
-            mMission.notifyFinished();
-        } else {
-            mMission.fallbackResumeOffset = start;
         }
     }
 

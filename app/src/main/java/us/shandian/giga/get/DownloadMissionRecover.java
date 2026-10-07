@@ -56,6 +56,9 @@ public class DownloadMissionRecover extends Thread {
                 return;
             } catch (InterruptedIOException | ClosedByInterruptException e) {
                 return;
+            } catch (ValidatedRange.InvalidRangeException e) {
+                mMission.notifyError(e);
+                return;
             } catch (Exception e) {
                 if (!mMission.running || super.isInterrupted()) return;
                 err = e;
@@ -175,11 +178,14 @@ public class DownloadMissionRecover extends Thread {
     }
 
     private void resolve(String url) throws IOException, HttpError {
-        if (mRecovery.getValidateCondition() == null) {
-            Log.w(TAG, "validation condition not defined, the resource can be stale");
+        final ResourceIdentity identity = mMission.resourceIdentity;
+        // An ETag is scoped to one resource URI; equal tags on different signed URLs
+        // do not prove equal bytes. Restart only after the previous workers have stopped.
+        if (identity != null && !identity.requestUrl.equals(url)) {
+            recover(url, true);
+            return;
         }
-
-        if (mMission.unknownLength || mRecovery.getValidateCondition() == null) {
+        if (mMission.unknownLength || identity == null) {
             recover(url, false);
             return;
         }
@@ -188,8 +194,10 @@ public class DownloadMissionRecover extends Thread {
         ////// Validate the http resource doing a range request
         /////////////////////
         try {
-            mConn = mMission.openConnection(url, true, mMission.length - 10, mMission.length);
-            mConn.setRequestProperty("If-Range", mRecovery.getValidateCondition());
+            // Range is defined for GET, not HEAD (RFC 9110 section 14.2).
+            mConn = mMission.openConnection(url, false,
+                    Math.max(0, mMission.length - 10), mMission.length - 1);
+            final String sentIfRange = mConn.getRequestProperty("If-Range");
             mMission.establishConnection(mID, mConn);
 
             int code = mConn.getResponseCode();
@@ -201,11 +209,12 @@ public class DownloadMissionRecover extends Thread {
                     recover(url, true);
                     return;
                 case 206:
-                    // in case of validation using the Last-Modified date, check the resource length
-                    long[] contentRange = parseContentRange(mConn.getHeaderField("Content-Range"));
-                    boolean lengthMismatch = contentRange[2] != -1 && contentRange[2] != mMission.length;
-
-                    recover(url, lengthMismatch);
+                    identity.verify(mConn, url, sentIfRange);
+                    final ValidatedRange range = ValidatedRange.from(mConn,
+                            Math.max(0, mMission.length - 10), mMission.length - 1, -1);
+                    // If-Range may return a new representation. Only the existing mission's
+                    // initializer may reset its file, after the previous workers have stopped.
+                    recover(url, range.total < 0 || range.total != mMission.length);
                     return;
             }
 
@@ -241,44 +250,6 @@ public class DownloadMissionRecover extends Thread {
         mMission.recoveryFinished();
     }
 
-    private long[] parseContentRange(String value) {
-        long[] range = new long[3];
-
-        if (value == null) {
-            // this never should happen
-            return range;
-        }
-
-        try {
-            value = value.trim();
-
-            if (!value.startsWith("bytes")) {
-                return range;// unknown range type
-            }
-
-            int space = value.lastIndexOf(' ') + 1;
-            int dash = value.indexOf('-', space) + 1;
-            int bar = value.indexOf('/', dash);
-
-            // start
-            range[0] = Long.parseLong(value.substring(space, dash - 1));
-
-            // end
-            range[1] = Long.parseLong(value.substring(dash, bar));
-
-            // resource length
-            value = value.substring(bar + 1);
-            if (value.equals("*")) {
-                range[2] = -1;// unknown length received from the server but should be valid
-            } else {
-                range[2] = Long.parseLong(value);
-            }
-        } catch (Exception e) {
-            // nothing to do
-        }
-
-        return range;
-    }
 
     private boolean test() {
         if (mMission.urls[mMission.current] == null) return false;
@@ -298,17 +269,11 @@ public class DownloadMissionRecover extends Thread {
     }
 
     private void disconnect() {
-        try {
-            try {
-                mConn.getInputStream().close();
-            } finally {
-                mConn.disconnect();
-            }
-        } catch (Exception e) {
-            // nothing to do
-        } finally {
-            mConn = null;
-        }
+        // A GET probe only needs the response headers. Opening its body just to close
+        // it can drain an ignored-range 200, which may be the entire media resource.
+        final HttpURLConnection conn = mConn;
+        mConn = null;
+        if (conn != null) conn.disconnect();
     }
 
     @Override

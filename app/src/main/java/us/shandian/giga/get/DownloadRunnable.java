@@ -4,6 +4,7 @@ import android.util.Log;
 
 import org.schabi.newpipe.streams.io.SharpStream;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -81,6 +82,7 @@ public class DownloadRunnable extends Thread {
 
             try {
                 mConn = mMission.openConnection(false, start, end);
+                final String sentIfRange = mConn.getRequestProperty("If-Range");
                 mMission.establishConnection(mId, mConn);
 
                 // check if the download can be resumed
@@ -99,24 +101,39 @@ public class DownloadRunnable extends Thread {
 
                 retry = false;
 
-                // The server may be ignoring the range request
+                // The server may ignore the range request; a wrong 206 is more dangerous,
+                // since writing it at this block's offset would silently corrupt the file.
                 if (mConn.getResponseCode() != 206) {
                     if (DEBUG) {
                         Log.e(TAG, mId + ":Unsupported " + mConn.getResponseCode());
                     }
-                    mMission.notifyError(new DownloadMission.HttpError(mConn.getResponseCode()));
+                    if (mConn.getResponseCode() == 200 && sentIfRange != null) {
+                        mMission.notifyError(new ValidatedRange.InvalidRangeException(
+                                "Resource changed during parallel download; restart required"));
+                    } else {
+                        mMission.notifyError(new DownloadMission.HttpError(mConn.getResponseCode()));
+                    }
                     break;
                 }
+                final ValidatedRange range = ValidatedRange.from(mConn, start, end,
+                        mMission.length);
+                mMission.validatePartialRepresentation(mConn, sentIfRange);
 
                 f.seek(mMission.offsets[mMission.current] + start);
 
                 try (InputStream is = mConn.getInputStream()) {
-                    byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
-                    int len;
-
-                    // use always start <= end
-                    // fixes a deadlock because in some videos, youtube is sending one byte alone
-                    while (start <= end && mMission.running && (len = is.read(buf, 0, buf.length)) != -1) {
+                    final byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
+                    // A valid server may send a shorter range than requested. Never write past
+                    // its advertised end or this worker's block; fetch the remainder separately.
+                    while (start <= range.end && mMission.running) {
+                        final int limit = (int) Math.min(buf.length, range.end - start + 1);
+                        final int len = is.read(buf, 0, limit);
+                        if (len < 0) {
+                            throw new EOFException("Truncated partial response at byte " + start);
+                        }
+                        if (len == 0) {
+                            throw new IOException("No progress reading partial response");
+                        }
                         f.write(buf, 0, len);
                         start += len;
                         block.done += len;
@@ -129,6 +146,11 @@ public class DownloadRunnable extends Thread {
                 }
             } catch (Exception e) {
                 if (!mMission.running || e instanceof ClosedByInterruptException) break;
+
+                if (e instanceof ValidatedRange.InvalidRangeException) {
+                    mMission.notifyError(e);
+                    break;
+                }
 
                 if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     // for youtube streams. The url has expired, recover
@@ -148,6 +170,10 @@ public class DownloadRunnable extends Thread {
 
                 retry = true;
             } finally {
+                if (mConn != null) {
+                    mConn.disconnect();
+                    mConn = null;
+                }
                 if (!retry) releaseBlock(block, end - start);
             }
         }
