@@ -14,9 +14,25 @@ audio-effect session broadcasts, volume-command checks, preferences and
 controlled adapter for focus and animation delivery. Device tests exercise the
 production adapter with real ExoPlayer and Android animation.
 
-This structural change preserves existing focus behavior: loss stores effective
-volume and pauses, duck stores effective volume and sets 0.2, and gain fades from
-0.2 to the stored level. Gain resumes directly when the existing preference is
-enabled. Unsupported internal-volume commands retain existing toast feedback
-and getter fallback of 1.0. Animation replacement, mute/focus interactions and
-post-disposal effects remain subjects for separately reproduced corrections.
+The user level and mute intent are independent of temporary effective volume.
+Duck caps output at the smaller of 0.2 and the chosen level, without changing
+that level. Repeated losses cannot overwrite it. Gain restores from current
+output, and resumes only previously playing playback interrupted by focus loss
+when the existing preference permits. Explicit pause or mute clears that resume
+intention. Positive volume gestures unmute and request focus only for active
+playback; zero gestures mute and release focus. Unmute restores the last audible
+level (1.0 when initialized at zero).
+
+Accepted user changes and newer focus events supersede restoration. Ownership
+is invalidated before canceling an animator, because Android emits synchronous
+cancel/end callbacks. Disposed playback audio ignores subsequent commands and
+focus/session/animation callbacks. Player disposes audio before releasing Exo.
+Immediate successful focus requests also reconcile ducking or interrupted
+restoration; a newer focus event or disposal during the request wins over its
+return value. Denied requests do not clear attenuation. Android distinguishes
+these immediate results from later focus callbacks in its
+[audio-focus guidance](https://developer.android.com/media/optimize/audio-focus).
+Denied internal-volume changes preserve prior intent and transition ownership;
+UI mute notifications report the resulting state. Unsupported getter feedback
+and fallback of 1.0 are preserved. Internal-volume reads otherwise report the
+chosen user level, not transient ducking or a restoration frame.

@@ -626,6 +626,9 @@ public final class Player implements PlaybackListener, Listener {
         }
         UIs.call(PlayerUi::destroyPlayer);
 
+        if (playbackAudio != null) {
+            playbackAudio.dispose();
+        }
         if (!exoPlayerIsNull()) {
             simpleExoPlayer.removeListener(this);
             simpleExoPlayer.stop();
@@ -636,9 +639,6 @@ public final class Player implements PlaybackListener, Listener {
         }
         if (playQueue != null) {
             playQueue.dispose();
-        }
-        if (playbackAudio != null) {
-            playbackAudio.dispose();
         }
         if (playQueueManager != null) {
             playQueueManager.dispose();
@@ -1234,9 +1234,8 @@ public final class Player implements PlaybackListener, Listener {
     //region Mute / Unmute
 
     public void toggleMute() {
-        final boolean wasMuted = isMuted();
         playbackAudio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
-        UIs.call(playerUi -> playerUi.onMuteUnmuteChanged(!wasMuted));
+        UIs.call(playerUi -> playerUi.onMuteUnmuteChanged(isMuted()));
         notifyPlaybackUpdateToListeners();
     }
 

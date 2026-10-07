@@ -10,7 +10,14 @@ import java.util.function.Consumer;
 public final class PlaybackAudio {
     private static final float DUCK_VOLUME = 0.2f;
     private final Environment environment;
-    private float savedVolume;
+    private float desiredVolume;
+    private float lastAudibleVolume;
+    private boolean muted;
+    private boolean ducked;
+    private boolean resumePending;
+    private boolean disposed;
+    private long generation;
+    private Runnable cancelAnimation;
 
     public PlaybackAudio(final Context context, final ExoPlayer player) {
         this(new AndroidPlaybackAudioEnvironment(context, player));
@@ -18,7 +25,9 @@ public final class PlaybackAudio {
 
     PlaybackAudio(final Environment environment) {
         this.environment = environment;
-        savedVolume = environment.internalVolume();
+        desiredVolume = environment.canReadVolume() ? environment.volume() : 1;
+        lastAudibleVolume = desiredVolume > 0 ? desiredVolume : 1;
+        muted = environment.volume() == 0;
         environment.attach(this::onFocusChange);
     }
 
@@ -32,27 +41,27 @@ public final class PlaybackAudio {
      * @param event the playback intention or preparation fact
      */
     public void onPlaybackEvent(final Event event) {
+        if (disposed) {
+            return;
+        }
         switch (event) {
             case INITIALIZED:
-                setMuted(isMuted());
+                environment.setInternalVolume(outputVolume());
                 break;
             case PREPARED_PLAYING:
             case PLAY_REQUESTED:
+                resumePending = false;
                 if (!isMuted()) {
-                    environment.requestFocus();
+                    requestFocus();
                 }
                 break;
             case PAUSE_REQUESTED:
+                resumePending = false;
+                cancelRestoration();
                 environment.abandonFocus();
                 break;
             case TOGGLE_MUTE:
-                final boolean wasMuted = isMuted();
-                setMuted(!wasMuted);
-                if (wasMuted) {
-                    environment.requestFocus();
-                } else {
-                    environment.abandonFocus();
-                }
+                toggleMute();
                 break;
             default:
                 break;
@@ -60,20 +69,44 @@ public final class PlaybackAudio {
     }
 
     public boolean isMuted() {
-        return environment.volume() == 0;
-    }
-
-    public float getInternalVolume() {
-        return environment.internalVolume();
+        return muted || desiredVolume == 0;
     }
 
     /**
-     * Changes internal volume and owns the restore bookkeeping previously required by gestures.
-     * @param volume the requested internal volume
+     * Returns the user's level, including mute, independently of temporary focus attenuation.
+     * @return the chosen level, or the existing 1.0 fallback when reading volume is unavailable
+     */
+    public float getInternalVolume() {
+        if (!disposed && !environment.canReadVolume()) {
+            return 1;
+        }
+        return isMuted() ? 0 : desiredVolume;
+    }
+
+    /**
+     * Changes the user level; accepted changes supersede prior restoration callbacks.
+     * @param volume the requested level, clamped to the range 0 to 1; NaN is rejected
      */
     public void setInternalVolume(final float volume) {
-        environment.setInternalVolume(volume);
-        saveVolume();
+        if (disposed) {
+            return;
+        }
+        if (Float.isNaN(volume)) {
+            throw new IllegalArgumentException("Internal volume must not be NaN");
+        }
+        final float level = Math.max(0, Math.min(1, volume));
+        final float output = ducked ? Math.min(level, DUCK_VOLUME) : level;
+        if (!environment.setInternalVolume(output)) {
+            return;
+        }
+        final boolean wasMuted = isMuted();
+        cancelRestoration();
+        desiredVolume = level;
+        muted = level == 0;
+        if (level > 0) {
+            lastAudibleVolume = level;
+        }
+        reconcileMuteFocus(wasMuted);
     }
 
     public int getSystemVolume() {
@@ -81,7 +114,9 @@ public final class PlaybackAudio {
     }
 
     public void setSystemVolume(final int volume) {
-        environment.setSystemVolume(volume);
+        if (!disposed) {
+            environment.setSystemVolume(volume);
+        }
     }
 
     public int getMaxSystemVolume() {
@@ -89,45 +124,115 @@ public final class PlaybackAudio {
     }
 
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        resumePending = false;
+        cancelRestoration();
         environment.abandonFocus();
         environment.close();
     }
 
-    private void setMuted(final boolean muted) {
-        if (muted) {
-            if (environment.internalVolume() != 0) {
-                saveVolume();
-                environment.setInternalVolume(0);
+    private void toggleMute() {
+        final boolean wasMuted = isMuted();
+        final float target = desiredVolume > 0 ? desiredVolume : lastAudibleVolume;
+        final float output = wasMuted ? (ducked ? Math.min(target, DUCK_VOLUME) : target) : 0;
+        if (!environment.setInternalVolume(output)) {
+            return;
+        }
+        cancelRestoration();
+        muted = !wasMuted;
+        if (wasMuted) {
+            desiredVolume = target;
+        }
+        reconcileMuteFocus(wasMuted);
+    }
+
+    private void reconcileMuteFocus(final boolean wasMuted) {
+        if (isMuted()) {
+            resumePending = false;
+            if (!wasMuted) {
+                environment.abandonFocus();
             }
-        } else {
-            environment.setInternalVolume(savedVolume);
+        } else if (wasMuted && environment.playWhenReady()) {
+            requestFocus();
         }
     }
 
-    private void saveVolume() {
-        savedVolume = environment.internalVolume();
+    private void requestFocus() {
+        final long owner = generation;
+        final boolean granted = environment.requestFocus();
+        if (granted && !disposed && owner == generation && !isMuted()) {
+            // An immediate grant need not produce a later Android gain callback.
+            onFocusChange(FocusChange.GAIN);
+        }
+    }
+
+    private float outputVolume() {
+        return isMuted() ? 0 : ducked ? Math.min(desiredVolume, DUCK_VOLUME) : desiredVolume;
     }
 
     private void onFocusChange(final FocusChange change) {
+        if (disposed) {
+            return;
+        }
+        cancelRestoration();
         switch (change) {
             case GAIN:
-                environment.setVolume(DUCK_VOLUME);
-                environment.animate(DUCK_VOLUME, savedVolume, environment::setVolume);
-                if (environment.resumeAfterFocusGain()) {
+                ducked = false;
+                final long owner = generation;
+                final boolean resume = resumePending && !isMuted()
+                        && environment.resumeAfterFocusGain();
+                resumePending = false;
+                if (!isMuted()) {
+                    restoreVolume();
+                }
+                if (resume && !disposed && owner == generation && !isMuted() && !ducked) {
                     environment.play();
                 }
                 break;
             case LOSS:
             case TRANSIENT_LOSS:
-                saveVolume();
+                resumePending |= !isMuted() && environment.playWhenReady();
                 environment.pause();
                 break;
             case DUCK:
-                saveVolume();
-                environment.setVolume(DUCK_VOLUME);
+                ducked = true;
+                if (!isMuted()) {
+                    environment.setVolume(outputVolume());
+                }
                 break;
             default:
                 break;
+        }
+    }
+
+    private void restoreVolume() {
+        final float from = environment.volume();
+        if (from == desiredVolume) {
+            return;
+        }
+        final long owner = generation;
+        final Runnable cancellation = environment.animate(from, desiredVolume, value -> {
+            if (!disposed && owner == generation && !isMuted() && !ducked) {
+                environment.setVolume(value);
+            }
+        });
+        if (!disposed && owner == generation) {
+            cancelAnimation = cancellation;
+        } else {
+            cancellation.run();
+        }
+    }
+
+    private void cancelRestoration() {
+        generation++;
+        final Runnable cancellation = cancelAnimation;
+        cancelAnimation = null;
+        if (cancellation != null) {
+            // Invalidate first: Android cancellation synchronously emits terminal callbacks.
+            cancellation.run();
         }
     }
 
@@ -139,7 +244,7 @@ public final class PlaybackAudio {
     interface Environment {
         void attach(Consumer<FocusChange> focusListener);
 
-        float internalVolume();
+        boolean canReadVolume();
 
         boolean setInternalVolume(float volume);
 
@@ -147,11 +252,13 @@ public final class PlaybackAudio {
 
         void setVolume(float volume);
 
-        void requestFocus();
+        boolean requestFocus();
 
         void abandonFocus();
 
         boolean resumeAfterFocusGain();
+
+        boolean playWhenReady();
 
         void play();
 

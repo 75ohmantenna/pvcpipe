@@ -30,6 +30,7 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     private final AudioManager audioManager;
     private AudioFocusRequestCompat request;
     private Consumer<PlaybackAudio.FocusChange> focusListener;
+    private boolean closed;
 
     AndroidPlaybackAudioEnvironment(final Context context, final ExoPlayer player) {
         this.context = context;
@@ -48,6 +49,9 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
 
     @Override
     public void onAudioFocusChange(final int change) {
+        if (closed) {
+            return;
+        }
         switch (change) {
             case AudioManager.AUDIOFOCUS_GAIN:
                 focusListener.accept(PlaybackAudio.FocusChange.GAIN);
@@ -67,8 +71,8 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     }
 
     @Override
-    public float internalVolume() {
-        return commandAvailable(Player.COMMAND_GET_VOLUME, "get") ? player.getVolume() : 1;
+    public boolean canReadVolume() {
+        return commandAvailable(Player.COMMAND_GET_VOLUME, "get");
     }
 
     @Override
@@ -100,8 +104,9 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     }
 
     @Override
-    public void requestFocus() {
-        AudioManagerCompat.requestAudioFocus(audioManager, request);
+    public boolean requestFocus() {
+        return AudioManagerCompat.requestAudioFocus(audioManager, request)
+                == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
     @Override
@@ -112,6 +117,11 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     @Override
     public boolean resumeAfterFocusGain() {
         return PlayerHelper.isResumeAfterAudioFocusGain(context);
+    }
+
+    @Override
+    public boolean playWhenReady() {
+        return player.getPlayWhenReady();
     }
 
     @Override
@@ -168,11 +178,15 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     @Override
     public void onAudioSessionIdChanged(@NonNull final EventTime eventTime,
                                         final int audioSessionId) {
-        notifyAudioSession(true, audioSessionId);
+        if (!closed) {
+            notifyAudioSession(true, audioSessionId);
+        }
     }
 
     @Override
     public void close() {
+        closed = true;
+        focusListener = null;
         player.removeAnalyticsListener(this);
         notifyAudioSession(false, player.getAudioSessionId());
     }

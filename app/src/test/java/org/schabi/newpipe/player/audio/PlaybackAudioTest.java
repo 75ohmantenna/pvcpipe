@@ -35,6 +35,7 @@ public class PlaybackAudioTest {
 
     @Test
     public void muteSuppressesFocusAndUnmuteRestoresLevelBeforeRequestingFocus() {
+        environment.playing = true;
         audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
         assertTrue(audio.isMuted());
         audio.onPlaybackEvent(PlaybackAudio.Event.PLAY_REQUESTED);
@@ -61,6 +62,8 @@ public class PlaybackAudioTest {
         environment.focus(PlaybackAudio.FocusChange.GAIN);
         assertFalse(environment.effects.contains("play"));
         environment.resume = true;
+        environment.playing = true;
+        environment.focus(PlaybackAudio.FocusChange.TRANSIENT_LOSS);
         environment.focus(PlaybackAudio.FocusChange.GAIN);
         assertEquals("play", environment.effects.get(environment.effects.size() - 1));
     }
@@ -85,9 +88,11 @@ public class PlaybackAudioTest {
     }
 
     @Test
-    public void unavailableGetterReportsFullVolumeButMuteReadsActualOutput() {
-        environment.volume = 0;
+    public void unavailableGetterReportsFullVolumeWithoutChangingMuteIntent() {
         environment.getAvailable = false;
+        assertEquals(1, audio.getInternalVolume(), 0);
+        assertFalse(audio.isMuted());
+        audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
         assertEquals(1, audio.getInternalVolume(), 0);
         assertTrue(audio.isMuted());
         assertTrue(environment.effects.contains("get-unavailable"));
