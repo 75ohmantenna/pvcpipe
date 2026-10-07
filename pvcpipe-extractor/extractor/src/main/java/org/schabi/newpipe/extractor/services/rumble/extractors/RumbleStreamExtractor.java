@@ -26,6 +26,7 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
+import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleStreamLinkHandlerFactory;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.Description;
@@ -88,7 +89,8 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     public static StreamExtractor factory(
             final StreamingService service,
             final LinkHandler linkHandler) {
-        if (linkHandler.getOriginalUrl().contains("/shorts/")) {
+        if (linkHandler.getUrl().startsWith(
+                RumbleStreamLinkHandlerFactory.BASE_URL + "/shorts/")) {
             return new RumbleShortsStreamExtractor(service, linkHandler);
         }
         return new RumbleStreamExtractor(service, linkHandler);

@@ -5,9 +5,14 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.downloader.DownloaderTestImpl;
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
+import org.schabi.newpipe.extractor.services.rumble.extractors.RumbleShortsStreamExtractor;
+import org.schabi.newpipe.extractor.services.rumble.extractors.RumbleStreamExtractor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -124,5 +129,38 @@ public class RumbleStreamLinkHandlerFactoryTest {
                 linkHandler.fromUrl("https://rumble.com/embed/v5pv5f/").getUrl());
         assertEquals("v5pv5f",
                 linkHandler.fromUrl("https://www.rumble.com/embed/ufe9n.v5pv5f").getId());
+    }
+
+    @Test
+    public void canonicalPathDeterminesExtractorType() throws Exception {
+        final String[][] cases = {
+                {"https://rumble.com/vdofb7?next=/shorts/v6abcde",
+                        "https://rumble.com/vdofb7", "watch"},
+                {"https://rumble.com/vdofb7#/shorts/v6abcde",
+                        "https://rumble.com/vdofb7", "watch"},
+                {"https://rumble.com/shorts/v6abcde-title.html?next=/v12345",
+                        "https://rumble.com/shorts/v6abcde", "shorts"},
+                {"https://rumble.com/shorts/v6abcde#section",
+                        "https://rumble.com/shorts/v6abcde", "shorts"},
+                {"https://www.rumble.com/vdofb7-title.html#section",
+                        "https://rumble.com/vdofb7", "watch"},
+                {"https://rumble.com/embed/ufe9n.v5pv5f/?next=/shorts/v6abcde",
+                        "https://rumble.com/embed/v5pv5f", "watch"},
+                {"https://rumble.com/embed/v5pv5f/#section",
+                        "https://rumble.com/embed/v5pv5f", "watch"}
+        };
+        for (final String[] testCase : cases) {
+            final String input = testCase[0];
+            assertTrue(linkHandler.acceptUrl(input), input);
+            final LinkHandler handler = linkHandler.fromUrl(input);
+            assertEquals(testCase[1], handler.getUrl(), input);
+            if ("shorts".equals(testCase[2])) {
+                assertInstanceOf(RumbleShortsStreamExtractor.class,
+                        ServiceList.Rumble.getStreamExtractor(handler), input);
+            } else {
+                assertInstanceOf(RumbleStreamExtractor.class,
+                        ServiceList.Rumble.getStreamExtractor(handler), input);
+            }
+        }
     }
 }
