@@ -161,7 +161,7 @@ public class DownloadDialog extends PvcDownloadDialog
         this.selectedAudioTrackIndex =
                 ListHelper.getDefaultAudioTrackGroup(context, groupedAudioStreams);
 
-        // TODO: Adapt this code when the downloader support other types of stream deliveries
+        // Only progressive streams and supported HLS video can be prepared for download.
         final List<VideoStream> videoStreams = ListHelper.getSortedStreamVideosList(
                 context,
                 pvcAddHlsStreams(info,

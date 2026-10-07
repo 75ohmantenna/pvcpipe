@@ -128,8 +128,8 @@ class FeedLoadManager(private val context: Context) {
                 }
 
                 if (originalInfo == null) {
-                    // use the normal channel tabs extractor if either the user wants it, or
-                    // the current service does not have a dedicated feed extractor
+                    // Use the normal channel tabs extractor if the user did not request
+                    // a dedicated feed extractor, or this service does not provide one.
 
                     val channelInfo = getChannelInfo(
                         subscriptionEntity.serviceId,

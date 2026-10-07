@@ -737,12 +737,11 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates whatever the backed storage is invalid
+     * Checks whether the mission has no storage or its saved file is missing.
      *
-     * @return {@code true}, if storage is invalid and cannot be used
+     * @return {@code true} when storage is absent or the file no longer exists
      */
     public boolean hasInvalidStorage() {
-        // Don't consider ERROR_PROGRESS_LOST as invalid storage - it can be recovered
         return storage == null || !storage.existsAsFile();
     }
 

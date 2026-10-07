@@ -14,15 +14,15 @@ handling is a separate setting. A functioning WebView provider is required.
 
 | Interaction | Request and parsing |
 | --- | --- |
-| Browse | Editor Picks (`/editor-picks`), Live (`/browse/live`), Battle Leaderboard (`/battle-leaderboard`), Trending Today (`/videos?sort=views&date=today`), Latest (`/videos?date=this-week`) use HTML cards and `link[rel=next]`. |
+| Browse | Editor Picks (`/editor-picks`), Live (`/browse/live`), Battle Leaderboard (`/battle-leaderboard`), Trending Today (`/videos?sort=views&date=today`), and Latest (`/videos?date=this-week`) use HTML cards and `link[rel=next]`. A separate Shorts kiosk uses the Shorts feed below. |
 | Video and channel search | `/search/video?q=…` and `/search/channel?q=…` use HTML; supported filters build query parameters. |
 | Suggestions | `/service.php?name=search.autocomplete&api=8&query=…` returns channel and category titles. |
-| Channels and users | `/c/{slug}` and `/user/{slug}`, their video/live/Shorts tabs, and linked About pages use HTML. |
+| Channels and users | `/c/{slug}` and `/user/{slug}` use HTML for channel details and their Videos (`/videos`) and Live (`/livestreams`) tabs; linked About pages provide descriptions. The service does not expose a channel Shorts tab. |
 | Watch and embed links | Watch HTML supplies an embed ID through an iframe, script URL, structured data, or inline `Rumble("play", …)`. Embed links supply the ID directly. |
 | Video and audio playback | `/embedJS/u3/?request=video&ver=2&v={embedId}` supplies formats, metadata, and captions. HLS playlists and progressive streams come from the returned media URLs. |
 | Shorts | `/service.php?name=shorts.feed&offset=…&limit=10&api=7&options=video.full%2Cvideo.related_video` supplies the feed. `/shorts/{permalink}` embeds `rum-shorts` JSON for playback. |
 | Comments and replies | `/service.php?video={internalIdInBase36}&name=comment.list` returns HTML and CSS in JSON. Pagination and replies use that response body locally. Shorts resolve the internal numeric video ID from their JSON; it differs from the public permalink ID. |
-| Live viewer count | `https://wn0.rumble.com/service.php?video_id=…` supplies a count independently of playback. |
+| Live viewer count | For a non-embed watch page, `https://wn0.rumble.com/service.php?video_id=…&viewer_id=…&name=video.watching-now` can supply a count independently of playback; an unavailable count is reported as unknown. |
 
 Playlists and subscription import are not implemented by the Rumble service. App subscriptions,
 bookmarks, history, and queues are local features; they do not follow, vote, or post comments on
@@ -123,9 +123,9 @@ The broader Rumble suite includes historical mocks and live requests:
 ```
 
 Remaining device coverage includes every search filter combination, search/channel scrolling
-past page one, channels with a Shorts tab, captions, sharing and opening links through the system
-chooser, and recovery from an actual Cloudflare challenge. The sampled player metadata did not
-supply captions.
+past page one, captions, sharing and opening links through the system chooser, and recovery
+from an actual Cloudflare challenge. A channel Shorts tab is not exposed by the extractor.
+The sampled player metadata did not supply captions.
 The automated suite also covers pagination and media-format behavior, including live states and
 HLS; those checks are separate from the successful device playback samples. Premium/private content requires its own
 access checks; anonymous failures do not establish a parser defect.

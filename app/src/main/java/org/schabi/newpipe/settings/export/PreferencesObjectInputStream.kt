@@ -11,12 +11,9 @@ import java.io.ObjectInputStream
 import java.io.ObjectStreamClass
 
 /**
- * An [ObjectInputStream] that only allows preferences-related types to be deserialized, to
- * prevent injections. The only allowed types are: all primitive types, all boxed primitive types,
- * null, strings. HashMap, HashSet and arrays of previously defined types are also allowed. Sources:
- * [cmu.edu](https://wiki.sei.cmu.edu/confluence/display/java/SER00-J.+Enable+serialization+compatibility+during+class+evolution) * ,
- * [OWASP cheatsheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html#harden-your-own-javaioobjectinputstream) * ,
- * [Apache's `ValidatingObjectInputStream`](https://commons.apache.org/proper/commons-io/apidocs/src-html/org/apache/commons/io/serialization/ValidatingObjectInputStream.html#line-118) *
+ * Restricts class resolution for legacy serialized preferences to boxed primitives, HashMap,
+ * and HashSet. Primitives and strings use dedicated serialization encodings; object arrays are
+ * not on the class whitelist.
  */
 class PreferencesObjectInputStream(stream: InputStream) : ObjectInputStream(stream) {
     @Throws(ClassNotFoundException::class, IOException::class)

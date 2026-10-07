@@ -38,9 +38,7 @@ class HistoryRecordManagerTest {
     fun onSearched() {
         manager.onSearched(0, "Hello").test().await().assertValue(1)
 
-        // For some reason the Flowable returned by getAll() never completes, so we can't assert
-        // that the number of Lists it returns is exactly 1, we can only check if the first List is
-        // correct. Why on earth has a Flowable been used instead of a Single for getAll()?!?
+        // getAll() observes database changes continuously, so inspect its first emitted list.
         val entities = database.searchHistoryDAO().getAll().blockingFirst()
         assertThat(entities).hasSize(1)
         assertThat(entities[0].id).isEqualTo(1)
@@ -68,7 +66,7 @@ class HistoryRecordManagerTest {
         assertThat(entities).usingElementComparator { o1, o2 -> if (o1.hasEqualValues(o2)) 0 else 1 }
             .containsExactly(*entries.subList(2, 4).toTypedArray())
 
-        // assert that nothing happens if we delete a search query that does exist in the db
+        // Deleting "A" again finds no matching entries and leaves the "B" entries intact.
         manager.deleteSearchHistory("A").test().await().assertValue(0)
         val entities2 = database.searchHistoryDAO().getAll().blockingFirst()
         assertThat(entities2).hasSize(2)

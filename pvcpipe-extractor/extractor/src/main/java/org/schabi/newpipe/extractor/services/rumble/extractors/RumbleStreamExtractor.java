@@ -279,7 +279,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
 
     @Override
     public boolean isUploaderVerified() throws ParsingException {
-        // TODO can be done
+        // TODO Extract the watch page's uploader verification badge when available.
         return false;
     }
 
@@ -590,13 +590,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
 
         final Response response2 = RumbleParsingHelper.fetchResponse(downloader, queryUrl);
 
-        // TODO keep some cookies to be more browser like
-        //curl 'https://rumble.com/embedJS/u3/?request=video&ver=2&v=vb294t&ext=%7B%22ad_count%22%3Anull%7D&ad_wt=0'
-        // -H 'Referer: https://rumble.com/vdofb7-1-year-old-pulls-pony-behind-electric-car.html'
-        // -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-        // (KHTML, like Gecko)
-        // Chrome/145.0.0.0 Safari/537.36' -H 'Sec-Fetch-Dest: empty' --compressed
-        //Document doc = Jsoup.parse(response.responseBody(), getUrl());
+        // TODO Check whether embed requests need site cookies on challenged sessions.
         try {
             embedJsonStreamInfoObj = JsonParser.object().from(response2.responseBody());
             extractStreams(downloader);
@@ -720,12 +714,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
                                                final String theViewerId) {
         try {
 
-            // This is the post version of below get version. It does not work but kept here
-            // for maybe later:)
-            // final Response response = downloader
-            //         .post("https://wn0.rumble.com/service.php?api=7&name=video.watching-now",
-            //                 null,
-            //                 ("video_id=" + videoId + "&viewer_id=" + theViewerId).getBytes());
+            // The former POST version of this viewer-count request was not usable.
             final Response response = downloader
                     .get("https://wn0.rumble.com/service.php?video_id="
                             + videoNumericId

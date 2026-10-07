@@ -1,7 +1,7 @@
 # PVCPipe Extractor
 
-This directory contains the extractor library used by PVCPipe. It is
-maintained as part of the parent monorepo and is not published separately.
+This directory contains the extractor library used by PVCPipe. It is maintained
+in the parent monorepo; its Gradle build also defines local Maven publication tasks.
 
 The parent Gradle build includes this project as a composite build and substitutes
 the application's extractor dependency with `:extractor` automatically.
@@ -13,6 +13,10 @@ Run extractor tests from the repository root with:
 ```sh
 ./pvcpipe-extractor/gradlew -p pvcpipe-extractor :extractor:test
 ```
+
+The `:extractor:test` task runs the full extractor test suite, including tests
+that may require network access. For the fork's deterministic offline regression
+tests, use `./gradlew :pvcpipe-extractor:extractor:forkCiTest` from the repository root.
 
 Run the complete application verification with:
 

@@ -30,8 +30,9 @@ import static org.schabi.newpipe.extractor.services.youtube.ClientsConstants.WEB
 import static org.schabi.newpipe.extractor.services.youtube.ClientsConstants.WEB_MUSIC_ANALYTICS_CLIENT_NAME;
 import static org.schabi.newpipe.extractor.services.youtube.ClientsConstants.WEB_MUSIC_ANALYTICS_CLIENT_VERSION;
 
-// TODO: add docs
-
+/**
+ * Client and device metadata used to build YouTube InnerTube requests.
+ */
 public final class InnertubeClientRequestInfo {
 
     @Nonnull

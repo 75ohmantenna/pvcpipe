@@ -8,10 +8,10 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 /**
- * Always run on [Schedulers.trampoline].
- * This executes the task in the current thread in FIFO manner.
- * This ensures that tasks are run quickly inside the tests
- * and not scheduled away to another thread for later execution
+ * Redirects RxJava's computation, IO, new-thread and single schedulers to
+ * [Schedulers.trampoline] for each test. The RxAndroid hook redirects only
+ * main-thread scheduler initialization; it cannot replace an already initialized scheduler.
+ * Other threading is unaffected.
  */
 class TrampolineSchedulerRule : TestRule {
 

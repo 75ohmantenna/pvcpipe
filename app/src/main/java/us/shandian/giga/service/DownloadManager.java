@@ -157,18 +157,19 @@ public class DownloadManager {
                 continue;
             }
 
-            // DON'T delete missions that are truly finished - let them be moved to finished list
+            // Migrate completed pending missions to the finished list.
             if (mis.isFinished()) {
-                // Move to finished missions instead of deleting
+                // Store the finished mission before removing its pending metadata.
                 setFinished(mis);
                 //noinspection ResultOfMethodCallIgnored
                 sub.delete();
                 continue;
             }
 
-            // DON'T delete missions with storage issues - try to recover them
+            // Discard missions without storage unless progress loss was already recorded;
+            // keep other invalid-storage missions for a recovery attempt.
             if (mis.hasInvalidStorage() && mis.errCode != ERROR_PROGRESS_LOST) {
-                // Only delete if it's truly unrecoverable (not just progress lost)
+                // A mission without storage cannot be deserialized or recovered here.
                 if (mis.storage == null) {
                     //noinspection ResultOfMethodCallIgnored
                     sub.delete();
@@ -199,8 +200,8 @@ public class DownloadManager {
                 mis.errCode = DownloadMission.ERROR_POSTPROCESSING_STOPPED;
             } else if (!exists) {
                 tryRecover(mis);
-                // Keep the mission even if recovery fails - don't reset to ERROR_PROGRESS_LOST
-                // This allows user to see the failed download and potentially retry
+                // Retain the pending mission for user-visible recovery. Mark initialized,
+                // error-free missions as having lost progress after the recovery attempt.
                 if (mis.isInitialized() && mis.errCode == ERROR_NOTHING) {
                     mis.resetState(true, true, ERROR_PROGRESS_LOST);
                 }

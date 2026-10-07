@@ -1,16 +1,22 @@
 # Extractor service architecture
 
-PVCPipe routes every remote URL through the bundled extractor. The application does not parse
-YouTube, BitChute, or Rumble responses itself.
+PVCPipe uses the bundled extractor to resolve supported service URLs and fetch
+stream and channel metadata. The app's extractor downloader issues those metadata
+requests; playback and download of the resulting media URLs use separate network
+paths (for example, `DownloadMission.openConnection` uses `HttpURLConnection`).
 
 ## Request flow
 
-1. `ServiceList` owns the stable numeric service IDs used by the app and database.
+1. `ServiceList` assigns stable numeric service IDs used by the app and database;
+   the list currently includes YouTube, SoundCloud, MediaCCC, PeerTube, Bandcamp,
+   BitChute, and Rumble.
 2. Each `StreamingService` supplies link-handler factories for the URL types it supports.
-3. A link handler validates the host and path, extracts a stable ID, and produces a canonical URL.
-4. The service creates the matching stream, channel, search, comments, playlist, or kiosk
-   extractor.
-5. The extractor fetches remote data and exposes the service-neutral models consumed by the app.
+3. A link handler validates a supported URL, extracts an ID, and produces a
+   canonical URL.
+4. The service creates the matching supported stream, channel, search, comments,
+   playlist, or kiosk extractor (not every service supports every type).
+5. The extractor fetches remote data and exposes service-neutral models consumed
+   by the app. Its network requests use the configured extractor downloader.
 
 The root Gradle build includes `pvcpipe-extractor` as a composite build and substitutes the
 published extractor dependency. App builds and tests therefore always exercise the source in this
@@ -43,10 +49,10 @@ comment authorization and replies, search/filter corrections, and emulator verif
 
 ## Verification
 
-Run extractor unit tests independently:
+Run the fork's deterministic offline extractor regression tests independently:
 
 ```sh
-./pvcpipe-extractor/gradlew -p pvcpipe-extractor :extractor:test
+./gradlew :pvcpipe-extractor:extractor:forkCiTest
 ```
 
 Maven publications are local-only, under `pvcpipe-extractor/extractor/build/maven`.
@@ -61,9 +67,9 @@ regression tests:
 make ci
 ```
 
-The complete extractor suite uses live third-party services and is intentionally
-kept separate from the reproducible gate. Run it when validating broader
-service compatibility:
+The complete extractor suite (`:extractor:test`) may use live third-party
+services and is intentionally kept separate from the reproducible gate. Run it
+when validating broader service compatibility:
 
 ```sh
 ./pvcpipe-extractor/gradlew -p pvcpipe-extractor :extractor:test

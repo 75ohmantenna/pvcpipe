@@ -220,12 +220,11 @@ public final class RumbleParsingHelper {
     }
 
     /**
-     * Rumble needs a cookie to avoid 307 return codes for category browse.
+     * Generates the PNRC/RNRC cookie sent on category browse requests by
+     * {@link org.schabi.newpipe.extractor.services.rumble.extractors.RumbleTrendingExtractor}.
+     * {@link #getMinimalHeaders()} retains the first generated value for later pages.
      *
-     * Generate random cookies -> seems to work for now. Used atm only in
-     * {@link org.schabi.newpipe.extractor.services.rumble.extractors.RumbleTrendingExtractor}
-     *
-     * @return Cookie with random values
+     * @return Cookie with pseudo-random values
      */
     private static String randomCookieGenerator() {
         final String rand = String.valueOf((int) (Math.random() * 10000));

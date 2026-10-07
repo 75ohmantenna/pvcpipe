@@ -13,9 +13,9 @@ details, rather than a documented, versioned public API contract.
 
 | Interaction | Request |
 | --- | --- |
-| Trending Today/Week/Month | POST `https://api.bitchute.com/api/beta9/videos`, with `selection` set to `trending-day`, `trending-week`, or `trending-month`. |
-| Popular and Suggested | The same endpoint, with distinct `popular` and `suggested` selections and offsets in steps of 20. |
-| Video search | POST `/api/beta/search/videos`, with `query`, `offset`, `limit`, and sensitivity, sort, and duration filters. |
+| Trending Today/Week/Month | POST `https://api.bitchute.com/api/beta9/videos`, with `selection` set to `trending-day`, `trending-week`, or `trending-month`. Each is a single snapshot, not a paginated feed. |
+| Popular and Suggested | The same endpoint, with distinct `popular` and `suggested` selections and offsets in steps of 20; these two selections paginate until an empty response. |
+| Video search | POST `/api/beta/search/videos`, with `query`, `offset`, `limit`, and optional sensitivity, sort, and duration filters. |
 | Channel search | POST `/api/beta/search/channels`; video duration and sort filters are omitted, matching the website. |
 | Suggestions | POST `/api/beta/search2/videos/autocomplete`; the response is an array of messages with highlighted HTML. |
 | Channel details | POST `/api/beta/channel`, with `channel_id` set to the public ID or slug. |
@@ -27,7 +27,7 @@ details, rather than a documented, versioned public API contract.
 | Comment authorization | POST `/api/beta/apps/commentfreely/video/`, with `video_id`; the response supplies a signed anonymous `auth` token. |
 | Comments | Form POST `https://commentfreely.bitchute.com/api/get_comments/`, with `cf_auth` and `commentCount=0`. Omitting `isNameValuesArrays` requests ordinary JSON comment objects. |
 
-All paths without a host above use `https://api.bitchute.com`.
+All paths without a host above use `https://api.bitchute.com`. Autocomplete returns no requests or results for queries shorter than two characters.
 
 The media response currently supplies a single URL, rather than a list of selectable qualities.
 The extractor recognizes progressive MP4/WebM/3GPP and HLS delivery. Background and popup modes
@@ -49,7 +49,9 @@ or post comments on the website.
 - Suggested requests its own feed rather than Popular.
 - Each search request uses the filters stored in its own link handler. Starting a Channels search
   no longer changes the endpoint or filters used when an earlier Videos search loads another page.
-  Exact multiples of 20 stop at the reported total instead of offering an extra empty page.
+  Current search calls use JSON API requests, not the legacy website `searchAuth` timestamp/nonce
+  helpers still present in `BitchuteParserHelper`. Exact multiples of 20 stop at the reported total
+  instead of offering an extra empty page.
 - BitChute's current sensitivity reference omits `safe`, and a live search with that value returned
   HTTP 400 (`safe invalid`). The UI no longer offers it. Old saved Safe filters use `normal`, the
   lowest sensitivity currently accepted by the website.

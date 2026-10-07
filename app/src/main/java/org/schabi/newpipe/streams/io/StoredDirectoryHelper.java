@@ -214,14 +214,13 @@ public class StoredDirectoryHelper {
     }
 
     /**
-     * Only using Java I/O. Creates the directory named by this abstract pathname, including any
-     * necessary but nonexistent parent directories.
-     * Note that if this operation fails it may have succeeded in creating some of the necessary
-     * parent directories.
+     * Attempts to create this directory. For filesystem paths, creates missing parent directories
+     * and reports whether the path exists afterward. For document-tree paths, attempts to create
+     * missing directories and returns true if this document already exists or an existing parent
+     * is encountered; a successful return there does not verify every creation.
      *
-     * @return <code>true</code> if and only if the directory was created,
-     * along with all necessary parent directories or already exists; <code>false</code>
-     * otherwise
+     * @return whether the filesystem path exists afterward, or the document-tree path or a parent
+     *         was found to exist
      */
     public boolean mkdirs() {
         if (docTree == null) {

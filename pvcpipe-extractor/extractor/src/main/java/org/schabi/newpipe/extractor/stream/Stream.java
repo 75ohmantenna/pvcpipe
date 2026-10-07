@@ -82,20 +82,12 @@ public abstract class Stream implements Serializable {
     }
 
     /**
-     * Reveals whether two streams have the same statistics ({@link MediaFormat media format} and
-     * {@link DeliveryMethod delivery method}).
+     * Checks whether two streams have matching known media formats, delivery methods, and
+     * URL/content flags. Streams with an unknown media format are not considered similar.
      *
-     * <p>
-     * If the {@link MediaFormat media format} of the stream is unknown, the streams are compared
-     * by using only the {@link DeliveryMethod delivery method} and their ID.
-     * </p>
-     *
-     * <p>
-     * Note: This method always returns false if the stream passed is null.
-     * </p>
-     *
-     * @param other the stream object to be compared to this stream object
-     * @return whether the stream have the same stats or not, based on the criteria above
+     * @param other the stream object to compare with this stream
+     * @return whether the streams have matching properties, or {@code false} if {@code other}
+     *         is null or either media format is unknown
      */
     public boolean equalStats(@Nullable final Stream other) {
         return other != null && mediaFormat != null && other.mediaFormat != null

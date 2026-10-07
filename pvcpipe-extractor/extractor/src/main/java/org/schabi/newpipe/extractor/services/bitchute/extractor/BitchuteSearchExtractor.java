@@ -61,13 +61,13 @@ public class BitchuteSearchExtractor extends SearchExtractor {
 
     @Override
     public boolean isCorrectedSearch() throws ParsingException {
-        return false; // TODO evermind: this is just to get it compiled not verified
+        return false; // No corrected-query metadata is read from the search JSON.
     }
 
     @Nonnull
     @Override
     public List<MetaInfo> getMetaInfo() throws ParsingException {
-        return Collections.emptyList(); // TODO evermind verify what really should be done
+        return Collections.emptyList(); // No search metadata is read from the JSON response.
     }
 
     @Nonnull
@@ -273,7 +273,7 @@ public class BitchuteSearchExtractor extends SearchExtractor {
 
         @Override
         public boolean isUploaderVerified() throws ParsingException {
-            return false; // TODO evermind: this is just to get it compiled not verified
+            return false; // Search video results do not provide a verified-uploader flag.
         }
 
         @Nullable
@@ -338,7 +338,7 @@ public class BitchuteSearchExtractor extends SearchExtractor {
 
         @Override
         public boolean isVerified() throws ParsingException {
-            return false; // TODO evermind: this is just to get it compiled not verified
+            return false; // Channel search results do not provide a verification flag.
         }
 
         @Override

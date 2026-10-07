@@ -27,12 +27,8 @@ import static org.schabi.newpipe.extractor.ServiceList.Rumble;
 public class RumbleStreamExtractorTest {
 
     /*
-     * This stream test has one speciality:
-     * - one related Stream is the RSBN Live-Stream. So here we also testing
-     *   if the detection of a live stream in the the related streams works
-     *
-     * -> Hopefully RSBN has always a live stream in the related section
-     *    We will see when we have to update this test case.
+     * The related-items fixture includes a live stream from The Quartering
+     * alongside recorded streams, exercising live-stream classification.
      */
     public static class NormalStreamExtractorTest extends DefaultStreamExtractorTest {
 
@@ -246,9 +242,8 @@ public class RumbleStreamExtractorTest {
             );
         }
 
-        // as we fake the audio stream with with video streams for background functionality
-        // we have to override this test as we don't want to check if the audio stream has
-        // a correct format id - because it can not have a correct id.
+        // This override checks audio-stream presence and secure URLs, but not the format
+        // metadata checked by DefaultStreamExtractorTest.
         @Override
         public void testAudioStreams() throws Exception {
             final List<AudioStream> audioStreams = extractor().getAudioStreams();

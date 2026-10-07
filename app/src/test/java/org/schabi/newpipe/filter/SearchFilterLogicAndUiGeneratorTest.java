@@ -445,15 +445,10 @@ public class SearchFilterLogicAndUiGeneratorTest {
         universalWrapper.clear();
         generator.createSearchUI();
 
-        // 1st test:
-        // default content filter is PeertubeFilters.ID_CF_MAIN_ALL so we expect all sort filters
-        // visible. Get the filters from service and compare with universalWrapper map
+        // The default content selection exposes the video sort filters in the UI.
         expectSortFiltersToBeVisible(PeertubeFilters.ID_CF_MAIN_VIDEOS);
 
-        // 2nd test:
-        // content filter with no sort filters aka Ui element should be not visible.
-        // get all sort filters from  and compare with universalWrapper map
-        // set content filter with no sort filters available
+        // Selecting playlists, which has no sort filters, hides the video sort controls.
         final int contentFilterWithNoSortFilters = PeertubeFilters.ID_CF_MAIN_PLAYLISTS;
         logic.selectContentFilter(contentFilterWithNoSortFilters);
         final FilterContainer noSortFiltersAkaNull = service.getSearchQHFactory()

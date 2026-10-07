@@ -1,13 +1,10 @@
 # Time ago parser raw resources
 
-This directory contains some JSON-formatted time ago strings gather directly from YouTube.
+This directory holds JSON-formatted time-ago string data for the parser.
+`times/` groups strings by time unit (for example, seconds and years).
+`overview.json` is generated from those files; `unique_patterns.json` is the
+input to the pattern-class generator.
 
-#### Java directory
-
-Some useful classes that can generate an overview and check if we have all the time units for all the languages.
-
-It also contains the resource bundle generator.
-
-#### Times directory
-
-All the units organized by their unit value and name (e.g. 1s = "1 second", 2y = "2 años", 4w = "4 semanas").
+The overview, coverage-checking, and pattern-generation Java sources are in
+`../../timeago-generator/src/main/java/org/schabi/newpipe/timeago_generator/`,
+not in this directory.
