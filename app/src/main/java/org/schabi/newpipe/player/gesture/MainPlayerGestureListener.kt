@@ -15,7 +15,7 @@ import org.schabi.newpipe.R
 import org.schabi.newpipe.ktx.AnimationType
 import org.schabi.newpipe.ktx.animate
 import org.schabi.newpipe.player.Player
-import org.schabi.newpipe.player.helper.AudioReactor
+import org.schabi.newpipe.player.audio.PlaybackAudio
 import org.schabi.newpipe.player.helper.PlayerHelper
 import org.schabi.newpipe.player.ui.MainPlayerUi
 import org.schabi.newpipe.util.ThemeHelper.getAndroidDimenPx
@@ -73,11 +73,11 @@ class MainPlayerGestureListener(
 
     private fun onScrollVolume(distanceY: Float) {
         val bar: ProgressBar = binding.volumeProgressBar
-        val audioReactor: AudioReactor = player.audioReactor
+        val playbackAudio: PlaybackAudio = player.playbackAudio
 
         // If we just started sliding, change the progress bar to match the system volume
         if (!binding.volumeRelativeLayout.isVisible) {
-            val volumePercent: Float = audioReactor.volume / audioReactor.maxVolume.toFloat()
+            val volumePercent: Float = playbackAudio.systemVolume / playbackAudio.maxSystemVolume.toFloat()
             bar.progress = (volumePercent * bar.max).toInt()
         }
 
@@ -86,8 +86,8 @@ class MainPlayerGestureListener(
 
         // Update volume
         val currentProgressPercent: Float = bar.progress / bar.max.toFloat()
-        val currentVolume = (audioReactor.maxVolume * currentProgressPercent).toInt()
-        audioReactor.volume = currentVolume
+        val currentVolume = (playbackAudio.maxSystemVolume * currentProgressPercent).toInt()
+        playbackAudio.systemVolume = currentVolume
         if (DEBUG) {
             Log.d(TAG, "onScroll().volumeControl, currentVolume = $currentVolume")
         }

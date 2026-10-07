@@ -102,3 +102,7 @@ playback-history decision.
 **Accepted playback recording**:
 A view or progress update admitted for ordered database storage independently
 of the player's lifetime while the application process remains running.
+
+**Playback audio**:
+The internal volume, mute state and audio-focus behavior associated with playback.
+Android music-stream volume is a separate device-level control.

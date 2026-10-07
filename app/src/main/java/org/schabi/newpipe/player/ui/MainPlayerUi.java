@@ -56,6 +56,7 @@ import org.schabi.newpipe.info_list.StreamSegmentItem;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.player.Player;
+import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.gesture.BasePlayerGestureListener;
 import org.schabi.newpipe.player.gesture.MainPlayerGestureListener;
@@ -565,9 +566,10 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
     }
 
     private void setInitialGestureValues() {
-        if (player.getAudioReactor() != null) {
-            final float currentVolumeNormalized = (float) player.getAudioReactor().getVolume()
-                    / player.getAudioReactor().getMaxVolume();
+        if (player.getPlaybackAudio() != null) {
+            final PlaybackAudio audio = player.getPlaybackAudio();
+            final float currentVolumeNormalized = (float) audio.getSystemVolume()
+                    / audio.getMaxSystemVolume();
             binding.volumeProgressBar.setProgress(
                     (int) (binding.volumeProgressBar.getMax() * currentVolumeNormalized));
         }

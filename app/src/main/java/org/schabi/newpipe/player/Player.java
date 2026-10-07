@@ -87,7 +87,7 @@ import org.schabi.newpipe.fragments.detail.VideoDetailFragment;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.event.PlayerEventListener;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
-import org.schabi.newpipe.player.helper.AudioReactor;
+import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.helper.CustomRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -192,7 +192,7 @@ public final class Player implements PlaybackListener, Listener {
     //////////////////////////////////////////////////////////////////////////*/
 
     private ExoPlayer simpleExoPlayer;
-    private AudioReactor audioReactor;
+    private PlaybackAudio playbackAudio;
 
     @NonNull
     private final DefaultTrackSelector trackSelector;
@@ -577,7 +577,7 @@ public final class Player implements PlaybackListener, Listener {
 
         UIs.call(PlayerUi::initPlayback);
 
-        audioReactor.pvcDoMute(isMuted());
+        playbackAudio.onPlaybackEvent(PlaybackAudio.Event.INITIALIZED);
         notifyQueueUpdateToListeners();
     }
 
@@ -597,7 +597,7 @@ public final class Player implements PlaybackListener, Listener {
         simpleExoPlayer.setWakeMode(C.WAKE_MODE_NETWORK);
         simpleExoPlayer.setHandleAudioBecomingNoisy(true);
 
-        audioReactor = new AudioReactor(context, simpleExoPlayer);
+        playbackAudio = new PlaybackAudio(context, simpleExoPlayer);
 
         registerBroadcastReceiver();
 
@@ -637,8 +637,8 @@ public final class Player implements PlaybackListener, Listener {
         if (playQueue != null) {
             playQueue.dispose();
         }
-        if (audioReactor != null) {
-            audioReactor.dispose();
+        if (playbackAudio != null) {
+            playbackAudio.dispose();
         }
         if (playQueueManager != null) {
             playQueueManager.dispose();
@@ -1086,8 +1086,8 @@ public final class Player implements PlaybackListener, Listener {
 
         UIs.call(PlayerUi::onPrepared);
 
-        if (playWhenReady && !isMuted()) {
-            audioReactor.requestAudioFocus();
+        if (playWhenReady) {
+            playbackAudio.onPlaybackEvent(PlaybackAudio.Event.PREPARED_PLAYING);
         }
     }
 
@@ -1235,18 +1235,13 @@ public final class Player implements PlaybackListener, Listener {
 
     public void toggleMute() {
         final boolean wasMuted = isMuted();
-        audioReactor.pvcDoMute(!wasMuted);
-        if (wasMuted) {
-            audioReactor.requestAudioFocus();
-        } else {
-            audioReactor.abandonAudioFocus();
-        }
+        playbackAudio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
         UIs.call(playerUi -> playerUi.onMuteUnmuteChanged(!wasMuted));
         notifyPlaybackUpdateToListeners();
     }
 
     public boolean isMuted() {
-        return !exoPlayerIsNull() && simpleExoPlayer.getVolume() == 0;
+        return !exoPlayerIsNull() && playbackAudio.isMuted();
     }
     //endregion
 
@@ -1627,13 +1622,11 @@ public final class Player implements PlaybackListener, Listener {
         if (DEBUG) {
             Log.d(TAG, "play() called");
         }
-        if (audioReactor == null || playQueue == null || exoPlayerIsNull()) {
+        if (playbackAudio == null || playQueue == null || exoPlayerIsNull()) {
             return;
         }
 
-        if (!isMuted()) {
-            audioReactor.requestAudioFocus();
-        }
+        playbackAudio.onPlaybackEvent(PlaybackAudio.Event.PLAY_REQUESTED);
 
         if (currentState == STATE_COMPLETED) {
             if (playQueue.getIndex() == 0) {
@@ -1651,11 +1644,11 @@ public final class Player implements PlaybackListener, Listener {
         if (DEBUG) {
             Log.d(TAG, "pause() called");
         }
-        if (audioReactor == null || exoPlayerIsNull()) {
+        if (playbackAudio == null || exoPlayerIsNull()) {
             return;
         }
 
-        audioReactor.abandonAudioFocus();
+        playbackAudio.onPlaybackEvent(PlaybackAudio.Event.PAUSE_REQUESTED);
         simpleExoPlayer.pause();
         saveStreamProgressState();
     }
@@ -2161,8 +2154,8 @@ public final class Player implements PlaybackListener, Listener {
         return playQueue;
     }
 
-    public AudioReactor getAudioReactor() {
-        return audioReactor;
+    public PlaybackAudio getPlaybackAudio() {
+        return playbackAudio;
     }
 
     public PlayerService getService() {

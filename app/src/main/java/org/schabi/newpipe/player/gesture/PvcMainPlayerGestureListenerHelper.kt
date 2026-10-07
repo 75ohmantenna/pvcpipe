@@ -12,7 +12,7 @@ import org.schabi.newpipe.R
 import org.schabi.newpipe.databinding.PlayerBinding
 import org.schabi.newpipe.ktx.AnimationType
 import org.schabi.newpipe.ktx.animate
-import org.schabi.newpipe.player.helper.AudioReactor
+import org.schabi.newpipe.player.audio.PlaybackAudio
 import org.schabi.newpipe.player.ui.MainPlayerUi
 
 /**
@@ -47,11 +47,11 @@ class PvcMainPlayerGestureListenerHelper {
     ) {
         val bar: ProgressBar = binding.pvcPlayerExt.internalVolProgressBar
         val player = playerUi.player
-        val audioReactor: AudioReactor = player.audioReactor
+        val playbackAudio: PlaybackAudio = player.playbackAudio
 
         // If we just started sliding, change the progress bar to match the system volume
         if (!binding.pvcPlayerExt.internalVolRelativeLayout.isVisible) {
-            val volumePercent: Float = audioReactor.internalVolume
+            val volumePercent: Float = playbackAudio.internalVolume
             bar.progress = (volumePercent * bar.max).toInt()
         }
 
@@ -60,8 +60,7 @@ class PvcMainPlayerGestureListenerHelper {
 
         // Update volume
         val currentVolumePercent: Float = bar.progress / bar.max.toFloat()
-        audioReactor.internalVolume = currentVolumePercent
-        audioReactor.pvcSaveInternalVolume()
+        playbackAudio.internalVolume = currentVolumePercent
         if (DEBUG) {
             Log.d(TAG, "onScroll().internalVolume, currentVolumePercent = $currentVolumePercent")
         }
