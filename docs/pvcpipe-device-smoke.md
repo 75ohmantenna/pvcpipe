@@ -136,15 +136,19 @@ Downloads showed **Nothing here but crickets**. The loopback server and
 the previously installed instrumentation APK was restored with a same-signer
 `install -r`. A pulled copy matched the pretest APK SHA-256
 `7bdace0cdbb94062496fe17fc129601774dca7276c14d2f1156f3adc26caa0d5`.
-The tested production debug APK and saved app settings were not replaced.
+The tested production debug APK and saved app settings were not replaced
+during that controlled follow-up.
 
-**Storage-setting exception:** Choosing the test SAF directory saved it as the
-video-download destination. The original destination value was not recorded
-before selection. The empty directory and grant were retained rather than
-deleting the configured destination or guessing a pre-existing preference.
-This remains an unresolved cleanup limitation: future videos would default to
-that empty test directory. Do not remove it without choosing the desired
-video-download destination in Settings → Downloads. No test media remains.
+**Destination restored after publication:** The original video destination
+was not captured before choosing the test SAF directory. The user subsequently
+identified it as `Download/ytdlp`. On this Pixel, the existing `ytdlp` folder
+was selected through the system folder picker and access was allowed.
+Settings → Download → Video download folder then displayed
+`content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fytdlp`.
+The now-unreferenced test directory
+`/sdcard/Download/PVCPipe-smoke-20261007/` was confirmed empty and removed.
+Files already in `Download/ytdlp` were left untouched. No new download was
+started after restoring the folder, so writing to it was not retested.
 
 Verification is limited to this phone, the stated public URLs and local
 fixture, and the network at the stated time. Rumble content availability can
