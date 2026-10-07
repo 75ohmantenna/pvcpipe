@@ -29,13 +29,20 @@ adapted to NewPipe Extractor's models and downloader API; Python code is not cop
 
 | Service | Adapted behavior | yt-dlp reference |
 | --- | --- | --- |
-| YouTube | Current client identities; Safari identity for web embeds; web-embed age-gate fallback; collaborator follower counts; safe manifest query composition | `yt_dlp/extractor/youtube/_base.py`, `_video.py` |
+| YouTube | Current client identities; Safari identity for web embeds; independent Android/visionOS player validation and age-gate web-embed fallback; collaborator follower counts; safe manifest query composition | `yt_dlp/extractor/youtube/_base.py`, `_video.py` |
 | BitChute | API media extraction; HLS recognition; old/embed/torrent URL forms; strict host validation | `yt_dlp/extractor/bitchute.py` |
-| Rumble | Format classification; HLS variants; audio and captions; live-state semantics; channel/user URL validation | `yt_dlp/extractor/rumble.py` |
+| Rumble | Format classification; HLS variants; audio and captions; live-state semantics; channel/user URL validation; canonical-path Shorts routing | `yt_dlp/extractor/rumble.py` |
 
 The source behavior was reviewed from the local yt-dlp checkout. Relevant upstream yt-dlp changes
 include `1d0f6539c` (BitChute API), `58d0c8345` (Rumble formats), `5d5b634d8` (YouTube web-embed
 fallbacks), `5d6b8c8cd` (collaborator follower counts), and `c7fb478d2` (Safari web-embed identity).
+
+The YouTube player clients retain only responses for the requested video with a
+supported stream descriptor or manifest URL. A failed Android request does not
+prevent a valid visionOS response from supplying metadata and formats; duration
+fallback also checks that client's adaptive formats. If no client succeeds, the
+extractor preserves a specific access restriction over a generic client failure.
+Rumble routes Shorts by the normalized video path, not query or fragment text.
 
 ## Rumble website verification
 
