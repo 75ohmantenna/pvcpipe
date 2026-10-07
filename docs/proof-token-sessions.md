@@ -16,9 +16,10 @@ request, generator creation, and main-thread retirement. `AndroidPoTokenEnvironm
 binds those operations to the application and the existing
 `PoTokenGenerator.Factory`. Its default remains `PoTokenWebView`.
 
-A supplied timeout scheduler lets tests advance the existing 30-second generator
-and token deadlines without waiting in real time. Diagnostics preserve production
-logging without introducing Android dependencies into the session implementation.
+A supplied timeout scheduler lets tests advance the 30-second generator-creation,
+streaming-token and player-token deadlines without waiting in real time.
+Diagnostics preserve production logging without introducing Android dependencies
+into the session implementation.
 Tests use the existing `PoTokenProvider` request interface and scripted external
 adapters rather than changing the singleton's state or reflecting into a generator.
 
@@ -49,7 +50,8 @@ An attempt on a newly initialized session also fails without another recreation.
 Initialization follows explicit phases on the main queue. Duplicate, premature,
 and closed-generation callbacks cannot start new transport work or publish a
 canceled generator. Nonfatal browser construction, loading, parsing, and JavaScript
-evaluation failures terminate initialization and close allocated resources.
+evaluation failures terminate initialization; an already constructed generator
+closes its browser and other resources.
 A fatal JavaScript initialization error still closes an already delivered generator.
 
 Each token request uses a unique callback ID independent of its input identifier.

@@ -415,7 +415,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         try {
             storage = new StoredFileHelper(this, parentPath, path, tag);
         } catch (IOException e) {
-            throw new RuntimeException(e);// this never should happen
+            throw new RuntimeException(e);// A saved URI can become inaccessible before service handling.
         }
 
         Postprocessing ps;

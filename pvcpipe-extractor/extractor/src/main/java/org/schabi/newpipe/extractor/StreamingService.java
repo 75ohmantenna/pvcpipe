@@ -174,7 +174,7 @@ public abstract class StreamingService {
 
     /**
      * Must create a new instance of a SearchExtractor implementation.
-     * @param queryHandler specifies the keyword lock for, and the filters which should be applied.
+     * @param queryHandler specifies the search query and the filters to apply
      * @return a new SearchExtractor instance
      */
     public abstract SearchExtractor getSearchExtractor(SearchQueryHandler queryHandler);
@@ -186,8 +186,10 @@ public abstract class StreamingService {
     public abstract SuggestionExtractor getSuggestionExtractor();
 
     /**
-     * Outdated or obsolete. null can be returned.
-     * @return just null
+     * Return a subscription extractor if this service supports subscription import, or
+     * {@code null} otherwise.
+     *
+     * @return a subscription extractor or {@code null}
      */
     public abstract SubscriptionExtractor getSubscriptionExtractor();
 

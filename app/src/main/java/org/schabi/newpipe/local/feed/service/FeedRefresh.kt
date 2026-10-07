@@ -44,8 +44,8 @@ class FeedRefresh internal constructor(
         .cache()
 
     private fun buildResult(): Single<List<Notification<FeedUpdateInfo>>> {
-        // like `currentProgress`, but counts the number of YouTube extractions that have begun, so
-        // they can be properly throttled every once in a while (see doOnNext below)
+        // Count YouTube subscriptions passing the first cancellation check so throttling
+        // applies once every BATCH_SIZE entries (before the parallel extraction stage).
         val youtubeExtractionCount = AtomicInteger()
 
         return Flowable.defer { operations.subscriptions(groupId, outdatedThreshold) }

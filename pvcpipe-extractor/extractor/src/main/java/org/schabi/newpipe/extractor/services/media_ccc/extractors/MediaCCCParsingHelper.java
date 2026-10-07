@@ -33,8 +33,8 @@ public final class MediaCCCParsingHelper {
     /**
      * Check whether an id is a live stream id
      * @param id the {@code id} to check
-     * @return returns {@code true} if the {@code id} is formatted like
-     *         {@code {conference_slug}/{room_slug}}; {@code false} otherwise
+     * @return {@code true} if the {@code id} contains a
+     *         {@code {conference_slug}/{room_slug}} segment; {@code false} otherwise
      */
     public static boolean isLiveStreamId(final String id) {
         return LIVE_STREAM_ID_PATTERN.matcher(id).find();
@@ -113,7 +113,7 @@ public final class MediaCCCParsingHelper {
      *
      * <p>
      * MediaCCC API provides two URL thumbnails for a livestream item: a {@code thumb} one,
-     * which should be medium quality and a {@code poster_url} one, which should be high quality.
+     * which should be medium quality and a {@code poster} one, which should be high quality.
      * </p>
      *
      * @param liveStreamItem a stream JSON item of MediaCCC's API, which must not be null
@@ -129,8 +129,7 @@ public final class MediaCCCParsingHelper {
      * Utility method to get an {@link Image} list of thumbnails from a stream or a livestream.
      *
      * <p>
-     * MediaCCC's API thumbnails come from two elements: a {@code thumb} element, which links to a
-     * medium thumbnail and a {@code poster} element, which links to a high thumbnail.
+     * The thumbnail and poster URL keys select medium- and high-resolution images, respectively.
      * </p>
      * <p>
      * Thumbnails are only added if their URLs are not null or empty.

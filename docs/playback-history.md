@@ -26,7 +26,10 @@ Disposal before the write barrier finishes prevents lookup. During lookup it
 detaches delivery without canceling earlier recordings. Absent, finished or
 failed history yields `RECOVERY_UNSET`.
 
-Existing preference defaults remain view registration: false, progress: true.
+With no stored preference, `HistoryRecordManager` defaults view registration to
+false while `AndroidPlaybackHistoryEnvironment` defaults progress saving to true.
+The history settings screen declares a true default for watch history.
+
 Module tests control write completion and extraction; real in-memory Room tests
 verify preferences, persistence and ordering across production history
 instances. An integration test calls actual `Player.destroy()` before the final

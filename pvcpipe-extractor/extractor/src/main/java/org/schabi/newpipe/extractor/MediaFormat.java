@@ -120,8 +120,8 @@ public enum MediaFormat {
      * Return the MIME type of the media format with the supplied id
      *
      * @param id the id of the media format. Currently an arbitrary, NewPipe-specific number.
-     * @return the MIME type of the MediaFormat associated with this ids,
-     * or an empty String if none match it.
+     * @return the MIME type of the {@link MediaFormat} associated with this id,
+     * or {@code null} if none matches
      */
     @Nullable
     public static String getMimeById(final int id) {
@@ -161,7 +161,7 @@ public enum MediaFormat {
      * Get the media format by its id.
      *
      * @param id the id
-     * @return the id of the media format or null.
+     * @return the media format with the given id, or {@code null} if none matches
      */
     @Nullable
     public static MediaFormat getFormatById(final int id) {

@@ -99,7 +99,7 @@ public class RumbleTrendingShortsExtractor extends KioskExtractor<StreamInfoItem
     }
 
     /**
-     * Next Page just increase the offset
+     * Advances by ten from the current page's offset.
      */
     private Page getNextPageFrom(Page page) {
         int offset = page.getId() != null ? Integer.parseInt(page.getId()) : 0;

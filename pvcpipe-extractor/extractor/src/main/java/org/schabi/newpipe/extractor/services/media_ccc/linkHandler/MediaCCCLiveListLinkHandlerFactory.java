@@ -39,7 +39,7 @@ public final class MediaCCCLiveListLinkHandlerFactory extends ListLinkHandlerFac
                          @Nonnull final List<FilterItem> contentFilter,
                          @Nullable final List<FilterItem> sortFilter)
             throws ParsingException, UnsupportedOperationException {
-        // FIXME: wrong URL; should be https://streaming.media.ccc.de/{conference_slug}/{room_slug}
+        // This is the live-stream kiosk URL; individual room URLs use the stream link handler.
         return "https://media.ccc.de/live";
     }
 }

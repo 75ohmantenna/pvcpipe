@@ -161,7 +161,8 @@ public final class PlaylistInfo extends ListInfo<StreamInfoItem> {
             info.addError(e);
         }
 
-        // do not fail if everything but the uploader infos could be collected (TODO better comment)
+        // Suppress uploader/sub-channel errors when at least three of their getters failed
+        // and no earlier non-uploader error was recorded; item-page errors are collected later.
         if (!uploaderParsingErrors.isEmpty()
                 && (!info.getErrors().isEmpty() || uploaderParsingErrors.size() < 3)) {
             info.addAllErrors(uploaderParsingErrors);

@@ -5,9 +5,9 @@ import javax.annotation.Nullable;
 
 public class PatternsManager {
     /**
-     * Return an holder object containing all the patterns array.
+     * Return the patterns holder for the requested language and optional country code.
      *
-     * @return an object containing the patterns. If not existent, {@code null}.
+     * @return the matching patterns holder, or {@code null} if no exact match exists
      */
     @Nullable
     public static PatternsHolder getPatterns(@Nonnull String languageCode, @Nullable String countryCode) {

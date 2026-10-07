@@ -55,10 +55,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
         }
     }
 
-    /**
-     * Exports given [SharedPreferences] to the file in given outputPath.
-     * It also creates the file.
-     */
+    /** Write the database and preferences to the selected document, truncating existing content. */
     @Throws(Exception::class)
     fun exportDatabase(preferences: SharedPreferences, file: StoredFileHelper) {
         // truncate the file before writing to it, otherwise if the new content is smaller than the

@@ -19,11 +19,13 @@ batches, progress, and terminal events through the same refresh interface used
 by callers. Existing database integration tests retain distinct storage coverage.
 
 Each refresh has independent cancellation, counters, and errors. A channel
-extraction failure is result data associated with its subscription; query,
-transaction, or cleanup failure terminates the result. Successful completion
-means the collected batches and cleanup finished, rather than that every
-channel extraction succeeded. Cancellation stops admitting extractions where
-cooperative checks permit and lets already collected results reach storage.
+extraction failure is a materialized error notification associated with its
+subscription; the returned result also contains successful feed updates. Query,
+transaction, or cleanup failure instead terminates the result with an error.
+Successful completion means the collected batches and cleanup finished, rather
+than that every channel extraction succeeded. Cancellation stops admitting
+extractions where cooperative checks permit and lets already collected results
+reach storage.
 
 The first result subscription accepts execution once. The refresh retains its
 complete pipeline through persistence and cleanup; disposing an observer only

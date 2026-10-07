@@ -17,8 +17,8 @@ public final class PvcPeertubeChannelLinkHandlerFactoryHelper {
      * If either host is found, PeerTube should not declare it as one of
      *    their own urls.
      *
-     * @param url the url man!
-     * @return false if not a Peertube url.
+     * @param url the URL to check
+     * @return {@code false} for rumble.com or bitchute.com, {@code true} for other hosts
      */
     public boolean onAcceptUrl(final URL url) {
         if (url.getHost().equals("rumble.com")

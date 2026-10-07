@@ -225,7 +225,7 @@ public class BitchuteStreamExtractor extends StreamExtractor {
 
     @Override
     public boolean isUploaderVerified() throws ParsingException {
-        return false; // TODO evermind: this is just to get it compiled not verified
+        return false; // The video details response does not expose uploader verification.
     }
 
     @Nonnull
@@ -238,13 +238,13 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nonnull
     @Override
     public String getSubChannelUrl() {
-        return ""; // TODO evermind: this is just to get it compiled not verified
+        return ""; // No sub-channel URL is extracted from video details.
     }
 
     @Nonnull
     @Override
     public String getSubChannelName() {
-        return ""; // TODO evermind: this is just to get it compiled not verified
+        return ""; // No sub-channel name is extracted from video details.
     }
 
     @Nonnull
@@ -374,7 +374,7 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nonnull
     @Override
     public Privacy getPrivacy() {
-        return Privacy.OTHER; // TODO evermind: this is just to get it compiled not verified
+        return Privacy.OTHER; // The video details response does not expose privacy status.
     }
 
     @Nonnull

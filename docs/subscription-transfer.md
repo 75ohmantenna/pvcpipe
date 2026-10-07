@@ -33,10 +33,11 @@ continue using the same input representation after an application update.
 Unavailable document streams produce failure outcomes instead of successful empty
 imports or unwritten exports. Import source, extraction, progress, and storage
 errors produce failure outcomes. A later failed batch leaves earlier committed
-batches intact; successful progress is reported only after each batch commits.
-Export success requires the destination to open, serialize, and close successfully.
-Cancellation propagates through the codec, transfer, and worker presentation
-instead of becoming an ordinary failure outcome.
+batches intact; import progress starts at zero before storage and advances only
+after each batch commits. Export success requires the destination to open,
+serialize, and close successfully. Cancellation propagates through the codec,
+transfer, and worker presentation instead of becoming an ordinary failure
+outcome.
 
 An explicit permit limits the whole channel-and-tab extraction to eight requests
 in flight, including suspended external requests. Loading progress increments and

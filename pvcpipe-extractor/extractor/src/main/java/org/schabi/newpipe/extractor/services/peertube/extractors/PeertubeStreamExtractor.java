@@ -489,9 +489,8 @@ public class PeertubeStreamExtractor extends StreamExtractor {
                             .setMediaFormat(MediaFormat.MPEG_4)
                             .setDeliveryMethod(DeliveryMethod.HLS)
                             .build())
-                    // Don't use the containsSimilarStream method because it will always return
-                    // false so if there are multiples HLS URLs returned, only the first will be
-                    // extracted in this case.
+                    // Keep every live HLS URL: equalStats considers streams with the same
+                    // format, delivery method and URL flag similar even if their URLs differ.
                     .forEachOrdered(videoStreams::add);
         } catch (final Exception e) {
             throw new ParsingException("Could not get video streams", e);

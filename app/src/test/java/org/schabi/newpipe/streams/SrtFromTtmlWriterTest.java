@@ -38,10 +38,9 @@ import static org.junit.Assert.assertEquals;
  *   at compile time, so they do not represent real XML entities.
  *
  * - Purpose of these tests:
- *   We simulate *real TTML input* as NewPipe receives it — i.e., strings that
- *   still contain encoded XML entities (&#x9;, &#xA;, &#xD;, etc.).
- *   The production code (`decodeXmlEntities()`) must convert these into their
- *   actual Unicode characters before normalization.
+ *   Some fixture strings contain XML entities. Jsoup parses them into DOM text
+ *   nodes before {@code extractText()} applies any remaining entity decoding
+ *   and SRT text normalization.
  */
 public class SrtFromTtmlWriterTest {
     private static final String TTML_WRAPPER_START = "<tt><body><div>";
@@ -120,9 +119,8 @@ public class SrtFromTtmlWriterTest {
      * &#x0001; → \u0001
      * &#x001F; → \u001F
      *
-     * These control characters, if included as raw Unicode(e.g. '\u0001'),
-     * are either invalid in XML or rendered as '?' when processed.
-     * To avoid issues, they should be encoded(e.g. '&#x0001;') in TTML file.
+     * XML 1.0 does not permit these control characters even as character references.
+     * These fixtures exercise the writer's normalization after Jsoup parsing.
      *
      * - Reference:
      *   Unicode Basic Latin (https://unicode.org/charts/PDF/U0000.pdf),
@@ -180,11 +178,11 @@ public class SrtFromTtmlWriterTest {
             + "</p>";
 
     /**
-     * Parses TTML string into a JSoup Document and selects the first <p> element.
+     * Parses TTML into a Jsoup Document and selects the first <p> element.
      *
      * @param ttmlContent TTML content (e.g., <p>...</p>)
      * @return the first <p> element
-     * @throws Exception if parsing or reflection fails
+     * @throws Exception if parsing fails
      */
     private Element parseTtmlParagraph(final String ttmlContent) throws Exception {
         final String ttml = TTML_WRAPPER_START + ttmlContent + TTML_WRAPPER_END;
@@ -289,14 +287,7 @@ public class SrtFromTtmlWriterTest {
         assertEquals(expected, actual);
     }
 
-    /**
-    * Test case to ensure that extractText() does not throw an exception
-    * when there are no text in the TTML paragraph (i.e., the paragraph
-    * is empty).
-    *
-    * Note:
-    *   In the NewPipe, *.srt files will contain empty text lines by default.
-    */
+    /** Empty paragraph text is extracted as an empty string. */
     @Test
     public void testExtractTextWithEmpty() throws Exception {
         final String expected = "";

@@ -17,6 +17,11 @@ Inspection is advisory: the current stream probe is not database validation and
 a document can change after inspection. JSON preferences take precedence over
 legacy serialized preferences; the fragment retains the legacy warning.
 
+Exports checkpoint the database, truncate the selected document, and include
+the database plus both JSON and legacy serialized preferences. The legacy
+format remains in exported archives for compatibility, but inspection offers
+JSON when both settings entries are present.
+
 An accepted restore first makes a private archive snapshot, decodes selected
 settings without writing them, and extracts a nonempty database to a unique
 unpublished file. A changed settings format requires another inspection rather

@@ -85,11 +85,11 @@ public final class DownloaderImpl extends Downloader {
     }
 
     /**
-     * It's recommended to call exactly once in the entire lifetime of the application.
+     * Initialize the shared downloader, preferably once during application startup.
      *
-     * @param builder if null, default builder will be used. If supplying a builder always use
-     * {@link #getNewBuilder()} to retrieve one - unless you know what you are doing.
-     * @return a new instance of {@link DownloaderImpl}
+     * @param builder if null, the current client's builder is used. If supplying a builder,
+     *                use {@link #getNewBuilder()} unless custom client configuration is intended.
+     * @return the shared {@link DownloaderImpl} instance
      */
     public DownloaderImpl init(@Nullable final OkHttpClient.Builder builder) {
         initInternal(builder);

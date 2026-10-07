@@ -37,7 +37,7 @@ public final class PlaybackAudio {
 
     /**
      * Applies audio effects before the caller's ordinary playback operation.
-     * Call on the player application thread, including initialization and disposal.
+     * Call on the player application thread; dispose separately on that thread.
      * @param event the playback intention or preparation fact
      */
     public void onPlaybackEvent(final Event event) {

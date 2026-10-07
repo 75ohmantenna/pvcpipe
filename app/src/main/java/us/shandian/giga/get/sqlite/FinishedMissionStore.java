@@ -24,7 +24,7 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
  */
 public class FinishedMissionStore extends SQLiteOpenHelper {
 
-    // TODO: use NewPipeSQLiteHelper ('s constants) when playlist branch is merged (?)
+    // Download history remains in its own downloads.db, separate from Room's newpipe.db.
     private static final String DATABASE_NAME = "downloads.db";
 
     private static final int DATABASE_VERSION = 5;

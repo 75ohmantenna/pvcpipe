@@ -31,9 +31,7 @@ class FeedDatabaseManager internal constructor(private val database: AppDatabase
     private val streamTable = database.streamDAO()
 
     companion object {
-        /**
-         * Only items that are newer than this will be saved.
-         */
+        /** Oldest allowed upload date for stored streams with a date; undated live streams are allowed. */
         val FEED_OLDEST_ALLOWED_DATE: OffsetDateTime = LocalDate.now().minusWeeks(13)
             .atStartOfDay().atOffset(ZoneOffset.UTC)
     }

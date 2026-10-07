@@ -89,7 +89,7 @@ player proof tokens for individual video requests.
 
 **Playback source**:
 The selected remote media and stream metadata prepared for the player, including
-its chosen video quality and audio track.
+video quality or audio-track selection where applicable.
 
 **Playback history**:
 The recorded views and progress of played streams, including the saved position

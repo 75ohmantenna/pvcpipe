@@ -14,14 +14,16 @@ Automatic thumbnails remain when their stream survives, otherwise they use the
 first surviving stream or the default for empty contents. Permanent thumbnails
 remain unchanged by content removal.
 
-The first subscription accepts each mutation once. The complete transaction is
-cached on the shared application writer, so disposing presentation does not stop
-queued content or thumbnail work and later observers receive its stored result.
+Each cached writer mutation starts on first subscription and runs once. Its
+transaction runs on the shared application writer and caches the outcome, so
+disposing presentation does not stop queued content or thumbnail work and later
+observers receive its stored result.
 Append stream fields and content ID lists are copied when the operation is
-created. Playlist creation retains its existing behavior. Renames,
-explicit thumbnails, bookmark ordering, and deletions use the same writer and
-read current metadata in their transactions; bookmark ordering only changes the
-display index, preserving newer names and thumbnails.
+created. Unlike these cached writer operations, playlist creation retains its
+existing IO scheduling and does not use the shared writer. Renames, explicit
+thumbnails, bookmark ordering, and deletions use the writer and read current
+metadata in their transactions; bookmark ordering only changes the display
+index, preserving newer names and thumbnails.
 
 Content selection, history/state classification, index replacement, thumbnail
 selection, and the returned ordered result use synchronous Room queries inside

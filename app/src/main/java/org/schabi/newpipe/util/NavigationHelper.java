@@ -509,16 +509,15 @@ public final class NavigationHelper {
     }
 
     /**
-     * Closes all open {@link CommentRepliesFragment}s in {@code activity},
-     * including those that are not at the top of the back stack.
-     * This is needed to prevent multiple open CommentRepliesFragments
-     * Ideally there should only be one since we remove existing before opening a new one.
+     * Removes currently added {@link CommentRepliesFragment}s and pops consecutive
+     * reply-fragment entries at the top of the back stack. Entries deeper in the
+     * back stack are not popped.
      * @param activity the activity in which to close the CommentRepliesFragments
      */
     public static void closeCommentRepliesFragments(@NonNull final FragmentActivity activity) {
         final FragmentManager fm = activity.getSupportFragmentManager();
 
-        // Remove all existing fragment instances tagged as CommentRepliesFragment
+        // Remove currently added reply fragments, including ones beneath another fragment.
         final FragmentTransaction tx = defaultTransaction(fm);
         boolean removed = false;
         for (final Fragment fragment : fm.getFragments()) {

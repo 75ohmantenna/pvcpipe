@@ -238,13 +238,11 @@ public final class SoundcloudParsingHelper {
     }
 
     /**
-     * Fetch the users from the given API and commit each of them to the collector.
-     * <p>
-     * This differ from {@link #getUsersFromApi(ChannelInfoItemsCollector, String)} in the sense
-     * that they will always get MIN_ITEMS or more.
+     * Fetch user pages until the collector contains at least {@code minItems} items or
+     * there are no more pages. The collector may contain fewer items if the API is exhausted.
      *
-     * @param minItems the method will return only when it have extracted that many items
-     *                 (equal or more)
+     * @param minItems the minimum number of collected items to try to reach
+     * @return the next page URL, or an empty string if there are no more pages
      */
     public static String getUsersFromApiMinItems(final int minItems,
                                                  final ChannelInfoItemsCollector collector,
@@ -290,13 +288,11 @@ public final class SoundcloudParsingHelper {
     }
 
     /**
-     * Fetch the streams from the given API and commit each of them to the collector.
-     * <p>
-     * This differ from {@link #getStreamsFromApi(StreamInfoItemsCollector, String)} in the sense
-     * that they will always get MIN_ITEMS or more items.
+     * Fetch stream pages until the collector contains at least {@code minItems} items or
+     * there are no more pages. The collector may contain fewer items if the API is exhausted.
      *
-     * @param minItems the method will return only when it have extracted that many items
-     *                 (equal or more)
+     * @param minItems the minimum number of collected items to try to reach
+     * @return the next page URL, or an empty string if there are no more pages
      */
     public static String getStreamsFromApiMinItems(final int minItems,
                                                    final StreamInfoItemsCollector collector,
