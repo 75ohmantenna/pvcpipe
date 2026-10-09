@@ -26,7 +26,14 @@ final class ResourceIdentity implements Serializable {
         this.effectiveUrl = effectiveUrl;
     }
 
-    /** An HTTP date is usable only without any ETag and with evidence it is strong. */
+    /**
+     * Returns a validator tied to the request and effective resource.
+     * An HTTP date is usable only without an ETag and with evidence that it is strong.
+     *
+     * @param response the initial HTTP response
+     * @param requestUrl the requested resource URI
+     * @return the identity, or null if no strong validator is available
+     */
     static ResourceIdentity from(final HttpURLConnection response, final String requestUrl) {
         final String etag = response.getHeaderField("ETag");
         final String condition;
@@ -58,9 +65,9 @@ final class ResourceIdentity implements Serializable {
         return new ResourceIdentity(condition, requestUrl, response.getURL().toExternalForm());
     }
 
-    void verify(final HttpURLConnection response, final String requestUrl,
+    void verify(final HttpURLConnection response, final String requestedUrl,
                 final String sentIfRange) throws IOException {
-        if (!this.requestUrl.equals(requestUrl)
+        if (!this.requestUrl.equals(requestedUrl)
                 || !effectiveUrl.equals(response.getURL().toExternalForm())) {
             throw new ValidatedRange.InvalidRangeException(
                     "Ranged response redirected to a different resource; restart required");

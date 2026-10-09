@@ -143,7 +143,35 @@ tasks.register<Checkstyle>("runCheckstyle") {
     exclude("**/gen/**")
     exclude("**/R.java")
     exclude("**/BuildConfig.java")
-    exclude("main/java/us/shandian/giga/**")
+    // Legacy downloader files with existing violations; new files are checked by default.
+    exclude(
+        "main/java/us/shandian/giga/get/DownloadInitializer.java",
+        "main/java/us/shandian/giga/get/DownloadMission.java",
+        "main/java/us/shandian/giga/get/DownloadMissionRecover.java",
+        "main/java/us/shandian/giga/get/DownloadRunnable.java",
+        "main/java/us/shandian/giga/get/DownloadRunnableFallback.java",
+        "main/java/us/shandian/giga/get/Mission.java",
+        "main/java/us/shandian/giga/get/sqlite/FinishedMissionStore.java",
+        "main/java/us/shandian/giga/io/ChunkFileInputStream.java",
+        "main/java/us/shandian/giga/io/CircularFileWriter.java",
+        "main/java/us/shandian/giga/io/FileStream.java",
+        "main/java/us/shandian/giga/io/FileStreamSAF.java",
+        "main/java/us/shandian/giga/postprocessing/M4aNoDash.java",
+        "main/java/us/shandian/giga/postprocessing/Mp4FromDashMuxer.java",
+        "main/java/us/shandian/giga/postprocessing/OggFromWebmDemuxer.java",
+        "main/java/us/shandian/giga/postprocessing/Postprocessing.java",
+        "main/java/us/shandian/giga/postprocessing/PvcFromHlsRemuxer.java",
+        "main/java/us/shandian/giga/postprocessing/TtmlConverter.java",
+        "main/java/us/shandian/giga/postprocessing/WebMMuxer.java",
+        "main/java/us/shandian/giga/preprocessing/PvcHlsPreProcessor.java",
+        "main/java/us/shandian/giga/service/DownloadManager.java",
+        "main/java/us/shandian/giga/service/DownloadManagerService.java",
+        "main/java/us/shandian/giga/ui/adapter/MissionAdapter.java",
+        "main/java/us/shandian/giga/ui/common/Deleter.java",
+        "main/java/us/shandian/giga/ui/common/ProgressDrawable.java",
+        "main/java/us/shandian/giga/ui/fragment/MissionsFragment.java",
+        "main/java/us/shandian/giga/util/Utility.java",
+    )
 
     classpath = configurations.getByName("checkstyle")
 

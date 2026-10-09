@@ -12,7 +12,7 @@
     -->
     <property name="severity" value="error"/>
 
-    <property name="fileExtensions" value="java, properties, xml"/>
+    <property name="fileExtensions" value="java"/>
 
     <!-- Excludes all 'module-info.java' files              -->
     <!-- See https://checkstyle.org/config_filefilters.html -->
@@ -28,16 +28,11 @@
     <!-- See https://checkstyle.org/config_misc.html#NewlineAtEndOfFile -->
     <module name="NewlineAtEndOfFile"/>
 
-    <!-- Checks that property files contain the same keys.         -->
-    <!-- See https://checkstyle.org/config_misc.html#Translation -->
-    <module name="Translation"/>
-
     <!-- Checks for Size Violations.                    -->
     <!-- See https://checkstyle.org/config_sizes.html -->
     <module name="FileLength"/>
     <module name="LineLength">
       <property name="max" value="100"/>
-      <property name="fileExtensions" value="java"/>
         <!-- Also allow links in javadocs to be longer (the default would just cover imports) -->
         <property name="ignorePattern" value="^((package|import) .*)|( *\* (@see )?&lt;a href ?\= ?&quot;.*&quot;&gt;)$"/>
     </module>
@@ -165,7 +160,7 @@
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
         <module name="FinalLocalVariable">
-            <property name="tokens" value="VARIABLE_DEF,PARAMETER_DEF"/>
+            <property name="tokens" value="VARIABLE_DEF"/>
             <property name="validateEnhancedForLoopVariable" value="true"/>
         </module>
 

@@ -7,7 +7,7 @@ public class FinishedMission extends Mission {
     public FinishedMission() {
     }
 
-    public FinishedMission(@NonNull DownloadMission mission) {
+    public FinishedMission(@NonNull final DownloadMission mission) {
         source = mission.source;
         length = mission.length;
         timestamp = mission.timestamp;

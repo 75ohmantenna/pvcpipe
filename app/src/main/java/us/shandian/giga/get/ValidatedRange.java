@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
 
 /** The bytes a 206 response promises to deliver, checked against the requested destination. */
 final class ValidatedRange {
-    private static final Pattern CONTENT_RANGE = Pattern.compile("bytes ([0-9]+)-([0-9]+)/([0-9]+|\\*)");
+    private static final Pattern CONTENT_RANGE =
+            Pattern.compile("bytes ([0-9]+)-([0-9]+)/([0-9]+|\\*)");
 
     final long end;
     final long total;
@@ -27,7 +28,8 @@ final class ValidatedRange {
     }
 
     static ValidatedRange from(final HttpURLConnection connection, final long requestedStart,
-                               final long requestedEnd, final long expectedTotal) throws IOException {
+                               final long requestedEnd, final long expectedTotal)
+            throws IOException {
         final String header = connection.getHeaderField("Content-Range");
         final Matcher match = header == null ? null : CONTENT_RANGE.matcher(header);
         if (match == null || !match.matches()) {
@@ -51,7 +53,8 @@ final class ValidatedRange {
         }
         final long contentLength = connection.getContentLengthLong();
         if (contentLength >= 0 && contentLength != end - start + 1) {
-            throw new InvalidRangeException("Content-Length disagrees with Content-Range: " + header);
+            throw new InvalidRangeException(
+                    "Content-Length disagrees with Content-Range: " + header);
         }
         return new ValidatedRange(end, total);
     }
