@@ -42,7 +42,7 @@ tasks.test {
         exceptionFormat = TestExceptionFormat.FULL
     }
 
-    // Pass on downloader type to tests for different CI jobs. See DownloaderFactory.java and ci.yml
+    // Allow callers to select the downloader implementation for tests.
     if (System.getProperties().containsKey("downloader")) {
         systemProperty("downloader", System.getProperty("downloader"))
     }
