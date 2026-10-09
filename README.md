@@ -31,6 +31,11 @@ and the extractor's deterministic offline tests and Checkstyle; it then builds
 debug and release APKs (`Makefile`). It does not run Android instrumentation tests
 or sign a distribution release.
 
+App Checkstyle covers Java in all source sets, except generated files and the explicit
+legacy downloader exclusions in `app/build.gradle.kts`. Newly added downloader Java
+files are checked by default. The bundled extractor checks its production Java;
+its generated models and test sources are excluded. Kotlin uses ktlint instead.
+
 ## Search history
 
 Accepted searches persist independently of result loading and search-screen lifecycle.
