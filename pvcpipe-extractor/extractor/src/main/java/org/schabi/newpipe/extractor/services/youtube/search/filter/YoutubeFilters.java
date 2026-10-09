@@ -285,52 +285,34 @@ public class YoutubeFilters extends BaseSearchFilters {
         final FilterGroup sortByGroup =
                 groupsFactory.createFilterGroup(ID_SF_SORT_BY_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SORT_BY, true,
-                        ID_SF_SORT_BY_RELEVANCE, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_RELEVANCE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_RATING),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_DATE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_VIEWS),
-                        }, null);
+                        ID_SF_SORT_BY_RELEVANCE, null,
+                        ID_SF_SORT_BY_RELEVANCE, ID_SF_SORT_BY_RATING,
+                        ID_SF_SORT_BY_DATE, ID_SF_SORT_BY_VIEWS);
 
         final FilterGroup uploadDateGroup =
                 groupsFactory.createFilterGroup(ID_SF_UPLOAD_DATE_GRP,
                         LibraryStringIds.SEARCH_FILTERS_UPLOAD_DATE, true,
-                        ID_SF_UPLOAD_DATE_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_ALL),
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_HOUR),
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_DAY),
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_WEEK),
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_MONTH),
-                                groupsFactory.getFilterForId(ID_SF_UPLOAD_DATE_YEAR),
-                        }, null);
+                        ID_SF_UPLOAD_DATE_ALL, null,
+                        ID_SF_UPLOAD_DATE_ALL, ID_SF_UPLOAD_DATE_HOUR,
+                        ID_SF_UPLOAD_DATE_DAY, ID_SF_UPLOAD_DATE_WEEK,
+                        ID_SF_UPLOAD_DATE_MONTH, ID_SF_UPLOAD_DATE_YEAR);
 
         final FilterGroup durationGroup =
                 groupsFactory.createFilterGroup(ID_SF_DURATION_GRP,
                         LibraryStringIds.SEARCH_FILTERS_DURATION, true,
-                        ID_SF_DURATION_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_DURATION_ALL),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_SHORT),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_MEDIUM),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_LONG),
-                        }, null);
+                        ID_SF_DURATION_ALL, null,
+                        ID_SF_DURATION_ALL, ID_SF_DURATION_SHORT,
+                        ID_SF_DURATION_MEDIUM, ID_SF_DURATION_LONG);
 
         final FilterGroup featureGroup =
                 groupsFactory.createFilterGroup(ID_SF_FEATURES_GRP,
                         LibraryStringIds.SEARCH_FILTERS_FEATURES, false,
-                        FilterContainer.ITEM_IDENTIFIER_UNKNOWN, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_LIVE),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_4K),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_HD),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_SUBTITLES),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_CCOMMONS),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_360),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_VR180),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_3D),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_HDR),
-                                groupsFactory.getFilterForId(ID_SF_FEATURES_LOCATION),
-                                // there is not use for that feature ATM.
-                                // groupsFactory.getFilterForId(ID_SF_FEATURES_PURCHASED),
-                        }, null);
+                        FilterContainer.ITEM_IDENTIFIER_UNKNOWN, null,
+                        ID_SF_FEATURES_LIVE, ID_SF_FEATURES_4K,
+                        ID_SF_FEATURES_HD, ID_SF_FEATURES_SUBTITLES,
+                        ID_SF_FEATURES_CCOMMONS, ID_SF_FEATURES_360,
+                        ID_SF_FEATURES_VR180, ID_SF_FEATURES_3D,
+                        ID_SF_FEATURES_HDR, ID_SF_FEATURES_LOCATION);
 
         final FilterGroup[] videoFilters = new FilterGroup[]{
                 sortByGroup,
@@ -424,18 +406,14 @@ public class YoutubeFilters extends BaseSearchFilters {
 
         final FilterGroup contentFilterGroup =
                 groupsFactory.createFilterGroup(ID_CF_MAIN_GRP, null, true,
-                        ID_CF_MAIN_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_CF_MAIN_ALL),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_VIDEOS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_CHANNELS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_PLAYLISTS),
-                                // groupsFactory.getFilterForId(ID_CF_MAIN_MOVIES),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_YOUTUBE_MUSIC_SONGS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_YOUTUBE_MUSIC_VIDEOS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_YOUTUBE_MUSIC_ALBUMS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_YOUTUBE_MUSIC_PLAYLISTS),
-                                groupsFactory.getFilterForId(ID_CF_MAIN_YOUTUBE_MUSIC_ARTISTS),
-                        }, allSortFilters);
+                        ID_CF_MAIN_ALL, allSortFilters,
+                        ID_CF_MAIN_ALL, ID_CF_MAIN_VIDEOS,
+                        ID_CF_MAIN_CHANNELS, ID_CF_MAIN_PLAYLISTS,
+                        ID_CF_MAIN_YOUTUBE_MUSIC_SONGS,
+                        ID_CF_MAIN_YOUTUBE_MUSIC_VIDEOS,
+                        ID_CF_MAIN_YOUTUBE_MUSIC_ALBUMS,
+                        ID_CF_MAIN_YOUTUBE_MUSIC_PLAYLISTS,
+                        ID_CF_MAIN_YOUTUBE_MUSIC_ARTISTS);
         addContentFilterGroup(contentFilterGroup);
     }
 

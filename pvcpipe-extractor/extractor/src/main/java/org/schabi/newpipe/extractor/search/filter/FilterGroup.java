@@ -174,6 +174,24 @@ public final class FilterGroup {
         }
 
         /**
+         * Create a group from previously added filter IDs, in the given order.
+         * Unknown IDs contribute a null item, as {@link #getFilterForId(int)} does.
+         */
+        public FilterGroup createFilterGroup(final int identifier,
+                                             @Nullable final LibraryStringIds groupNameId,
+                                             final boolean onlyOneCheckable,
+                                             final int defaultSelectedFilterId,
+                                             @Nullable final FilterContainer allSortFilters,
+                                             final int... filterIds) {
+            final List<FilterItem> filterItems = new ArrayList<>(filterIds.length);
+            for (final int filterId : filterIds) {
+                filterItems.add(getFilterForId(filterId));
+            }
+            return new FilterGroup(identifier, groupNameId, onlyOneCheckable,
+                    defaultSelectedFilterId, filterItems, allSortFilters);
+        }
+
+        /**
          * Get previously via {@link #addFilterItem(FilterItem)} added {@link FilterItem}.
          *
          * @param identifier the id of the desired {@link FilterItem}

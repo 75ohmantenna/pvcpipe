@@ -178,51 +178,36 @@ public final class PeertubeFilters extends BaseSearchFilters {
         final FilterContainer allSortFilters = new FilterContainer(new FilterGroup[]{
                 groupsFactory.createFilterGroup(ID_SF_SORT_ORDER_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SORT_ORDER, false,
-                        ITEM_IDENTIFIER_UNKNOWN, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SORT_ORDER_ASCENDING),
-                        }, null),
+                        ITEM_IDENTIFIER_UNKNOWN, null,
+                        ID_SF_SORT_ORDER_ASCENDING),
                 groupsFactory.createFilterGroup(ID_SF_SORT_BY_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SORT_BY, true,
-                        ID_SF_SORT_BY_RELEVANCE, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_RELEVANCE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_NAME),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_DURATION),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_PUBLISH_DATE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_CREATION_DATE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_VIEWS),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_LIKES),
-                        }, null),
+                        ID_SF_SORT_BY_RELEVANCE, null,
+                        ID_SF_SORT_BY_RELEVANCE, ID_SF_SORT_BY_NAME,
+                        ID_SF_SORT_BY_DURATION, ID_SF_SORT_BY_PUBLISH_DATE,
+                        ID_SF_SORT_BY_CREATION_DATE, ID_SF_SORT_BY_VIEWS,
+                        ID_SF_SORT_BY_LIKES),
                 groupsFactory.createFilterGroup(ID_SF_KIND_GRP,
                         LibraryStringIds.SEARCH_FILTERS_KIND, true,
-                        ID_SF_KIND_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_KIND_ALL),
-                                groupsFactory.getFilterForId(ID_SF_KIND_LIVE),
-                                groupsFactory.getFilterForId(ID_SF_KIND_VOD_VIDEOS),
-                        }, null),
+                        ID_SF_KIND_ALL, null,
+                        ID_SF_KIND_ALL, ID_SF_KIND_LIVE,
+                        ID_SF_KIND_VOD_VIDEOS),
                 groupsFactory.createFilterGroup(ID_SF_SENSITIVE_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SENSITIVE, true,
-                        ID_SF_SENSITIVE_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVE_ALL),
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVE_YES),
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVE_NO),
-                        }, null),
+                        ID_SF_SENSITIVE_ALL, null,
+                        ID_SF_SENSITIVE_ALL, ID_SF_SENSITIVE_YES,
+                        ID_SF_SENSITIVE_NO),
                 groupsFactory.createFilterGroup(ID_SF_PUBLISHED_GRP,
                         LibraryStringIds.SEARCH_FILTERS_PUBLISHED, true,
-                        ID_SF_PUBLISHED_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_PUBLISHED_ALL),
-                                groupsFactory.getFilterForId(ID_SF_PUBLISHED_TODAY),
-                                groupsFactory.getFilterForId(ID_SF_PUBLISHED_LAST_7_DAYS),
-                                groupsFactory.getFilterForId(ID_SF_PUBLISHED_LAST_30_DAYS),
-                                groupsFactory.getFilterForId(ID_SF_PUBLISHED_LAST_YEAR),
-                        }, null),
+                        ID_SF_PUBLISHED_ALL, null,
+                        ID_SF_PUBLISHED_ALL, ID_SF_PUBLISHED_TODAY,
+                        ID_SF_PUBLISHED_LAST_7_DAYS, ID_SF_PUBLISHED_LAST_30_DAYS,
+                        ID_SF_PUBLISHED_LAST_YEAR),
                 groupsFactory.createFilterGroup(ID_SF_DURATION_GRP,
                         LibraryStringIds.SEARCH_FILTERS_DURATION, true,
-                        ID_SF_DURATION_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_DURATION_ALL),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_SHORT),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_MEDIUM),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_LONG),
-                        }, null),
+                        ID_SF_DURATION_ALL, null,
+                        ID_SF_DURATION_ALL, ID_SF_DURATION_SHORT,
+                        ID_SF_DURATION_MEDIUM, ID_SF_DURATION_LONG),
         });
 
 
@@ -243,19 +228,17 @@ public final class PeertubeFilters extends BaseSearchFilters {
 
         /* content filter groups */
         addContentFilterGroup(groupsFactory.createFilterGroup(ID_CF_MAIN_GRP, null, true,
-                ID_CF_MAIN_VIDEOS, new FilterItem[]{
-                        groupsFactory.getFilterForId(ID_CF_MAIN_VIDEOS),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_CHANNELS),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_PLAYLISTS),
-                }, allSortFilters));
+                ID_CF_MAIN_VIDEOS, allSortFilters,
+                ID_CF_MAIN_VIDEOS, ID_CF_MAIN_CHANNELS,
+                ID_CF_MAIN_PLAYLISTS));
 
         groupsFactory.addFilterItem(new PeertubeSepiaFilterItem(
                 ID_CF_SEPIA_SEPIASEARCH,
                 LibraryStringIds.SEARCH_FILTERS_SEPIASEARCH));
 
         addContentFilterGroup(groupsFactory.createFilterGroup(ID_CF_SEPIA_GRP, null, false,
-                ITEM_IDENTIFIER_UNKNOWN, new FilterItem[]{
-                        groupsFactory.getFilterForId(ID_CF_SEPIA_SEPIASEARCH)}, null));
+                ITEM_IDENTIFIER_UNKNOWN, null,
+                ID_CF_SEPIA_SEPIASEARCH));
 
         addContentFilterSortVariant(ID_CF_MAIN_VIDEOS, allSortFilters);
     }
