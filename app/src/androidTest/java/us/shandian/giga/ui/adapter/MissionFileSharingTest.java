@@ -20,6 +20,7 @@ import org.junit.Test;
 import org.schabi.newpipe.BuildConfig;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
+import java.io.DataInputStream;
 import java.io.FileNotFoundException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,9 +44,13 @@ public class MissionFileSharingTest {
             assertEquals(context.getPackageName() + ".mission-files", shared.getAuthority());
             assertFalse(shared.toString().contains(media.getFileName().toString()));
             assertEquals("video/mp4", context.getContentResolver().getType(shared));
-            try (var input = context.getContentResolver().openInputStream(shared)) {
-                assertArrayEquals("mission bytes".getBytes(StandardCharsets.UTF_8),
-                        input.readAllBytes());
+            try (var input = new DataInputStream(context.getContentResolver()
+                    .openInputStream(shared))) {
+                final byte[] expected = "mission bytes".getBytes(StandardCharsets.UTF_8);
+                final byte[] actual = new byte[expected.length];
+                input.readFully(actual);
+                assertArrayEquals(expected, actual);
+                assertEquals(-1, input.read());
             }
             try (Cursor metadata = context.getContentResolver().query(shared,
                     new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE},
@@ -105,9 +110,13 @@ public class MissionFileSharingTest {
                         new StoredFileHelper(context, Uri.fromFile(media.toFile()), "video/mp4"),
                         "video/mp4");
                 assertEquals(context.getPackageName() + ".mission-files", shared.getAuthority());
-                try (var input = context.getContentResolver().openInputStream(shared)) {
-                    assertEquals("external volume",
-                            new String(input.readAllBytes(), StandardCharsets.UTF_8));
+                try (var input = new DataInputStream(context.getContentResolver()
+                        .openInputStream(shared))) {
+                    final byte[] expected = "external volume".getBytes(StandardCharsets.UTF_8);
+                    final byte[] actual = new byte[expected.length];
+                    input.readFully(actual);
+                    assertArrayEquals(expected, actual);
+                    assertEquals(-1, input.read());
                 }
             } finally {
                 Files.deleteIfExists(media);
