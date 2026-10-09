@@ -136,7 +136,8 @@ public class RumbleStreamRelatedInfoItemExtractor implements StreamInfoItemExtra
             return channelUrl;
         } catch (final Exception e) {
             throw new ParsingException(
-                    "Error parsing uploader url: " + e.getMessage() + ". Cause:" + e.getCause());
+                    "Error parsing uploader url: " + e.getMessage() + ". Cause:" + e.getCause(),
+                    e);
         }
     }
 
@@ -185,7 +186,7 @@ public class RumbleStreamRelatedInfoItemExtractor implements StreamInfoItemExtra
             return List.of(new Image(thumbUrl,
                     Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
         } catch (final Exception e) {
-            throw new ParsingException("Error parsing thumbnail url");
+            throw new ParsingException("Error parsing thumbnail url", e);
         }
     }
 }

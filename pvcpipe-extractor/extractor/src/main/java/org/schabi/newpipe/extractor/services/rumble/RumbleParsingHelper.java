@@ -148,7 +148,7 @@ public final class RumbleParsingHelper {
         try {
             thumbIdentifier = function.call();
         } catch (final Exception e) {
-            throw new ParsingException(e.getMessage(), e);
+            throw new ParsingException("Could not extract thumbnail identifier", e);
         }
         if (thumbIdentifier == null) {
             return null;
@@ -157,6 +157,10 @@ public final class RumbleParsingHelper {
         // extract thumbnail url
         final String matchThat = document.toString();
         final int pos = matchThat.indexOf(thumbIdentifier);
+        if (pos < 0) {
+            throw new ParsingException("Could not find thumbnail identifier in Rumble page: "
+                    + thumbIdentifier);
+        }
         final String preciselyMatchHere = matchThat.substring(pos);
 
         final Pattern channelThumbUrl =

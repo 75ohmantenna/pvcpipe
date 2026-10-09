@@ -110,7 +110,11 @@ public class PlayQueueAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                 break;
             case APPEND:
                 final AppendEvent appendEvent = (AppendEvent) message;
-                notifyItemRangeInserted(playQueue.size(), appendEvent.getAmount());
+                if (appendEvent.getAmount() == 0) {
+                    notifyDataSetChanged();
+                } else {
+                    notifyItemRangeInserted(appendEvent.getStartIndex(), appendEvent.getAmount());
+                }
                 break;
             case ERROR:
                 final ErrorEvent errorEvent = (ErrorEvent) message;
