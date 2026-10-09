@@ -31,4 +31,11 @@ and the extractor's deterministic offline tests and Checkstyle; it then builds
 debug and release APKs (`Makefile`). It does not run Android instrumentation tests
 or sign a distribution release.
 
+## Search history
+
+Accepted searches persist independently of result loading and search-screen lifecycle.
+Search-history writes and deletions execute in request order, so clearing history cannot
+restore an earlier queued search. When search history is disabled in settings,
+searches are not recorded.
+
 GPL-3.0-or-later; see [LICENSE](LICENSE).
