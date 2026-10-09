@@ -38,4 +38,16 @@ Search-history writes and deletions execute in request order, so clearing histor
 restore an earlier queued search. When search history is disabled in settings,
 searches are not recorded.
 
+`HistoryRecordManagerTest` covers queued writes and clearing against in-memory Room.
+`SearchHistoryUiTest` covers actual search-fragment destruction and attached error
+presentation with an isolated database. These are Android instrumentation tests,
+not part of `make ci`; run them directly on a disposable emulator. Do not run
+`connectedDebugAndroidTest` on a device with an existing installation: its
+cleanup has been observed uninstalling the app and deleting its private data.
+
+## List-view preferences
+
+List fragments ignore preference callbacks delivered after detachment. A new view
+reads the current display mode when created.
+
 GPL-3.0-or-later; see [LICENSE](LICENSE).
