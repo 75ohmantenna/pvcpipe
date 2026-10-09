@@ -8,8 +8,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.fragments.list.search.filter.SearchFilterLogic;
 import org.schabi.newpipe.fragments.list.search.filter.SearchFilterUIOptionMenu;
@@ -27,10 +25,27 @@ import androidx.core.content.ContextCompat;
  * using {@link androidx.fragment.app.DialogFragment}.
  */
 public class SearchFragmentLegacy extends SearchFragment {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.search.SearchFragmentLegacy$$StateSaver";
 
-    @State
     protected int countOnPrepareOptionsMenuCalls = 0;
     private SearchFilterUIOptionMenu searchFilterUi;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putInt("countOnPrepareOptionsMenuCalls" + STATE_SUFFIX,
+                countOnPrepareOptionsMenuCalls);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("countOnPrepareOptionsMenuCalls" + STATE_SUFFIX)) {
+            countOnPrepareOptionsMenuCalls =
+                    state.getInt("countOnPrepareOptionsMenuCalls" + STATE_SUFFIX);
+        }
+    }
 
     @Override
     protected void initViewModel() {

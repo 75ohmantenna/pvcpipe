@@ -44,7 +44,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.evernote.android.state.State
 import com.xwray.groupie.GroupieAdapter
 import com.xwray.groupie.Item
 import com.xwray.groupie.OnItemClickListener
@@ -93,8 +92,6 @@ class FeedFragment : BaseStateFragment<FeedState>() {
 
     private lateinit var viewModel: FeedViewModel
 
-    @State
-    @JvmField
     var listState: Parcelable? = null
 
     private var groupId = FeedGroupEntity.GROUP_ALL_ID
@@ -111,6 +108,18 @@ class FeedFragment : BaseStateFragment<FeedState>() {
 
     init {
         setHasOptionsMenu(true)
+    }
+
+    override fun saveFragmentState(state: Bundle) {
+        super.saveFragmentState(state)
+        state.putParcelable("listState" + STATE_SUFFIX, listState)
+    }
+
+    override fun restoreFragmentState(state: Bundle) {
+        super.restoreFragmentState(state)
+        if (state.containsKey("listState" + STATE_SUFFIX)) {
+            listState = state.getParcelable("listState" + STATE_SUFFIX)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -685,6 +694,7 @@ class FeedFragment : BaseStateFragment<FeedState>() {
     }
 
     companion object {
+        private const val STATE_SUFFIX = "org.schabi.newpipe.local.feed.FeedFragment\$\$StateSaver"
         const val KEY_GROUP_ID = "ARG_GROUP_ID"
         const val KEY_GROUP_NAME = "ARG_GROUP_NAME"
 

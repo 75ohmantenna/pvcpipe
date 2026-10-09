@@ -10,8 +10,6 @@ import androidx.core.os.BundleCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
-import com.livefront.bridge.Bridge;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.local.subscription.workers.SubscriptionImportInput;
 import org.schabi.newpipe.local.subscription.workers.SubscriptionTransfer;
@@ -45,16 +43,4 @@ public class ImportConfirmationDialog extends DialogFragment {
                 .create();
     }
 
-    @Override
-    public void onCreate(@Nullable final Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        Bridge.restoreInstanceState(this, savedInstanceState);
-    }
-
-    @Override
-    public void onSaveInstanceState(@NonNull final Bundle outState) {
-        super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
-    }
 }

@@ -14,7 +14,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.evernote.android.state.State;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.reactivestreams.Subscriber;
@@ -53,9 +52,12 @@ import io.reactivex.rxjava3.disposables.Disposable;
 public class StatisticsPlaylistFragment
         extends BaseLocalListFragment<List<StreamStatisticsEntry>, Void>
         implements PlaylistControlViewHolder {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.local.history.StatisticsPlaylistFragment$$StateSaver";
+
     private final CompositeDisposable disposables = new CompositeDisposable();
-    @State
     Parcelable itemsListState;
+
     private StatisticSortMode sortMode = StatisticSortMode.LAST_PLAYED;
 
     private StatisticPlaylistControlBinding headerBinding;
@@ -84,6 +86,20 @@ public class StatisticsPlaylistFragment
     ///////////////////////////////////////////////////////////////////////////
     // Fragment LifeCycle - Creation
     ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putParcelable("itemsListState" + STATE_SUFFIX, itemsListState);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("itemsListState" + STATE_SUFFIX)) {
+            itemsListState = state.getParcelable("itemsListState" + STATE_SUFFIX);
+        }
+    }
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {

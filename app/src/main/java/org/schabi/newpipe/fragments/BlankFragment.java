@@ -5,9 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.evernote.android.state.State;
 
 import org.schabi.newpipe.BaseFragment;
 import org.schabi.newpipe.R;
@@ -15,12 +14,28 @@ import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorPanelHelper;
 
 public class BlankFragment extends BaseFragment {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.BlankFragment$$StateSaver";
 
-    @State
     @Nullable
     ErrorInfo errorInfo;
     @Nullable
     ErrorPanelHelper errorPanel = null;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putParcelable("errorInfo" + STATE_SUFFIX, errorInfo);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("errorInfo" + STATE_SUFFIX)) {
+            errorInfo = state.getParcelable("errorInfo" + STATE_SUFFIX);
+        }
+    }
 
     /**
      * Builds a blank fragment that just says the app name and suggests clicking on search.

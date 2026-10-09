@@ -10,8 +10,6 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
@@ -23,7 +21,9 @@ import org.schabi.newpipe.util.Localization;
 import java.util.List;
 
 public class ChannelAboutFragment extends BaseDescriptionFragment {
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.channel.ChannelAboutFragment$$StateSaver";
+
     protected ChannelInfo channelInfo;
 
     ChannelAboutFragment(@NonNull final ChannelInfo channelInfo) {
@@ -31,7 +31,22 @@ public class ChannelAboutFragment extends BaseDescriptionFragment {
     }
 
     public ChannelAboutFragment() {
-        // keep empty constructor for State when resuming fragment from memory
+        // keep empty constructor for fragment restoration by Android
+    }
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putSerializable("channelInfo" + STATE_SUFFIX, channelInfo);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("channelInfo" + STATE_SUFFIX)) {
+            channelInfo = (ChannelInfo) state.getSerializable("channelInfo" + STATE_SUFFIX);
+        }
     }
 
     @Override

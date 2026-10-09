@@ -20,8 +20,6 @@ import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.evernote.android.state.State;
-
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.schabi.newpipe.NewPipeDatabase;
@@ -56,7 +54,8 @@ public final class BookmarkFragment extends BaseLocalListFragment<List<PlaylistL
         implements DebounceSavable {
 
     private static final int MINIMUM_INITIAL_DRAG_VELOCITY = 12;
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.local.bookmark.BookmarkFragment$$StateSaver";
     Parcelable itemsListState;
 
     private Subscription databaseSubscription;
@@ -77,6 +76,20 @@ public final class BookmarkFragment extends BaseLocalListFragment<List<PlaylistL
     ///////////////////////////////////////////////////////////////////////////
     // Fragment LifeCycle - Creation
     ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putParcelable("itemsListState" + STATE_SUFFIX, itemsListState);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("itemsListState" + STATE_SUFFIX)) {
+            itemsListState = state.getParcelable("itemsListState" + STATE_SUFFIX);
+        }
+    }
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {

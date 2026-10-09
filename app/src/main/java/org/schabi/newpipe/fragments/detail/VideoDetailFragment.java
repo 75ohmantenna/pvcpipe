@@ -52,7 +52,6 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.evernote.android.state.State;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.material.appbar.AppBarLayout;
@@ -128,6 +127,9 @@ public final class VideoDetailFragment
         OnKeyDownListener {
     public static final String KEY_SWITCHING_PLAYERS = "switching_players";
 
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.detail.VideoDetailFragment$$StateSaver";
+
     private static final float MAX_OVERLAY_ALPHA = 0.9f;
     private static final float MAX_PLAYER_HEIGHT = 0.7f;
 
@@ -144,22 +146,50 @@ public final class VideoDetailFragment
 
     private DetailContentCoordinator content;
 
-    @State
     protected int serviceId = Constants.NO_SERVICE_ID;
-    @State
     @NonNull
     protected String title = "";
-    @State
     @Nullable
     protected String url = null;
     @Nullable
     protected PlayQueue playQueue = null;
-    @State
     int bottomSheetState = BottomSheetBehavior.STATE_EXPANDED;
-    @State
     int lastStableBottomSheetState = BottomSheetBehavior.STATE_EXPANDED;
-    @State
     protected boolean autoPlayEnabled = true;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putBoolean("autoPlayEnabled" + STATE_SUFFIX, autoPlayEnabled);
+        state.putInt("bottomSheetState" + STATE_SUFFIX, bottomSheetState);
+        state.putInt("lastStableBottomSheetState" + STATE_SUFFIX, lastStableBottomSheetState);
+        state.putInt("serviceId" + STATE_SUFFIX, serviceId);
+        state.putString("title" + STATE_SUFFIX, title);
+        state.putString("url" + STATE_SUFFIX, url);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("autoPlayEnabled" + STATE_SUFFIX)) {
+            autoPlayEnabled = state.getBoolean("autoPlayEnabled" + STATE_SUFFIX);
+        }
+        if (state.containsKey("bottomSheetState" + STATE_SUFFIX)) {
+            bottomSheetState = state.getInt("bottomSheetState" + STATE_SUFFIX);
+        }
+        if (state.containsKey("lastStableBottomSheetState" + STATE_SUFFIX)) {
+            lastStableBottomSheetState = state.getInt("lastStableBottomSheetState" + STATE_SUFFIX);
+        }
+        if (state.containsKey("serviceId" + STATE_SUFFIX)) {
+            serviceId = state.getInt("serviceId" + STATE_SUFFIX);
+        }
+        if (state.containsKey("title" + STATE_SUFFIX)) {
+            title = state.getString("title" + STATE_SUFFIX);
+        }
+        if (state.containsKey("url" + STATE_SUFFIX)) {
+            url = state.getString("url" + STATE_SUFFIX);
+        }
+    }
 
     @Nullable
     private StreamInfo currentInfo = null;
