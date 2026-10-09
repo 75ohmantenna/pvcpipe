@@ -52,10 +52,12 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.functions.Consumer;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class HistoryRecordManager {
@@ -205,17 +207,32 @@ public class HistoryRecordManager {
             } else {
                 return searchHistoryTable.insert(newEntry);
             }
-        })).subscribeOn(Schedulers.io());
+        })).subscribeOn(Schedulers.single());
     }
+
+    /**
+     * Records an accepted search independently of the search screen's request and view lifetime.
+     *
+     * @param serviceId the service used for the search
+     * @param search the accepted query
+     * @param onError reports a failure on the main thread
+     */
+    public void recordSearch(final int serviceId, final String search,
+                             final Consumer<Throwable> onError) {
+        onSearched(serviceId, search)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(ignored -> { }, onError);
+    }
+
 
     public Single<Integer> deleteSearchHistory(final String search) {
         return Single.fromCallable(() -> searchHistoryTable.deleteAllWhereQuery(search))
-                .subscribeOn(Schedulers.io());
+                .subscribeOn(Schedulers.single());
     }
 
     public Single<Integer> deleteCompleteSearchHistory() {
         return Single.fromCallable(searchHistoryTable::deleteAll)
-                .subscribeOn(Schedulers.io());
+                .subscribeOn(Schedulers.single());
     }
 
     public Flowable<List<String>> getRelatedSearches(final String query,

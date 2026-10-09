@@ -1,6 +1,8 @@
 package org.schabi.newpipe.local.history
 
 import androidx.test.core.app.ApplicationProvider
+import io.reactivex.rxjava3.plugins.RxJavaPlugins
+import io.reactivex.rxjava3.schedulers.TestScheduler
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -44,6 +46,40 @@ class HistoryRecordManagerTest {
         assertThat(entities[0].id).isEqualTo(1)
         assertThat(entities[0].serviceId).isEqualTo(0)
         assertThat(entities[0].search).isEqualTo("Hello")
+    }
+
+    @Test
+    fun recordSearchCompletesWhenScreenStopsBeforeIoRuns() {
+        val io = TestScheduler()
+        RxJavaPlugins.setSingleSchedulerHandler { io }
+
+        manager.recordSearch(0, "queued search") { error -> throw AssertionError(error) }
+        // The screen can dispose its search request or be destroyed before IO gets a turn.
+        assertThat(database.searchHistoryDAO().getAll().blockingFirst()).isEmpty()
+
+        io.triggerActions()
+        val entries = database.searchHistoryDAO().getAll().blockingFirst()
+        assertThat(entries).hasSize(1)
+        assertThat(entries[0].search).isEqualTo("queued search")
+    }
+
+    @Test
+    fun clearingHistoryAfterQueuedSearchDoesNotRestoreDeletedEntry() {
+        val io = TestScheduler()
+        RxJavaPlugins.setSingleSchedulerHandler { io }
+
+        manager.recordSearch(0, "before clear") { error -> throw AssertionError(error) }
+        val cleared = manager.deleteCompleteSearchHistory().test()
+        assertThat(database.searchHistoryDAO().getAll().blockingFirst()).isEmpty()
+
+        io.triggerActions()
+        cleared.assertValue(1)
+        assertThat(database.searchHistoryDAO().getAll().blockingFirst()).isEmpty()
+
+        manager.recordSearch(0, "after clear") { error -> throw AssertionError(error) }
+        io.triggerActions()
+        assertThat(database.searchHistoryDAO().getAll().blockingFirst().map { it.search })
+            .containsExactly("after clear")
     }
 
     @Test
