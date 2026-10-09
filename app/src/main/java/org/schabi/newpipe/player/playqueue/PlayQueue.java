@@ -255,7 +255,7 @@ public abstract class PlayQueue implements Serializable {
      * Notifies that a change has occurred.
      */
     public synchronized void notifyChange() {
-        broadcast(new AppendEvent(0));
+        broadcast(new AppendEvent(size(), 0));
     }
 
     /**
@@ -265,25 +265,36 @@ public abstract class PlayQueue implements Serializable {
      * append the shuffle items to the play queue.
      * </p>
      * <p>
-     * Will emit a {@link AppendEvent} on any given context.
+     * Will emit a {@link RemoveEvent} before {@link AppendEvent} when replacing an
+     * auto-queued tail. An empty list leaves the queue unchanged and emits no event.
      * </p>
      *
      * @param items {@link PlayQueueItem}s to append
      */
     public synchronized void append(@NonNull final List<PlayQueueItem> items) {
-        final List<PlayQueueItem> itemList = new ArrayList<>(items);
+        if (items.isEmpty()) {
+            return;
+        }
 
+        final List<PlayQueueItem> itemList = new ArrayList<>(items);
+        if (!streams.isEmpty() && streams.get(streams.size() - 1).isAutoQueued()
+                && !itemList.get(0).isAutoQueued()) {
+            final int removeIndex = streams.size() - 1;
+            removeInternal(removeIndex);
+            broadcast(new RemoveEvent(removeIndex, getIndex()));
+        }
+
+        final int startIndex = streams.size();
         if (isShuffled()) {
             backup.addAll(itemList);
             Collections.shuffle(itemList);
         }
-        if (!streams.isEmpty() && streams.get(streams.size() - 1).isAutoQueued()
-                && !itemList.get(0).isAutoQueued()) {
-            streams.remove(streams.size() - 1);
-        }
         streams.addAll(itemList);
+        if (startIndex == 0 && getIndex() == 0 && history.isEmpty()) {
+            history.add(streams.get(0));
+        }
 
-        broadcast(new AppendEvent(itemList.size()));
+        broadcast(new AppendEvent(startIndex, itemList.size()));
     }
 
     /**
@@ -292,21 +303,22 @@ public abstract class PlayQueue implements Serializable {
      * @param item item to add.
      * @param skipIfSame if set, skip adding if the next stream is the same stream.
      */
-    public void enqueueNext(@NonNull final PlayQueueItem item, final boolean skipIfSame) {
+    public synchronized void enqueueNext(@NonNull final PlayQueueItem item,
+                                         final boolean skipIfSame) {
         final int currentIndex = getIndex();
         // if the next item is the same item as the one we want to enqueue, skip if flag is true
         if (skipIfSame && item.isSameItem(getItem(currentIndex + 1))) {
             return;
         }
         append(List.of(item));
-        move(size() - 1, currentIndex + 1);
+        move(size() - 1, getIndex() + 1);
     }
 
     /**
      * Removes the item at the given index from the play queue.
      * <p>
      * The current playing index will decrement if it is greater than the index being removed.
-     * On cases where the current playing index exceeds the playlist range, it is set to 0.
+     * If the current item is the last item being removed, the index is reset to 0.
      * </p>
      * <p>
      * Will emit a {@link RemoveEvent} if the index is within the play queue index range.
@@ -344,10 +356,6 @@ public abstract class PlayQueue implements Serializable {
 
         if (currentIndex > removeIndex) {
             queueIndex.decrementAndGet();
-
-        } else if (currentIndex >= size) {
-            queueIndex.set(currentIndex % (size - 1));
-
         } else if (currentIndex == removeIndex && currentIndex == size - 1) {
             queueIndex.set(0);
         }
@@ -356,9 +364,17 @@ public abstract class PlayQueue implements Serializable {
             backup.remove(getItem(removeIndex));
         }
 
-        history.remove(streams.remove(removeIndex));
+        final PlayQueueItem removed = streams.remove(removeIndex);
+        if (streams.contains(removed)) {
+            history.remove(removed);
+        } else {
+            history.removeIf(item -> item == removed);
+        }
         if (streams.size() > queueIndex.get()) {
-            history.add(streams.get(queueIndex.get()));
+            final PlayQueueItem selected = streams.get(queueIndex.get());
+            if (history.isEmpty() || history.get(history.size() - 1) != selected) {
+                history.add(selected);
+            }
         }
     }
 

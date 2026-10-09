@@ -1,8 +1,8 @@
 package us.shandian.giga.util;
-
 import android.content.Context;
 import android.os.Environment;
 import android.os.StatFs;
+import android.util.AtomicFile;
 import android.util.Log;
 
 import androidx.annotation.ColorInt;
@@ -18,7 +18,6 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -64,30 +63,33 @@ public class Utility {
         }
     }
 
-    public static void writeToFile(@NonNull File file, @NonNull Serializable serializable) {
-
-        try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-            objectOutputStream.writeObject(serializable);
+    public static boolean writeToFile(@NonNull File file, @NonNull Serializable serializable) {
+        AtomicFile atomicFile = new AtomicFile(file);
+        FileOutputStream stream = null;
+        try {
+            stream = atomicFile.startWrite();
+            ObjectOutputStream output = new ObjectOutputStream(new BufferedOutputStream(stream));
+            output.writeObject(serializable);
+            output.flush();
+            // AtomicFile must own/close the underlying stream after it synchronizes the bytes.
+            atomicFile.finishWrite(stream);
+            return true;
         } catch (Exception e) {
-            //nothing to do
+            Log.e("Utility", "Failed to serialize the object to " + file, e);
+            if (stream != null) atomicFile.failWrite(stream);
+            return false;
         }
-        //nothing to do
     }
 
     @Nullable
     @SuppressWarnings("unchecked")
     public static <T> T readFromFile(File file) {
-        T object;
-
-        try (ObjectInputStream objectInputStream =
-                     new ObjectInputStream(new FileInputStream(file))) {
-            object = (T) objectInputStream.readObject();
+        try (ObjectInputStream input = new ObjectInputStream(new AtomicFile(file).openRead())) {
+            return (T) input.readObject();
         } catch (Exception e) {
-            Log.e("Utility", "Failed to deserialize the object", e);
-            object = null;
+            Log.e("Utility", "Failed to deserialize the object from " + file, e);
+            return null;
         }
-
-        return object;
     }
 
     @Nullable

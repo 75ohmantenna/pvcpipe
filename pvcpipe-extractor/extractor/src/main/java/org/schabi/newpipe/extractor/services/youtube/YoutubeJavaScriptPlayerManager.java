@@ -104,6 +104,7 @@ public final class YoutubeJavaScriptPlayerManager {
         } catch (final NumberFormatException e) {
             sigTimestampExtractionEx =
                     new ParsingException("Could not convert signature timestamp to a number", e);
+            throw sigTimestampExtractionEx;
         } catch (final Exception e) {
             sigTimestampExtractionEx = new ParsingException("Could not get signature timestamp", e);
             throw e;

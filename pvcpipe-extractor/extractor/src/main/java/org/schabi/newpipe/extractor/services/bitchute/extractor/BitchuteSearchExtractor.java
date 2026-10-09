@@ -26,7 +26,6 @@ import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteConstants;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteParserHelper;
-import org.schabi.newpipe.extractor.services.bitchute.misc.BitchuteHelpers;
 import org.schabi.newpipe.extractor.services.bitchute.search.filter.BitchuteFilters;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper;
 import org.schabi.newpipe.extractor.stream.StreamInfoItemExtractor;
@@ -165,7 +164,6 @@ public class BitchuteSearchExtractor extends SearchExtractor {
             final InfoItemExtractor infoItemExtractor;
 
             final String textualDate = result.getDatePublished();
-            final String videoId = result.getVideoId();
             DateWrapper uploadDate = null;
 
             // textualDate is sometimes null. Observation 20220812
@@ -189,10 +187,6 @@ public class BitchuteSearchExtractor extends SearchExtractor {
                     BitchuteParserHelper.prependBaseUrl(result.getChannel().getChannelUrl()),
                     uploadDate
             );
-            BitchuteHelpers.VideoDurationCache.addDurationToMap(videoId,
-                    ((BitchuteQuickStreamInfoItemExtractor) infoItemExtractor)
-                            .getDuration());
-
             collector.commit(infoItemExtractor);
         }
     }

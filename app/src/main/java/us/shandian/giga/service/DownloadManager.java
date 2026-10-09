@@ -1,6 +1,7 @@
 package us.shandian.giga.service;
 
 import android.content.Context;
+import android.util.AtomicFile;
 import android.os.Handler;
 import android.util.Log;
 
@@ -148,21 +149,36 @@ public class DownloadManager {
 
         for (File sub : subs) {
             if (!sub.isFile()) continue;
-            if (sub.getName().equals(".tmp")) continue;
+            String name = sub.getName();
+            if (name.equals(".tmp") || name.equals(".bak") || name.endsWith(".new")) continue;
+            File checkpoint = name.endsWith(".bak")
+                    ? new File(mPendingMissionsDir, name.substring(0, name.length() - 4))
+                    : sub;
+            // AtomicFile.openRead() restores backups left by an interrupted write.
+            if (checkpoint != sub && checkpoint.exists()) continue;
 
-            DownloadMission mis = Utility.readFromFile(sub);
+            DownloadMission mis = Utility.readFromFile(checkpoint);
             if (mis == null) {
-                //noinspection ResultOfMethodCallIgnored
-                sub.delete();
+                // An unreadable checkpoint may become readable on the next launch.
+                Log.w(TAG, "Unable to load pending checkpoint: " + checkpoint);
                 continue;
             }
+            mis.metadata = checkpoint;
+            mis.checkpointReady = true;
 
-            // Migrate completed pending missions to the finished list.
+            // Replaying a finished checkpoint after a crash is safe and retryable.
             if (mis.isFinished()) {
-                // Store the finished mission before removing its pending metadata.
-                setFinished(mis);
-                //noinspection ResultOfMethodCallIgnored
-                sub.delete();
+                try {
+                    mis.storage = StoredFileHelper.deserialize(mis.storage, ctx);
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to restore finished checkpoint storage: " + checkpoint, ex);
+                }
+                if (!setFinished(mis)) {
+                    mis.threads = new Thread[0];
+                    mis.maxRetry = mPrefMaxRetry;
+                    mis.mHandler = mHandler;
+                    mMissionsPending.add(mis);
+                }
                 continue;
             }
 
@@ -171,8 +187,7 @@ public class DownloadManager {
             if (mis.hasInvalidStorage() && mis.errCode != ERROR_PROGRESS_LOST) {
                 // A mission without storage cannot be deserialized or recovered here.
                 if (mis.storage == null) {
-                    //noinspection ResultOfMethodCallIgnored
-                    sub.delete();
+                    new AtomicFile(checkpoint).delete();
                     continue;
                 }
             }
@@ -212,7 +227,7 @@ public class DownloadManager {
                 mis.psAlgorithm.setTemporalDir(tempDir);
             }
 
-            mis.metadata = sub;
+            mis.metadata = checkpoint;
             mis.maxRetry = mPrefMaxRetry;
             mis.mHandler = mHandler;
 
@@ -237,7 +252,9 @@ public class DownloadManager {
             // create metadata file
             while (true) {
                 mission.metadata = new File(mPendingMissionsDir, String.valueOf(mission.timestamp));
-                if (!mission.metadata.isFile() && !mission.metadata.exists()) {
+                if (!mission.metadata.exists()
+                        && !new File(mission.metadata.getPath() + ".bak").exists()
+                        && !new File(mission.metadata.getPath() + ".new").exists()) {
                     try {
                         if (!mission.metadata.createNewFile())
                             throw new RuntimeException("Can't create download metadata file");
@@ -246,14 +263,21 @@ public class DownloadManager {
                     }
                     break;
                 }
-                mission.timestamp = System.currentTimeMillis();
+                mission.timestamp = Math.max(mission.timestamp + 1, System.currentTimeMillis());
             }
 
             mSelfMissionsControl = true;
             mMissionsPending.add(mission);
 
-            // Before continue, save the metadata in case the internet connection is not available
-            Utility.writeToFile(mission.metadata, mission);
+            // Never run a mission without at least one durable checkpoint to recover from.
+            if (!Utility.writeToFile(mission.metadata, mission)) {
+                // The mission has never downloaded bytes; leave no unreadable placeholder.
+                new AtomicFile(mission.metadata).delete();
+                mission.notifyError(DownloadMission.ERROR_FILE_CREATION,
+                        new IOException("Unable to save download checkpoint"));
+                return;
+            }
+            mission.checkpointReady = true;
 
             if (mission.storage == null) {
                 // noting to do here
@@ -273,9 +297,16 @@ public class DownloadManager {
 
 
     public void resumeMission(DownloadMission mission) {
-        if (!mission.running) {
-            mission.start();
+        if (mission.running) return;
+        if (!mission.checkpointReady) {
+            if (mission.metadata == null || !Utility.writeToFile(mission.metadata, mission)) {
+                mission.notifyError(DownloadMission.ERROR_FILE_CREATION,
+                        new IOException("Unable to save download checkpoint"));
+                return;
+            }
+            mission.checkpointReady = true;
         }
+        mission.start();
     }
 
     @Nullable
@@ -432,8 +463,7 @@ public class DownloadManager {
         synchronized (this) {
             for (DownloadMission mission : mMissionsPending) {
                 if (mission.running || mission.isCorrupt()) continue;
-
-                mission.start();
+                resumeMission(mission);
             }
         }
     }
@@ -443,11 +473,35 @@ public class DownloadManager {
      *
      * @param mission the desired mission
      */
-    void setFinished(DownloadMission mission) {
+    boolean setFinished(DownloadMission mission) {
         synchronized (this) {
+            final String path;
+            try {
+                path = mission.storage.getUri().toString();
+                if (!mFinishedMissionStore.addFinishedMission(mission)) {
+                    Log.e(TAG, "Failed to persist finished mission: " + mission.timestamp);
+                    return false;
+                }
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Failed to persist finished mission: " + mission.timestamp, e);
+                return false;
+            }
             mMissionsPending.remove(mission);
+            mMissionsFinished.removeIf(finished -> {
+                if (finished.timestamp != mission.timestamp || finished.storage == null) return false;
+                try {
+                    return finished.storage.getUri() != null
+                            && path.equals(finished.storage.getUri().toString());
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "Unable to compare finished mission paths", e);
+                    return false;
+                }
+            });
             mMissionsFinished.add(0, new FinishedMission(mission));
-            mFinishedMissionStore.addFinishedMission(mission);
+            if (!mission.deleteMetadata()) {
+                Log.w(TAG, "Failed to remove finished mission checkpoint: " + mission.timestamp);
+            }
+            return true;
         }
     }
 
@@ -523,7 +577,7 @@ public class DownloadManager {
                 if (mission.running && isMetered) {
                     mission.pause();
                 } else if (!mission.running && !isMetered && mission.enqueued) {
-                    mission.start();
+                    resumeMission(mission);
                     if (mPrefQueueLimit) break;
                 }
             }
