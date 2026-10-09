@@ -10,16 +10,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
-import com.evernote.android.state.State;
-import com.livefront.bridge.Bridge;
-
-
 public abstract class BaseFragment extends Fragment {
+    private static final String STATE_SUFFIX = "org.schabi.newpipe.BaseFragment$$StateSaver";
     protected final String TAG = getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
     protected static final boolean DEBUG = MainActivity.DEBUG;
     protected AppCompatActivity activity;
     //These values are used for controlling fragments when they are part of the frontpage
-    @State
     protected boolean useAsFrontPage = false;
 
     public void useAsFrontPage(final boolean value) {
@@ -49,8 +45,9 @@ public abstract class BaseFragment extends Fragment {
                     + "savedInstanceState = [" + savedInstanceState + "]");
         }
         super.onCreate(savedInstanceState);
-        Bridge.restoreInstanceState(this, savedInstanceState);
         if (savedInstanceState != null) {
+            savedInstanceState.setClassLoader(getClass().getClassLoader());
+            restoreFragmentState(savedInstanceState);
             onRestoreInstanceState(savedInstanceState);
         }
     }
@@ -71,7 +68,15 @@ public abstract class BaseFragment extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
+        saveFragmentState(outState);
+    }
+
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        state.putBoolean("useAsFrontPage" + STATE_SUFFIX, useAsFrontPage);
+    }
+
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        useAsFrontPage = state.getBoolean("useAsFrontPage" + STATE_SUFFIX, useAsFrontPage);
     }
 
     protected void onRestoreInstanceState(@NonNull final Bundle savedInstanceState) {

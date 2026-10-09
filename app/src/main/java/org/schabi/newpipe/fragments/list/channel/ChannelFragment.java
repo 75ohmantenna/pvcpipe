@@ -25,7 +25,6 @@ import androidx.core.graphics.ColorUtils;
 import androidx.core.view.MenuProvider;
 import androidx.preference.PreferenceManager;
 
-import com.evernote.android.state.State;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 import com.jakewharton.rxbinding4.view.RxView;
@@ -73,15 +72,36 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         implements StateSaver.WriteRead {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.channel.ChannelFragment$$StateSaver";
 
     private static final int BUTTON_DEBOUNCE_INTERVAL = 100;
 
-    @State
     protected int serviceId = Constants.NO_SERVICE_ID;
-    @State
     protected String name;
-    @State
     protected String url;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putString("name" + STATE_SUFFIX, name);
+        state.putInt("serviceId" + STATE_SUFFIX, serviceId);
+        state.putString("url" + STATE_SUFFIX, url);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("name" + STATE_SUFFIX)) {
+            name = state.getString("name" + STATE_SUFFIX);
+        }
+        if (state.containsKey("serviceId" + STATE_SUFFIX)) {
+            serviceId = state.getInt("serviceId" + STATE_SUFFIX);
+        }
+        if (state.containsKey("url" + STATE_SUFFIX)) {
+            url = state.getString("url" + STATE_SUFFIX);
+        }
+    }
 
     private ChannelInfo currentInfo;
     private Disposable currentWorker;

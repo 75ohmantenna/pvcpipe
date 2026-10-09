@@ -23,9 +23,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-import com.evernote.android.state.State;
 import com.jakewharton.rxbinding4.widget.RxTextView;
-import com.livefront.bridge.Bridge;
 
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
@@ -71,6 +69,8 @@ public class SettingsActivity extends AppCompatActivity implements
         PreferenceSearchResultListener {
     private static final String TAG = "SettingsActivity";
     private static final boolean DEBUG = MainActivity.DEBUG;
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.settings.SettingsActivity$$StateSaver";
 
     @IdRes
     private static final int FRAGMENT_HOLDER_ID = R.id.settings_fragment_holder;
@@ -85,9 +85,7 @@ public class SettingsActivity extends AppCompatActivity implements
     private Disposable searchTextChanges;
 
     // State
-    @State
     String searchText;
-    @State
     boolean wasSearchActive;
     private final OnBackPressedCallback searchBackCallback = new OnBackPressedCallback(false) {
         @Override
@@ -101,7 +99,14 @@ public class SettingsActivity extends AppCompatActivity implements
         setTheme(ThemeHelper.getSettingsThemeStyle(this));
 
         super.onCreate(savedInstanceBundle);
-        Bridge.restoreInstanceState(this, savedInstanceBundle);
+        if (savedInstanceBundle != null) {
+            if (savedInstanceBundle.containsKey("searchText" + STATE_SUFFIX)) {
+                searchText = savedInstanceBundle.getString("searchText" + STATE_SUFFIX);
+            }
+            if (savedInstanceBundle.containsKey("wasSearchActive" + STATE_SUFFIX)) {
+                wasSearchActive = savedInstanceBundle.getBoolean("wasSearchActive" + STATE_SUFFIX);
+            }
+        }
         final boolean restored = savedInstanceBundle != null;
 
         final SettingsLayoutBinding settingsLayoutBinding =
@@ -142,7 +147,8 @@ public class SettingsActivity extends AppCompatActivity implements
     @Override
     protected void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
+        outState.putString("searchText" + STATE_SUFFIX, searchText);
+        outState.putBoolean("wasSearchActive" + STATE_SUFFIX, wasSearchActive);
     }
 
     @Override

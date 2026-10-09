@@ -36,9 +36,6 @@ import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
 
-import com.evernote.android.state.State;
-import com.livefront.bridge.Bridge;
-
 import org.schabi.newpipe.database.stream.model.StreamEntity;
 import org.schabi.newpipe.databinding.ListRadioIconItemBinding;
 import org.schabi.newpipe.databinding.SingleChoiceDialogViewBinding;
@@ -92,17 +89,15 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * Get the url from the intent and open it in the chosen preferred player.
  */
 public class RouterActivity extends AppCompatActivity {
+    private static final String STATE_SUFFIX = "org.schabi.newpipe.RouterActivity$$StateSaver";
+
     protected final CompositeDisposable disposables = new CompositeDisposable();
-    @State
     protected int currentServiceId = -1;
-    @State
     protected LinkType currentLinkType;
-    @State
     protected int selectedRadioPosition = -1;
     protected int selectedPreviously = -1;
     protected String currentUrl;
     private StreamingService currentService;
-    @State
     Choice pendingChoice;
     private FetcherViewModel fetcher;
     private Runnable whenResumed;
@@ -136,7 +131,24 @@ public class RouterActivity extends AppCompatActivity {
         getWindow().setAttributes(params);
 
         super.onCreate(savedInstanceState);
-        Bridge.restoreInstanceState(this, savedInstanceState);
+        if (savedInstanceState != null) {
+            savedInstanceState.setClassLoader(getClass().getClassLoader());
+            if (savedInstanceState.containsKey("currentServiceId" + STATE_SUFFIX)) {
+                currentServiceId = savedInstanceState.getInt("currentServiceId" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("currentLinkType" + STATE_SUFFIX)) {
+                currentLinkType = (LinkType) savedInstanceState.getSerializable(
+                        "currentLinkType" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("selectedRadioPosition" + STATE_SUFFIX)) {
+                selectedRadioPosition = savedInstanceState.getInt(
+                        "selectedRadioPosition" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("pendingChoice" + STATE_SUFFIX)) {
+                pendingChoice = (Choice) savedInstanceState.getSerializable(
+                        "pendingChoice" + STATE_SUFFIX);
+            }
+        }
         fetcher = new ViewModelProvider(this).get(FetcherViewModel.class);
         fetcher.ready.observe(this, ready -> dispatchResult());
 
@@ -186,7 +198,10 @@ public class RouterActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
+        outState.putInt("currentServiceId" + STATE_SUFFIX, currentServiceId);
+        outState.putSerializable("currentLinkType" + STATE_SUFFIX, currentLinkType);
+        outState.putInt("selectedRadioPosition" + STATE_SUFFIX, selectedRadioPosition);
+        outState.putSerializable("pendingChoice" + STATE_SUFFIX, pendingChoice);
     }
 
     @Override

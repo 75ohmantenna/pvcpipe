@@ -33,7 +33,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.evernote.android.state.State;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.schabi.newpipe.NewPipeDatabase;
@@ -78,11 +77,10 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
         implements PlaylistControlViewHolder, DebounceSavable {
 
     private static final int MINIMUM_INITIAL_DRAG_VELOCITY = 12;
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.local.playlist.LocalPlaylistFragment$$StateSaver";
     protected Long playlistId;
-    @State
     protected String name;
-    @State
     Parcelable itemsListState;
 
     private LocalPlaylistHeaderBinding headerBinding;
@@ -118,6 +116,30 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     ///////////////////////////////////////////////////////////////////////////
     // Fragment LifeCycle - Creation
     ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putParcelable("itemsListState" + STATE_SUFFIX, itemsListState);
+        state.putString("name" + STATE_SUFFIX, name);
+        if (playlistId != null) {
+            state.putLong("playlistId" + STATE_SUFFIX, playlistId);
+        }
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("itemsListState" + STATE_SUFFIX)) {
+            itemsListState = state.getParcelable("itemsListState" + STATE_SUFFIX);
+        }
+        if (state.containsKey("name" + STATE_SUFFIX)) {
+            name = state.getString("name" + STATE_SUFFIX);
+        }
+        if (state.containsKey("playlistId" + STATE_SUFFIX)) {
+            playlistId = state.getLong("playlistId" + STATE_SUFFIX);
+        }
+    }
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {

@@ -34,7 +34,6 @@ import org.schabi.newpipe.ktx.hasAssignableCause
 import org.schabi.newpipe.settings.NewPipeSettings
 import org.schabi.newpipe.settings.export.BackupFileLocator
 import org.schabi.newpipe.settings.export.PendingDatabaseRestore
-import org.schabi.newpipe.util.BridgeStateSaverInitializer
 import org.schabi.newpipe.util.Localization
 import org.schabi.newpipe.util.ServiceHelper
 import org.schabi.newpipe.util.StateSaver
@@ -108,7 +107,6 @@ open class App :
         )
         Localization.initPrettyTime(Localization.resolvePrettyTime())
 
-        BridgeStateSaverInitializer.init(this)
         StateSaver.init(this)
         initNotificationChannels()
 

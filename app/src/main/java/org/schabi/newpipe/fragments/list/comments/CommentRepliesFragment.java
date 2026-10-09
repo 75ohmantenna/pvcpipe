@@ -12,8 +12,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.CommentRepliesHeaderBinding;
 import org.schabi.newpipe.error.UserAction;
@@ -37,13 +35,29 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 public final class CommentRepliesFragment
         extends PvcCommentRepliesFragment {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment$$StateSaver";
 
     public static final String TAG = CommentRepliesFragment.class.getSimpleName();
 
-    @State
     CommentsInfoItem commentsInfoItem; // the comment to show replies of
     private final CompositeDisposable disposables = new CompositeDisposable();
 
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putSerializable("commentsInfoItem" + STATE_SUFFIX, commentsInfoItem);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("commentsInfoItem" + STATE_SUFFIX)) {
+            commentsInfoItem = (CommentsInfoItem)
+                    state.getSerializable("commentsInfoItem" + STATE_SUFFIX);
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
     // Constructors and lifecycle

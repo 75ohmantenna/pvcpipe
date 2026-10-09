@@ -39,8 +39,6 @@ import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.FragmentSearchBinding;
@@ -93,6 +91,9 @@ import io.reactivex.rxjava3.subjects.PublishSubject;
 
 public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.InfoItemsPage<?>>
         implements BackPressable {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.search.SearchFragment$$StateSaver";
+
     /*//////////////////////////////////////////////////////////////////////////
     // Search
     //////////////////////////////////////////////////////////////////////////*/
@@ -110,11 +111,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     private static final int SUGGESTIONS_DEBOUNCE = 120; //ms
     private final PublishSubject<String> suggestionPublisher = PublishSubject.create();
 
-    @State
     protected int serviceId = Constants.NO_SERVICE_ID;
 
     // these three represents the current search query
-    @State
     String searchString;
 
     List<FilterItem> selectedContentFilter = new ArrayList<>();
@@ -122,19 +121,14 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     List<FilterItem> selectedSortFilter = new ArrayList<>();
 
     // these represents the last search
-    @State
     String lastSearchedString;
 
-    @State
     String searchSuggestion;
 
-    @State
     boolean isCorrectedSearch;
 
-    @State
     MetaInfo[] metaInfo;
 
-    @State
     boolean wasSearchFocused = false;
 
     @Nullable
@@ -169,10 +163,8 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
      */
     private TextWatcher textWatcher;
 
-    @State
     ArrayList<Integer> userSelectedContentFilterList;
 
-    @State
     ArrayList<Integer> userSelectedSortFilterList = null;
 
     protected SearchViewModel searchViewModel;
@@ -247,8 +239,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         searchViewModel.getSelectedSortFilterItemListLiveData().observe(
                 getViewLifecycleOwner(), filterItems -> selectedSortFilter = filterItems);
 
-        // the content/sort filters ids lists are only
-        // observed here to store them via Icepick
+        // Observe the content/sort filter IDs so they can be saved with the fragment state.
         searchViewModel.getUserSelectedContentFilterListLiveData().observe(
                 getViewLifecycleOwner(), filterIds -> userSelectedContentFilterList = filterIds);
         searchViewModel.getUserSelectedSortFilterListLiveData().observe(
@@ -446,6 +437,57 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     public void readFrom(@NonNull final Queue<Object> savedObjects) throws Exception {
         super.readFrom(savedObjects);
         nextPage = (Page) savedObjects.poll();
+    }
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putBoolean("isCorrectedSearch" + STATE_SUFFIX, isCorrectedSearch);
+        state.putString("lastSearchedString" + STATE_SUFFIX, lastSearchedString);
+        state.putSerializable("metaInfo" + STATE_SUFFIX, metaInfo);
+        state.putString("searchString" + STATE_SUFFIX, searchString);
+        state.putString("searchSuggestion" + STATE_SUFFIX, searchSuggestion);
+        state.putInt("serviceId" + STATE_SUFFIX, serviceId);
+        state.putIntegerArrayList("userSelectedContentFilterList" + STATE_SUFFIX,
+                userSelectedContentFilterList);
+        state.putIntegerArrayList("userSelectedSortFilterList" + STATE_SUFFIX,
+                userSelectedSortFilterList);
+        state.putBoolean("wasSearchFocused" + STATE_SUFFIX, wasSearchFocused);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("isCorrectedSearch" + STATE_SUFFIX)) {
+            isCorrectedSearch = state.getBoolean("isCorrectedSearch" + STATE_SUFFIX);
+        }
+        if (state.containsKey("lastSearchedString" + STATE_SUFFIX)) {
+            lastSearchedString = state.getString("lastSearchedString" + STATE_SUFFIX);
+        }
+        if (state.containsKey("metaInfo" + STATE_SUFFIX)) {
+            metaInfo = (MetaInfo[]) state.getSerializable("metaInfo" + STATE_SUFFIX);
+        }
+        if (state.containsKey("searchString" + STATE_SUFFIX)) {
+            searchString = state.getString("searchString" + STATE_SUFFIX);
+        }
+        if (state.containsKey("searchSuggestion" + STATE_SUFFIX)) {
+            searchSuggestion = state.getString("searchSuggestion" + STATE_SUFFIX);
+        }
+        if (state.containsKey("serviceId" + STATE_SUFFIX)) {
+            serviceId = state.getInt("serviceId" + STATE_SUFFIX);
+        }
+        if (state.containsKey("userSelectedContentFilterList" + STATE_SUFFIX)) {
+            userSelectedContentFilterList =
+                    state.getIntegerArrayList("userSelectedContentFilterList" + STATE_SUFFIX);
+        }
+        if (state.containsKey("userSelectedSortFilterList" + STATE_SUFFIX)) {
+            userSelectedSortFilterList =
+                    state.getIntegerArrayList("userSelectedSortFilterList" + STATE_SUFFIX);
+        }
+        if (state.containsKey("wasSearchFocused" + STATE_SUFFIX)) {
+            wasSearchFocused = state.getBoolean("wasSearchFocused" + STATE_SUFFIX);
+        }
     }
 
     @Override

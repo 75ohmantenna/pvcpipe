@@ -13,8 +13,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.fragment.app.Fragment;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.BaseFragment;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
@@ -25,7 +23,9 @@ import org.schabi.newpipe.util.InfoCache;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class BaseStateFragment<I> extends BaseFragment implements ViewContract<I> {
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.BaseStateFragment$$StateSaver";
+
     protected AtomicBoolean wasLoading = new AtomicBoolean();
     protected AtomicBoolean isLoading = new AtomicBoolean();
 
@@ -38,8 +38,30 @@ public abstract class BaseStateFragment<I> extends BaseFragment implements ViewC
 
     private ErrorPanelHelper errorPanelHelper;
     @Nullable
-    @State
     protected ErrorInfo lastPanelError = null;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putParcelable("lastPanelError" + STATE_SUFFIX, lastPanelError);
+        state.putSerializable("wasLoading" + STATE_SUFFIX, wasLoading);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("lastPanelError" + STATE_SUFFIX)) {
+            lastPanelError = state.getParcelable("lastPanelError" + STATE_SUFFIX);
+        }
+        if (state.containsKey("wasLoading" + STATE_SUFFIX)) {
+            final AtomicBoolean restoredWasLoading =
+                    (AtomicBoolean) state.getSerializable("wasLoading" + STATE_SUFFIX);
+            if (restoredWasLoading != null) {
+                wasLoading = restoredWasLoading;
+            }
+        }
+    }
 
     @Override
     public void onViewCreated(@NonNull final View rootView, final Bundle savedInstanceState) {
