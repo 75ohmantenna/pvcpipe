@@ -16,10 +16,21 @@ manager persists the finished-history row before removing it. Startup can
 replay a completed checkpoint after interruption. Destination media bytes,
 checkpoint files, and the finished-history database are not one transaction.
 
+Sharing or externally opening a direct mission grants a read-only URI for that
+individual file, not for its containing storage volume. The download stays in
+place on primary or removable storage; no second media copy is made. The grant
+is backed by a private, process-persistent token mapping so a recipient can
+open the selected file after the chooser or app process exits. If its pathname
+no longer points to a regular file, the URI cannot be opened. SAF missions
+continue to use their original document URIs. Preview thumbnails use a
+separate FileProvider cache path; neither provider grants directory-prefix
+access.
+
 For verification, `make ci` includes the application unit tests and APK builds.
 `DownloadPreparationTest`, `DownloadMissionLifecycleTest`,
 `DownloadManagerCheckpointTest`, and `UtilityAtomicCheckpointTest` cover the
-preparation and recovery seams. `DownloadPreparationIntegrationTest` needs
-Android instrumentation and is not included in `make ci`. On an existing
-installation, read the [device-test safety record](local-playlist-mutations.md)
+preparation and recovery seams. `DownloadPreparationIntegrationTest` and
+`MissionFileSharingTest` need Android instrumentation and are not included in
+`make ci`. On an existing installation, read the
+[device-test safety record](local-playlist-mutations.md)
 before selecting any instrumentation task.

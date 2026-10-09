@@ -153,6 +153,12 @@
                 android:resource="@xml/shared_file_paths" />
         </provider>
 
+        <provider
+            android:name="org.schabi.newpipe.streams.io.MissionFileProvider"
+            android:authorities="${applicationId}.mission-files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <activity
             android:name=".RouterActivity"
             android:excludeFromRecents="true"

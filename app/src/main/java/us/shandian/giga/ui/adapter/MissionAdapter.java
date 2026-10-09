@@ -1,7 +1,6 @@
 package us.shandian.giga.ui.adapter;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static android.content.Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
 import static android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION;
 import static android.content.Intent.createChooser;
 import static us.shandian.giga.get.DownloadMission.ERROR_CONNECT_HOST;
@@ -23,6 +22,7 @@ import static us.shandian.giga.get.DownloadMission.ERROR_UNKNOWN_HOST;
 
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -46,7 +46,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
-import androidx.core.content.FileProvider;
 import androidx.core.os.HandlerCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
@@ -61,13 +60,14 @@ import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.streams.io.MissionFileProvider;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.external_communication.ShareUtils;
 
 import java.io.File;
-import java.net.URI;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -350,9 +350,10 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         String mimeType = resolveMimeType(mission);
 
         if (BuildConfig.DEBUG)
-            Log.v(TAG, "Mime: " + mimeType + " package: " + BuildConfig.APPLICATION_ID + ".provider");
+            Log.v(TAG, "Mime: " + mimeType);
 
         Uri uri = resolveShareableUri(mission);
+        if (uri == null) return;
 
         Intent intent = new Intent(mContext, LocalPlayerActivity.class);
         intent.setDataAndType(uri, mimeType);
@@ -369,12 +370,11 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         String mimeType = resolveMimeType(mission);
 
         if (BuildConfig.DEBUG)
-            Log.v(TAG, "Mime: " + mimeType + " package: " + BuildConfig.APPLICATION_ID + ".provider");
+            Log.v(TAG, "Mime: " + mimeType);
 
-        Intent viewIntent = new Intent(Intent.ACTION_VIEW);
-        viewIntent.setDataAndType(resolveShareableUri(mission), mimeType);
-        viewIntent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
-        viewIntent.addFlags(FLAG_GRANT_PREFIX_URI_PERMISSION);
+        final Uri uri = resolveShareableUri(mission);
+        if (uri == null) return;
+        final Intent viewIntent = createExternalViewIntent(uri, mimeType);
 
         Intent chooserIntent = createChooser(viewIntent, null);
         chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION);
@@ -382,13 +382,20 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         ShareUtils.openIntentInApp(mContext, chooserIntent);
     }
 
+    static Intent createExternalViewIntent(@NonNull final Uri uri, @NonNull final String mimeType) {
+        final Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, mimeType);
+        intent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
     private void shareFile(Mission mission) {
         if (checkInvalidFile(mission)) return;
 
-        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType(resolveMimeType(mission));
-        shareIntent.putExtra(Intent.EXTRA_STREAM, resolveShareableUri(mission));
-        shareIntent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
+        final Uri uri = resolveShareableUri(mission);
+        if (uri == null) return;
+        final Intent shareIntent = createShareIntent(mContext, uri, resolveMimeType(mission),
+                mission.storage.getName());
 
         final Intent intent = createChooser(shareIntent, null);
         intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
@@ -397,22 +404,36 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         mContext.startActivity(intent);
     }
 
-    /**
-     * Returns an Uri which can be shared to other applications.
-     *
-     * @see <a href="https://stackoverflow.com/questions/38200282/android-os-fileuriexposedexception-file-storage-emulated-0-test-txt-exposed">
-     * https://stackoverflow.com/questions/38200282/android-os-fileuriexposedexception-file-storage-emulated-0-test-txt-exposed</a>
-     */
-    private Uri resolveShareableUri(Mission mission) {
-        if (mission.storage.isDirect()) {
-            return FileProvider.getUriForFile(
-                mContext,
-                BuildConfig.APPLICATION_ID + ".provider",
-                new File(URI.create(mission.storage.getUri().toString()))
-            );
-        } else {
-            return mission.storage.getUri();
+    static Intent createShareIntent(@NonNull final Context context, @NonNull final Uri uri,
+                                    @NonNull final String mimeType,
+                                    @NonNull final String displayName) {
+        final Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType(mimeType);
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.setClipData(ClipData.newUri(context.getContentResolver(), displayName, uri));
+        intent.addFlags(FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
+    /** Direct files are granted individually, without exposing their parent storage volume. */
+    private Uri resolveShareableUri(@NonNull final Mission mission) {
+        try {
+            return resolveShareableUri(mContext, mission.storage, resolveMimeType(mission));
+        } catch (final IOException e) {
+            Log.e(TAG, "Could not share mission file", e);
+            Toast.makeText(mContext, R.string.missing_file, Toast.LENGTH_SHORT).show();
+            return null;
         }
+    }
+
+    static Uri resolveShareableUri(@NonNull final Context context,
+                                   @NonNull final StoredFileHelper storage,
+                                   @NonNull final String mimeType) throws IOException {
+        if (storage.isDirect()) {
+            return MissionFileProvider.register(context, new File(storage.getUri().getPath()),
+                    mimeType);
+        }
+        return storage.getUri();
     }
 
     private static String resolveMimeType(@NonNull Mission mission) {
