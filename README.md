@@ -7,7 +7,12 @@ PVCPipe is an in-development Android app (Android 8.0+, API 26) forked from
 ## Build
 
 The app is in `app/`; the bundled extractor is in `pvcpipe-extractor/`.
-See [extractor services](docs/extractor-services.md) for URL handling.
+Code and tests define current behavior. The consolidated developer guides cover
+[services](docs/services.md), [playback](docs/playback.md),
+[library data](docs/library-data.md), and [downloads](docs/download-preparation.md).
+The [device-test safety record](docs/local-playlist-mutations.md) and
+[dated smoke results](docs/pvcpipe-device-smoke.md) describe observed devices,
+not a current behavior specification.
 
 Install Android SDK platform 37 and Java 11, 17, and 21 toolchains, then run
 `./gradlew :app:assembleDebug` for a debug APK or `make ci` for checks, unit

@@ -3,6 +3,7 @@ package us.shandian.giga.get;
 import android.os.Handler;
 import android.system.ErrnoException;
 import android.system.OsConstants;
+import android.util.AtomicFile;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -109,6 +110,9 @@ public class DownloadMission extends Mission {
      * Metadata where the mission state is saved
      */
     public transient File metadata;
+
+    /** An initial checkpoint must exist before this mission can start downloading. */
+    public transient boolean checkpointReady;
 
     /**
      * maximum attempts
@@ -488,7 +492,11 @@ public class DownloadMission extends Mission {
         enqueued = false;
         running = false;
 
-        deleteThisFromFile();
+        // Keep a complete checkpoint until the finished row is committed by the manager.
+        // If this write fails, the initial checkpoint remains available for restart recovery.
+        if (!writeThisToFile()) {
+            Log.w(TAG, "Unable to save final checkpoint for " + storage.getName());
+        }
         notify(DownloadManagerService.MESSAGE_FINISHED);
     }
 
@@ -685,7 +693,7 @@ public class DownloadMission extends Mission {
 
         notify(DownloadManagerService.MESSAGE_DELETED);
 
-        boolean res = deleteThisFromFile();
+        boolean res = deleteMetadata();
 
         if (!super.delete()) return false;
         return res;
@@ -737,11 +745,12 @@ public class DownloadMission extends Mission {
      * Write this {@link DownloadMission} to the meta file asynchronously
      * if no thread is already running.
      */
-    void writeThisToFile() {
+    boolean writeThisToFile() {
         synchronized (LOCK) {
-            if (metadata == null) return;
-            Utility.writeToFile(metadata, this);
+            if (metadata == null) return false;
+            boolean saved = Utility.writeToFile(metadata, this);
             writingToFile = false;
+            return saved;
         }
     }
 
@@ -917,11 +926,15 @@ public class DownloadMission extends Mission {
         start();
     }
 
-    private boolean deleteThisFromFile() {
+    public boolean deleteMetadata() {
         synchronized (LOCK) {
-            boolean res = metadata.delete();
-            metadata = null;
-            return res;
+            if (metadata == null) return true;
+            new AtomicFile(metadata).delete();
+            boolean deleted = !metadata.exists()
+                    && !new File(metadata.getPath() + ".bak").exists()
+                    && !new File(metadata.getPath() + ".new").exists();
+            if (deleted) metadata = null;
+            return deleted;
         }
     }
 

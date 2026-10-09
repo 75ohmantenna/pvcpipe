@@ -19,8 +19,8 @@ sealed interface PlayQueueEvent : Serializable {
         override fun type() = Type.SELECT
     }
 
-    // sent when more streams are added to the play queue
-    class AppendEvent(val amount: Int) : PlayQueueEvent {
+    // Captures the insertion position at mutation time, before asynchronous observers run.
+    class AppendEvent(val startIndex: Int, val amount: Int) : PlayQueueEvent {
         override fun type() = Type.APPEND
     }
 
