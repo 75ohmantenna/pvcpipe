@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.ComponentDialog
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.getSystemService
+import androidx.core.os.BundleCompat
 import androidx.core.os.bundleOf
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -20,8 +21,6 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.evernote.android.state.State
-import com.livefront.bridge.Bridge
 import com.xwray.groupie.GroupieAdapter
 import com.xwray.groupie.OnItemClickListener
 import com.xwray.groupie.Section
@@ -63,40 +62,22 @@ class FeedGroupDialog : DialogFragment(), BackPressable {
         data object DeleteScreen : ScreenState()
     }
 
-    @State
-    @JvmField
     var selectedIcon: FeedGroupIcon? = null
 
-    @State
-    @JvmField
     var selectedSubscriptions: HashSet<Long> = HashSet()
 
-    @State
-    @JvmField
     var wasSubscriptionSelectionChanged: Boolean = false
 
-    @State
-    @JvmField
     var currentScreen: ScreenState = InitialScreen
 
-    @State
-    @JvmField
     var subscriptionsListState: Parcelable? = null
 
-    @State
-    @JvmField
     var iconsListState: Parcelable? = null
 
-    @State
-    @JvmField
     var wasSearchSubscriptionsVisible = false
 
-    @State
-    @JvmField
     var subscriptionsCurrentSearchQuery = ""
 
-    @State
-    @JvmField
     var subscriptionsShowOnlyUngrouped = false
 
     private val subscriptionMainSection = Section()
@@ -105,7 +86,66 @@ class FeedGroupDialog : DialogFragment(), BackPressable {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Bridge.restoreInstanceState(this, savedInstanceState)
+        if (savedInstanceState != null) {
+            savedInstanceState.classLoader = javaClass.classLoader
+            if (savedInstanceState.containsKey("selectedIcon" + STATE_SUFFIX)) {
+                selectedIcon = BundleCompat.getSerializable(
+                    savedInstanceState,
+                    "selectedIcon" + STATE_SUFFIX,
+                    FeedGroupIcon::class.java
+                )
+            }
+            if (savedInstanceState.containsKey("selectedSubscriptions" + STATE_SUFFIX)) {
+                @Suppress("UNCHECKED_CAST")
+                val restored = BundleCompat.getSerializable(
+                    savedInstanceState,
+                    "selectedSubscriptions" + STATE_SUFFIX,
+                    HashSet::class.java
+                ) as? HashSet<Long>
+                selectedSubscriptions = restored ?: HashSet()
+            }
+            if (savedInstanceState.containsKey("wasSubscriptionSelectionChanged" + STATE_SUFFIX)) {
+                wasSubscriptionSelectionChanged = savedInstanceState.getBoolean(
+                    "wasSubscriptionSelectionChanged" + STATE_SUFFIX
+                )
+            }
+            if (savedInstanceState.containsKey("currentScreen" + STATE_SUFFIX)) {
+                currentScreen = BundleCompat.getSerializable(
+                    savedInstanceState,
+                    "currentScreen" + STATE_SUFFIX,
+                    ScreenState::class.java
+                ) ?: InitialScreen
+            }
+            if (savedInstanceState.containsKey("subscriptionsListState" + STATE_SUFFIX)) {
+                subscriptionsListState = BundleCompat.getParcelable(
+                    savedInstanceState,
+                    "subscriptionsListState" + STATE_SUFFIX,
+                    Parcelable::class.java
+                )
+            }
+            if (savedInstanceState.containsKey("iconsListState" + STATE_SUFFIX)) {
+                iconsListState = BundleCompat.getParcelable(
+                    savedInstanceState,
+                    "iconsListState" + STATE_SUFFIX,
+                    Parcelable::class.java
+                )
+            }
+            if (savedInstanceState.containsKey("wasSearchSubscriptionsVisible" + STATE_SUFFIX)) {
+                wasSearchSubscriptionsVisible = savedInstanceState.getBoolean(
+                    "wasSearchSubscriptionsVisible" + STATE_SUFFIX
+                )
+            }
+            if (savedInstanceState.containsKey("subscriptionsCurrentSearchQuery" + STATE_SUFFIX)) {
+                subscriptionsCurrentSearchQuery = savedInstanceState.getString(
+                    "subscriptionsCurrentSearchQuery" + STATE_SUFFIX
+                ) ?: ""
+            }
+            if (savedInstanceState.containsKey("subscriptionsShowOnlyUngrouped" + STATE_SUFFIX)) {
+                subscriptionsShowOnlyUngrouped = savedInstanceState.getBoolean(
+                    "subscriptionsShowOnlyUngrouped" + STATE_SUFFIX
+                )
+            }
+        }
 
         setStyle(STYLE_NO_TITLE, ThemeHelper.getMinWidthDialogTheme(requireContext()))
         groupId = arguments?.getLong(KEY_GROUP_ID, NO_GROUP_SELECTED) ?: NO_GROUP_SELECTED
@@ -146,7 +186,27 @@ class FeedGroupDialog : DialogFragment(), BackPressable {
         iconsListState = feedGroupCreateBinding.iconSelector.layoutManager?.onSaveInstanceState()
         subscriptionsListState = feedGroupCreateBinding.subscriptionsSelectorList.layoutManager?.onSaveInstanceState()
 
-        Bridge.saveInstanceState(this, outState)
+        outState.putSerializable("selectedIcon" + STATE_SUFFIX, selectedIcon)
+        outState.putSerializable("selectedSubscriptions" + STATE_SUFFIX, selectedSubscriptions)
+        outState.putBoolean(
+            "wasSubscriptionSelectionChanged" + STATE_SUFFIX,
+            wasSubscriptionSelectionChanged
+        )
+        outState.putSerializable("currentScreen" + STATE_SUFFIX, currentScreen)
+        outState.putParcelable("subscriptionsListState" + STATE_SUFFIX, subscriptionsListState)
+        outState.putParcelable("iconsListState" + STATE_SUFFIX, iconsListState)
+        outState.putBoolean(
+            "wasSearchSubscriptionsVisible" + STATE_SUFFIX,
+            wasSearchSubscriptionsVisible
+        )
+        outState.putString(
+            "subscriptionsCurrentSearchQuery" + STATE_SUFFIX,
+            subscriptionsCurrentSearchQuery
+        )
+        outState.putBoolean(
+            "subscriptionsShowOnlyUngrouped" + STATE_SUFFIX,
+            subscriptionsShowOnlyUngrouped
+        )
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -545,6 +605,8 @@ class FeedGroupDialog : DialogFragment(), BackPressable {
     }
 
     companion object {
+        private const val STATE_SUFFIX =
+            "org.schabi.newpipe.local.subscription.dialog.FeedGroupDialog\$\$StateSaver"
         private const val KEY_GROUP_ID = "KEY_GROUP_ID"
         private const val NO_GROUP_SELECTED = -1L
 

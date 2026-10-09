@@ -10,8 +10,6 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.UserAction;
@@ -34,12 +32,34 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public abstract class BaseListInfoFragment<I extends InfoItem, L extends ListInfo<I>>
         extends BaseListFragment<L, ListExtractor.InfoItemsPage<I>> {
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.BaseListInfoFragment$$StateSaver";
+
     protected int serviceId = Constants.NO_SERVICE_ID;
-    @State
     protected String name;
-    @State
     protected String url;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putString("name" + STATE_SUFFIX, name);
+        state.putInt("serviceId" + STATE_SUFFIX, serviceId);
+        state.putString("url" + STATE_SUFFIX, url);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("name" + STATE_SUFFIX)) {
+            name = state.getString("name" + STATE_SUFFIX);
+        }
+        if (state.containsKey("serviceId" + STATE_SUFFIX)) {
+            serviceId = state.getInt("serviceId" + STATE_SUFFIX);
+        }
+        if (state.containsKey("url" + STATE_SUFFIX)) {
+            url = state.getString("url" + STATE_SUFFIX);
+        }
+    }
 
     private final UserAction errorUserAction;
     protected L currentInfo;

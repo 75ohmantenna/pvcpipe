@@ -11,8 +11,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.UserAction;
@@ -58,11 +56,32 @@ import io.reactivex.rxjava3.core.Single;
  */
 
 public class KioskFragment extends BaseListInfoFragment<StreamInfoItem, KioskInfo> {
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.kiosk.KioskFragment$$StateSaver";
+
     String kioskId = "";
     String kioskTranslatedName;
-    @State
     ContentCountry contentCountry;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putSerializable("contentCountry" + STATE_SUFFIX, contentCountry);
+        state.putString("kioskId" + STATE_SUFFIX, kioskId);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("contentCountry" + STATE_SUFFIX)) {
+            contentCountry = (ContentCountry)
+                    state.getSerializable("contentCountry" + STATE_SUFFIX);
+        }
+        if (state.containsKey("kioskId" + STATE_SUFFIX)) {
+            kioskId = state.getString("kioskId" + STATE_SUFFIX);
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
     // Views

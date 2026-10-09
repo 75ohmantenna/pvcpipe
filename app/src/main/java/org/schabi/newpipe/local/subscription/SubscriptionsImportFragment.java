@@ -23,8 +23,6 @@ import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
 import androidx.core.text.util.LinkifyCompat;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.BaseFragment;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
@@ -43,7 +41,9 @@ import java.util.Collections;
 import java.util.List;
 
 public class SubscriptionsImportFragment extends BaseFragment {
-    @State
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.local.subscription.SubscriptionsImportFragment$$StateSaver";
+
     int currentServiceId = Constants.NO_SERVICE_ID;
 
     private List<SubscriptionExtractor.ContentSource> supportedSources;
@@ -51,6 +51,20 @@ public class SubscriptionsImportFragment extends BaseFragment {
 
     @StringRes
     private int instructionsString;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putInt("currentServiceId" + STATE_SUFFIX, currentServiceId);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        if (state.containsKey("currentServiceId" + STATE_SUFFIX)) {
+            currentServiceId = state.getInt("currentServiceId" + STATE_SUFFIX);
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
     // Views
