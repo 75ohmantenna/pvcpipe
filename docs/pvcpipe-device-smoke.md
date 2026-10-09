@@ -1,8 +1,8 @@
 # Pixel 6a device smoke — 2026-10-07
 
-Tested commit `169113e7c4605297fa7184c7e307b21a08cd7cdb` on clean
-`master`. Pixel 6a (`bluejay`), Android 17/API 37, Wi-Fi ADB serial
-`adb-25311JEGR13654-vFFNKQ._adb-tls-connect._tcp`. Built with
+The smoke test used commit `169113e7c4605297fa7184c7e307b21a08cd7cdb` on clean
+`master`, a Pixel 6a (`bluejay`) running Android 17/API 37, and Wi-Fi ADB serial
+`adb-25311JEGR13654-vFFNKQ._adb-tls-connect._tcp`. The APK was built with
 `./gradlew :app:assembleDebug --console=plain` (58 tasks up to date), then
 installed `app/build/outputs/apk/debug/app-debug.apk` with
 `adb -s <serial> install -r`. The installed signer matched this APK; app data
@@ -50,8 +50,8 @@ not inferences from offline tests. All URLs are public; no account was used.
   moving frame and 02:53 duration.
   [Decoded saved media](device-smoke/download-decoded.webp).
 - **PASS — Parallel requests observed:** Bounded `DownloadMission` debug logs
-  for the 360p mission showed workers 0, 1 and 2 issuing byte ranges and
-  receiving compatible `Content-Range` responses with total 13,435,079.
+  for the 360p mission showed workers 0, 1, and 2 issuing byte ranges and
+  receiving compatible `Content-Range` responses with a total of 13,435,079 bytes.
   Final length and decode agreed. Later one-thread 1080p logs showed
   `Range=bytes=0-`, `Content-Range=bytes 0-81542670/81542671`, then
   `Range=bytes=81542661-81542671` answered with end 81542670. Those
@@ -114,7 +114,7 @@ No phone-wide network or VPN setting was changed.
 
 A bounded app-PID error-log sample had no playback crash or extractor error
 associated with the successful checks. A null-thumbnail `RealImageLoader`
-`NullRequestDataException` and `LegacyGraphicsTracker` buffer warning also
+`NullRequestDataException` and a `LegacyGraphicsTracker` buffer warning also
 occurred; neither established a media failure. The root cause of the later
 metadata overlay is **unconfirmed**: rapid taps hit a finished card and no
 corresponding extraction failure was isolated. Raw device-wide logs, cookies,
@@ -153,7 +153,7 @@ started after restoring the folder, so writing to it was not retested.
 Verification is limited to this phone, the stated public URLs and local
 fixture, and the network at the stated time. Rumble content availability can
 change. The controlled resume checks exercised the real downloader and its
-mission UI, **not** a site-extracted UI-created slow mission. Validator
+mission UI, **not** a site-extracted, UI-created slow mission. Validator
 replacement, recovery after changed content, HTTP 200/416 on resume, and
 YouTube client-fallback device scenarios remain untested; separate
 deterministic regressions cannot substitute for these device observations.

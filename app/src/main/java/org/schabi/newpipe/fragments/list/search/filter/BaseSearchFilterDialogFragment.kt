@@ -142,14 +142,14 @@ abstract class BaseSearchFilterDialogFragment : DialogFragment() {
         SavePresetDialog(requireContext()) { name ->
 
             if (name.isEmpty()) {
-                showError("Name cannot be empty")
+                showError(R.string.search_preset_name_required)
                 return@SavePresetDialog
             }
 
             val currentService = searchViewModel!!.getService().serviceInfo.name
 
             if (!searchViewModel!!.isPresetNameAvailable(currentService, name)) {
-                showError("Preset name already exists")
+                showError(R.string.search_preset_name_taken)
                 return@SavePresetDialog
             }
 
@@ -157,9 +157,9 @@ abstract class BaseSearchFilterDialogFragment : DialogFragment() {
         }.show()
     }
 
-    private fun showError(string: String) {
-        Log.e(TAG, "Error $string")
-        Toast.makeText(context, "Error $string", Toast.LENGTH_LONG).show()
+    private fun showError(messageRes: Int) {
+        Log.e(TAG, getString(messageRes))
+        Toast.makeText(context, messageRes, Toast.LENGTH_LONG).show()
     }
 
     class SavePresetDialog(

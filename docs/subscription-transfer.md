@@ -39,10 +39,10 @@ serialize, and close successfully. Cancellation propagates through the codec,
 transfer, and worker presentation instead of becoming an ordinary failure
 outcome.
 
-An explicit permit limits the whole channel-and-tab extraction to eight requests
+An explicit permit limits the entire channel-and-tab extraction to eight requests
 in flight, including suspended external requests. Loading progress increments and
-reporting are serialized together, preventing overlapping foreground updates or
-backwards progress. WorkManager retains ownership of cancellation and lifetime;
+reports are serialized together, preventing overlapping foreground updates or
+backward progress. WorkManager retains ownership of cancellation and lifetime;
 the module executes in its caller's coroutine.
 
 `SubscriptionTransferTest` exercises the execution interface with actual JSON

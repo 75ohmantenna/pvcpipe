@@ -3,15 +3,15 @@
 `BackupRestore` owns export, inspection, and accepted restore. The settings
 fragment selects documents and presents confirmation and result dialogs.
 
-Operations begin on first subscription. A request caches its result; observing
-it again does not repeat work. Create a new request to retry. All production
+Operations begin on first subscription. Each request caches its result; observing
+it again does not repeat the work. Create a new request to retry. All production
 instances share application-owned admission through `BackupOperations`, which
 rejects overlapping work. Inspection releases admission before delivering its
-result, so a confirmation dialog holds no reservation.
+result, so a confirmation dialog does not hold a reservation.
 
-Detaching observers does not interrupt accepted work. Restore restart and error
-notification belong to the module and run once on the main scheduler, even when
-the settings view has disappeared. Completion means staged and restart requested.
+Detaching observers does not interrupt accepted work. The module handles restore
+restart and error notification once on the main scheduler, even if the settings
+view has disappeared. Completion means the restore is staged and a restart has been requested.
 
 Inspection is advisory: the current stream probe is not database validation and
 a document can change after inspection. JSON preferences take precedence over
@@ -53,5 +53,5 @@ admission, detached observers, replay, format selection, export, and staging.
 `BackupRestoreFailureTest` covers preparation, failed commits and rollback,
 source changes, cleanup, and failed restart. `BackupRestoreIntegrationTest` uses
 isolated files and real Android preferences. `PendingDatabaseRestoreTest` covers
-the startup lifecycle. Run `make ci` for the
-application and deterministic extractor checks and both APK builds.
+the startup lifecycle. Run `make ci` for application and deterministic extractor
+checks and both APK builds.

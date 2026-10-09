@@ -47,16 +47,15 @@ accepted mutations. Read-error reset marks contents unloaded, clears rewrite
 ownership, and detaches old callbacks before retry observers are attached. The
 cleared adapter cannot be saved as an empty loaded playlist.
 
-The database is local-substitutable. Tests exercise the manager interface with
-in-memory Room, actual history and playback state, joins, and playlist metadata.
-No additional adapter is needed. Real Room tests use controlled scheduling to
-cover disposed accepted appends,
-consecutive index allocation, and the execution order of two disposed accepted
-replacements. These replace the overlapping DAO-mock mutation tests. Fragment
-regressions cover failed draft saves and read-error reset/reload races. Run
-`make ci` for ordinary checks and APK builds; run
-playlist database tests on an Android device for transaction and persistence
-coverage.
+The database can be substituted locally. Tests exercise the manager interface
+with in-memory Room, actual history and playback state, joins, and playlist
+metadata. No additional adapter is needed. Real Room tests use controlled
+scheduling to cover disposed accepted appends, consecutive index allocation,
+and the execution order of two disposed accepted replacements. These replace
+the overlapping DAO-mock mutation tests. Fragment regressions cover failed
+draft saves and read-error reset/reload races. Run `make ci` for ordinary checks
+and APK builds; run playlist database tests on an Android device for transaction
+and persistence coverage.
 
 ## Device instrumentation without replacing user data
 

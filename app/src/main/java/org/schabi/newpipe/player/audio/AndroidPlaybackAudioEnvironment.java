@@ -17,6 +17,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.analytics.AnalyticsListener;
 
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.player.helper.PlayerHelper;
 
 import java.util.function.Consumer;
@@ -72,24 +73,23 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
 
     @Override
     public boolean canReadVolume() {
-        return commandAvailable(Player.COMMAND_GET_VOLUME, "get");
+        return commandAvailable(Player.COMMAND_GET_VOLUME);
     }
 
     @Override
     public boolean setInternalVolume(final float volume) {
-        if (!commandAvailable(Player.COMMAND_SET_VOLUME, "set")) {
+        if (!commandAvailable(Player.COMMAND_SET_VOLUME)) {
             return false;
         }
         player.setVolume(volume);
         return true;
     }
 
-    private boolean commandAvailable(final int command, final String type) {
+    private boolean commandAvailable(final int command) {
         if (player.isCommandAvailable(command)) {
             return true;
         }
-        Toast.makeText(context, type + " command for internal volume is not available",
-                Toast.LENGTH_LONG).show();
+        Toast.makeText(context, R.string.internal_volume_unavailable, Toast.LENGTH_LONG).show();
         return false;
     }
 

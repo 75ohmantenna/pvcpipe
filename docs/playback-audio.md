@@ -1,15 +1,15 @@
 # Playback audio
 
 `PlaybackAudio` owns internal-volume restoration bookkeeping, mute effects,
-audio-focus eligibility and focus-triggered playback effects. `Player` reports
+audio-focus eligibility, and focus-triggered playback effects. `Player` reports
 playback intentions before its normal play/pause operations and retains queue,
-replay, history and UI control. A gesture changes internal volume once; it does
+replay, history, and UI control. A gesture changes internal volume once; it does
 not save restoration state separately. Android music-stream volume remains
-explicitly distinct from ExoPlayer internal volume.
+distinct from ExoPlayer internal volume.
 
-The caller interface and Android focus callbacks run on the player application
+The caller interface and Android focus callbacks run on the player's application
 thread. The Android adapter owns focus requests, analytics registration,
-audio-effect session broadcasts, volume-command checks, preferences and
+audio-effect session broadcasts, volume-command checks, preferences, and
 1500 ms restoration animations. Tests use the same playback interface with a
 controlled adapter for focus and animation delivery. Device tests exercise the
 production adapter with real ExoPlayer and Android animation.

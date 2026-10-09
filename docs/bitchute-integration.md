@@ -8,8 +8,8 @@ or BitChute account is required for the public interactions below.
 ## Website request paths
 
 The current BitChute homepage is a JavaScript application. Its `app.d1922799.js` bundle was
-inspected on 2026-10-06, along with live JSON responses. The endpoints are website implementation
-details, rather than a documented, versioned public API contract.
+inspected on 2026-10-06 alongside live JSON responses. These endpoints are website implementation
+details, not a documented, versioned public API contract.
 
 | Interaction | Request |
 | --- | --- |
@@ -27,7 +27,7 @@ details, rather than a documented, versioned public API contract.
 | Comment authorization | POST `/api/beta/apps/commentfreely/video/`, with `video_id`; the response supplies a signed anonymous `auth` token. |
 | Comments | Form POST `https://commentfreely.bitchute.com/api/get_comments/`, with `cf_auth` and `commentCount=0`. Omitting `isNameValuesArrays` requests ordinary JSON comment objects. |
 
-All paths without a host above use `https://api.bitchute.com`. Autocomplete returns no requests or results for queries shorter than two characters.
+Paths without a host use `https://api.bitchute.com`. Autocomplete makes no requests and returns no results for queries shorter than two characters.
 
 The media response currently supplies a single URL, rather than a list of selectable qualities.
 The extractor recognizes progressive MP4/WebM/3GPP and HLS delivery. Background and popup modes
@@ -46,7 +46,7 @@ or post comments on the website.
   parent has been deleted remain visible at the root.
 - Absolute comment avatar URLs remain intact. Relative and protocol-relative URLs are resolved
   correctly. Comment dates accept ISO offsets with variable fractional precision or no fraction.
-- Suggested requests its own feed rather than Popular.
+- Suggested requests its own feed instead of Popular.
 - Each search request uses the filters stored in its own link handler. Starting a Channels search
   no longer changes the endpoint or filters used when an earlier Videos search loads another page.
   Current search calls use JSON API requests, not the legacy website `searchAuth` timestamp/nonce
@@ -86,10 +86,10 @@ An older telescope video returned an empty comments array, which is a valid empt
 Relevance, Newest, Oldest, all four duration filters, and Normal/NSFW/NSFL searches returned video
 results. A burst of filter probes initially encountered HTTP 429 Cloudflare challenge HTML;
 the remaining filters returned HTTP 200 when retried later with requests spaced apart.
-The application has no verified
-BitChute challenge recovery flow: the Rumble WebView interceptor is restricted to Rumble hosts,
-and the existing reCAPTCHA cookie flow handles YouTube cookies. A public request succeeding does
-not prove challenge recovery, access from another region, or access to private/restricted content.
+The application has no verified BitChute challenge recovery flow: the Rumble WebView interceptor
+is restricted to Rumble hosts, and the existing reCAPTCHA cookie flow handles YouTube cookies.
+A successful public request does not prove challenge recovery, access from another region,
+or access to private/restricted content.
 
 The existing Android 15 AVD `pvcpipe_rumble_api35` was used with the debug APK. Cold boot initially
 caused System UI and application startup timeouts; after recovery, the app loaded BitChute browse
