@@ -139,11 +139,11 @@ abstract class PvcErrorActivity : AppCompatActivity() {
                     if (null != fileContent) {
                         ShareUtils.copyToClipboard(context, fileContent)
                     } else {
-                        Toast.makeText(context, "no logcat log available", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, R.string.logcat_log_unavailable, Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    Toast.makeText(context, "error reading logcat file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, R.string.logcat_log_read_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }

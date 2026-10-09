@@ -1,7 +1,7 @@
 # Playback history
 
 `PlaybackHistory` owns view registration, progress checkpoints, completion
-markers, discontinuity interpretation and resume outcomes. `Player` supplies
+markers, discontinuity interpretation, and resume outcomes. `Player` supplies
 playback snapshots and retains ExoPlayer control and intent-request
 cancellation. Queue recovery uses content position; saved progress uses playback
 position. Normal checkpoints require matching queue and media-item indexes.

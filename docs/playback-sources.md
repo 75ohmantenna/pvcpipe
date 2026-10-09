@@ -14,9 +14,9 @@ policy. `PlaybackResolver` retains delivery and manifest construction.
 
 `Environment` substitutes Android preference-dependent selection and ExoPlayer
 construction. `AndroidPlaybackEnvironment` binds the existing ListHelper and
-PlayerDataSource operations; scripted tests record actual selected streams and
-construction failures. Both tests and Player use resolve/requiresReload and the
-same quality/audio setters. Device tests construct real progressive, merged and
+PlayerDataSource operations; scripted tests record selected streams and
+construction failures. Tests and Player both use resolve/requiresReload and the
+same quality/audio setters. Device tests construct real progressive, merged, and
 HLS sources and queue wrappers without preparing or fetching media.
 
 ## Source-local decisions

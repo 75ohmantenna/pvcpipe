@@ -43,8 +43,8 @@ Channel search accepts legacy `channel-item` cards, subscribe/notify metadata, a
 profile links with headings. It skips unrelated articles, excludes verification badge labels from
 channel names, and handles channels without image avatars.
 
-The Shorts feed now advances through offsets 0, 10, 20, and stops after an empty response.
-Previously the initial next-page calculation skipped offset 10 and never stopped on an empty feed.
+The Shorts feed now advances through offsets 0, 10, and 20, stopping after an empty response.
+Previously, the initial next-page calculation skipped offset 10 and never stopped on an empty feed.
 Channels without a banner return an empty image list. Channel About links resolve against their
 page URL and receive the same response validation.
 
@@ -77,10 +77,9 @@ Observations from the investigation on 2026-10-05 and 2026-10-06:
 - A live Short displayed three root comments and its child reply. The earlier APK rejected the
   reply's API URL; the final APK displayed the reply after the comment item URL correction.
 - Shorts, a direct embed link, and regular watch-page playback reached Android's PLAYING state
-  and advanced.
-  Pause and seek worked. Switching the regular sample from 720p to 360p produced a 640×360
-  video track and resumed playback. Background audio remained active with the launcher visible;
-  popup playback displayed video over the launcher, including replay after completion.
+  and advanced. Pause and seek worked. Switching the regular sample from 720p to 360p produced
+  a 640×360 video track and resumed playback. Background audio remained active with the launcher
+  visible; popup playback displayed video over the launcher, including replay after completion.
 - A 360p MP4 download completed through HTTP 206 range requests. The saved file contained
   13,435,079 bytes; ffprobe identified H.264 video, AAC audio, 640×360 resolution, and a duration
   of 173.035 seconds. The sample was
@@ -104,10 +103,11 @@ Existing stream tests cover progressive media, HLS variants/fallbacks, audio, ca
 states. These deterministic checks do not prove that every current Rumble page has compatible
 markup or that media actually plays on every device.
 
-The original investigation checks passed: 142 offline extractor tests (40 for Rumble), 281 application unit tests,
-and 283 tests in the broader Rumble suite. The broader suite includes historical fixtures and live
-browse checks for all five categories. Historical fixtures were repaired for missing empty About
-pages and current image representations; test setup no longer mutates the global downloader type.
+The original investigation checks passed: 142 offline extractor tests (40 for Rumble),
+281 application unit tests, and 283 tests in the broader Rumble suite. The broader suite includes
+historical fixtures and live browse checks for all five categories. Historical fixtures were
+repaired for missing empty About pages and current image representations; test setup no longer
+mutates the global downloader type.
 The debug APK built successfully.
 
 Run the deterministic checks and build the debug APK:
@@ -125,10 +125,10 @@ The broader Rumble suite includes historical mocks and live requests:
 Remaining device coverage includes every search filter combination, search/channel scrolling
 past page one, captions, sharing and opening links through the system chooser, and recovery
 from an actual Cloudflare challenge. A channel Shorts tab is not exposed by the extractor.
-The sampled player metadata did not supply captions.
-The automated suite also covers pagination and media-format behavior, including live states and
-HLS; those checks are separate from the successful device playback samples. Premium/private content requires its own
-access checks; anonymous failures do not establish a parser defect.
+The sampled player metadata did not supply captions. The automated suite also covers pagination
+and media-format behavior, including live states and HLS; those checks are separate from the
+successful device playback samples. Premium/private content requires its own access checks;
+anonymous failures do not establish a parser defect.
 
 Android lint analysis was canceled after a prolonged stall. The debug build, extractor Checkstyle,
 unit tests, and on-device link resolution passed; a completed Android lint run is not claimed.

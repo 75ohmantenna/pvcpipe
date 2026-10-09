@@ -22,9 +22,9 @@ retains the old fragment or its selection supplier.
 
 Submission means `DownloadManagerService.startMission` returned from its
 `Context.startService` call. The service later handles the intent on its handler;
-for HLS it first prepares the media before registering the mission. Submission
-is not a durable-registration or atomic-replacement guarantee, nor proof that
-downloading has begun.
+for HLS, it first prepares the media before registering the mission. Submission
+guarantees neither durable registration nor atomic replacement, and does not prove
+that downloading has begun.
 
 HLS preparation can still fail after submission; the service reports that failure
 through its error notification, not through the dialog's dispatch-failure callback.
@@ -36,10 +36,10 @@ that plan through recreation; changing the dialog selection does not alter it.
 Mutable launch arrays are copied.
 
 Each decision is consumed once. New save attempts invalidate earlier decisions,
-and closing the module prevents old callbacks from submitting. Saved picker
-state can be resumed by a fresh module, with repeated descriptors ignored within
-that module. The dialog admits one outstanding picker, matches results to their launcher,
-clears consumed, cancelled, or failed-launch picker state, and dismisses collision presentation
+and closing the module prevents old callbacks from submitting. A fresh module can
+resume saved picker state; it ignores repeated descriptors. The dialog admits one
+outstanding picker, matches results to their launcher, clears picker state after
+consumption, cancellation, or launch failure, and dismisses collision presentation
 when its view is destroyed. Calls and decisions run on the UI thread.
 
 Confirmation checks the current mission state again. A mission that starts while

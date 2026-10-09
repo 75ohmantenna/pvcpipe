@@ -1,6 +1,6 @@
 # PVCPipe
 
-PVCPipe lets users watch remote streams and keep local viewing data and settings.
+PVCPipe plays remote streams and stores viewing data and settings locally.
 
 ## Backup and restore
 
@@ -8,16 +8,16 @@ PVCPipe lets users watch remote streams and keep local viewing data and settings
 A saved copy of PVCPipe's local database that may also contain application settings.
 
 **Backup inspection**:
-An assessment of a selected backup archive that informs the user's restore choices.
-Inspection does not establish that the archive can be restored successfully.
+An assessment of a selected backup archive that helps the user choose what to
+restore. Inspection does not guarantee that restoration will succeed.
 
 **Restore**:
 Replacement of PVCPipe's local database from a backup archive, optionally including
 application settings.
 
 **Accepted restore**:
-A restore request admitted by the application for completion independently of the
-settings screen's lifetime.
+A restore request accepted by the application for completion even if the
+settings screen closes.
 
 **Pending database restore**:
 A replacement database prepared for activation when the application next starts.
@@ -31,15 +31,15 @@ The media and options a user chooses for a local download.
 The folder or document chosen to hold a downloaded file.
 
 **Download preparation**:
-Determining how a download selection will become a local file and resolving
-whether its destination can be used.
+Determining how to save a selected download as a local file and checking
+whether its destination is available.
 
 **Download collision**:
 A destination already used by an existing file or download.
 
 **Submitted download**:
-A prepared download handed off for background execution.
-Submission does not establish that the download has started or completed.
+A prepared download handed off for background execution. Submission does not
+mean the download has started or finished.
 
 ## Subscription feeds
 
@@ -59,7 +59,7 @@ The collected feed updates and subscription failures after the refresh has
 finished storing batches and cleaning up the feed.
 
 **Accepted feed refresh**:
-A feed refresh admitted for completion independently of its observers while the
+A feed refresh accepted for completion even if observers detach, while the
 application process remains running.
 
 ## Subscription transfers
@@ -71,7 +71,7 @@ channels to a saved file.
 ## Local playlists
 
 **Local playlist**:
-A saved ordered collection of streams. A stream may appear more than once.
+An ordered collection of saved streams. A stream may appear more than once.
 
 **Automatic playlist thumbnail**:
 A playlist image chosen from its current streams, or the default image when empty.
@@ -96,13 +96,13 @@ The recorded views and progress of played streams, including the saved position
 used to resume unfinished playback.
 
 **Playback snapshot**:
-Stream metadata, queue identity and player positions captured together for a
+Stream metadata, queue identity, and player positions captured together for a
 playback-history decision.
 
 **Accepted playback recording**:
-A view or progress update admitted for ordered database storage independently
-of the player's lifetime while the application process remains running.
+A view or progress update accepted for ordered database storage even if the
+player closes, while the application process remains running.
 
 **Playback audio**:
-The internal volume, mute state and audio-focus behavior associated with playback.
-Android music-stream volume is a separate device-level control.
+The internal volume, mute state, and audio-focus behavior of playback. Android
+music-stream volume is a separate device-level control.

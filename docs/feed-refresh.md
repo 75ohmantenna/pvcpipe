@@ -1,9 +1,9 @@
 # Feed refresh ownership
 
 A `FeedRefresh` is one attempt to update a selected set of subscriptions. Its
-interface exposes progress, a result, and cooperative cancellation. Both the
-foreground refresh and notification worker use this interface. Presentation,
-Android lifecycle, and new-stream notifications remain with the callers.
+interface exposes progress, a result, and cooperative cancellation. The foreground
+refresh and notification worker both use this interface. Callers retain
+presentation, Android lifecycle, and new-stream notifications.
 
 `FeedLoadManager.createRefresh` reads application preferences and creates the
 production adapters. The refresh owns the actual Rx pipeline: subscription
@@ -33,11 +33,11 @@ detaches presentation. Later observers receive the same success or failure
 without re-extracting or rewriting data. Progress remains a live stream, so
 callers that need all progress subscribe before observing the result.
 
-Cooperative cancellation prevents further extraction where checks permit. It
+Cancellation prevents further extraction where cooperative checks permit. It
 does not interrupt an external request or throttle sleep already running. Those
 requests can finish, and their results join the final partial batch. The module
-publishes one terminal shared feed event independently of which caller started
-it or whether observers remain attached. Synchronous subscription-query errors
+publishes one terminal shared feed event regardless of which caller started it
+or whether observers remain attached. Synchronous subscription-query errors
 also enter this terminal result.
 
 The foreground caller cancels and disposes its observers on destruction or

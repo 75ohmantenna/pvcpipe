@@ -1,8 +1,8 @@
 # Extractor service architecture
 
 PVCPipe uses the bundled extractor to resolve supported service URLs and fetch
-stream and channel metadata. The app's extractor downloader issues those metadata
-requests; playback and download of the resulting media URLs use separate network
+stream and channel metadata. The app's extractor downloader issues metadata
+requests; playback and downloads from the resulting media URLs use separate network
 paths (for example, `DownloadMission.openConnection` uses `HttpURLConnection`).
 
 ## Request flow
@@ -11,9 +11,9 @@ paths (for example, `DownloadMission.openConnection` uses `HttpURLConnection`).
    the list currently includes YouTube, SoundCloud, MediaCCC, PeerTube, Bandcamp,
    BitChute, and Rumble.
 2. Each `StreamingService` supplies link-handler factories for the URL types it supports.
-3. A link handler validates a supported URL, extracts an ID, and produces a
+3. A link handler validates a supported URL, extracts its ID, and produces a
    canonical URL.
-4. The service creates the matching supported stream, channel, search, comments,
+4. The service creates a matching stream, channel, search, comments,
    playlist, or kiosk extractor (not every service supports every type).
 5. The extractor fetches remote data and exposes service-neutral models consumed
    by the app. Its network requests use the configured extractor downloader.
@@ -33,7 +33,7 @@ adapted to NewPipe Extractor's models and downloader API; Python code is not cop
 | BitChute | API media extraction; HLS recognition; old/embed/torrent URL forms; strict host validation | `yt_dlp/extractor/bitchute.py` |
 | Rumble | Format classification; HLS variants; audio and captions; live-state semantics; channel/user URL validation; canonical-path Shorts routing | `yt_dlp/extractor/rumble.py` |
 
-The source behavior was reviewed from the local yt-dlp checkout. Relevant upstream yt-dlp changes
+The behavior was reviewed in a local yt-dlp checkout. Relevant upstream yt-dlp changes
 include `1d0f6539c` (BitChute API), `58d0c8345` (Rumble formats), `5d5b634d8` (YouTube web-embed
 fallbacks), `5d6b8c8cd` (collaborator follower counts), and `c7fb478d2` (Safari web-embed identity).
 

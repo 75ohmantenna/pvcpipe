@@ -65,12 +65,13 @@ public class SponsorBlockApiUrlPreference extends Preference {
 
                     new AlertDialog.Builder(getContext())
                             .setView(helpDialogView)
-                            .setPositiveButton("Use Official", (dialog, which) -> {
+                            .setPositiveButton(R.string.sponsor_block_use_official,
+                                    (dialog, which) -> {
                                 editText.setText(getContext()
                                         .getString(R.string.sponsor_block_default_api_url));
                                 dialog.dismiss();
                             })
-                            .setNeutralButton("Close", (dialog, which) -> dialog.dismiss())
+                            .setNeutralButton(R.string.close, (dialog, which) -> dialog.dismiss())
                             .create()
                             .show();
                 });
@@ -79,7 +80,7 @@ public class SponsorBlockApiUrlPreference extends Preference {
                 new AlertDialog.Builder(getContext())
                         .setView(alertDialogView)
                         .setTitle(getContext().getString(R.string.sponsor_block_api_url_title))
-                        .setPositiveButton("OK", (dialog, which) -> {
+                        .setPositiveButton(R.string.ok, (dialog, which) -> {
                             final String newValue = editText.getText().toString().trim();
                             if (callChangeListener(newValue)) {
                                 persistString(newValue);
@@ -87,7 +88,7 @@ public class SponsorBlockApiUrlPreference extends Preference {
 
                             dialog.dismiss();
                         })
-                        .setNegativeButton("Cancel", (dialog, which) -> dialog.cancel())
+                        .setNegativeButton(R.string.cancel, (dialog, which) -> dialog.cancel())
                         .create();
 
         alertDialog.show();

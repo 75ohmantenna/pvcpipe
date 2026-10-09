@@ -1,8 +1,8 @@
 # Proof-token sessions
 
-`PoTokenProviderImpl` remains the extractor's registered provider. Its blocking web
-request delegates to the internal `WebPoTokenProvider`; the other client methods
-continue returning `null`.
+`PoTokenProviderImpl` remains the extractor's registered provider. Its blocking
+web request delegates to the internal `WebPoTokenProvider`; the other client
+methods continue returning `null`.
 
 A proof-token session contains a generator, visitor data, and its streaming token.
 The module initializes all three before publishing their coherent replacement.
@@ -17,7 +17,7 @@ binds those operations to the application and the existing
 `PoTokenGenerator.Factory`. Its default remains `PoTokenWebView`.
 
 A supplied timeout scheduler lets tests advance the 30-second generator-creation,
-streaming-token and player-token deadlines without waiting in real time.
+streaming-token, and player-token deadlines without waiting in real time.
 Diagnostics preserve production logging without introducing Android dependencies
 into the session implementation.
 Tests use the existing `PoTokenProvider` request interface and scripted external
@@ -49,10 +49,10 @@ An attempt on a newly initialized session also fails without another recreation.
 
 Initialization follows explicit phases on the main queue. Duplicate, premature,
 and closed-generation callbacks cannot start new transport work or publish a
-canceled generator. Nonfatal browser construction, loading, parsing, and JavaScript
-evaluation failures terminate initialization; an already constructed generator
-closes its browser and other resources.
-A fatal JavaScript initialization error still closes an already delivered generator.
+canceled generator. Nonfatal failures in browser construction, loading, parsing,
+or JavaScript evaluation terminate initialization; an already constructed
+generator closes its browser and other resources. A fatal JavaScript
+initialization error still closes an already delivered generator.
 
 Each token request uses a unique callback ID independent of its input identifier.
 Canceled, duplicate, or reordered callbacks cannot consume a different request,
