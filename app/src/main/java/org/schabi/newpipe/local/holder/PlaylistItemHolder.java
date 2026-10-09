@@ -1,5 +1,7 @@
 package org.schabi.newpipe.local.holder;
 
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -48,5 +50,16 @@ public abstract class PlaylistItemHolder extends LocalItemHolder {
             }
             return true;
         });
+    }
+
+    protected View.OnTouchListener getDragHandleTouchListener(final LocalItem item) {
+        return (view, motionEvent) -> {
+            view.performClick();
+            if (itemBuilder != null && itemBuilder.getOnItemSelectedListener() != null
+                    && motionEvent.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                itemBuilder.getOnItemSelectedListener().drag(item, this);
+            }
+            return false;
+        };
     }
 }

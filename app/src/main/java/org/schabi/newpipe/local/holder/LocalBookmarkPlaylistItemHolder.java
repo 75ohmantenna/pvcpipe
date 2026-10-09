@@ -1,6 +1,5 @@
 package org.schabi.newpipe.local.holder;
 
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -35,20 +34,9 @@ public class LocalBookmarkPlaylistItemHolder extends LocalPlaylistItemHolder {
         }
         final PlaylistMetadataEntry item = (PlaylistMetadataEntry) localItem;
 
-        itemHandleView.setOnTouchListener(getOnTouchListener(item));
+        itemHandleView.setOnTouchListener(getDragHandleTouchListener(item));
 
         super.updateFromItem(localItem, historyRecordManager, dateTimeFormatter);
     }
 
-    private View.OnTouchListener getOnTouchListener(final PlaylistMetadataEntry item) {
-        return (view, motionEvent) -> {
-            view.performClick();
-            if (itemBuilder != null && itemBuilder.getOnItemSelectedListener() != null
-                    && motionEvent.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                itemBuilder.getOnItemSelectedListener().drag(item,
-                        LocalBookmarkPlaylistItemHolder.this);
-            }
-            return false;
-        };
-    }
 }

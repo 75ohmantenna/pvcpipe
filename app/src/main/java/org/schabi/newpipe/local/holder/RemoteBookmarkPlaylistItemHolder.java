@@ -1,6 +1,5 @@
 package org.schabi.newpipe.local.holder;
 
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -35,20 +34,9 @@ public class RemoteBookmarkPlaylistItemHolder extends RemotePlaylistItemHolder {
         }
         final PlaylistRemoteEntity item = (PlaylistRemoteEntity) localItem;
 
-        itemHandleView.setOnTouchListener(getOnTouchListener(item));
+        itemHandleView.setOnTouchListener(getDragHandleTouchListener(item));
 
         super.updateFromItem(localItem, historyRecordManager, dateTimeFormatter);
     }
 
-    private View.OnTouchListener getOnTouchListener(final PlaylistRemoteEntity item) {
-        return (view, motionEvent) -> {
-            view.performClick();
-            if (itemBuilder != null && itemBuilder.getOnItemSelectedListener() != null
-                    && motionEvent.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                itemBuilder.getOnItemSelectedListener().drag(item,
-                        RemoteBookmarkPlaylistItemHolder.this);
-            }
-            return false;
-        };
-    }
 }
