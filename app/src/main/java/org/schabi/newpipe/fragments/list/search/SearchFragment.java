@@ -74,6 +74,7 @@ import org.schabi.newpipe.util.ExtractorHelper;
 import org.schabi.newpipe.util.KeyboardUtil;
 import org.schabi.newpipe.util.NavigationHelper;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -871,15 +872,18 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
                 searchBinding.searchMetaInfoSeparator, disposables);
         hideKeyboardSearch();
 
-        // store search query if search history is enabled
-        disposables.add(historyRecordManager.onSearched(serviceId, theSearchString)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        ignored -> {
-                        },
-                        throwable -> showSnackBarError(new ErrorInfo(throwable, UserAction.SEARCHED,
-                                theSearchString, serviceId))
-                ));
+        // The write survives leaving the screen; error presentation does not retain its view.
+        final int searchedServiceId = serviceId;
+        final WeakReference<SearchFragment> searchFragment = new WeakReference<>(this);
+        historyRecordManager.recordSearch(searchedServiceId, theSearchString, error -> {
+            final SearchFragment fragment = searchFragment.get();
+            if (fragment != null && fragment.isAdded() && fragment.searchBinding != null) {
+                fragment.showSnackBarError(new ErrorInfo(error, UserAction.SEARCHED,
+                        theSearchString, searchedServiceId));
+            } else {
+                Log.e("SearchFragment", "Could not save search history", error);
+            }
+        });
 
         // load search results
         suggestionPublisher.onNext(theSearchString);
