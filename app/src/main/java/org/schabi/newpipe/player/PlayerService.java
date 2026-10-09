@@ -249,9 +249,9 @@ public final class PlayerService extends MediaBrowserServiceCompat {
         if (player != null && !player.videoPlayerSelected()) {
             return;
         }
-        onDestroy();
-        // Unload from memory completely
-        Runtime.getRuntime().halt(0);
+        // Release video playback and its foreground notification, but let Android stop the
+        // service only when no media-browser clients remain bound.
+        destroyPlayerAndStopService();
     }
 
     @Override

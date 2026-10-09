@@ -18,6 +18,9 @@ Install Android SDK platform 37 and Java 11, 17, and 21 toolchains, then run
 `./gradlew :app:assembleDebug` for a debug APK or `make ci` for checks, unit
 tests, and APK builds. `make ci` does not run instrumentation tests or sign a
 distribution release.
+Pull requests and pushes to `master` run `make ci` in GitHub Actions with
+Android SDK 37 and Java 11, 17, and 21 toolchains. Instrumentation tests remain
+separate because they require a disposable emulator.
 
 The Checkstyle task covers most Java sources; remaining legacy downloader
 exclusions are listed in `app/build.gradle.kts`. Remove an exclusion only after
