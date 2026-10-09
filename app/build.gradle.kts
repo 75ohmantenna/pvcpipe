@@ -152,9 +152,7 @@ tasks.register<Checkstyle>("runCheckstyle") {
         "main/java/us/shandian/giga/get/DownloadRunnableFallback.java",
         "main/java/us/shandian/giga/get/Mission.java",
         "main/java/us/shandian/giga/get/sqlite/FinishedMissionStore.java",
-        "main/java/us/shandian/giga/io/ChunkFileInputStream.java",
         "main/java/us/shandian/giga/io/CircularFileWriter.java",
-        "main/java/us/shandian/giga/io/FileStream.java",
         "main/java/us/shandian/giga/io/FileStreamSAF.java",
         "main/java/us/shandian/giga/postprocessing/M4aNoDash.java",
         "main/java/us/shandian/giga/postprocessing/Mp4FromDashMuxer.java",
@@ -168,7 +166,6 @@ tasks.register<Checkstyle>("runCheckstyle") {
         "main/java/us/shandian/giga/service/DownloadManagerService.java",
         "main/java/us/shandian/giga/ui/adapter/MissionAdapter.java",
         "main/java/us/shandian/giga/ui/common/Deleter.java",
-        "main/java/us/shandian/giga/ui/common/ProgressDrawable.java",
         "main/java/us/shandian/giga/ui/fragment/MissionsFragment.java",
         "main/java/us/shandian/giga/util/Utility.java",
     )

@@ -14,6 +14,12 @@ Install Android SDK platform 37 and Java 11, 17, and 21 toolchains, then run
 tests, and APK builds. `make ci` does not run instrumentation tests or sign a
 distribution release.
 
+The Checkstyle task covers most Java sources; remaining legacy downloader
+exclusions are listed in `app/build.gradle.kts`. Remove an exclusion only after
+that source passes Checkstyle. The Evernote StateSaver processor still handles
+saved state across app components; removing its kapt dependency requires a
+complete state-restoration migration.
+
 Run instrumentation tests only on a disposable emulator:
 `connectedDebugAndroidTest` can uninstall the app and erase its data on a device.
 

@@ -15,7 +15,8 @@ public class ChunkFileInputStream extends SharpStream {
     private long progressReport;
     private final ProgressReport onProgress;
 
-    public ChunkFileInputStream(SharpStream target, long start, long end, ProgressReport callback) throws IOException {
+    public ChunkFileInputStream(final SharpStream target, final long start, final long end,
+                                final ProgressReport callback) throws IOException {
         source = target;
         offset = start;
         length = end - start;
@@ -29,7 +30,8 @@ public class ChunkFileInputStream extends SharpStream {
         }
         if (source.length() < end) {
             try {
-                throw new IOException(String.format("invalid file length. expected = %s  found = %s", end, source.length()));
+                throw new IOException(String.format(
+                        "invalid file length. expected = %s  found = %s", end, source.length()));
             } finally {
                 source.close();
             }
@@ -39,7 +41,7 @@ public class ChunkFileInputStream extends SharpStream {
     }
 
     /**
-     * Get absolute position on file
+     * Get absolute position on file.
      *
      * @return the position
      */
@@ -53,7 +55,7 @@ public class ChunkFileInputStream extends SharpStream {
             return -1; // EOF
         }
 
-        int res = source.read();
+        final int res = source.read();
         if (res >= 0) {
             position++;
         }
@@ -61,21 +63,21 @@ public class ChunkFileInputStream extends SharpStream {
     }
 
     @Override
-    public int read(byte[] b) throws IOException {
+    public int read(final byte[] b) throws IOException {
         return read(b, 0, b.length);
     }
 
     @Override
-    public int read(byte[] b, int off, int len) throws IOException {
+    public int read(final byte[] b, final int off, final int len) throws IOException {
         if (position >= length) {
             return -1; // EOF
         }
 
+        int availableLength = len;
         if ((position + len) > length) {
-            len = (int) (length - position);
+            availableLength = (int) (length - position);
         }
-
-        int res = source.read(b, off, len);
+        final int res = source.read(b, off, availableLength);
         if (res > 0) {
             position += res;
 
@@ -89,19 +91,19 @@ public class ChunkFileInputStream extends SharpStream {
     }
 
     @Override
-    public long skip(long pos) throws IOException {
-        pos = Math.min(pos + position, length);
+    public long skip(final long pos) throws IOException {
+        final long nextPosition = Math.min(pos + position, length);
 
-        if (pos == 0) {
+        if (nextPosition == 0) {
             return 0;
         }
 
-        source.seek(offset + pos);
+        source.seek(offset + nextPosition);
 
-        long oldPos = position;
-        position = pos;
+        final long oldPos = position;
+        position = nextPosition;
 
-        return pos - oldPos;
+        return nextPosition - oldPos;
     }
 
     @Override
@@ -147,15 +149,15 @@ public class ChunkFileInputStream extends SharpStream {
     }
 
     @Override
-    public void write(byte value) {
+    public void write(final byte value) {
     }
 
     @Override
-    public void write(byte[] buffer) {
+    public void write(final byte[] buffer) {
     }
 
     @Override
-    public void write(byte[] buffer, int offset, int count) {
+    public void write(final byte[] buffer, final int ignoredOffset, final int count) {
     }
 
 }

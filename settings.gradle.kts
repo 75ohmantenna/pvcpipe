@@ -29,17 +29,3 @@ includeBuild("pvcpipe-extractor") {
             .using(project(":extractor"))
     }
 }
-
-//includeBuild("../logcat-toolkit") {
-//    dependencySubstitution {
-//        substitute(module("com.github.evermind-zz:logcat-toolkit"))
-//            .using(project(":"))
-//    }
-//}
-
-//includeBuild("../challengeFloatsAway") {
-//    dependencySubstitution {
-//        substitute(module("com.github.evermind-zz:challengeFloatsAway"))
-//            .using(project(":library"))
-//    }
-//}

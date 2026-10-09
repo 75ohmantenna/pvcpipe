@@ -16,98 +16,101 @@ import androidx.annotation.NonNull;
 public class ProgressDrawable extends Drawable {
     private static final int MARQUEE_INTERVAL = 150;
 
-    private float mProgress;
-    private int mBackgroundColor, mForegroundColor;
-    private Handler mMarqueeHandler;
-    private float mMarqueeProgress;
-    private Path mMarqueeLine;
-    private int mMarqueeSize;
-    private long mMarqueeNext;
+    private float progress;
+    private int backgroundColor;
+    private int foregroundColor;
+    private Handler marqueeHandler;
+    private float marqueeProgress;
+    private Path marqueeLine;
+    private int marqueeSize;
+    private long marqueeNext;
 
     public ProgressDrawable() {
-        mMarqueeLine = null;// marquee disabled
-        mMarqueeProgress = 0.0f;
-        mMarqueeSize = 0;
-        mMarqueeNext = 0;
+        marqueeLine = null; // marquee disabled
+        marqueeProgress = 0.0f;
+        marqueeSize = 0;
+        marqueeNext = 0;
     }
 
-    public void setColors(@ColorInt int background, @ColorInt int foreground) {
-        mBackgroundColor = background;
-        mForegroundColor = foreground;
+    public void setColors(@ColorInt final int background, @ColorInt final int foreground) {
+        backgroundColor = background;
+        foregroundColor = foreground;
     }
 
-    public void setProgress(double progress) {
-        mProgress = (float) progress;
+    public void setProgress(final double value) {
+        progress = (float) value;
         invalidateSelf();
     }
 
-    public void setMarquee(boolean marquee) {
-        if (marquee == (mMarqueeLine != null)) {
+    public void setMarquee(final boolean marquee) {
+        if (marquee == (marqueeLine != null)) {
             return;
         }
-        mMarqueeLine = marquee ? new Path() : null;
-        mMarqueeHandler = marquee ? new Handler(Looper.getMainLooper()) : null;
-        mMarqueeSize = 0;
-        mMarqueeNext = 0;
+        marqueeLine = marquee ? new Path() : null;
+        marqueeHandler = marquee ? new Handler(Looper.getMainLooper()) : null;
+        marqueeSize = 0;
+        marqueeNext = 0;
     }
 
     @Override
-    public void draw(@NonNull Canvas canvas) {
+    public void draw(@NonNull final Canvas canvas) {
         int width = getBounds().width();
-        int height = getBounds().height();
+        final int height = getBounds().height();
 
-        Paint paint = new Paint();
+        final Paint paint = new Paint();
 
-        paint.setColor(mBackgroundColor);
+        paint.setColor(backgroundColor);
         canvas.drawRect(0, 0, width, height, paint);
 
-        paint.setColor(mForegroundColor);
+        paint.setColor(foregroundColor);
 
-        if (mMarqueeLine != null) {
-            if (mMarqueeSize < 1) setupMarquee(width, height);
+        if (marqueeLine != null) {
+            if (marqueeSize < 1) {
+                setupMarquee(width, height);
+            }
 
-            int size = mMarqueeSize;
-            Paint paint2 = new Paint();
-            paint2.setColor(mForegroundColor);
+            int size = marqueeSize;
+            final Paint paint2 = new Paint();
+            paint2.setColor(foregroundColor);
             paint2.setStrokeWidth(size);
             paint2.setStyle(Paint.Style.STROKE);
 
             size *= 2;
 
-            if (mMarqueeProgress >= size) {
-                mMarqueeProgress = 1;
+            if (marqueeProgress >= size) {
+                marqueeProgress = 1;
             } else {
-                mMarqueeProgress++;
+                marqueeProgress++;
             }
 
             // render marquee
             width += size * 2;
-            Path marquee = new Path();
+            final Path marquee = new Path();
             for (int i = -size; i < width; i += size) {
-                marquee.addPath(mMarqueeLine, ((float)i + mMarqueeProgress), 0);
+                marquee.addPath(marqueeLine, ((float) i + marqueeProgress), 0);
             }
             marquee.close();
 
-            canvas.drawPath(marquee, paint2);// draw marquee
+            canvas.drawPath(marquee, paint2); // draw marquee
 
-            if (System.currentTimeMillis() >= mMarqueeNext) {
+            if (System.currentTimeMillis() >= marqueeNext) {
                 // program next update
-                mMarqueeNext = System.currentTimeMillis() + MARQUEE_INTERVAL;
-                mMarqueeHandler.postDelayed(this::invalidateSelf, MARQUEE_INTERVAL);
+                marqueeNext = System.currentTimeMillis() + MARQUEE_INTERVAL;
+                marqueeHandler.postDelayed(this::invalidateSelf, MARQUEE_INTERVAL);
             }
             return;
         }
 
-        canvas.drawRect(0, 0, (int) (mProgress * width), height, paint);
+        canvas.drawRect(0, 0, (int) (progress * width), height, paint);
     }
 
     @Override
-    public void setAlpha(int alpha) {
+    public void setAlpha(final int alpha) {
         // Unsupported
     }
 
     @Override
-    public void setColorFilter(ColorFilter filter) {
+    public void setColorFilter(final ColorFilter filter) {
         // Unsupported
     }
 
@@ -117,16 +120,18 @@ public class ProgressDrawable extends Drawable {
     }
 
     @Override
-    public void onBoundsChange(Rect rect) {
-        if (mMarqueeLine != null) setupMarquee(rect.width(), rect.height());
+    public void onBoundsChange(final Rect rect) {
+        if (marqueeLine != null) {
+            setupMarquee(rect.width(), rect.height());
+        }
     }
 
-    private void setupMarquee(int width, int height) {
-        mMarqueeSize = (int) ((width * 10.0f) / 100.0f);// the size is 10% of the width
+    private void setupMarquee(final int width, final int height) {
+        marqueeSize = (int) ((width * 10.0f) / 100.0f); // the size is 10% of the width
 
-        mMarqueeLine.rewind();
-        mMarqueeLine.moveTo(-mMarqueeSize, -mMarqueeSize);
-        mMarqueeLine.lineTo(-mMarqueeSize * 4, height + mMarqueeSize);
-        mMarqueeLine.close();
+        marqueeLine.rewind();
+        marqueeLine.moveTo(-marqueeSize, -marqueeSize);
+        marqueeLine.lineTo(-marqueeSize * 4, height + marqueeSize);
+        marqueeLine.close();
     }
 }
