@@ -207,10 +207,12 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         }
     }
 
-    public void addFinishedMission(DownloadMission downloadMission) {
+    public boolean addFinishedMission(DownloadMission downloadMission) {
         ContentValues values = getValuesOfMission(Objects.requireNonNull(downloadMission));
         SQLiteDatabase database = getWritableDatabase();
-        database.insert(FINISHED_TABLE_NAME, null, values);
+        // Replaying a completed checkpoint after a crash must be safe.
+        return database.insertWithOnConflict(FINISHED_TABLE_NAME, null, values,
+                SQLiteDatabase.CONFLICT_REPLACE) != -1;
     }
 
     public void deleteMission(Mission mission) {
