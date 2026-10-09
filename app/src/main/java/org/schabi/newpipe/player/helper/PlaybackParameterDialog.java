@@ -23,9 +23,6 @@ import androidx.core.math.MathUtils;
 import androidx.fragment.app.DialogFragment;
 import androidx.preference.PreferenceManager;
 
-import com.evernote.android.state.State;
-import com.livefront.bridge.Bridge;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.DialogPlaybackParameterBinding;
 import org.schabi.newpipe.player.ui.VideoPlayerUi;
@@ -41,6 +38,9 @@ import java.util.function.DoubleSupplier;
 
 public class PlaybackParameterDialog extends DialogFragment {
     private static final String TAG = "PlaybackParameterDialog";
+
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.player.helper.PlaybackParameterDialog$$StateSaver";
 
     // Minimum allowable range in ExoPlayer
     private static final double MIN_PITCH_OR_SPEED = 0.10f;
@@ -81,18 +81,12 @@ public class PlaybackParameterDialog extends DialogFragment {
     @Nullable
     private Callback callback;
 
-    @State
     double initialTempo = DEFAULT_TEMPO;
-    @State
     double initialPitchPercent = DEFAULT_PITCH_PERCENT;
-    @State
     boolean initialSkipSilence = DEFAULT_SKIP_SILENCE;
 
-    @State
     double tempo = DEFAULT_TEMPO;
-    @State
     double pitchPercent = DEFAULT_PITCH_PERCENT;
-    @State
     boolean skipSilence = DEFAULT_SKIP_SILENCE;
 
     private DialogPlaybackParameterBinding binding;
@@ -134,7 +128,12 @@ public class PlaybackParameterDialog extends DialogFragment {
     @Override
     public void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
+        outState.putDouble("initialTempo" + STATE_SUFFIX, initialTempo);
+        outState.putDouble("initialPitchPercent" + STATE_SUFFIX, initialPitchPercent);
+        outState.putBoolean("initialSkipSilence" + STATE_SUFFIX, initialSkipSilence);
+        outState.putDouble("tempo" + STATE_SUFFIX, tempo);
+        outState.putDouble("pitchPercent" + STATE_SUFFIX, pitchPercent);
+        outState.putBoolean("skipSilence" + STATE_SUFFIX, skipSilence);
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -144,7 +143,28 @@ public class PlaybackParameterDialog extends DialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable final Bundle savedInstanceState) {
-        Bridge.restoreInstanceState(this, savedInstanceState);
+        if (savedInstanceState != null) {
+            if (savedInstanceState.containsKey("initialTempo" + STATE_SUFFIX)) {
+                initialTempo = savedInstanceState.getDouble("initialTempo" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("initialPitchPercent" + STATE_SUFFIX)) {
+                initialPitchPercent = savedInstanceState.getDouble(
+                        "initialPitchPercent" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("initialSkipSilence" + STATE_SUFFIX)) {
+                initialSkipSilence = savedInstanceState.getBoolean(
+                        "initialSkipSilence" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("tempo" + STATE_SUFFIX)) {
+                tempo = savedInstanceState.getDouble("tempo" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("pitchPercent" + STATE_SUFFIX)) {
+                pitchPercent = savedInstanceState.getDouble("pitchPercent" + STATE_SUFFIX);
+            }
+            if (savedInstanceState.containsKey("skipSilence" + STATE_SUFFIX)) {
+                skipSilence = savedInstanceState.getBoolean("skipSilence" + STATE_SUFFIX);
+            }
+        }
 
         binding = DialogPlaybackParameterBinding.inflate(getLayoutInflater());
         initUI();

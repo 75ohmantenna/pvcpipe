@@ -17,7 +17,6 @@ import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
-import com.evernote.android.state.State
 import com.xwray.groupie.Group
 import com.xwray.groupie.GroupAdapter
 import com.xwray.groupie.Section
@@ -67,12 +66,8 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     private lateinit var feedGroupsSortMenuItem: GroupsHeader
     private val subscriptionsSection = Section()
 
-    @State
-    @JvmField
     var itemsListState: Parcelable? = null
 
-    @State
-    @JvmField
     var feedGroupsCarouselState: Parcelable? = null
 
     init {
@@ -82,6 +77,22 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     // /////////////////////////////////////////////////////////////////////////
     // Fragment LifeCycle
     // /////////////////////////////////////////////////////////////////////////
+
+    override fun saveFragmentState(state: Bundle) {
+        super.saveFragmentState(state)
+        state.putParcelable("itemsListState" + STATE_SUFFIX, itemsListState)
+        state.putParcelable("feedGroupsCarouselState" + STATE_SUFFIX, feedGroupsCarouselState)
+    }
+
+    override fun restoreFragmentState(state: Bundle) {
+        super.restoreFragmentState(state)
+        if (state.containsKey("itemsListState" + STATE_SUFFIX)) {
+            itemsListState = state.getParcelable("itemsListState" + STATE_SUFFIX)
+        }
+        if (state.containsKey("feedGroupsCarouselState" + STATE_SUFFIX)) {
+            feedGroupsCarouselState = state.getParcelable("feedGroupsCarouselState" + STATE_SUFFIX)
+        }
+    }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -415,6 +426,9 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     }
 
     companion object {
+        private const val STATE_SUFFIX =
+            "org.schabi.newpipe.local.subscription.SubscriptionFragment\$\$StateSaver"
+
         val JSON_MIME_TYPE = MimeTypeMap.getSingleton()
             .getMimeTypeFromExtension("json") ?: "application/octet-stream"
     }

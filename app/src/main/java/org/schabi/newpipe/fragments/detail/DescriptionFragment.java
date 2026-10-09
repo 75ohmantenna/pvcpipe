@@ -3,6 +3,7 @@ package org.schabi.newpipe.fragments.detail;
 import static org.schabi.newpipe.extractor.stream.StreamExtractor.NO_AGE_LIMIT;
 import static org.schabi.newpipe.util.Localization.getAppLocale;
 
+import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -10,8 +11,6 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
-
-import com.evernote.android.state.State;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.StreamingService;
@@ -22,8 +21,9 @@ import org.schabi.newpipe.util.Localization;
 import java.util.List;
 
 public class DescriptionFragment extends PvcDescriptionFragment {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.detail.DescriptionFragment$$StateSaver";
 
-    @State
     StreamInfo streamInfo;
 
     public DescriptionFragment(final StreamInfo streamInfo) {
@@ -31,9 +31,23 @@ public class DescriptionFragment extends PvcDescriptionFragment {
     }
 
     public DescriptionFragment() {
-        // keep empty constructor for State when resuming fragment from memory
+        // keep empty constructor for fragment restoration by Android
     }
 
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putSerializable("streamInfo" + STATE_SUFFIX, streamInfo);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("streamInfo" + STATE_SUFFIX)) {
+            streamInfo = (StreamInfo) state.getSerializable("streamInfo" + STATE_SUFFIX);
+        }
+    }
 
     @Nullable
     @Override

@@ -16,9 +16,10 @@ distribution release.
 
 The Checkstyle task covers most Java sources; remaining legacy downloader
 exclusions are listed in `app/build.gradle.kts`. Remove an exclusion only after
-that source passes Checkstyle. The Evernote StateSaver processor still handles
-saved state across app components; removing its kapt dependency requires a
-complete state-restoration migration.
+that source passes Checkstyle. Fragment, activity, and dialog state is saved
+explicitly in Android `Bundle`s; the original generated-state keys remain
+readable after app updates. `org.schabi.newpipe.util.StateSaver` is a separate
+disk-backed cache for large list state, not an annotation processor.
 
 Run instrumentation tests only on a disposable emulator:
 `connectedDebugAndroidTest` can uninstall the app and erase its data on a device.

@@ -7,7 +7,6 @@ import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.android.legacy.kapt)
     alias(libs.plugins.google.ksp)
     alias(libs.plugins.jetbrains.kotlin.parcelize)
     alias(libs.plugins.jetbrains.kotlinx.serialization)
@@ -249,9 +248,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     /** Third-party libraries **/
-    implementation(libs.livefront.bridge)
-    implementation(libs.evernote.statesaver.core)
-    kapt(libs.evernote.statesaver.compiler)
 
     // HTML parser
     implementation(libs.jsoup)

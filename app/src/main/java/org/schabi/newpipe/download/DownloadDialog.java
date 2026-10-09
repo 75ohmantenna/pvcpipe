@@ -35,9 +35,6 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.collection.SparseArrayCompat;
 import androidx.preference.PreferenceManager;
 
-import com.evernote.android.state.State;
-import com.livefront.bridge.Bridge;
-
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.DownloadDialogBinding;
@@ -79,22 +76,16 @@ public class DownloadDialog extends PvcDownloadDialog
         implements RadioGroup.OnCheckedChangeListener, AdapterView.OnItemSelectedListener {
     private static final String TAG = "DialogFragment";
     private static final boolean DEBUG = MainActivity.DEBUG;
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.download.DownloadDialog$$StateSaver";
 
-    @State
     StreamInfo currentInfo;
-    @State
     StreamInfoWrapper<VideoStream> wrappedVideoStreams;
-    @State
     StreamInfoWrapper<SubtitlesStream> wrappedSubtitleStreams;
-    @State
     AudioTracksWrapper wrappedAudioTracks;
-    @State
     int selectedAudioTrackIndex;
-    @State
     int selectedVideoIndex; // set in the constructor
-    @State
     int selectedAudioIndex = 0; // default to the first item
-    @State
     int selectedSubtitleIndex = 0; // default to the first item
 
     private StoredDirectoryHelper mainStorageAudio = null;
@@ -117,9 +108,7 @@ public class DownloadDialog extends PvcDownloadDialog
     private SharedPreferences prefs;
     private ServiceBinding downloadServiceBinding;
 
-    @State
     DownloadPreparation.Location pendingLocationState;
-    @State
     Uri pendingLocationResult;
 
     private final ActivityResultLauncher<Intent> requestDownloadSaveAsLauncher =
@@ -196,7 +185,9 @@ public class DownloadDialog extends PvcDownloadDialog
         context = getContext();
 
         setStyle(STYLE_NO_TITLE, ThemeHelper.getDialogTheme(context));
-        Bridge.restoreInstanceState(this, savedInstanceState);
+        if (savedInstanceState != null) {
+            restoreDialogState(savedInstanceState);
+        }
 
         this.audioTrackAdapter = new AudioTrackAdapter(wrappedAudioTracks);
         this.subtitleStreamsAdapter = new StreamItemAdapter<>(wrappedSubtitleStreams);
@@ -229,6 +220,44 @@ public class DownloadDialog extends PvcDownloadDialog
                 // nothing to do
             }
         });
+    }
+
+    void restoreDialogState(@NonNull final Bundle state) {
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("currentInfo" + STATE_SUFFIX)) {
+            currentInfo = (StreamInfo) state.getSerializable("currentInfo" + STATE_SUFFIX);
+        }
+        if (state.containsKey("wrappedVideoStreams" + STATE_SUFFIX)) {
+            wrappedVideoStreams = (StreamInfoWrapper<VideoStream>)
+                    state.getSerializable("wrappedVideoStreams" + STATE_SUFFIX);
+        }
+        if (state.containsKey("wrappedSubtitleStreams" + STATE_SUFFIX)) {
+            wrappedSubtitleStreams = (StreamInfoWrapper<SubtitlesStream>)
+                    state.getSerializable("wrappedSubtitleStreams" + STATE_SUFFIX);
+        }
+        if (state.containsKey("wrappedAudioTracks" + STATE_SUFFIX)) {
+            wrappedAudioTracks = (AudioTracksWrapper)
+                    state.getSerializable("wrappedAudioTracks" + STATE_SUFFIX);
+        }
+        if (state.containsKey("selectedAudioTrackIndex" + STATE_SUFFIX)) {
+            selectedAudioTrackIndex = state.getInt("selectedAudioTrackIndex" + STATE_SUFFIX);
+        }
+        if (state.containsKey("selectedVideoIndex" + STATE_SUFFIX)) {
+            selectedVideoIndex = state.getInt("selectedVideoIndex" + STATE_SUFFIX);
+        }
+        if (state.containsKey("selectedAudioIndex" + STATE_SUFFIX)) {
+            selectedAudioIndex = state.getInt("selectedAudioIndex" + STATE_SUFFIX);
+        }
+        if (state.containsKey("selectedSubtitleIndex" + STATE_SUFFIX)) {
+            selectedSubtitleIndex = state.getInt("selectedSubtitleIndex" + STATE_SUFFIX);
+        }
+        if (state.containsKey("pendingLocationState" + STATE_SUFFIX)) {
+            pendingLocationState = (DownloadPreparation.Location)
+                    state.getSerializable("pendingLocationState" + STATE_SUFFIX);
+        }
+        if (state.containsKey("pendingLocationResult" + STATE_SUFFIX)) {
+            pendingLocationResult = state.getParcelable("pendingLocationResult" + STATE_SUFFIX);
+        }
     }
 
     /**
@@ -364,7 +393,20 @@ public class DownloadDialog extends PvcDownloadDialog
     @Override
     public void onSaveInstanceState(@NonNull final Bundle outState) {
         super.onSaveInstanceState(outState);
-        Bridge.saveInstanceState(this, outState);
+        saveDialogState(outState);
+    }
+
+    void saveDialogState(@NonNull final Bundle state) {
+        state.putSerializable("currentInfo" + STATE_SUFFIX, currentInfo);
+        state.putSerializable("wrappedVideoStreams" + STATE_SUFFIX, wrappedVideoStreams);
+        state.putSerializable("wrappedSubtitleStreams" + STATE_SUFFIX, wrappedSubtitleStreams);
+        state.putSerializable("wrappedAudioTracks" + STATE_SUFFIX, wrappedAudioTracks);
+        state.putInt("selectedAudioTrackIndex" + STATE_SUFFIX, selectedAudioTrackIndex);
+        state.putInt("selectedVideoIndex" + STATE_SUFFIX, selectedVideoIndex);
+        state.putInt("selectedAudioIndex" + STATE_SUFFIX, selectedAudioIndex);
+        state.putInt("selectedSubtitleIndex" + STATE_SUFFIX, selectedSubtitleIndex);
+        state.putSerializable("pendingLocationState" + STATE_SUFFIX, pendingLocationState);
+        state.putParcelable("pendingLocationResult" + STATE_SUFFIX, pendingLocationResult);
     }
 
 

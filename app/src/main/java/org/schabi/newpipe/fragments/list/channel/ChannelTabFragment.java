@@ -9,8 +9,6 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.evernote.android.state.State;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.PlaylistControlBinding;
 import org.schabi.newpipe.error.UserAction;
@@ -38,12 +36,30 @@ import io.reactivex.rxjava3.core.Single;
 
 public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTabInfo>
         implements PlaylistControlViewHolder {
+    private static final String STATE_SUFFIX =
+            "org.schabi.newpipe.fragments.list.channel.ChannelTabFragment$$StateSaver";
 
-    // states must be protected and not private for State being able to access them
-    @State
     protected ListLinkHandler tabHandler;
-    @State
     protected String channelName;
+
+    @Override
+    protected void saveFragmentState(@NonNull final Bundle state) {
+        super.saveFragmentState(state);
+        state.putString("channelName" + STATE_SUFFIX, channelName);
+        state.putSerializable("tabHandler" + STATE_SUFFIX, tabHandler);
+    }
+
+    @Override
+    protected void restoreFragmentState(@NonNull final Bundle state) {
+        super.restoreFragmentState(state);
+        state.setClassLoader(getClass().getClassLoader());
+        if (state.containsKey("channelName" + STATE_SUFFIX)) {
+            channelName = state.getString("channelName" + STATE_SUFFIX);
+        }
+        if (state.containsKey("tabHandler" + STATE_SUFFIX)) {
+            tabHandler = (ListLinkHandler) state.getSerializable("tabHandler" + STATE_SUFFIX);
+        }
+    }
 
     private PlaylistControlBinding playlistControlBinding;
 
