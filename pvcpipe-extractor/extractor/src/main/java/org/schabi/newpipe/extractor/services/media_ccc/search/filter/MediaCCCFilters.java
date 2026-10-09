@@ -27,10 +27,8 @@ public final class MediaCCCFilters extends BaseSearchFilters {
                 LibraryStringIds.SEARCH_FILTERS_EVENTS));
 
         addContentFilterGroup(groupsFactory.createFilterGroup(ID_CF_MAIN_GRP, null, true,
-                ID_CF_MAIN_ALL, new FilterItem[]{
-                        groupsFactory.getFilterForId(ID_CF_MAIN_ALL),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_CONFERENCES),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_EVENTS),
-                }, null));
+                ID_CF_MAIN_ALL, null,
+                ID_CF_MAIN_ALL, ID_CF_MAIN_CONFERENCES,
+                ID_CF_MAIN_EVENTS));
     }
 }

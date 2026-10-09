@@ -7,6 +7,7 @@ import org.schabi.newpipe.extractor.search.filter.FilterContainer;
 import org.schabi.newpipe.extractor.search.filter.FilterGroup;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.search.filter.LibraryStringIds;
+import org.schabi.newpipe.extractor.search.filter.QuerySortFilterItem;
 
 import javax.annotation.Nonnull;
 
@@ -66,47 +67,47 @@ public final class SoundcloudFilters extends BaseSearchFilters {
 
         /* Sort filters */
         /* 'Date' filter items */
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_ALL,
                 LibraryStringIds.SEARCH_FILTERS_ANY_TIME, ""));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_LAST_HOUR,
                 LibraryStringIds.SEARCH_FILTERS_PAST_HOUR, "filter.created_at=last_hour"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_LAST_DAY,
                 LibraryStringIds.SEARCH_FILTERS_PAST_DAY, "filter.created_at=last_day"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_LAST_WEEK,
                 LibraryStringIds.SEARCH_FILTERS_PAST_WEEK, "filter.created_at=last_week"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_LAST_MONTH,
                 LibraryStringIds.SEARCH_FILTERS_PAST_MONTH, "filter.created_at=last_month"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DATE_LAST_YEAR,
                 LibraryStringIds.SEARCH_FILTERS_PAST_YEAR, "filter.created_at=last_year"));
 
         /* duration' filter items */
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DURATION_ALL,
                 LibraryStringIds.SEARCH_FILTERS_ALL, ""));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DURATION_SHORT,
                 LibraryStringIds.SEARCH_FILTERS_LESS_2_MIN, "filter.duration=short"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DURATION_MEDIUM,
                 LibraryStringIds.SEARCH_FILTERS_2_10_MIN, "filter.duration=medium"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DURATION_LONG,
                 LibraryStringIds.SEARCH_FILTERS_10_30_MIN, "filter.duration=long"));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_DURATION_EPIC,
                 LibraryStringIds.SEARCH_FILTERS_GREATER_30_MIN, "filter.duration=epic"));
 
         /* license */
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_LICENSE_ALL,
                 LibraryStringIds.SEARCH_FILTERS_ALL, ""));
-        groupsFactory.addFilterItem(new SoundcloudSortFilterItem(
+        groupsFactory.addFilterItem(new QuerySortFilterItem(
                 ID_SF_LICENSE_COMMERCE,
                 LibraryStringIds.SEARCH_FILTERS_TO_MODIFY_COMMERCIALLY,
                 "filter.license=to_modify_commercially"));
@@ -114,29 +115,18 @@ public final class SoundcloudFilters extends BaseSearchFilters {
         final FilterContainer allMainCFGrpSortFilters = new FilterContainer(new FilterGroup[]{
                 groupsFactory.createFilterGroup(ID_SF_DATE_GRP,
                         LibraryStringIds.SEARCH_FILTERS_ADDED, true,
-                        ID_SF_DATE_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_DATE_ALL),
-                                groupsFactory.getFilterForId(ID_SF_DATE_LAST_HOUR),
-                                groupsFactory.getFilterForId(ID_SF_DATE_LAST_DAY),
-                                groupsFactory.getFilterForId(ID_SF_DATE_LAST_WEEK),
-                                groupsFactory.getFilterForId(ID_SF_DATE_LAST_MONTH),
-                                groupsFactory.getFilterForId(ID_SF_DATE_LAST_YEAR),
-                        }, null),
+                        ID_SF_DATE_ALL, null,
+                        ID_SF_DATE_ALL, ID_SF_DATE_LAST_HOUR, ID_SF_DATE_LAST_DAY,
+                        ID_SF_DATE_LAST_WEEK, ID_SF_DATE_LAST_MONTH, ID_SF_DATE_LAST_YEAR),
                 groupsFactory.createFilterGroup(ID_SF_DURATION_GRP,
                         LibraryStringIds.SEARCH_FILTERS_LENGTH, true,
-                        ID_SF_DURATION_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_DURATION_ALL),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_SHORT),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_MEDIUM),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_LONG),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_EPIC),
-                        }, null),
+                        ID_SF_DURATION_ALL, null,
+                        ID_SF_DURATION_ALL, ID_SF_DURATION_SHORT, ID_SF_DURATION_MEDIUM,
+                        ID_SF_DURATION_LONG, ID_SF_DURATION_EPIC),
                 groupsFactory.createFilterGroup(ID_SF_LICENSE_GRP,
                         LibraryStringIds.SEARCH_FILTERS_LICENSE, true,
-                        ID_SF_LICENSE_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_LICENSE_ALL),
-                                groupsFactory.getFilterForId(ID_SF_LICENSE_COMMERCE),
-                        }, null),
+                        ID_SF_LICENSE_ALL, null,
+                        ID_SF_LICENSE_ALL, ID_SF_LICENSE_COMMERCE),
         });
 
         /* content filters */
@@ -153,29 +143,7 @@ public final class SoundcloudFilters extends BaseSearchFilters {
 
     @Override
     public String evaluateSelectedSortFilters() {
-        final StringBuilder sortQuery = new StringBuilder();
-        if (selectedSortFilter != null) {
-            for (final FilterItem item : selectedSortFilter) {
-                final SoundcloudSortFilterItem sortItem =
-                        (SoundcloudSortFilterItem) item;
-                if (sortItem != null && !sortItem.query.isEmpty()) {
-                    sortQuery.append("&").append(sortItem.query);
-                }
-            }
-        }
-
-        return sortQuery.toString();
-    }
-
-    private static class SoundcloudSortFilterItem extends FilterItem {
-        private final String query;
-
-        SoundcloudSortFilterItem(final int identifier,
-                                 @Nonnull final LibraryStringIds nameId,
-                                 final String query) {
-            super(identifier, nameId);
-            this.query = query;
-        }
+        return QuerySortFilterItem.evaluate(selectedSortFilter);
     }
 
     private static final class SoundcloudContentFilterItem extends FilterItem {

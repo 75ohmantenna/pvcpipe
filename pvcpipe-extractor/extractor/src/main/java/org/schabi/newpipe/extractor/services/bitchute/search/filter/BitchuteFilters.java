@@ -89,27 +89,20 @@ public final class BitchuteFilters extends BaseSearchFilters {
         final FilterContainer allSortFilters = new FilterContainer(new FilterGroup[]{
                 groupsFactory.createFilterGroup(ID_SF_SORT_BY_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SORT_BY, true,
-                        ID_SF_SORT_BY_RELEVANCE, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_RELEVANCE),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_NEWEST),
-                                groupsFactory.getFilterForId(ID_SF_SORT_BY_OLDEST),
-                        }, null),
+                        ID_SF_SORT_BY_RELEVANCE, null,
+                        ID_SF_SORT_BY_RELEVANCE, ID_SF_SORT_BY_NEWEST,
+                        ID_SF_SORT_BY_OLDEST),
                 groupsFactory.createFilterGroup(ID_SF_DURATION_GRP,
                         LibraryStringIds.SEARCH_FILTERS_DURATION, true,
-                        ID_SF_DURATION_ALL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_DURATION_ALL),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_SHORT),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_MEDIUM),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_LONG),
-                                groupsFactory.getFilterForId(ID_SF_DURATION_FEATURE),
-                        }, null),
+                        ID_SF_DURATION_ALL, null,
+                        ID_SF_DURATION_ALL, ID_SF_DURATION_SHORT,
+                        ID_SF_DURATION_MEDIUM, ID_SF_DURATION_LONG,
+                        ID_SF_DURATION_FEATURE),
                 groupsFactory.createFilterGroup(ID_SF_SENSITIVITY_GRP,
                         LibraryStringIds.SEARCH_FILTERS_SENSITIVITY, true,
-                        ID_SF_SENSITIVITY_NORMAL, new FilterItem[]{
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NORMAL),
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NSFW),
-                                groupsFactory.getFilterForId(ID_SF_SENSITIVITY_NSFL),
-                        }, null)
+                        ID_SF_SENSITIVITY_NORMAL, null,
+                        ID_SF_SENSITIVITY_NORMAL, ID_SF_SENSITIVITY_NSFW,
+                        ID_SF_SENSITIVITY_NSFL)
         });
 
         /* content filters */
@@ -122,10 +115,8 @@ public final class BitchuteFilters extends BaseSearchFilters {
 
         /* content filter groups */
         addContentFilterGroup(groupsFactory.createFilterGroup(ID_CF_MAIN_GRP, null, true,
-                ID_CF_MAIN_VIDEOS, new FilterItem[]{
-                        groupsFactory.getFilterForId(ID_CF_MAIN_VIDEOS),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_CHANNELS),
-                }, allSortFilters));
+                ID_CF_MAIN_VIDEOS, allSortFilters,
+                ID_CF_MAIN_VIDEOS, ID_CF_MAIN_CHANNELS));
         addContentFilterSortVariant(ID_CF_MAIN_VIDEOS, allSortFilters);
     }
 

@@ -37,6 +37,12 @@ observations were historical samples, **not** a claim of current live capability
 or universal device support. Recheck the relevant flow against the live website
 and a device when assessing current compatibility.
 
+Search-filter groups use registered item IDs in display order; the extractor
+factory resolves those IDs without changing each service's defaults or sort
+variants. Rumble and SoundCloud share URL sort-parameter assembly, while their
+content endpoints remain service-specific. When changing filter declarations,
+check both the displayed order and the exact generated search URL.
+
 ## Source and verification
 
 - Service registration:

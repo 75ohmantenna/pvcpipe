@@ -55,13 +55,9 @@ public final class BandcampFilters extends BaseSearchFilters {
         //         ID_CF_MAIN_FANS, FANS, "item_type=f"));
 
         addContentFilterGroup(groupsFactory.createFilterGroup(ID_CF_MAIN_GRP, null, true,
-                ID_CF_MAIN_ALL, new FilterItem[]{
-                        groupsFactory.getFilterForId(ID_CF_MAIN_ALL),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_ARTISTS),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_ALBUMS),
-                        groupsFactory.getFilterForId(ID_CF_MAIN_TRACKS),
-                        // groupsFactory.getFilterForId(ID_CF_MAIN_FANS),
-                }, null));
+                ID_CF_MAIN_ALL, null,
+                ID_CF_MAIN_ALL, ID_CF_MAIN_ARTISTS,
+                ID_CF_MAIN_ALBUMS, ID_CF_MAIN_TRACKS));
     }
 
     public static class BandcampContentFilterItem extends FilterItem {
