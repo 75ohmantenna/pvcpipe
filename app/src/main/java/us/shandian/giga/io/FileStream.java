@@ -16,11 +16,11 @@ public class FileStream extends SharpStream {
 
     public RandomAccessFile source;
 
-    public FileStream(@NonNull File target) throws FileNotFoundException {
+    public FileStream(@NonNull final File target) throws FileNotFoundException {
         this.source = new RandomAccessFile(target, "rw");
     }
 
-    public FileStream(@NonNull String path) throws FileNotFoundException {
+    public FileStream(@NonNull final String path) throws FileNotFoundException {
         this.source = new RandomAccessFile(path, "rw");
     }
 
@@ -30,17 +30,17 @@ public class FileStream extends SharpStream {
     }
 
     @Override
-    public int read(byte[] b) throws IOException {
+    public int read(final byte[] b) throws IOException {
         return source.read(b);
     }
 
     @Override
-    public int read(byte[] b, int off, int len) throws IOException {
+    public int read(final byte[] b, final int off, final int len) throws IOException {
         return source.read(b, off, len);
     }
 
     @Override
-    public long skip(long pos) throws IOException {
+    public long skip(final long pos) throws IOException {
         return source.skipBytes((int) pos);
     }
 
@@ -48,17 +48,19 @@ public class FileStream extends SharpStream {
     public long available() {
         try {
             return source.length() - source.getFilePointer();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             return 0;
         }
     }
 
     @Override
     public void close() {
-        if (source == null) return;
+        if (source == null) {
+            return;
+        }
         try {
             source.close();
-        } catch (IOException err) {
+        } catch (final IOException err) {
             // nothing to do
         }
         source = null;
@@ -100,27 +102,27 @@ public class FileStream extends SharpStream {
     }
 
     @Override
-    public void write(byte value) throws IOException {
+    public void write(final byte value) throws IOException {
         source.write(value);
     }
 
     @Override
-    public void write(byte[] buffer) throws IOException {
+    public void write(final byte[] buffer) throws IOException {
         source.write(buffer);
     }
 
     @Override
-    public void write(byte[] buffer, int offset, int count) throws IOException {
+    public void write(final byte[] buffer, final int offset, final int count) throws IOException {
         source.write(buffer, offset, count);
     }
 
     @Override
-    public void setLength(long length) throws IOException {
+    public void setLength(final long length) throws IOException {
         source.setLength(length);
     }
 
     @Override
-    public void seek(long offset) throws IOException {
+    public void seek(final long offset) throws IOException {
         source.seek(offset);
     }
 
