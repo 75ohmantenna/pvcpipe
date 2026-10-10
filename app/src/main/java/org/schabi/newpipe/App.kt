@@ -1,6 +1,7 @@
 package org.schabi.newpipe
 
 import android.app.ActivityManager
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.core.app.NotificationChannelCompat
@@ -31,6 +32,7 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.ktx.hasAssignableCause
+import org.schabi.newpipe.pvc.bus.PvcSharedPrefsListenerToEventsBridge
 import org.schabi.newpipe.settings.NewPipeSettings
 import org.schabi.newpipe.settings.export.BackupFileLocator
 import org.schabi.newpipe.settings.export.PendingDatabaseRestore
@@ -59,8 +61,14 @@ import org.schabi.newpipe.util.potoken.PoTokenProviderImpl
  * along with NewPipe.  If not, see <http://www.gnu.org/licenses/>.
  */
 open class App :
-    PvcCommonApp(),
+    Application(),
     SingletonImageLoader.Factory {
+    lateinit var extractorSettings: PvcExtractorSettings
+        private set
+
+    // Held here because SharedPreferences only keeps weak references to its listeners.
+    private lateinit var prefsChangeListener: PvcSharedPrefsListenerToEventsBridge
+
     var isFirstRun = false
         private set
     var notificationsRequested = false
@@ -81,6 +89,12 @@ open class App :
 
     override fun onCreate() {
         super.onCreate()
+
+        // These run first, in every process including the Phoenix restart process.
+        extractorSettings = PvcExtractorSettings(this).apply { initExtractorConfig() }
+        prefsChangeListener = PvcSharedPrefsListenerToEventsBridge(applicationContext)
+        PreferenceManager.getDefaultSharedPreferences(applicationContext)
+            .registerOnSharedPreferenceChangeListener(prefsChangeListener)
 
         instance = this
 
