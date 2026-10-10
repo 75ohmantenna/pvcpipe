@@ -23,11 +23,11 @@ import androidx.fragment.app.FragmentManager;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-import com.jakewharton.rxbinding4.widget.RxTextView;
 
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.SettingsLayoutBinding;
+import org.schabi.newpipe.ktx.TextViewUtils;
 import org.schabi.newpipe.settings.preferencesearch.PreferenceParser;
 import org.schabi.newpipe.settings.preferencesearch.PreferenceSearchConfiguration;
 import org.schabi.newpipe.settings.preferencesearch.PreferenceSearchFragment;
@@ -231,7 +231,7 @@ public class SettingsActivity extends AppCompatActivity implements
 
         // Configure input field for search
         searchEditText = searchContainer.findViewById(R.id.toolbar_search_edit_text);
-        searchTextChanges = RxTextView.textChanges(searchEditText)
+        searchTextChanges = TextViewUtils.textChanges(searchEditText)
                 // Wait some time after the last input before actually searching
                 .debounce(200, TimeUnit.MILLISECONDS)
                 .subscribe(v -> runOnUiThread(this::onSearchChanged));

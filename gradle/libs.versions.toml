@@ -50,7 +50,6 @@ recyclerview = "1.4.0"
 room = "2.7.2"
 runner = "1.7.0"
 rxandroid = "3.0.2"
-rxbinding = "4.0.0"
 rxjava = "3.1.12"
 savedstate = "1.3.3"
 slimhls-converter = "7e7f373dbf"
@@ -114,7 +113,6 @@ google-exoplayer-smoothstreaming = { module = "com.google.android.exoplayer:exop
 google-exoplayer-ui = { module = "com.google.android.exoplayer:exoplayer-ui", version.ref = "exoplayer" }
 greenrobot-eventbus = { module = "org.greenrobot:eventbus", version.ref = "eventbus" }
 jakewharton-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "phoenix" }
-jakewharton-rxbinding = { module = "com.jakewharton.rxbinding4:rxbinding", version.ref = "rxbinding" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-rx3 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx3", version.ref = "kotlinx-coroutines-rx3" }

@@ -8,13 +8,13 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import com.jakewharton.rxbinding4.view.clicks
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
 import java.util.concurrent.TimeUnit
 import org.schabi.newpipe.MainActivity
 import org.schabi.newpipe.R
 import org.schabi.newpipe.ktx.animate
+import org.schabi.newpipe.ktx.clicks
 import org.schabi.newpipe.util.external_communication.ShareUtils
 import org.schabi.newpipe.util.text.setTextWithLinks
 
