@@ -177,10 +177,6 @@ open class LocalPlaylistManager internal constructor(
     }
 
     @Suppress("UNCHECKED_CAST")
-    open fun getDistinctPlaylistStreams(playlistId: Long): Flowable<List<PlaylistStreamEntry>> = playlistStreamTable
-        .getStreamsWithoutDuplicates(playlistId).subscribeOn(Schedulers.io()) as Flowable<List<PlaylistStreamEntry>>
-
-    @Suppress("UNCHECKED_CAST")
     open fun getPlaylistDuplicates(streamUrl: String): Flowable<List<PlaylistDuplicatesEntry>> = playlistStreamTable
         .getPlaylistDuplicatesMetadata(streamUrl).subscribeOn(Schedulers.io()) as Flowable<List<PlaylistDuplicatesEntry>>
 

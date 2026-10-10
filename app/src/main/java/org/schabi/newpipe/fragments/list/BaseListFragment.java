@@ -44,7 +44,6 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     private static final int LIST_MODE_UPDATE_FLAG = 0x32;
     protected org.schabi.newpipe.util.SavedState savedState;
 
-    private boolean useDefaultStateSaving = true;
     private int updateFlags = 0;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -79,9 +78,7 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (useDefaultStateSaving) {
-            StateSaver.onDestroy(savedState);
-        }
+        StateSaver.onDestroy(savedState);
         PreferenceManager.getDefaultSharedPreferences(activity)
                 .unregisterOnSharedPreferenceChangeListener(this);
     }
@@ -102,16 +99,6 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     // State Saving
     //////////////////////////////////////////////////////////////////////////*/
 
-    /**
-     * If the default implementation of {@link StateSaver.WriteRead} should be used.
-     *
-     * @param useDefaultStateSaving Whether the default implementation should be used
-     * @see StateSaver
-     */
-    public void setUseDefaultStateSaving(final boolean useDefaultStateSaving) {
-        this.useDefaultStateSaving = useDefaultStateSaving;
-    }
-
     @Override
     public String generateSuffix() {
         // Naive solution, but it's good for now (the items don't change)
@@ -131,10 +118,6 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
 
     @Override
     public void writeTo(final Queue<Object> objectsToSave) {
-        if (!useDefaultStateSaving) {
-            return;
-        }
-
         objectsToSave.add(infoListAdapter.getItemsList());
         objectsToSave.add(getFocusedPosition());
     }
@@ -142,10 +125,6 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     @Override
     @SuppressWarnings("unchecked")
     public void readFrom(@NonNull final Queue<Object> savedObjects) throws Exception {
-        if (!useDefaultStateSaving) {
-            return;
-        }
-
         infoListAdapter.getItemsList().clear();
         infoListAdapter.getItemsList().addAll((List<InfoItem>) savedObjects.poll());
         restoreFocus((Integer) savedObjects.poll());
@@ -169,18 +148,14 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     @Override
     public void onSaveInstanceState(@NonNull final Bundle bundle) {
         super.onSaveInstanceState(bundle);
-        if (useDefaultStateSaving) {
-            savedState = StateSaver
-                    .tryToSave(activity.isChangingConfigurations(), savedState, bundle, this);
-        }
+        savedState = StateSaver
+                .tryToSave(activity.isChangingConfigurations(), savedState, bundle, this);
     }
 
     @Override
     protected void onRestoreInstanceState(@NonNull final Bundle bundle) {
         super.onRestoreInstanceState(bundle);
-        if (useDefaultStateSaving) {
-            savedState = StateSaver.tryToRestore(bundle, this);
-        }
+        savedState = StateSaver.tryToRestore(bundle, this);
     }
 
     @Override
