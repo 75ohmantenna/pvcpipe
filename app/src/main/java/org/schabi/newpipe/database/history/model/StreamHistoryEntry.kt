@@ -21,10 +21,6 @@ data class StreamHistoryEntry(
     val repeatCount: Long
 ) {
 
-    fun toStreamHistoryEntity(): StreamHistoryEntity {
-        return StreamHistoryEntity(streamId, accessDate, repeatCount)
-    }
-
     fun hasEqualValues(other: StreamHistoryEntry): Boolean {
         return this.streamEntity.uid == other.streamEntity.uid && streamId == other.streamId &&
             accessDate.isEqual(other.accessDate)
