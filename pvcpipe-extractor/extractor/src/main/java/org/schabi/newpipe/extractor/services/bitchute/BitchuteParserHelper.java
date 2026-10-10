@@ -53,6 +53,9 @@ public final class BitchuteParserHelper {
     // the time interval the searchAuthTimestamp/Nonce value should be used (in seconds)
     // before renewing
     private static final int SEARCH_AUTH_DATA_TIMEOUT = 60 * 10;
+    private static final Pattern SEARCH_AUTH_PATTERN =
+            Pattern.compile("searchAuth\\('([^']+)', '([^']+)'");
+    private static final Pattern CF_AUTH_PATTERN = Pattern.compile("\\{cf_auth: '([^']+)'");
     private static volatile String cookies;
     private static volatile String csrfToken;
     private static volatile String searchAuthNonce;
@@ -273,9 +276,7 @@ public final class BitchuteParserHelper {
     }
 
     public static boolean extractAndStoreSearchAuth(@Nonnull final String body) {
-        final Pattern pattern = Pattern.compile("searchAuth\\('([^']+)', '([^']+)'");
-
-        final Matcher match = pattern.matcher(body);
+        final Matcher match = SEARCH_AUTH_PATTERN.matcher(body);
 
         if (match.find()) {
             searchAuthTimestamp = match.group(1);
@@ -309,8 +310,7 @@ public final class BitchuteParserHelper {
 
     public static boolean extractAndStoreCfAuth(@Nonnull final String id,
                                                 @Nonnull final String body) {
-        final Pattern pattern = Pattern.compile("\\{cf_auth: '([^']+)'");
-        final Matcher match = pattern.matcher(body);
+        final Matcher match = CF_AUTH_PATTERN.matcher(body);
 
         if (match.find()) {
             VIDEO_ID_2_COMMENT_CF_AUTH.put(id, match.group(1));

@@ -35,6 +35,9 @@ import java.util.regex.Pattern;
 
 @SuppressWarnings({"checkstyle:FinalLocalVariable", "checkstyle:FinalParameters"})
 public class RumbleCommentsExtractor extends CommentsExtractor {
+    private static final Pattern USER_IMAGE_PATTERN = Pattern.compile(
+            "i\\.user-image--img--id-(\\w+)\\s*\\{\\s*"
+                    + "background-image:\\s*url\\(([^)]+)\\)");
     private final int maxCommentsPerPage = 15;
 
     private Map<String, String> imageMap;
@@ -210,10 +213,7 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     }
 
     private void initImageMap(String css) {
-        Pattern pattern = Pattern.compile(
-                "i\\.user-image--img--id-(\\w+)\\s*\\{\\s*"
-                        + "background-image:\\s*url\\(([^)]+)\\)");
-        Matcher matcher = pattern.matcher(css);
+        Matcher matcher = USER_IMAGE_PATTERN.matcher(css);
         imageMap = new HashMap<>();
         while (matcher.find()) {
             String key = "user-image--img--id-" + matcher.group(1);
