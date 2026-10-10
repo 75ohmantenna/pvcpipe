@@ -51,7 +51,7 @@ interface PlaylistStreamDAO : BasicDAO<PlaylistStreamEntity> {
         WHERE playlist_id = :playlistId LIMIT 1
         """
     )
-    fun getAutomaticThumbnailStreamId(playlistId: Long): Flowable<Long>
+    fun getAutomaticThumbnailStreamIdSync(playlistId: Long): Long
 
     // get ids of streams of the given playlist then merge with the stream metadata
     @RewriteQueriesToDropUnusedColumns

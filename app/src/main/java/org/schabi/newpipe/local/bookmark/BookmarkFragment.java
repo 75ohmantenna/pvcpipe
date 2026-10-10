@@ -506,11 +506,29 @@ public final class BookmarkFragment extends BaseLocalListFragment<List<PlaylistL
     }
 
     private void showLocalDialog(final PlaylistMetadataEntry selectedItem) {
+        if (disposables == null) {
+            return;
+        }
+
+        disposables.add(localPlaylistManager
+                .getIsPlaylistThumbnailPermanent(selectedItem.getUid())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(isThumbnailPermanent ->
+                                showLocalDialog(selectedItem, isThumbnailPermanent),
+                        throwable -> showError(new ErrorInfo(throwable,
+                                UserAction.REQUESTED_BOOKMARK,
+                                "Loading playlist thumbnail state"))));
+    }
+
+    private void showLocalDialog(final PlaylistMetadataEntry selectedItem,
+                                 final boolean isThumbnailPermanent) {
+        if (activity == null) {
+            return;
+        }
+
         final String rename = getString(R.string.rename);
         final String delete = getString(R.string.delete);
         final String unsetThumbnail = getString(R.string.unset_playlist_thumbnail);
-        final boolean isThumbnailPermanent = localPlaylistManager
-                .getIsPlaylistThumbnailPermanent(selectedItem.getUid());
 
         final ArrayList<String> items = new ArrayList<>();
         items.add(rename);
@@ -525,10 +543,13 @@ public final class BookmarkFragment extends BaseLocalListFragment<List<PlaylistL
             } else if (items.get(index).equals(delete)) {
                 showDeleteDialog(selectedItem.getOrderingName(), selectedItem);
             } else if (isThumbnailPermanent && items.get(index).equals(unsetThumbnail)) {
-                final long thumbnailStreamId = localPlaylistManager
-                        .getAutomaticPlaylistThumbnailStreamId(selectedItem.getUid());
+                // Not tied to this fragment's disposables: once chosen, the change completes
+                // even if the screen closes first.
+                final long playlistId = selectedItem.getUid();
                 localPlaylistManager
-                        .changePlaylistThumbnail(selectedItem.getUid(), thumbnailStreamId, false)
+                        .getAutomaticPlaylistThumbnailStreamId(playlistId)
+                        .flatMapMaybe(thumbnailStreamId -> localPlaylistManager
+                                .changePlaylistThumbnail(playlistId, thumbnailStreamId, false))
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe();
             }

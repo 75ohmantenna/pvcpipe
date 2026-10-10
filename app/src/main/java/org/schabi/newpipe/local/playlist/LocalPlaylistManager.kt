@@ -4,6 +4,7 @@ import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.core.Scheduler
+import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.schedulers.Schedulers
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -207,16 +208,17 @@ open class LocalPlaylistManager internal constructor(
         isPermanent
     )
 
-    open fun getPlaylistThumbnailStreamId(playlistId: Long): Long = playlistTable
-        .getPlaylist(playlistId).blockingFirst()[0].thumbnailStreamId
+    // The two lookups below return Singles so that no caller can run their queries on the main thread.
+    open fun getIsPlaylistThumbnailPermanent(playlistId: Long): Single<Boolean> = Single.fromCallable {
+        val playlist = playlistTable.getPlaylistSync(playlistId)
+            ?: throw NoSuchElementException("Playlist does not exist: $playlistId")
+        playlist.isThumbnailPermanent
+    }.subscribeOn(Schedulers.io())
 
-    open fun getIsPlaylistThumbnailPermanent(playlistId: Long): Boolean = playlistTable
-        .getPlaylist(playlistId).blockingFirst()[0].isThumbnailPermanent
-
-    open fun getAutomaticPlaylistThumbnailStreamId(playlistId: Long): Long {
-        val streamId = playlistStreamTable.getAutomaticThumbnailStreamId(playlistId).blockingFirst()
-        return if (streamId < 0) PlaylistEntity.DEFAULT_THUMBNAIL_ID else streamId
-    }
+    open fun getAutomaticPlaylistThumbnailStreamId(playlistId: Long): Single<Long> = Single.fromCallable {
+        val streamId = playlistStreamTable.getAutomaticThumbnailStreamIdSync(playlistId)
+        if (streamId < 0) PlaylistEntity.DEFAULT_THUMBNAIL_ID else streamId
+    }.subscribeOn(Schedulers.io())
 
     private fun modifyPlaylist(
         playlistId: Long,
