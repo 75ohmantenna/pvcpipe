@@ -7,14 +7,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.RelativeLayout;
 
-import org.schabi.newpipe.pvc.bus.events.PvcEvents;
-
 /**
  * Intercept all touch events and handle the according to a listener.
  * <p>
  * In our case we do not want the controls above the comments/related items/description to be
  * scrollable in case the user enable
- * see {@link PvcEvents.PrefEventScrollOnlyBelowPlayer}
+ * "scroll only below player", see
+ * {@link org.schabi.newpipe.fragments.detail.DetailPagerViewModel#getScrollOnlyBelowPlayer()}.
  * see https://stackoverflow.com/questions/6841971/android-intercept-and-pass-on-all-touch-events
  */
 public class PvcInterceptTouchRelativeLayout extends RelativeLayout {

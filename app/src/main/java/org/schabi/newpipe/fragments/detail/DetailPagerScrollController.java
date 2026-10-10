@@ -1,15 +1,13 @@
 package org.schabi.newpipe.fragments.detail;
 
+import android.content.Context;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewTreeObserver;
 
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
-import org.schabi.newpipe.pvc.bus.events.PvcEvents;
 import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.databinding.FragmentVideoDetailBinding;
-import org.schabi.newpipe.pvc.bus.PvcBus;
+import org.schabi.newpipe.pvc.PvcPreferences;
 import org.schabi.newpipe.pvc.views.PvcInterceptTouchRelativeLayout;
 import org.schabi.newpipe.player.ui.VideoPlayerUi;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -20,24 +18,15 @@ import static org.schabi.newpipe.ktx.ViewUtils.animateRotation;
  * Keeps the pager below the player sized and scrollable for {@link VideoDetailFragment}, and
  * lets the system Back key leave comment replies shown in its comments tab.
  * <p>
- * It receives this event:
- * <ul>
- * <li>{@link PvcEvents.PrefEventScrollOnlyBelowPlayer}</li>
- * </ul>
- * <p>
- * It sends this event:
- * <ul>
- * <li>{@link PvcEvents.EventViewPagersContentHeight}</li>
- * </ul>
- * <p>
- * The class is public because EventBus calls its subscriber methods reflectively.
+ * It follows the "scroll only below player" setting through {@link DetailPagerViewModel} and
+ * publishes the height the pager content should have there.
  */
-public final class DetailPagerScrollController
-        implements PvcEvents.PrefEventScrollOnlyBelowPlayer.Handler {
+final class DetailPagerScrollController {
     private static final String TAG = "DetailPagerScroll";
 
     private final VideoDetailFragment fragment;
     private FragmentVideoDetailBinding binding;
+    private DetailPagerViewModel pager;
 
     DetailPagerScrollController(final VideoDetailFragment fragment) {
         this.fragment = fragment;
@@ -71,7 +60,7 @@ public final class DetailPagerScrollController
                     @Override
                     public void onGlobalLayout() {
                         rootLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        PvcBus.Helpers.postEventViewPagersContentHeightChanged(
+                        pager.publishPagerContentHeight(
                                 recalcPossibleViewPagersContentHeight());
                     }
                 });
@@ -92,12 +81,9 @@ public final class DetailPagerScrollController
         return height;
     }
 
-    @Override
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void handlePrefEventScrollOnlyBelowPlayer(
-            final PvcEvents.PrefEventScrollOnlyBelowPlayer event) {
-
-        if (!DeviceUtils.isLandscape(fragment.requireContext()) && event.doScrollInViewPager) {
+    private void onScrollOnlyBelowPlayerChanged(final boolean scrollOnlyBelowPlayer) {
+        if (PagerScrollPolicy.scrollsBelowPlayer(
+                DeviceUtils.isLandscape(fragment.requireContext()), scrollOnlyBelowPlayer)) {
             binding.detailContentRootLayout.setOnInterceptTouchEventListener(
                     new PvcInterceptTouchRelativeLayout
                             .NoOuterScrollingWhileInlineCommentsEnabledListener());
@@ -145,7 +131,7 @@ public final class DetailPagerScrollController
                 );
                 if (lastHeight != actualHeight) {
                     lastHeight = actualHeight;
-                    PvcBus.Helpers.postEventViewPagersContentHeightChanged(actualHeight);
+                    pager.publishPagerContentHeight(actualHeight);
                 }
             }
         };
@@ -158,7 +144,8 @@ public final class DetailPagerScrollController
      * @return true if it was handled here
      */
     boolean onBackPressed() {
-        if (PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+        final Context context = fragment.getContext();
+        if (context != null && PvcPreferences.commentRepliesInSameWindow(context)) {
             return PvcHostFragment.handleBackPressed(fragment.getChildFragmentManager());
         } else {
             return false;
@@ -167,17 +154,19 @@ public final class DetailPagerScrollController
 
 
     /**
-     * Starts listening for events. The current preference state is delivered before this returns.
+     * Starts following the "scroll only below player" setting for as long as the fragment's view
+     * lives. The current setting arrives when that view starts.
      *
      * @param viewBinding the views of the fragment this controller belongs to
      */
     void attach(final FragmentVideoDetailBinding viewBinding) {
         binding = viewBinding;
-        PvcBus.getBus().register(this);
+        pager = DetailPagerViewModel.of(fragment);
+        pager.getScrollOnlyBelowPlayer().observe(fragment.getViewLifecycleOwner(),
+                this::onScrollOnlyBelowPlayerChanged);
     }
 
     void detach() {
-        PvcBus.getBus().unregister(this);
         binding = null;
     }
 }

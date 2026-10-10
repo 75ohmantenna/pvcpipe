@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
+import org.schabi.newpipe.App;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.CommentRepliesHeaderBinding;
 import org.schabi.newpipe.error.UserAction;
@@ -34,12 +35,12 @@ import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import org.schabi.newpipe.pvc.fragments.PvcEventBusBaseListInfoFragment;
+import org.schabi.newpipe.pvc.fragments.PagerHostedListInfoFragment;
 import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
-import org.schabi.newpipe.pvc.bus.PvcBus;
+import org.schabi.newpipe.pvc.PvcPreferences;
 
 public final class CommentRepliesFragment
-        extends PvcEventBusBaseListInfoFragment<CommentsInfoItem, CommentRepliesInfo> {
+        extends PagerHostedListInfoFragment<CommentsInfoItem, CommentRepliesInfo> {
     private static final String STATE_SUFFIX =
             "org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment$$StateSaver";
 
@@ -201,7 +202,7 @@ public final class CommentRepliesFragment
             final CommentsInfoItem comment) {
 
         final LinearLayout layout = rootView.findViewById(R.id.replies_layout);
-        if (PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+        if (PvcPreferences.commentRepliesInSameWindow(requireContext())) {
             final Button backButton = rootView.findViewById(R.id.back_button);
             backButton.setText(
                     Localization.replyCount(requireContext(), comment.getReplyCount()));
@@ -230,7 +231,7 @@ public final class CommentRepliesFragment
     @Override
     public void setTitle(
             final String title) {
-        if (!PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+        if (!PvcPreferences.commentRepliesInSameWindow(App.getInstance())) {
             super.setTitle(title);
         }
     }

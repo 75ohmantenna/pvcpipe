@@ -30,7 +30,7 @@ import org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment;
 import org.schabi.newpipe.info_list.InfoListAdapter;
 import org.schabi.newpipe.info_list.ItemViewMode;
 import org.schabi.newpipe.info_list.dialog.InfoItemDialog;
-import org.schabi.newpipe.pvc.bus.PvcBus;
+import org.schabi.newpipe.pvc.PvcPreferences;
 import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.OnClickGesture;
@@ -279,7 +279,7 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
      */
     private void onCommentRepliesSelected(final CommentsInfoItem comment) {
         final PvcHostFragment host = PvcHostFragment.findHostOf(this);
-        if (host != null && PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+        if (host != null && PvcPreferences.commentRepliesInSameWindow(requireContext())) {
             host.replaceFragment(new CommentRepliesFragment(comment), true);
         } else {
             NavigationHelper.openCommentRepliesFragment(requireActivity(), comment);
