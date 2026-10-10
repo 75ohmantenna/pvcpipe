@@ -19,7 +19,7 @@ import java.util.List;
 import us.shandian.giga.get.DownloadMission;
 import us.shandian.giga.get.MissionRecoveryInfo;
 
-public class PvcHlsPreProcessor implements PvcPreprocessing {
+public class PvcHlsPreProcessor {
     private final HlsMediaProcessor segmentsDataDownloader;
     private List<HlsParser.Segment> segments;
 
