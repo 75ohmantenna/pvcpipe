@@ -13,6 +13,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import io.reactivex.rxjava3.core.Flowable
 import org.schabi.newpipe.database.BasicDAO
+import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.database.stream.model.StreamStateEntity
 
 @Dao
@@ -23,6 +24,15 @@ interface StreamStateDAO : BasicDAO<StreamStateEntity> {
 
     @Query("SELECT * FROM " + StreamStateEntity.STREAM_STATE_TABLE + " WHERE " + StreamStateEntity.JOIN_STREAM_ID + " = :streamId")
     fun getStateSync(streamId: Long): StreamStateEntity?
+
+    @Query(
+        "SELECT state.* FROM " + StreamStateEntity.STREAM_STATE_TABLE + " state" +
+            " INNER JOIN " + StreamEntity.STREAM_TABLE + " stream" +
+            " ON stream." + StreamEntity.STREAM_ID + " = state." + StreamStateEntity.JOIN_STREAM_ID +
+            " WHERE stream." + StreamEntity.STREAM_SERVICE_ID + " = :serviceId" +
+            " AND stream." + StreamEntity.STREAM_URL + " = :url"
+    )
+    fun getStateSync(serviceId: Int, url: String): StreamStateEntity?
 
     @Query("DELETE FROM " + StreamStateEntity.STREAM_STATE_TABLE)
     override fun deleteAll(): Int

@@ -9,11 +9,17 @@ import java.time.ZoneOffset
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.schabi.newpipe.database.AppDatabase
 import org.schabi.newpipe.database.history.model.SearchHistoryEntry
+import org.schabi.newpipe.database.stream.model.StreamEntity
+import org.schabi.newpipe.database.stream.model.StreamStateEntity
+import org.schabi.newpipe.extractor.InfoItem
+import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.testUtil.TestDatabase
 import org.schabi.newpipe.testUtil.TrampolineSchedulerRule
 
@@ -194,7 +200,65 @@ class HistoryRecordManagerTest {
         assertThat(searches).isEqualTo(searches2)
     }
 
+    @Test
+    fun loadStreamStateOfListItemReturnsSavedProgress() {
+        val streamId = insertStream(serviceId = 0, url = STREAM_URL)
+        database.streamStateDAO().insert(StreamStateEntity(streamId, 42_000))
+
+        val states = manager.loadStreamState(listItem(serviceId = 0, url = STREAM_URL)).blockingGet()
+
+        assertEquals(1, states.size)
+        assertEquals(StreamStateEntity(streamId, 42_000), states[0])
+    }
+
+    @Test
+    fun loadStreamStateOfListItemIsNullForUnknownStream() {
+        val states = manager.loadStreamState(listItem(serviceId = 0, url = STREAM_URL)).blockingGet()
+
+        assertEquals(1, states.size)
+        assertNull(states[0])
+    }
+
+    @Test
+    fun loadStreamStateOfListItemIsNullForStreamWithoutProgress() {
+        insertStream(serviceId = 0, url = STREAM_URL)
+
+        val states = manager.loadStreamState(listItem(serviceId = 0, url = STREAM_URL)).blockingGet()
+
+        assertEquals(1, states.size)
+        assertNull(states[0])
+    }
+
+    @Test
+    fun loadStreamStateOfListItemMatchesBothServiceAndUrl() {
+        val sameUrlOtherService = insertStream(serviceId = 1, url = STREAM_URL)
+        val sameServiceOtherUrl = insertStream(serviceId = 0, url = "$STREAM_URL&other")
+        val wanted = insertStream(serviceId = 0, url = STREAM_URL)
+        database.streamStateDAO().insert(StreamStateEntity(sameUrlOtherService, 1_000))
+        database.streamStateDAO().insert(StreamStateEntity(sameServiceOtherUrl, 2_000))
+        database.streamStateDAO().insert(StreamStateEntity(wanted, 3_000))
+
+        val states = manager.loadStreamState(listItem(serviceId = 0, url = STREAM_URL)).blockingGet()
+
+        assertEquals(1, states.size)
+        assertEquals(StreamStateEntity(wanted, 3_000), states[0])
+    }
+
+    private fun insertStream(serviceId: Int, url: String): Long = database.streamDAO().insert(
+        StreamEntity(
+            serviceId = serviceId,
+            url = url,
+            title = "stream",
+            streamType = StreamType.VIDEO_STREAM,
+            duration = 600,
+            uploader = "uploader"
+        )
+    )
+
+    private fun listItem(serviceId: Int, url: String): InfoItem = StreamInfoItem(serviceId, url, "stream", StreamType.VIDEO_STREAM)
+
     companion object {
+        private const val STREAM_URL = "https://example.com/watch?v=1"
         private val time = OffsetDateTime.of(LocalDateTime.of(2000, 1, 1, 1, 1), ZoneOffset.UTC)
 
         private val RELATED_SEARCHES_ENTRIES = listOf(
