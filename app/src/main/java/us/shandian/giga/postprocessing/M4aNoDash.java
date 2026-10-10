@@ -13,10 +13,10 @@ class M4aNoDash extends Postprocessing {
     }
 
     @Override
-    boolean test(SharpStream... sources) throws IOException {
+    boolean test(final SharpStream... sources) throws IOException {
         // check if the mp4 file is DASH (youtube)
 
-        Mp4DashReader reader = new Mp4DashReader(sources[0]);
+        final Mp4DashReader reader = new Mp4DashReader(sources[0]);
         reader.parse();
 
         switch (reader.getBrands()[0]) {
@@ -29,9 +29,9 @@ class M4aNoDash extends Postprocessing {
     }
 
     @Override
-    int process(SharpStream out, SharpStream... sources) throws IOException {
-        Mp4FromDashWriter muxer = new Mp4FromDashWriter(sources[0]);
-        muxer.setMainBrand(0x4D344120);// binary string "M4A "
+    int process(final SharpStream out, final SharpStream... sources) throws IOException {
+        final Mp4FromDashWriter muxer = new Mp4FromDashWriter(sources[0]);
+        muxer.setMainBrand(0x4D344120); // binary string "M4A "
         muxer.parseSources();
         muxer.selectTracks(0);
         muxer.build(out);

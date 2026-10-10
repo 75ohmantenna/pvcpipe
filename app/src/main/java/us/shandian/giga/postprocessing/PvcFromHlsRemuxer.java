@@ -33,9 +33,9 @@ public class PvcFromHlsRemuxer extends Postprocessing {
 
 
     @Override
-    int process(SharpStream out, SharpStream... sources) throws IOException {
+    int process(final SharpStream out, final SharpStream... sources) throws IOException {
         try {
-            PvcHlsConverterToMp4 converterToMp4 = new PvcHlsConverterToMp4(this.mission);
+            final PvcHlsConverterToMp4 converterToMp4 = new PvcHlsConverterToMp4(this.mission);
             converterToMp4.convert(sources, out);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -49,12 +49,12 @@ public class PvcFromHlsRemuxer extends Postprocessing {
     static final class SegmentInputStreamProvider implements HlsMediaProcessor.InputStreamProvider {
         final SharpStream[] segmentStreams;
 
-        private SegmentInputStreamProvider(SharpStream[] segmentStreams) {
+        private SegmentInputStreamProvider(final SharpStream[] segmentStreams) {
             this.segmentStreams = segmentStreams;
         }
 
         @Override
-        public InputStream get(URI uri, int i) throws IOException {
+        public InputStream get(final URI uri, final int i) throws IOException {
             if (segmentStreams.length > i) {
                 return new SharpInputStream(segmentStreams[i]);
             }
@@ -67,14 +67,14 @@ public class PvcFromHlsRemuxer extends Postprocessing {
         private final File tempDir;
         private final DownloadMission mission;
 
-        PvcHlsConverterToMp4(DownloadMission mission) {
+        PvcHlsConverterToMp4(final DownloadMission mission) {
             this.mission = mission;
             final Context context = App.getInstance().getApplicationContext();
             this.tempDir = new File(context.getExternalFilesDir(null), "ffmpeg_temp");
         }
 
         private FFmpegSegmentCombiner createCombiner() {
-            RunFFmpeg runFFmpeg = new RunFFmpeg(App.getInstance().getApplicationContext());
+            final RunFFmpeg runFFmpeg = new RunFFmpeg(App.getInstance().getApplicationContext());
             return new FFmpegSegmentCombiner(args -> {
                 try {
                     return runFFmpeg.execute(args);
@@ -85,7 +85,7 @@ public class PvcFromHlsRemuxer extends Postprocessing {
         }
 
         /**
-         * Actually convert the hls stream to the output stream
+         * Actually convert the hls stream to the output stream.
          *
          * @param segmentStreams        the hls input segment streams
          * @param outputStream          the result of the conversion will be written there
@@ -94,14 +94,16 @@ public class PvcFromHlsRemuxer extends Postprocessing {
          *                              not likely here as we do not interrupt it.
          */
         public void convert(
-                SharpStream[] segmentStreams,
-                SharpStream outputStream)
+                final SharpStream[] segmentStreams,
+                final SharpStream outputStream)
                 throws IOException, InterruptedException {
             createTempDir();
 
-            File remuxedFile = new File(tempDir, "output.mp4");
-            SegmentInputStreamProvider segmentInputStreamProvider = new SegmentInputStreamProvider(segmentStreams);
-            HlsMediaProcessor hlsMediaProcessor = new HlsMediaProcessor(null, tempDir.getAbsolutePath(), remuxedFile.getAbsolutePath(),
+            final File remuxedFile = new File(tempDir, "output.mp4");
+            final SegmentInputStreamProvider segmentInputStreamProvider =
+                    new SegmentInputStreamProvider(segmentStreams);
+            final HlsMediaProcessor hlsMediaProcessor = new HlsMediaProcessor(null,
+                    tempDir.getAbsolutePath(), remuxedFile.getAbsolutePath(),
                     null,
                     null,
                     1, null,
@@ -114,7 +116,8 @@ public class PvcFromHlsRemuxer extends Postprocessing {
             );
 
             if (mission.pvcArbitraryData instanceof List<?>) {
-                @SuppressWarnings("unchecked") final List<HlsParser.Segment> segments = (List<HlsParser.Segment>) mission.pvcArbitraryData;
+                @SuppressWarnings("unchecked") final List<HlsParser.Segment> segments =
+                        (List<HlsParser.Segment>) mission.pvcArbitraryData;
                 hlsMediaProcessor.setSegments(segments);
                 hlsMediaProcessor.processSegments(segmentInputStreamProvider);
                 hlsMediaProcessor.finalizeDownload();
@@ -126,14 +129,14 @@ public class PvcFromHlsRemuxer extends Postprocessing {
         }
 
         private void copyFileToStream(
-                File inFile,
-                SharpStream outStream) throws IOException {
-            Source source = Okio.source(inFile);
-            SharpOutputStream sharpOutputStream = new SharpOutputStream(outStream);
-            Sink sink = Okio.sink(sharpOutputStream);
+                final File inFile,
+                final SharpStream outStream) throws IOException {
+            final Source source = Okio.source(inFile);
+            final SharpOutputStream sharpOutputStream = new SharpOutputStream(outStream);
+            final Sink sink = Okio.sink(sharpOutputStream);
 
-            BufferedSource bufferedSource = Okio.buffer(source);
-            BufferedSink bufferedSink = Okio.buffer(sink);
+            final BufferedSource bufferedSource = Okio.buffer(source);
+            final BufferedSink bufferedSink = Okio.buffer(sink);
 
             // Read all data from source to sink
             bufferedSource.readAll(bufferedSink);
