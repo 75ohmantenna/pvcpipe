@@ -281,18 +281,8 @@ public class HistoryRecordManager {
     }
 
     public Single<StreamStateEntity[]> loadStreamState(final InfoItem info) {
-        return Single.fromCallable(() -> {
-            final List<StreamEntity> entities = streamTable
-                    .getStream(info.getServiceId(), info.getUrl()).blockingFirst();
-            if (entities.isEmpty()) {
-                return new StreamStateEntity[]{null};
-            }
-            final List<StreamStateEntity> states = streamStateTable
-                    .getState(entities.get(0).getUid()).blockingFirst();
-            if (states.isEmpty()) {
-                return new StreamStateEntity[]{null};
-            }
-            return new StreamStateEntity[]{states.get(0)};
+        return Single.fromCallable(() -> new StreamStateEntity[]{
+                streamStateTable.getStateSync(info.getServiceId(), info.getUrl())
         }).subscribeOn(Schedulers.io());
     }
 
