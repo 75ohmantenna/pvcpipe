@@ -25,6 +25,10 @@ public final class Utils {
     public static final String HTTPS = "https://";
     private static final Pattern M_PATTERN = Pattern.compile("(https?)?://m\\.");
     private static final Pattern WWW_PATTERN = Pattern.compile("(https?)?://www\\.");
+    private static final Pattern NUMBER_WORD_MULTIPLIER_PATTERN =
+            Pattern.compile("[\\d]+([\\.,][\\d]+)?([KMBkmb])+");
+    private static final Pattern NUMBER_WORD_COUNT_PATTERN =
+            Pattern.compile("([\\d]+([\\.,][\\d]+)?)");
 
     private Utils() {
         // no instance
@@ -89,11 +93,11 @@ public final class Utils {
             throws NumberFormatException, ParsingException {
         String multiplier = "";
         try {
-            multiplier = Parser.matchGroup("[\\d]+([\\.,][\\d]+)?([KMBkmb])+", numberWord, 2);
+            multiplier = Parser.matchGroup(NUMBER_WORD_MULTIPLIER_PATTERN, numberWord, 2);
         } catch (final ParsingException ignored) {
         }
         final double count = Double.parseDouble(
-                Parser.matchGroup1("([\\d]+([\\.,][\\d]+)?)", numberWord).replace(",", "."));
+                Parser.matchGroup1(NUMBER_WORD_COUNT_PATTERN, numberWord).replace(",", "."));
         switch (multiplier.toUpperCase()) {
             case "K":
                 return (long) (count * 1e3);
