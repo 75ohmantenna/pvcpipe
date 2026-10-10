@@ -6,13 +6,12 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.LocalItem;
 import org.schabi.newpipe.database.stream.model.StreamStateEntity;
+import org.schabi.newpipe.info_list.HeaderFooterListAdapter;
 import org.schabi.newpipe.info_list.ItemViewMode;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.local.holder.LocalBookmarkPlaylistItemHolder;
@@ -30,7 +29,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /*
  * Created by Christian Schabesberger on 01.08.16.
@@ -52,12 +50,9 @@ import java.util.function.Supplier;
  * along with NewPipe.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+public class LocalItemListAdapter extends HeaderFooterListAdapter<LocalItem> {
     private static final String TAG = LocalItemListAdapter.class.getSimpleName();
     private static final boolean DEBUG = false;
-
-    private static final int HEADER_TYPE = 0;
-    private static final int FOOTER_TYPE = 1;
 
     private static final int STREAM_STATISTICS_HOLDER_TYPE = 0x1000;
     private static final int STREAM_PLAYLIST_HOLDER_TYPE = 0x1001;
@@ -77,12 +72,9 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
     private static final int REMOTE_BOOKMARK_PLAYLIST_HOLDER_TYPE = 0x3003;
 
     private final LocalItemBuilder localItemBuilder;
-    private final ArrayList<LocalItem> localItems;
     private final HistoryRecordManager recordManager;
     private final DateTimeFormatter dateTimeFormatter;
 
-    private boolean showFooter = false;
-    private Supplier<View> headerSupplier = null;
     private View footer = null;
     private ItemViewMode itemViewMode = ItemViewMode.LIST;
     private boolean useItemHandle = false;
@@ -90,7 +82,6 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
     public LocalItemListAdapter(final Context context) {
         recordManager = new HistoryRecordManager(context);
         localItemBuilder = new LocalItemBuilder(context);
-        localItems = new ArrayList<>();
 
         dateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
                 .withLocale(Localization.getPreferredLocale(context));
@@ -104,41 +95,10 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         localItemBuilder.setOnItemSelectedListener(null);
     }
 
-    public void addItems(@Nullable final List<? extends LocalItem> data) {
-        if (data == null) {
-            return;
-        }
-        if (DEBUG) {
-            Log.d(TAG, "addItems() before > localItems.size() = "
-                    + localItems.size() + ", data.size() = " + data.size());
-        }
-
-        final int offsetStart = sizeConsideringHeader();
-        localItems.addAll(data);
-
-        if (DEBUG) {
-            Log.d(TAG, "addItems() after > offsetStart = " + offsetStart + ", "
-                    + "localItems.size() = " + localItems.size() + ", "
-                    + "header = " + hasHeader() + ", footer = " + footer + ", "
-                    + "showFooter = " + showFooter);
-        }
-        notifyItemRangeInserted(offsetStart, data.size());
-
-        if (footer != null && showFooter) {
-            final int footerNow = sizeConsideringHeader();
-            notifyItemMoved(offsetStart, footerNow);
-
-            if (DEBUG) {
-                Log.d(TAG, "addItems() footer from " + offsetStart
-                        + " to " + footerNow);
-            }
-        }
-    }
-
     public void removeItem(final LocalItem data) {
-        final int index = localItems.indexOf(data);
+        final int index = getItemsList().indexOf(data);
         if (index != -1) {
-            localItems.remove(index);
+            getItemsList().remove(index);
             notifyItemRemoved(index + (hasHeader() ? 1 : 0));
         } else {
             // this happens when
@@ -153,27 +113,20 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
     }
 
     public boolean swapItems(final int fromAdapterPosition, final int toAdapterPosition) {
-        final int actualFrom = adapterOffsetWithoutHeader(fromAdapterPosition);
-        final int actualTo = adapterOffsetWithoutHeader(toAdapterPosition);
+        final ArrayList<LocalItem> items = getItemsList();
+        final int actualFrom = itemIndexOf(fromAdapterPosition);
+        final int actualTo = itemIndexOf(toAdapterPosition);
 
         if (actualFrom < 0 || actualTo < 0) {
             return false;
         }
-        if (actualFrom >= localItems.size() || actualTo >= localItems.size()) {
+        if (actualFrom >= items.size() || actualTo >= items.size()) {
             return false;
         }
 
-        localItems.add(actualTo, localItems.remove(actualFrom));
+        items.add(actualTo, items.remove(actualFrom));
         notifyItemMoved(fromAdapterPosition, toAdapterPosition);
         return true;
-    }
-
-    public void clearStreamItemList() {
-        if (localItems.isEmpty()) {
-            return;
-        }
-        localItems.clear();
-        notifyDataSetChanged();
     }
 
     public void setItemViewMode(final ItemViewMode itemViewMode) {
@@ -184,89 +137,32 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         this.useItemHandle = useItemHandle;
     }
 
-    public void setHeaderSupplier(@Nullable final Supplier<View> headerSupplier) {
-        final boolean changed = headerSupplier != this.headerSupplier;
-        this.headerSupplier = headerSupplier;
-        if (changed) {
-            notifyDataSetChanged();
-        }
-    }
-
     public void setFooter(final View view) {
         this.footer = view;
     }
 
-    protected boolean hasHeader() {
-        return this.headerSupplier != null;
-    }
-
     @Deprecated(since = "Calling this method with `true` may cause crashes, see "
             + "https://github.com/TeamNewPipe/NewPipe/pull/12996#pullrequestreview-3713317115")
+    @Override
     public void showFooter(final boolean show) {
-        if (DEBUG) {
-            Log.d(TAG, "showFooter() called with: show = [" + show + "]");
-        }
-        if (show == showFooter) {
-            return;
-        }
-
-        showFooter = show;
-        if (show) {
+        if (show && !isFooterRequested()) {
             Log.w(TAG, "Calling LocalItemListAdapter.showFooter(true) may cause crashes, see https"
                     + "://github.com/TeamNewPipe/NewPipe/pull/12996#pullrequestreview-3713317115");
-            notifyItemInserted(sizeConsideringHeader());
-        } else {
-            notifyItemRemoved(sizeConsideringHeader());
         }
+        super.showFooter(show);
     }
 
-    private int adapterOffsetWithoutHeader(final int offset) {
-        return offset - (hasHeader() ? 1 : 0);
-    }
-
-    private int sizeConsideringHeader() {
-        return localItems.size() + (hasHeader() ? 1 : 0);
-    }
-
-    public ArrayList<LocalItem> getItemsList() {
-        return localItems;
+    /**
+     * Unlike in {@link org.schabi.newpipe.info_list.InfoListAdapter}, the footer row only exists
+     * once {@link #setFooter(View)} supplied its view.
+     */
+    @Override
+    protected boolean isFooterShown() {
+        return footer != null && isFooterRequested();
     }
 
     @Override
-    public int getItemCount() {
-        int count = localItems.size();
-        if (hasHeader()) {
-            count++;
-        }
-        if (footer != null && showFooter) {
-            count++;
-        }
-
-        if (DEBUG) {
-            Log.d(TAG, "getItemCount() called, count = " + count + ", "
-                    + "localItems.size() = " + localItems.size() + ", "
-                    + "header = " + hasHeader() + ", footer = " + footer + ", "
-                    + "showFooter = " + showFooter);
-        }
-        return count;
-    }
-
-    @SuppressWarnings("FinalParameters")
-    @Override
-    public int getItemViewType(int position) {
-        if (DEBUG) {
-            Log.d(TAG, "getItemViewType() called with: position = [" + position + "]");
-        }
-
-        if (hasHeader() && position == 0) {
-            return HEADER_TYPE;
-        } else if (hasHeader()) {
-            position--;
-        }
-        if (footer != null && position == localItems.size() && showFooter) {
-            return FOOTER_TYPE;
-        }
-        final LocalItem item = localItems.get(position);
+    protected int getViewTypeOf(@NonNull final LocalItem item) {
         switch (item.getLocalItemType()) {
             case PLAYLIST_LOCAL_ITEM:
                 if (useItemHandle) {
@@ -321,7 +217,7 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         }
         switch (type) {
             case HEADER_TYPE:
-                return new HeaderFooterHolder(headerSupplier.get());
+                return new HeaderFooterHolder(createHeaderView());
             case FOOTER_TYPE:
                 return new HeaderFooterHolder(footer);
             case LOCAL_PLAYLIST_HOLDER_TYPE:
@@ -366,9 +262,9 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         }
     }
 
-    @SuppressWarnings("FinalParameters")
     @Override
-    public void onBindViewHolder(@NonNull final RecyclerView.ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull final RecyclerView.ViewHolder holder,
+                                 final int position) {
         if (DEBUG) {
             Log.d(TAG, "onBindViewHolder() called with: "
                     + "holder = [" + holder.getClass().getSimpleName() + "], "
@@ -376,17 +272,12 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         }
 
         if (holder instanceof LocalItemHolder) {
-            // If header isn't null, offset the items by -1
-            if (hasHeader()) {
-                position--;
-            }
-
-            ((LocalItemHolder) holder)
-                    .updateFromItem(localItems.get(position), recordManager, dateTimeFormatter);
+            ((LocalItemHolder) holder).updateFromItem(getItemsList().get(itemIndexOf(position)),
+                    recordManager, dateTimeFormatter);
         } else if (holder instanceof HeaderFooterHolder && position == 0 && hasHeader()) {
-            ((HeaderFooterHolder) holder).view = headerSupplier.get();
+            ((HeaderFooterHolder) holder).view = createHeaderView();
         } else if (holder instanceof HeaderFooterHolder && position == sizeConsideringHeader()
-                && footer != null && showFooter) {
+                && isFooterShown()) {
             ((HeaderFooterHolder) holder).view = footer;
         }
     }
@@ -397,11 +288,11 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         if (!payloads.isEmpty() && holder instanceof LocalItemHolder) {
             for (final Object payload : payloads) {
                 if (payload instanceof StreamStateEntity) {
-                    ((LocalItemHolder) holder).updateState(localItems
-                            .get(hasHeader() ? position - 1 : position), recordManager);
+                    ((LocalItemHolder) holder).updateState(
+                            getItemsList().get(itemIndexOf(position)), recordManager);
                 } else if (payload instanceof Boolean) {
-                    ((LocalItemHolder) holder).updateState(localItems
-                            .get(hasHeader() ? position - 1 : position), recordManager);
+                    ((LocalItemHolder) holder).updateState(
+                            getItemsList().get(itemIndexOf(position)), recordManager);
                 }
             }
         } else {
@@ -409,13 +300,4 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         }
     }
 
-    public GridLayoutManager.SpanSizeLookup getSpanSizeLookup(final int spanCount) {
-        return new GridLayoutManager.SpanSizeLookup() {
-            @Override
-            public int getSpanSize(final int position) {
-                final int type = getItemViewType(position);
-                return type == HEADER_TYPE || type == FOOTER_TYPE ? spanCount : 1;
-            }
-        };
-    }
 }

@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.schabi.newpipe.R;
@@ -29,9 +28,7 @@ import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.util.FallbackViewHolder;
 import org.schabi.newpipe.util.OnClickGesture;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /*
  * Created by Christian Schabesberger on 01.08.16.
@@ -53,12 +50,9 @@ import java.util.function.Supplier;
  * along with NewPipe.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+public class InfoListAdapter extends HeaderFooterListAdapter<InfoItem> {
     private static final String TAG = InfoListAdapter.class.getSimpleName();
     private static final boolean DEBUG = false;
-
-    private static final int HEADER_TYPE = 0;
-    private static final int FOOTER_TYPE = 1;
 
     private static final int MINI_STREAM_HOLDER_TYPE = 0x100;
     private static final int STREAM_HOLDER_TYPE = 0x101;
@@ -76,21 +70,16 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private final LayoutInflater layoutInflater;
     private final InfoItemBuilder infoItemBuilder;
-    private final List<InfoItem> infoItemList;
     private final HistoryRecordManager recordManager;
 
     private boolean useMiniVariant = false;
-    private boolean showFooter = false;
 
     private ItemViewMode itemMode = ItemViewMode.LIST;
-
-    private Supplier<View> headerSupplier = null;
 
     public InfoListAdapter(final Context context) {
         layoutInflater = LayoutInflater.from(context);
         recordManager = new HistoryRecordManager(context);
         infoItemBuilder = new InfoItemBuilder(context);
-        infoItemList = new ArrayList<>();
     }
 
     public void setOnStreamSelectedListener(final OnClickGesture<StreamInfoItem> listener) {
@@ -118,119 +107,11 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     }
 
     public void addInfoItemList(@Nullable final List<? extends InfoItem> data) {
-        if (data == null) {
-            return;
-        }
-        if (DEBUG) {
-            Log.d(TAG, "addInfoItemList() before > infoItemList.size() = "
-                    + infoItemList.size() + ", data.size() = " + data.size());
-        }
-
-        final int offsetStart = sizeConsideringHeaderOffset();
-        infoItemList.addAll(data);
-
-        if (DEBUG) {
-            Log.d(TAG, "addInfoItemList() after > offsetStart = " + offsetStart + ", "
-                    + "infoItemList.size() = " + infoItemList.size() + ", "
-                    + "hasHeader = " + hasHeader() + ", "
-                    + "showFooter = " + showFooter);
-        }
-        notifyItemRangeInserted(offsetStart, data.size());
-
-        if (showFooter) {
-            final int footerNow = sizeConsideringHeaderOffset();
-            notifyItemMoved(offsetStart, footerNow);
-
-            if (DEBUG) {
-                Log.d(TAG, "addInfoItemList() footer from " + offsetStart
-                        + " to " + footerNow);
-            }
-        }
-    }
-
-    public void clearStreamItemList() {
-        if (infoItemList.isEmpty()) {
-            return;
-        }
-        infoItemList.clear();
-        notifyDataSetChanged();
-    }
-
-    public void setHeaderSupplier(@Nullable final Supplier<View> headerSupplier) {
-        final boolean changed = headerSupplier != this.headerSupplier;
-        this.headerSupplier = headerSupplier;
-        if (changed) {
-            notifyDataSetChanged();
-        }
-    }
-
-    protected boolean hasHeader() {
-        return this.headerSupplier != null;
-    }
-
-    public void showFooter(final boolean show) {
-        if (DEBUG) {
-            Log.d(TAG, "showFooter() called with: show = [" + show + "]");
-        }
-        if (show == showFooter) {
-            return;
-        }
-
-        showFooter = show;
-        if (show) {
-            notifyItemInserted(sizeConsideringHeaderOffset());
-        } else {
-            notifyItemRemoved(sizeConsideringHeaderOffset());
-        }
-    }
-
-    private int sizeConsideringHeaderOffset() {
-        final int i = infoItemList.size() + (hasHeader() ? 1 : 0);
-        if (DEBUG) {
-            Log.d(TAG, "sizeConsideringHeaderOffset() called → " + i);
-        }
-        return i;
-    }
-
-    public List<InfoItem> getItemsList() {
-        return infoItemList;
+        addItems(data);
     }
 
     @Override
-    public int getItemCount() {
-        int count = infoItemList.size();
-        if (hasHeader()) {
-            count++;
-        }
-        if (showFooter) {
-            count++;
-        }
-
-        if (DEBUG) {
-            Log.d(TAG, "getItemCount() called with: "
-                    + "count = " + count + ", infoItemList.size() = " + infoItemList.size() + ", "
-                    + "hasHeader = " + hasHeader() + ", "
-                    + "showFooter = " + showFooter);
-        }
-        return count;
-    }
-
-    @SuppressWarnings("FinalParameters")
-    @Override
-    public int getItemViewType(int position) {
-        if (DEBUG) {
-            Log.d(TAG, "getItemViewType() called with: position = [" + position + "]");
-        }
-
-        if (hasHeader() && position == 0) {
-            return HEADER_TYPE;
-        } else if (hasHeader()) {
-            position--;
-        }
-        if (position == infoItemList.size() && showFooter) {
-            return FOOTER_TYPE;
-        }
-        final InfoItem item = infoItemList.get(position);
+    protected int getViewTypeOf(@NonNull final InfoItem item) {
         switch (item.getInfoType()) {
             case STREAM:
                 if (itemMode == ItemViewMode.CARD) {
@@ -282,7 +163,7 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             // Always create a new instance otherwise the same instance
             // is sometimes reused which causes a crash
             case HEADER_TYPE:
-                return new HFHolder(headerSupplier.get());
+                return new HFHolder(createHeaderView());
             case FOOTER_TYPE:
                 return new HFHolder(PignateFooterBinding
                         .inflate(layoutInflater, parent, false)
@@ -336,8 +217,7 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
         if (holder instanceof InfoItemHolder) {
             ((InfoItemHolder) holder).updateFromItem(
-                    // If header is present, offset the items by -1
-                    infoItemList.get(hasHeader() ? position - 1 : position), recordManager);
+                    getItemsList().get(itemIndexOf(position)), recordManager);
         }
     }
 
@@ -347,16 +227,6 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             infoHolder.recycle();
         }
         super.onViewRecycled(holder);
-    }
-
-    public GridLayoutManager.SpanSizeLookup getSpanSizeLookup(final int spanCount) {
-        return new GridLayoutManager.SpanSizeLookup() {
-            @Override
-            public int getSpanSize(final int position) {
-                final int type = getItemViewType(position);
-                return type == HEADER_TYPE || type == FOOTER_TYPE ? spanCount : 1;
-            }
-        };
     }
 
     static class HFHolder extends RecyclerView.ViewHolder {
