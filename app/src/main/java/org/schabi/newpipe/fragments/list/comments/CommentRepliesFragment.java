@@ -32,9 +32,14 @@ import java.util.function.Supplier;
 
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import org.schabi.newpipe.pvc.bus.events.PvcEvents;
+import org.schabi.newpipe.pvc.fragments.PvcEventBusBaseListInfoFragment;
+import org.schabi.newpipe.pvc.bus.PvcBus;
 
 public final class CommentRepliesFragment
-        extends PvcCommentRepliesFragment {
+        extends PvcEventBusBaseListInfoFragment<CommentsInfoItem, CommentRepliesInfo> {
     private static final String STATE_SUFFIX =
             "org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment$$StateSaver";
 
@@ -73,7 +78,7 @@ public final class CommentRepliesFragment
             final View rootView,
             final Bundle savedInstanceState) {
         super.initViews(rootView, savedInstanceState);
-        pvcInitReplyTitleAndCustomBackButton(rootView, commentsInfoItem);
+        initReplyTitleAndCustomBackButton(rootView, commentsInfoItem);
     }
 
     public CommentRepliesFragment(@NonNull final CommentsInfoItem commentsInfoItem) {
@@ -189,5 +194,40 @@ public final class CommentRepliesFragment
      */
     public CommentsInfoItem getCommentsInfoItem() {
         return commentsInfoItem;
+    }
+
+    private void initReplyTitleAndCustomBackButton(
+            final View rootView,
+            final CommentsInfoItem comment) {
+
+        final LinearLayout layout = rootView.findViewById(R.id.replies_layout);
+        if (PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+            final Button backButton = rootView.findViewById(R.id.back_button);
+            backButton.setText(
+                    Localization.replyCount(requireContext(), comment.getReplyCount()));
+            backButton.setOnClickListener(v -> PvcBus.getBus()
+                    .post(new PvcEvents.EventBackPressedInCommentRepliesFragment()));
+            layout.setVisibility(View.VISIBLE);
+        } else {
+            layout.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    protected void doResizeViewPagersContent(final int height) {
+        final int backButtonHeight =
+                getActivity().findViewById(R.id.back_button).getLayoutParams().height;
+        final ViewGroup.LayoutParams params = itemsList.getLayoutParams();
+        params.height = height -  backButtonHeight;
+        itemsList.setLayoutParams(params);
+        itemsList.requestLayout();
+    }
+
+    @Override
+    public void setTitle(
+            final String title) {
+        if (!PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+            super.setTitle(title);
+        }
     }
 }

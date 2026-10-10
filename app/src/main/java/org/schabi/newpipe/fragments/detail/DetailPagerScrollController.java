@@ -1,6 +1,5 @@
 package org.schabi.newpipe.fragments.detail;
 
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewTreeObserver;
@@ -8,13 +7,10 @@ import android.view.ViewTreeObserver;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 import org.schabi.newpipe.pvc.bus.events.PvcEvents;
-import org.schabi.newpipe.pvc.fragments.PvcBackStackFragment;
 import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.databinding.FragmentVideoDetailBinding;
 import org.schabi.newpipe.pvc.bus.PvcBus;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
-import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment;
 import org.schabi.newpipe.pvc.views.PvcInterceptTouchRelativeLayout;
 import org.schabi.newpipe.player.ui.VideoPlayerUi;
@@ -27,26 +23,37 @@ import androidx.viewpager.widget.ViewPager;
 import static org.schabi.newpipe.ktx.ViewUtils.animateRotation;
 
 /**
- * Handle PVCPipe specific features.
+ * Keeps the pager below the player sized and scrollable for {@link VideoDetailFragment}, and
+ * swaps comment replies in and out of its comments tab.
  * <p>
- * It receives below events:
+ * It receives these events:
  * <ul>
  * <li>{@link PvcEvents.PrefEventScrollOnlyBelowPlayer}</li>
  * <li>{@link PvcEvents.EventBackPressedInCommentRepliesFragment}</li>
  * <li>{@link PvcEvents.EventShowCommentRepliesFragment}</li>
  * </ul>
  * <p>
- * It sends this events:
+ * It sends this event:
  * <ul>
  * <li>{@link PvcEvents.EventViewPagersContentHeight}</li>
  * </ul>
+ * <p>
+ * The class is public because EventBus calls its subscriber methods reflectively.
  */
-public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInfo>
+public final class DetailPagerScrollController
         implements PvcEvents.EventShowCommentRepliesFragment.Handler,
         PvcEvents.EventBackPressedInCommentRepliesFragment.Handler,
         PvcEvents.PrefEventScrollOnlyBelowPlayer.Handler {
+    private static final String TAG = "DetailPagerScroll";
 
-    protected FragmentVideoDetailBinding binding;
+    private final VideoDetailFragment fragment;
+    private FragmentVideoDetailBinding binding;
+
+    DetailPagerScrollController(final VideoDetailFragment fragment) {
+        this.fragment = fragment;
+    }
+
+
     private int lastHeight = -1;
     private View.OnLayoutChangeListener onChangeLayoutListener = null;
 
@@ -63,11 +70,11 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
             binding.detailContentRootHiding.setVisibility(View.GONE);
         }
         // view pager height has changed, update the tab layout
-        updateTabLayoutVisibility();
+        fragment.updateTabLayoutVisibility();
         addGlobalLayoutListener();
     }
 
-    protected void addGlobalLayoutListener() {
+    private void addGlobalLayoutListener() {
         final View rootLayout = binding.detailContentRootLayout;
         rootLayout.getViewTreeObserver().addOnGlobalLayoutListener(
                 new ViewTreeObserver.OnGlobalLayoutListener() {
@@ -95,16 +102,12 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
         return height;
     }
 
-    protected void pvcSetBinding(final FragmentVideoDetailBinding binder) {
-        this.binding = binder;
-    }
-
     @Override
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
     public void handlePrefEventScrollOnlyBelowPlayer(
             final PvcEvents.PrefEventScrollOnlyBelowPlayer event) {
 
-        if (!DeviceUtils.isLandscape(requireContext()) && event.doScrollInViewPager) {
+        if (!DeviceUtils.isLandscape(fragment.requireContext()) && event.doScrollInViewPager) {
             binding.detailContentRootLayout.setOnInterceptTouchEventListener(
                     new PvcInterceptTouchRelativeLayout
                             .NoOuterScrollingWhileInlineCommentsEnabledListener());
@@ -160,15 +163,13 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
         return onChangeLayoutListener;
     }
 
-    public abstract void updateTabLayoutVisibility();
-
     /**
      * Handle android back button pressed.
      * @return true if it was handled here
      */
-    protected boolean pvcOnBackPressed() {
+    boolean onBackPressed() {
         if (PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
-            return PvcBackStackFragment.handleBackPressed(getChildFragmentManager());
+            return PvcHostFragment.handleBackPressed(fragment.getChildFragmentManager());
         } else {
             return false;
         }
@@ -178,7 +179,7 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
     public void handleEventBackPressedInCommentRepliesFragment(
             final PvcEvents.EventBackPressedInCommentRepliesFragment event) {
-        PvcBackStackFragment.handleBackPressed(getChildFragmentManager());
+        PvcHostFragment.handleBackPressed(fragment.getChildFragmentManager());
     }
 
     @Override
@@ -191,7 +192,7 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
                 binding.viewPager);
     }
 
-    public void replaceCommentsFragmentInViewPager(
+    private void replaceCommentsFragmentInViewPager(
             @NonNull final CommentsInfoItem comment,
             final PagerAdapter pagerAdapter,
             final ViewPager viewPager) {
@@ -202,17 +203,17 @@ public abstract class PvcVideoDetailFragment extends BaseStateFragment<StreamInf
     }
 
 
-    @Override
-    public void onViewCreated(
-            @NonNull final View rootView,
-            final Bundle savedInstanceState) {
-        super.onViewCreated(rootView, savedInstanceState);
+    /**
+     * Starts listening for events. The current preference state is delivered before this returns.
+     *
+     * @param viewBinding the views of the fragment this controller belongs to
+     */
+    void attach(final FragmentVideoDetailBinding viewBinding) {
+        binding = viewBinding;
         PvcBus.getBus().register(this);
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
+    void detach() {
         PvcBus.getBus().unregister(this);
         binding = null;
     }

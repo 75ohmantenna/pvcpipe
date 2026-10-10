@@ -73,6 +73,7 @@ import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.fragments.BackPressable;
+import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.MainFragment;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.local.dialog.PlaylistDialog;
@@ -121,7 +122,7 @@ import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public final class VideoDetailFragment
-        extends PvcVideoDetailFragment
+        extends BaseStateFragment<StreamInfo>
         implements BackPressable,
         PlayerServiceExtendedEventListener,
         OnKeyDownListener {
@@ -143,6 +144,10 @@ public final class VideoDetailFragment
             App.PACKAGE_NAME + ".VideoDetailFragment.ACTION_VIDEO_FRAGMENT_RESUMED";
     public static final String ACTION_VIDEO_FRAGMENT_STOPPED =
             App.PACKAGE_NAME + ".VideoDetailFragment.ACTION_VIDEO_FRAGMENT_STOPPED";
+
+    private final DetailPagerScrollController pagerScroll =
+            new DetailPagerScrollController(this);
+    private FragmentVideoDetailBinding binding;
 
     private DetailContentCoordinator content;
 
@@ -322,8 +327,13 @@ public final class VideoDetailFragment
     public View onCreateView(@NonNull final LayoutInflater inflater, final ViewGroup container,
                              final Bundle savedInstanceState) {
         binding = FragmentVideoDetailBinding.inflate(inflater, container, false);
-        pvcSetBinding(binding);
         return binding.getRoot();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull final View rootView, final Bundle savedInstanceState) {
+        super.onViewCreated(rootView, savedInstanceState);
+        pagerScroll.attach(binding);
     }
 
     @Override
@@ -406,6 +416,7 @@ public final class VideoDetailFragment
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        pagerScroll.detach();
         disposeDislikeWorker();
         content.detach();
         binding = null;
@@ -692,7 +703,7 @@ public final class VideoDetailFragment
 
     @Override
     public boolean onBackPressed() {
-        if (pvcOnBackPressed()) {
+        if (pagerScroll.onBackPressed()) {
             return true;
         }
 
@@ -876,7 +887,6 @@ public final class VideoDetailFragment
     // Tabs
     //////////////////////////////////////////////////////////////////////////*/
 
-    @Override
     public void updateTabLayoutVisibility() {
         content.updateTabLayoutVisibility();
     }
