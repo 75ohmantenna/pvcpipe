@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.PignateFooterBinding;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem;
@@ -18,17 +19,10 @@ import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.info_list.holder.ChannelCardInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.ChannelGridInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.ChannelInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.ChannelMiniInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.CommentInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.InfoItemHolder;
-import org.schabi.newpipe.info_list.holder.PlaylistCardInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.PlaylistGridInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.PlaylistInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.PlaylistMiniInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.StreamCardInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.StreamGridInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamMiniInfoItemHolder;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -299,25 +293,32 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             case STREAM_HOLDER_TYPE:
                 return new StreamInfoItemHolder(infoItemBuilder, parent);
             case GRID_STREAM_HOLDER_TYPE:
-                return new StreamGridInfoItemHolder(infoItemBuilder, parent);
+                return new StreamInfoItemHolder(infoItemBuilder,
+                        R.layout.list_stream_grid_item, parent);
             case CARD_STREAM_HOLDER_TYPE:
-                return new StreamCardInfoItemHolder(infoItemBuilder, parent);
+                return new StreamInfoItemHolder(infoItemBuilder,
+                        R.layout.list_stream_card_item, parent);
             case MINI_CHANNEL_HOLDER_TYPE:
                 return new ChannelMiniInfoItemHolder(infoItemBuilder, parent);
             case CHANNEL_HOLDER_TYPE:
-                return new ChannelInfoItemHolder(infoItemBuilder, parent);
+                return new ChannelMiniInfoItemHolder(infoItemBuilder,
+                        R.layout.list_channel_item, parent);
             case CARD_CHANNEL_HOLDER_TYPE:
                 return new ChannelCardInfoItemHolder(infoItemBuilder, parent);
             case GRID_CHANNEL_HOLDER_TYPE:
-                return new ChannelGridInfoItemHolder(infoItemBuilder, parent);
+                return new ChannelMiniInfoItemHolder(infoItemBuilder,
+                        R.layout.list_channel_grid_item, parent);
             case MINI_PLAYLIST_HOLDER_TYPE:
                 return new PlaylistMiniInfoItemHolder(infoItemBuilder, parent);
             case PLAYLIST_HOLDER_TYPE:
-                return new PlaylistInfoItemHolder(infoItemBuilder, parent);
+                return new PlaylistMiniInfoItemHolder(infoItemBuilder,
+                        R.layout.list_playlist_item, parent);
             case GRID_PLAYLIST_HOLDER_TYPE:
-                return new PlaylistGridInfoItemHolder(infoItemBuilder, parent);
+                return new PlaylistMiniInfoItemHolder(infoItemBuilder,
+                        R.layout.list_playlist_grid_item, parent);
             case CARD_PLAYLIST_HOLDER_TYPE:
-                return new PlaylistCardInfoItemHolder(infoItemBuilder, parent);
+                return new PlaylistMiniInfoItemHolder(infoItemBuilder,
+                        R.layout.list_playlist_card_item, parent);
             case COMMENT_HOLDER_TYPE:
                 return new CommentInfoItemHolder(infoItemBuilder, parent);
             default:

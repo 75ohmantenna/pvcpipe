@@ -22,7 +22,7 @@ public class ChannelMiniInfoItemHolder extends InfoItemHolder {
     private final TextView itemAdditionalDetailView;
     private final TextView itemChannelDescriptionView;
 
-    ChannelMiniInfoItemHolder(final InfoItemBuilder infoItemBuilder, final int layoutId,
+    public ChannelMiniInfoItemHolder(final InfoItemBuilder infoItemBuilder, final int layoutId,
                               final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
 

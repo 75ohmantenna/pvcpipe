@@ -29,7 +29,7 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
     private final View itemHandleView;
     private final AnimatedProgressBar itemProgressView;
 
-    LocalPlaylistStreamItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
+    public LocalPlaylistStreamItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                                   final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
 

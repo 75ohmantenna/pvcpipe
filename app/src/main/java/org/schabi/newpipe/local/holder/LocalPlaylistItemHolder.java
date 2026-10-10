@@ -21,7 +21,7 @@ public class LocalPlaylistItemHolder extends PlaylistItemHolder {
         super(infoItemBuilder, parent);
     }
 
-    LocalPlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
+    public LocalPlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                             final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
     }

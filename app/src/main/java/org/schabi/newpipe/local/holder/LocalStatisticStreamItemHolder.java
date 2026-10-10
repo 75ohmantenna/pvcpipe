@@ -56,8 +56,9 @@ public class LocalStatisticStreamItemHolder extends LocalItemHolder {
         this(itemBuilder, R.layout.list_stream_item, parent);
     }
 
-    LocalStatisticStreamItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
-                                   final ViewGroup parent) {
+    public LocalStatisticStreamItemHolder(final LocalItemBuilder infoItemBuilder,
+                                          final int layoutId,
+                                          final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
 
         itemThumbnailView = itemView.findViewById(R.id.itemThumbnailView);
