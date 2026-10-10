@@ -17,15 +17,15 @@ class WebMMuxer extends Postprocessing {
     }
 
     @Override
-    int process(SharpStream out, SharpStream... sources) throws IOException {
-        WebMWriter muxer = new WebMWriter(sources);
+    int process(final SharpStream out, final SharpStream... sources) throws IOException {
+        final WebMWriter muxer = new WebMWriter(sources);
         muxer.parseSources();
 
         // youtube uses a webm with a fake video track that acts as a "cover image"
-        int[] indexes = new int[sources.length];
+        final int[] indexes = new int[sources.length];
 
         for (int i = 0; i < sources.length; i++) {
-            WebMTrack[] tracks = muxer.getTracksFromSource(i);
+            final WebMTrack[] tracks = muxer.getTracksFromSource(i);
             for (int j = 0; j < tracks.length; j++) {
                 if (tracks[j].kind == TrackKind.Audio) {
                     indexes[i] = j;
