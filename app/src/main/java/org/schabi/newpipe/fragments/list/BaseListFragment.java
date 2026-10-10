@@ -22,12 +22,16 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.extractor.InfoItem;
+import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.OnScrollBelowItemsListener;
+import org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment;
 import org.schabi.newpipe.info_list.InfoListAdapter;
 import org.schabi.newpipe.info_list.ItemViewMode;
 import org.schabi.newpipe.info_list.dialog.InfoItemDialog;
+import org.schabi.newpipe.pvc.bus.PvcBus;
+import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.OnClickGesture;
 import org.schabi.newpipe.util.StateSaver;
@@ -261,9 +265,25 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
         });
 
         infoListAdapter.setOnCommentsSelectedListener(this::onItemSelected);
+        infoListAdapter.setOnCommentRepliesSelectedListener(this::onCommentRepliesSelected);
 
         // Ensure that there is always a scroll listener (e.g. when rotating the device)
         useNormalItemListScrollListener();
+    }
+
+    /**
+     * Shows the replies to a comment: inside the host this list is shown in when replies should
+     * stay in the same window, otherwise as a screen of their own.
+     *
+     * @param comment the comment whose replies were requested
+     */
+    private void onCommentRepliesSelected(final CommentsInfoItem comment) {
+        final PvcHostFragment host = PvcHostFragment.findHostOf(this);
+        if (host != null && PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
+            host.replaceFragment(new CommentRepliesFragment(comment), true);
+        } else {
+            NavigationHelper.openCommentRepliesFragment(requireActivity(), comment);
+        }
     }
 
     /**

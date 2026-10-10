@@ -81,6 +81,28 @@ public class PvcHostFragment extends Fragment {
         return false;
     }
 
+    /**
+     * @param fragment a fragment that may be shown inside a host
+     * @return the nearest host above the fragment, or {@code null} if it is not inside one
+     */
+    @Nullable
+    public static PvcHostFragment findHostOf(@NonNull final Fragment fragment) {
+        Fragment parent = fragment.getParentFragment();
+        while (parent != null && !(parent instanceof PvcHostFragment)) {
+            parent = parent.getParentFragment();
+        }
+        return (PvcHostFragment) parent;
+    }
+
+    /**
+     * Leaves the replies shown in this host, as its in-page back button asks.
+     *
+     * @return whether something was popped
+     */
+    public boolean handleRepliesBackPressed() {
+        return onBackPressed();
+    }
+
     protected boolean onBackPressed() {
         final FragmentManager fm = getChildFragmentManager();
         if (handleBackPressed(fm))  {

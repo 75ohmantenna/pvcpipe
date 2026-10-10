@@ -1,7 +1,6 @@
 package org.schabi.newpipe.pvc.bus.events;
 
 import org.schabi.newpipe.pvc.PvcConstants;
-import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 
 /**
  * Home of all PVCPipe Events.
@@ -10,34 +9,6 @@ import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
  * called via the {@link org.greenrobot.eventbus.EventBus} Subscribe notation.
  */
 public class PvcEvents {
-
-    /**
-     * If the user wants to see replies to a comment this event is ignited.
-     */
-    public static class EventShowCommentRepliesFragment {
-        public final CommentsInfoItem item;
-
-        public EventShowCommentRepliesFragment(
-                final CommentsInfoItem item) {
-            this.item = item;
-        }
-
-        public interface Handler {
-            void handleEventShowCommentRepliesFragment(EventShowCommentRepliesFragment event);
-        }
-    }
-
-    /**
-     * Event ignited if back button of is pushed.
-     * Back button of {@link org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment}
-     */
-    public static class EventBackPressedInCommentRepliesFragment {
-
-        public interface Handler {
-            void handleEventBackPressedInCommentRepliesFragment(
-                    EventBackPressedInCommentRepliesFragment event);
-        }
-    }
 
     /**
      * Event for a new height to the the VideoDetailFragment's ViewPager's content height.

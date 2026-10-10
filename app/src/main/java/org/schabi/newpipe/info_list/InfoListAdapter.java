@@ -29,6 +29,7 @@ import org.schabi.newpipe.util.FallbackViewHolder;
 import org.schabi.newpipe.util.OnClickGesture;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /*
  * Created by Christian Schabesberger on 01.08.16.
@@ -96,6 +97,10 @@ public class InfoListAdapter extends HeaderFooterListAdapter<InfoItem> {
 
     public void setOnCommentsSelectedListener(final OnClickGesture<CommentsInfoItem> listener) {
         infoItemBuilder.setOnCommentsSelectedListener(listener);
+    }
+
+    public void setOnCommentRepliesSelectedListener(final Consumer<CommentsInfoItem> listener) {
+        infoItemBuilder.setOnCommentRepliesSelectedListener(listener);
     }
 
     public void setUseMiniVariant(final boolean useMiniVariant) {
