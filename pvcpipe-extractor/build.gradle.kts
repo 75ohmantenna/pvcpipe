@@ -38,27 +38,3 @@ subprojects {
         }
     }
 }
-
-tasks.register<Javadoc>("aggregatedJavadocs") {
-    group = "documentation"
-    description = "Generates aggregated Javadocs for all subprojects."
-    (options as StandardJavadocDocletOptions).apply {
-        encoding = Charsets.UTF_8.toString()
-        links = listOf("https://docs.oracle.com/javase/11/docs/api/")
-        title = "NewPipe Extractor ${rootProject.version}"
-        tags = listOf(
-            "apiNote:a:API Note:",
-            "implSpec:a:Implementation Requirements:",
-            "implNote:a:Implementation Note:"
-        )
-    }
-
-    dependsOn(subprojects.map { it.tasks.named("classes") })
-
-    subprojects.forEach { proj ->
-        proj.extensions.findByType(JavaPluginExtension::class.java)?.sourceSets?.getByName("main")?.let { main ->
-            source(main.allJava)
-            classpath += main.output + proj.configurations.getByName("compileClasspath")
-        }
-    }
-}

@@ -1,9 +1,9 @@
 # PVCPipe Extractor
 
 This directory contains PVCPipe's extractor library. It is maintained in the
-parent repository, although its Gradle build also provides local Maven
-publication tasks. The parent build includes the extractor as a composite build
-and automatically substitutes it for the app's extractor dependency.
+parent repository and is not published as a separate artifact. The parent build
+includes the extractor as a composite build and automatically substitutes it for
+the app's extractor dependency.
 
 ## Development
 

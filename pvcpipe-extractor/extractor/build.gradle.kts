@@ -6,19 +6,10 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
-val snapshotVersion = providers.gradleProperty("extractorSnapshotVersion")
-    .getOrElse("${rootProject.version}-SNAPSHOT")
-
 plugins {
     alias(libs.plugins.google.protobuf)
     id("com.squareup.wire") version "5.5.0"
     checkstyle
-    `maven-publish`
-}
-
-java {
-    withSourcesJar()
-    withJavadocJar()
 }
 
 sourceSets {
@@ -139,68 +130,5 @@ wire {
     }
 
     java {
-    }
-}
-
-// Run "./gradlew publishReleasePublicationToLocalRepository" to generate release JARs locally
-publishing {
-    publications {
-        val mavenGroupId = "net.newpipe"
-        val mavenArtifactId = "extractor"
-        fun MavenPublication.setupPOM() = pom {
-            name = "NewPipe Extractor"
-            description = "A library for extracting data from streaming websites, used in NewPipe"
-            url = "https://github.com/TeamNewPipe/NewPipeExtractor"
-
-            licenses {
-                license {
-                    name = "GNU General Public License v3.0 or later"
-                    url = "https://www.gnu.org/licenses/gpl-3.0.txt"
-                }
-            }
-
-            scm {
-                url = "https://github.com/TeamNewPipe/NewPipeExtractor"
-                connection = "scm:git:git@github.com:TeamNewPipe/NewPipeExtractor.git"
-                developerConnection = "scm:git:git@github.com:TeamNewPipe/NewPipeExtractor.git"
-            }
-
-            developers {
-                developer {
-                    id = "newpipe"
-                    name = "Team NewPipe"
-                    email = "team@newpipe.net"
-                }
-            }
-        }
-
-        create<MavenPublication>("release") {
-            groupId = mavenGroupId
-            artifactId = mavenArtifactId
-            version = rootProject.version.toString()
-
-            afterEvaluate {
-                from(components["java"])
-            }
-
-            setupPOM()
-        }
-        create<MavenPublication>("snapshot") {
-            groupId = mavenGroupId
-            artifactId = mavenArtifactId
-            version = snapshotVersion
-
-            afterEvaluate {
-                from(components["java"])
-            }
-
-            setupPOM()
-        }
-        repositories {
-            maven {
-                name = "local"
-                url = uri(layout.buildDirectory.dir("maven"))
-            }
-        }
     }
 }
