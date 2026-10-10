@@ -112,9 +112,8 @@ dependencies {
     testImplementation(libs.google.gson)
 
     // PVCPipeExtractor
-    implementation("com.github.evermind-zz:hlsdownloader:1.0.0")
-    val okHttpVersion: String = libs.versions.okhttp.get()
-    testImplementation("com.squareup.okhttp3:okhttp-urlconnection:$okHttpVersion")
+    implementation(libs.evermind.hlsdownloader)
+    testImplementation(libs.squareup.okhttp.urlconnection)
 }
 
 protobuf {

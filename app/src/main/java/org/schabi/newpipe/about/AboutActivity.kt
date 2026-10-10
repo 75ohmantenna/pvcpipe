@@ -147,7 +147,6 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("Material Components for Android", "2016 - 2020", "Google, Inc.", "https://github.com/material-components/material-components-android", StandardLicenses.APACHE2),
             SoftwareComponent("nanojson", "2011", "The nanojson Authors", "https://github.com/TeamNewPipe/nanojson", StandardLicenses.APACHE2),
             SoftwareComponent("NewPipe", "2014 - 2026", "NewPipe contributors", "https://github.com/TeamNewPipe/NewPipe", StandardLicenses.GPL3),
-            SoftwareComponent("NoNonsense-FilePicker", "2016", "Jonas Kalderstam", "https://github.com/TeamNewPipe/NoNonsense-FilePicker", StandardLicenses.MPL2),
             SoftwareComponent("OkHttp", "2019", "Square, Inc.", "https://square.github.io/okhttp/", StandardLicenses.APACHE2),
             SoftwareComponent("Okio", "2013 - 2026", "Square, Inc.", "https://github.com/square/okio", StandardLicenses.APACHE2),
             SoftwareComponent("PrettyTime", "2012 - 2020", "Lincoln Baxter, III", "https://github.com/ocpsoft/prettytime", StandardLicenses.APACHE2),

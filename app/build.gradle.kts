@@ -212,7 +212,6 @@ dependencies {
     /** NewPipe libraries **/
     implementation(libs.newpipe.nanojson)
     implementation(libs.pvcpipe.extractor)
-    implementation(libs.newpipe.filepicker)
 
     /** Checkstyle **/
     checkstyle(libs.puppycrawl.checkstyle)
@@ -227,6 +226,7 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.lifecycle.livedata)
     implementation(libs.androidx.lifecycle.viewmodel)
+    // Not referenced by app code: pins the version Material pulls in transitively
     implementation(libs.androidx.localbroadcastmanager)
     implementation(libs.androidx.media)
     implementation(libs.androidx.preference)
@@ -270,7 +270,7 @@ dependencies {
     implementation(libs.lisawray.groupie.viewbinding)
 
     // Image loading
-    implementation(libs.coil.compose)
+    implementation(libs.coil.core)
     implementation(libs.coil.network.okhttp)
 
     // Markdown library for Android
@@ -311,21 +311,28 @@ dependencies {
     androidTestImplementation(libs.androidx.runner)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.assertj.core)
-}
 
-// keep the changed dependencies for PVCPipe more
-// separate in hope of not getting to many merge conflicts
-val okHttpVersion: String = libs.versions.okhttp.get()
-// for JavaNetCookieJar see https://github.com/75ohmantenna/pvcpipe-extractor/issues/123
-project.dependencies.implementation("com.squareup.okhttp3:okhttp-urlconnection:$okHttpVersion")
-// for hls support on rumble
-project.dependencies.implementation("com.github.evermind-zz:hlsdownloader:1.0.0")
-project.dependencies.implementation(
-    "com.github.75ohmantenna:slimhls-converter:7e7f373dbf",
-)
-// the eventbus
-project.dependencies.implementation("org.greenrobot:eventbus:3.3.1")
-// the LogcatToolkit
-project.dependencies.implementation("com.github.evermind-zz:logcat-toolkit:1.0.0")
-// cf challenge helper
-project.dependencies.implementation("com.github.evermind-zz:challengeFloatsAway:1.1.1")
+    /** PVCPipe libraries **/
+    // JavaNetCookieJar, see https://github.com/75ohmantenna/pvcpipe-extractor/issues/123
+    implementation(libs.squareup.okhttp.urlconnection)
+    // HLS support on Rumble
+    implementation(libs.evermind.hlsdownloader)
+    implementation(libs.pvcpipe.slimhls.converter)
+    // Event bus
+    implementation(libs.greenrobot.eventbus)
+    // Logcat toolkit
+    implementation(libs.evermind.logcattoolkit)
+    // Cloudflare challenge helper
+    implementation(libs.evermind.challengefloatsaway)
+
+    constraints {
+        // Transitive libraries the app uses. coil-compose used to raise them to these versions;
+        // the pins keep them there now that it is gone.
+        implementation(libs.androidx.collection)
+        implementation(libs.androidx.collection.ktx)
+        implementation(libs.androidx.emoji2)
+        implementation(libs.androidx.emoji2.views.helper)
+        implementation(libs.androidx.savedstate)
+        implementation(libs.androidx.savedstate.ktx)
+    }
+}
