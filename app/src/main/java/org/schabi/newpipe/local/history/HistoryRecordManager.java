@@ -27,14 +27,10 @@ import androidx.preference.PreferenceManager;
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.AppDatabase;
-import org.schabi.newpipe.database.LocalItem;
 import org.schabi.newpipe.database.history.dao.SearchHistoryDAO;
 import org.schabi.newpipe.database.history.dao.StreamHistoryDAO;
 import org.schabi.newpipe.database.history.model.SearchHistoryEntry;
 import org.schabi.newpipe.database.history.model.StreamHistoryEntity;
-import org.schabi.newpipe.database.history.model.StreamHistoryEntry;
-import org.schabi.newpipe.database.playlist.PlaylistStreamEntry;
-import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity;
 import org.schabi.newpipe.database.stream.StreamStatisticsEntry;
 import org.schabi.newpipe.database.stream.dao.StreamDAO;
 import org.schabi.newpipe.database.stream.dao.StreamStateDAO;
@@ -49,7 +45,6 @@ import org.schabi.newpipe.util.ExtractorHelper;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -175,10 +170,6 @@ public class HistoryRecordManager {
                 .subscribeOn(Schedulers.io());
     }
 
-    public Flowable<List<StreamHistoryEntry>> getStreamHistorySortedById() {
-        return streamHistoryTable.getHistorySortedById().subscribeOn(Schedulers.io());
-    }
-
     public Flowable<List<StreamStatisticsEntry>> getStreamStatistics() {
         return streamHistoryTable.getStatistics().subscribeOn(Schedulers.io());
     }
@@ -293,34 +284,6 @@ public class HistoryRecordManager {
                 return new StreamStateEntity[]{null};
             }
             return new StreamStateEntity[]{states.get(0)};
-        }).subscribeOn(Schedulers.io());
-    }
-
-    public Single<List<StreamStateEntity>> loadLocalStreamStateBatch(
-            final List<? extends LocalItem> items) {
-        return Single.fromCallable(() -> {
-            final List<StreamStateEntity> result = new ArrayList<>(items.size());
-            for (final LocalItem item : items) {
-                final long streamId;
-                if (item instanceof StreamStatisticsEntry) {
-                    streamId = ((StreamStatisticsEntry) item).getStreamId();
-                } else if (item instanceof PlaylistStreamEntity) {
-                    streamId = ((PlaylistStreamEntity) item).getStreamUid();
-                } else if (item instanceof PlaylistStreamEntry) {
-                    streamId = ((PlaylistStreamEntry) item).getStreamId();
-                } else {
-                    result.add(null);
-                    continue;
-                }
-                final List<StreamStateEntity> states = streamStateTable.getState(streamId)
-                        .blockingFirst();
-                if (states.isEmpty()) {
-                    result.add(null);
-                } else {
-                    result.add(states.get(0));
-                }
-            }
-            return result;
         }).subscribeOn(Schedulers.io());
     }
 
