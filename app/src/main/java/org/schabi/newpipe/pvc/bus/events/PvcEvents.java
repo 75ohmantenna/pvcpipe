@@ -29,7 +29,7 @@ public class PvcEvents {
 
     /**
      * Event ignited if back button of is pushed.
-     * Back button of {@link org.schabi.newpipe.fragments.list.comments.PvcCommentRepliesFragment}
+     * Back button of {@link org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment}
      */
     public static class EventBackPressedInCommentRepliesFragment {
 
@@ -43,7 +43,7 @@ public class PvcEvents {
      * Event for a new height to the the VideoDetailFragment's ViewPager's content height.
      * <p>
      * The height value is calculated in
-     * {@link org.schabi.newpipe.fragments.detail.PvcVideoDetailFragment} and used in
+     * {@link org.schabi.newpipe.fragments.detail.DetailPagerScrollController} and used in
      * the fragments that are placed in
      * {@link org.schabi.newpipe.fragments.detail.VideoDetailFragment}'s ViewPager.
      */

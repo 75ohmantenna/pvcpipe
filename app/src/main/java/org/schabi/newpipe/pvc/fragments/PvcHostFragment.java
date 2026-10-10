@@ -11,11 +11,12 @@ import org.schabi.newpipe.R;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
 /**
  * Host another Fragment that might be replaced dynamically on runtime.
  */
-public class PvcHostFragment extends PvcBackStackFragment {
+public class PvcHostFragment extends Fragment {
     private Fragment fragment;
 
     @Override
@@ -64,5 +65,30 @@ public class PvcHostFragment extends PvcBackStackFragment {
         final PvcHostFragment pvcHostFragment = new PvcHostFragment();
         pvcHostFragment.fragment = fragment;
         return pvcHostFragment;
+    }
+
+    public static boolean handleBackPressed(
+            final FragmentManager fm) {
+        if (fm.getFragments() != null) {
+            for (final Fragment frag : fm.getFragments()) {
+                if (frag != null && frag.isVisible() && frag instanceof PvcHostFragment) {
+                    if (((PvcHostFragment) frag).onBackPressed()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    protected boolean onBackPressed() {
+        final FragmentManager fm = getChildFragmentManager();
+        if (handleBackPressed(fm))  {
+            return true;
+        } else if (getUserVisibleHint() && fm.getBackStackEntryCount() > 0) {
+            fm.popBackStack();
+            return true;
+        }
+        return false;
     }
 }
