@@ -1,6 +1,8 @@
 package org.schabi.newpipe.download;
 
+import static org.schabi.newpipe.extractor.stream.DeliveryMethod.HLS;
 import static org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP;
+import static org.schabi.newpipe.ktx.ViewUtils.animate;
 import static org.schabi.newpipe.util.ListHelper.getStreamsOfSpecifiedDelivery;
 
 import android.app.Activity;
@@ -33,6 +35,7 @@ import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.collection.SparseArrayCompat;
+import androidx.fragment.app.DialogFragment;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.MainActivity;
@@ -59,6 +62,8 @@ import org.schabi.newpipe.util.ListHelper;
 import org.schabi.newpipe.util.SecondaryStreamHelper;
 import org.schabi.newpipe.util.ServiceBinding;
 import org.schabi.newpipe.util.SimpleOnSeekBarChangeListener;
+import org.schabi.newpipe.util.SponsorBlock;
+import org.schabi.newpipe.util.SponsorBlockSegment;
 import org.schabi.newpipe.util.StreamItemAdapter;
 import org.schabi.newpipe.util.StreamItemAdapter.StreamInfoWrapper;
 import org.schabi.newpipe.util.ThemeHelper;
@@ -68,16 +73,23 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import us.shandian.giga.service.DownloadManagerService;
 import us.shandian.giga.service.DownloadManagerService.DownloadManagerBinder;
 
-public class DownloadDialog extends PvcDownloadDialog
+public class DownloadDialog extends DialogFragment
         implements RadioGroup.OnCheckedChangeListener, AdapterView.OnItemSelectedListener {
     private static final String TAG = "DialogFragment";
     private static final boolean DEBUG = MainActivity.DEBUG;
     private static final String STATE_SUFFIX =
             "org.schabi.newpipe.download.DownloadDialog$$StateSaver";
+
+    private SponsorBlockSegment[] sponsorBlockSegments = new SponsorBlockSegment[0];
+    private Disposable sponsorBlockDisposable;
 
     StreamInfo currentInfo;
     StreamInfoWrapper<VideoStream> wrappedVideoStreams;
@@ -153,7 +165,7 @@ public class DownloadDialog extends PvcDownloadDialog
         // Only progressive streams and supported HLS video can be prepared for download.
         final List<VideoStream> videoStreams = ListHelper.getSortedStreamVideosList(
                 context,
-                pvcAddHlsStreams(info,
+                withHlsStreams(info,
                         getStreamsOfSpecifiedDelivery(info.getVideoStreams(), PROGRESSIVE_HTTP)),
                 getStreamsOfSpecifiedDelivery(info.getVideoOnlyStreams(), PROGRESSIVE_HTTP),
                 false,
@@ -326,7 +338,7 @@ public class DownloadDialog extends PvcDownloadDialog
         initToolbar(dialogBinding.toolbarLayout.toolbar);
         downloadServiceBinding.bind(Context.BIND_AUTO_CREATE);
 
-        loadSponsorBlockSegments(currentInfo, okButton, dialogBinding);
+        loadSponsorBlockSegments();
 
         setupDownloadOptions();
 
@@ -387,6 +399,9 @@ public class DownloadDialog extends PvcDownloadDialog
         downloadServiceBinding.unbind();
         okButton = null;
         dialogBinding = null;
+        if (sponsorBlockDisposable != null) {
+            sponsorBlockDisposable.dispose();
+        }
         super.onDestroyView();
     }
 
@@ -816,7 +831,7 @@ public class DownloadDialog extends PvcDownloadDialog
             return null;
         }
         return new DownloadPreparation.Selection(kind, stream, secondaryStream, size, secondarySize,
-                dialogBinding.threads.getProgress() + 1, currentInfo, pvcSponsorBlockSegments());
+                dialogBinding.threads.getProgress() + 1, currentInfo, sponsorBlockSegments.clone());
     }
 
     private final class DownloadPresentation implements DownloadPreparation.Presentation {
@@ -930,5 +945,51 @@ public class DownloadDialog extends PvcDownloadDialog
             }
             showFailedDialog(message);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+    // HLS streams and SponsorBlock segments
+    //////////////////////////////////////////////////////////////////////////*/
+
+    private static List<VideoStream> withHlsStreams(final StreamInfo info,
+                                                    final List<VideoStream> videoStreams) {
+        videoStreams.addAll(getStreamsOfSpecifiedDelivery(info.getVideoStreams(), HLS));
+        return videoStreams;
+    }
+
+    private void loadSponsorBlockSegments() {
+        final Context applicationContext = requireContext().getApplicationContext();
+        if (!SponsorBlock.canFetch(applicationContext, currentInfo)) {
+            return;
+        }
+
+        // The lookup and its callbacks keep using the stream and views it started with.
+        final StreamInfo lookupInfo = currentInfo;
+        final MenuItem lookupOkButton = okButton;
+        final DownloadDialogBinding lookupBinding = dialogBinding;
+        showSponsorBlockLoading(lookupBinding);
+        lookupOkButton.setEnabled(false);
+        sponsorBlockDisposable = Single.fromCallable(
+                        () -> SponsorBlock.getSegments(applicationContext, lookupInfo))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doFinally(() -> {
+                    if (getView() != null) {
+                        lookupOkButton.setEnabled(true);
+                        hideSponsorBlockLoading(lookupBinding);
+                    }
+                })
+                .subscribe(segments -> sponsorBlockSegments = segments,
+                        error -> Log.w(TAG, "SponsorBlock lookup failed", error));
+    }
+
+    private static void showSponsorBlockLoading(final DownloadDialogBinding binding) {
+        binding.fileName.setVisibility(View.GONE);
+        animate(binding.loadingProgressBar, true, 400);
+    }
+
+    private static void hideSponsorBlockLoading(final DownloadDialogBinding binding) {
+        animate(binding.loadingProgressBar, false, 0);
+        binding.fileName.setVisibility(View.VISIBLE);
     }
 }

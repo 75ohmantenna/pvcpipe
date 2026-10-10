@@ -25,6 +25,7 @@ import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
@@ -47,12 +48,14 @@ import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
 import androidx.core.os.HandlerCompat;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import org.schabi.newpipe.App;
 import org.schabi.newpipe.BuildConfig;
 import org.schabi.newpipe.LocalPlayerActivity;
 import org.schabi.newpipe.R;
@@ -89,7 +92,8 @@ import us.shandian.giga.ui.common.Deleter;
 import us.shandian.giga.ui.common.ProgressDrawable;
 import us.shandian.giga.util.Utility;
 
-public class MissionAdapter extends PvcMissionAdapter implements Handler.Callback {
+public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
+        implements Handler.Callback {
     private static final String TAG = "MissionAdapter";
     private static final String UNDEFINED_PROGRESS = "--.-%";
     private static final String DEFAULT_MIME_TYPE = "*/*";
@@ -343,8 +347,19 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         }
     }
 
-    @Override
-    protected void openInternally(Mission mission) {
+    private void openFinishedMission(final DownloadManager.MissionItem item) {
+        final Context context = App.getInstance();
+        final SharedPreferences preferences =
+                PreferenceManager.getDefaultSharedPreferences(context);
+        if (preferences.getBoolean(context
+                .getString(R.string.enable_local_player_key), false)) {
+            openInternally(item.mission);
+        } else {
+            openExternally(item.mission);
+        }
+    }
+
+    private void openInternally(Mission mission) {
         if (checkInvalidFile(mission)) return;
 
         String mimeType = resolveMimeType(mission);
@@ -363,8 +378,7 @@ public class MissionAdapter extends PvcMissionAdapter implements Handler.Callbac
         mContext.startActivity(intent);
     }
 
-    @Override
-    protected void openExternally(Mission mission) {
+    private void openExternally(Mission mission) {
         if (checkInvalidFile(mission)) return;
 
         String mimeType = resolveMimeType(mission);
