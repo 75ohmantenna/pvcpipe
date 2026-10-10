@@ -120,8 +120,7 @@ public final class RumbleParsingHelper {
         return extractThumbnail(doc, classStr,
                 () -> {
                     // extract checksum to use as identifier
-                    final Pattern matchChecksum = Pattern.compile("([a-fA-F0-9]{32})");
-                    final Matcher match2 = matchChecksum.matcher(classStr);
+                    final Matcher match2 = CHECKSUM_PATTERN.matcher(classStr);
                     if (match2.find()) {
                         final String chkSum = match2.group(1);
                         return chkSum;
@@ -163,9 +162,7 @@ public final class RumbleParsingHelper {
         }
         final String preciselyMatchHere = matchThat.substring(pos);
 
-        final Pattern channelThumbUrl =
-                Pattern.compile("\\W+background-image:\\W+url(?:\\()([^)]*)(?:\\));");
-        final Matcher match = channelThumbUrl.matcher(preciselyMatchHere);
+        final Matcher match = CHANNEL_THUMBNAIL_URL_PATTERN.matcher(preciselyMatchHere);
         if (match.find()) {
             return match.group(1);
         }
@@ -244,6 +241,16 @@ public final class RumbleParsingHelper {
         }
         return HEADERS;
     }
+    private static final Pattern CHECKSUM_PATTERN = Pattern.compile("([a-fA-F0-9]{32})");
+    private static final Pattern CHANNEL_THUMBNAIL_URL_PATTERN =
+            Pattern.compile("\\W+background-image:\\W+url(?:\\()([^)]*)(?:\\));");
+    // the embed id is group 1
+    private static final Pattern EMBED_URL_PATTERN = Pattern.compile(
+            "(?:<(?:script|iframe)[^>]+\\bsrc=|[\"']embedUrl[\"']\\s*:\\s*)[\"']"
+                    + "https?://(?:www\\.)?rumble\\.com/embed/(?:[0-9a-z]+\\.)?([0-9a-z]+)");
+    private static final Pattern EMBED_PLAY_CALL_PATTERN = Pattern.compile(
+            "\\bRumble\\(\\s*[\"']play[\"']\\s*,\\s*\\{[^}]*"
+                    + "[\"']?video[\"']?\\s*:\\s*[\"'](v[0-9a-z]+)[\"']");
     private static final int EMBED_VIDEO_ID_CACHE_SIZE = 64;
     private static final Map<String, String> EMBED_VIDEO_IDS_CACHE =
             Collections.synchronizedMap(new LinkedHashMap<String, String>(
@@ -261,11 +268,6 @@ public final class RumbleParsingHelper {
         if (cachedId != null) {
             return cachedId;
         }
-        final String validUrl = "https?://(?:www\\.)?rumble\\.com/embed/"
-                + "(?:[0-9a-z]+\\.)?([0-9a-z]+)"; // id is group 1
-        final String embedRegex = "(?:<(?:script|iframe)[^>]+\\bsrc=|"
-                + "[\"']embedUrl[\"']\\s*:\\s*)[\"']" + validUrl;
-        Pattern pattern = Pattern.compile(embedRegex);
         final String content;
         try {
             content = contentProvider.call();
@@ -275,13 +277,11 @@ public final class RumbleParsingHelper {
             throw new ParsingException("Could not extract the embed id due to missing content", e);
         }
 
-        Matcher matcher = pattern.matcher(content);
+        Matcher matcher = EMBED_URL_PATTERN.matcher(content);
         String embedId = matcher.find() ? matcher.group(1) : null;
         if (embedId == null) {
-            pattern = Pattern.compile("\\bRumble\\(\\s*[\"']play[\"']\\s*,\\s*\\{[^}]*"
-                    + "[\"']?video[\"']?\\s*:\\s*[\"'](v[0-9a-z]+)[\"']");
             for (final Element script : Jsoup.parse(content).select("script")) {
-                matcher = pattern.matcher(script.data());
+                matcher = EMBED_PLAY_CALL_PATTERN.matcher(script.data());
                 if (matcher.find()) {
                     embedId = matcher.group(1);
                     break;

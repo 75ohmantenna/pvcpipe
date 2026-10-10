@@ -76,6 +76,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     private static final String RELATED_STREAMS_SELECTOR = "ul.mediaList-list";
     private static final Pattern HLS_RESOLUTION_PATTERN =
             Pattern.compile("^[1-9][0-9]*x([1-9][0-9]*)$");
+    private static final Pattern VIEWER_ID_PATTERN = Pattern.compile("viewer_id: \"(.*)\"");
 
     private Document doc;
     JsonObject embedJsonStreamInfoObj;
@@ -699,8 +700,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         if (embedOnly || doc == null) {
             return -1;
         }
-        final Pattern matchChecksum = Pattern.compile("viewer_id: \"(.*)\"");
-        final Matcher matcher = matchChecksum.matcher(doc.toString());
+        final Matcher matcher = VIEWER_ID_PATTERN.matcher(doc.toString());
         if (!matcher.find()) {
             throw new ParsingException("Could not extract viewer_id");
         }

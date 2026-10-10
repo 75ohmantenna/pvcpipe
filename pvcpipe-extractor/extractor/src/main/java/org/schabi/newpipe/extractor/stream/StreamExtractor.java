@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Scrapes information from a video/audio streaming service (eg, YouTube).
@@ -51,6 +52,11 @@ public abstract class StreamExtractor extends Extractor {
 
     public static final int NO_AGE_LIMIT = 0;
     public static final long UNKNOWN_SUBSCRIBER_COUNT = -1;
+
+    private static final Pattern TIMESTAMP_SECONDS_PATTERN = Pattern.compile("(\\d+)s");
+    private static final Pattern TIMESTAMP_MINUTES_PATTERN = Pattern.compile("(\\d+)m");
+    private static final Pattern TIMESTAMP_HOURS_PATTERN = Pattern.compile("(\\d+)h");
+    private static final Pattern TIMESTAMP_UNLABELLED_PATTERN = Pattern.compile("t=(\\d+)");
 
     public StreamExtractor(final StreamingService service, final LinkHandler linkHandler) {
         super(service, linkHandler);
@@ -434,14 +440,15 @@ public abstract class StreamExtractor extends Extractor {
                 String minutesString = "";
                 String hoursString = "";
                 try {
-                    secondsString = Parser.matchGroup1("(\\d+)s", timestamp);
-                    minutesString = Parser.matchGroup1("(\\d+)m", timestamp);
-                    hoursString = Parser.matchGroup1("(\\d+)h", timestamp);
+                    secondsString = Parser.matchGroup1(TIMESTAMP_SECONDS_PATTERN, timestamp);
+                    minutesString = Parser.matchGroup1(TIMESTAMP_MINUTES_PATTERN, timestamp);
+                    hoursString = Parser.matchGroup1(TIMESTAMP_HOURS_PATTERN, timestamp);
                 } catch (final Exception e) {
                     // it could be that time is given in another method
                     if (secondsString.isEmpty() && minutesString.isEmpty()) {
                         // if nothing was obtained, treat as unlabelled seconds
-                        secondsString = Parser.matchGroup1("t=(\\d+)", timestamp);
+                        secondsString = Parser.matchGroup1(TIMESTAMP_UNLABELLED_PATTERN,
+                                timestamp);
                     }
                 }
 
