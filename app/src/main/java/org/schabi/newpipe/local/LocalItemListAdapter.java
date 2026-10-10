@@ -10,24 +10,17 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.LocalItem;
 import org.schabi.newpipe.database.stream.model.StreamStateEntity;
 import org.schabi.newpipe.info_list.ItemViewMode;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.local.holder.LocalBookmarkPlaylistItemHolder;
 import org.schabi.newpipe.local.holder.LocalItemHolder;
-import org.schabi.newpipe.local.holder.LocalPlaylistCardItemHolder;
-import org.schabi.newpipe.local.holder.LocalPlaylistGridItemHolder;
 import org.schabi.newpipe.local.holder.LocalPlaylistItemHolder;
-import org.schabi.newpipe.local.holder.LocalPlaylistStreamCardItemHolder;
-import org.schabi.newpipe.local.holder.LocalPlaylistStreamGridItemHolder;
 import org.schabi.newpipe.local.holder.LocalPlaylistStreamItemHolder;
-import org.schabi.newpipe.local.holder.LocalStatisticStreamCardItemHolder;
-import org.schabi.newpipe.local.holder.LocalStatisticStreamGridItemHolder;
 import org.schabi.newpipe.local.holder.LocalStatisticStreamItemHolder;
 import org.schabi.newpipe.local.holder.RemoteBookmarkPlaylistItemHolder;
-import org.schabi.newpipe.local.holder.RemotePlaylistCardItemHolder;
-import org.schabi.newpipe.local.holder.RemotePlaylistGridItemHolder;
 import org.schabi.newpipe.local.holder.RemotePlaylistItemHolder;
 import org.schabi.newpipe.util.FallbackViewHolder;
 import org.schabi.newpipe.util.Localization;
@@ -334,31 +327,39 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
             case LOCAL_PLAYLIST_HOLDER_TYPE:
                 return new LocalPlaylistItemHolder(localItemBuilder, parent);
             case LOCAL_PLAYLIST_GRID_HOLDER_TYPE:
-                return new LocalPlaylistGridItemHolder(localItemBuilder, parent);
+                return new LocalPlaylistItemHolder(localItemBuilder,
+                        R.layout.list_playlist_grid_item, parent);
             case LOCAL_PLAYLIST_CARD_HOLDER_TYPE:
-                return new LocalPlaylistCardItemHolder(localItemBuilder, parent);
+                return new LocalPlaylistItemHolder(localItemBuilder,
+                        R.layout.list_playlist_card_item, parent);
             case LOCAL_BOOKMARK_PLAYLIST_HOLDER_TYPE:
                 return new LocalBookmarkPlaylistItemHolder(localItemBuilder, parent);
             case REMOTE_PLAYLIST_HOLDER_TYPE:
                 return new RemotePlaylistItemHolder(localItemBuilder, parent);
             case REMOTE_PLAYLIST_GRID_HOLDER_TYPE:
-                return new RemotePlaylistGridItemHolder(localItemBuilder, parent);
+                return new RemotePlaylistItemHolder(localItemBuilder,
+                        R.layout.list_playlist_grid_item, parent);
             case REMOTE_PLAYLIST_CARD_HOLDER_TYPE:
-                return new RemotePlaylistCardItemHolder(localItemBuilder, parent);
+                return new RemotePlaylistItemHolder(localItemBuilder,
+                        R.layout.list_playlist_card_item, parent);
             case REMOTE_BOOKMARK_PLAYLIST_HOLDER_TYPE:
                 return new RemoteBookmarkPlaylistItemHolder(localItemBuilder, parent);
             case STREAM_PLAYLIST_HOLDER_TYPE:
                 return new LocalPlaylistStreamItemHolder(localItemBuilder, parent);
             case STREAM_PLAYLIST_GRID_HOLDER_TYPE:
-                return new LocalPlaylistStreamGridItemHolder(localItemBuilder, parent);
+                return new LocalPlaylistStreamItemHolder(localItemBuilder,
+                        R.layout.list_stream_playlist_grid_item, parent);
             case STREAM_PLAYLIST_CARD_HOLDER_TYPE:
-                return new LocalPlaylistStreamCardItemHolder(localItemBuilder, parent);
+                return new LocalPlaylistStreamItemHolder(localItemBuilder,
+                        R.layout.list_stream_playlist_card_item, parent);
             case STREAM_STATISTICS_HOLDER_TYPE:
                 return new LocalStatisticStreamItemHolder(localItemBuilder, parent);
             case STREAM_STATISTICS_GRID_HOLDER_TYPE:
-                return new LocalStatisticStreamGridItemHolder(localItemBuilder, parent);
+                return new LocalStatisticStreamItemHolder(localItemBuilder,
+                        R.layout.list_stream_grid_item, parent);
             case STREAM_STATISTICS_CARD_HOLDER_TYPE:
-                return new LocalStatisticStreamCardItemHolder(localItemBuilder, parent);
+                return new LocalStatisticStreamItemHolder(localItemBuilder,
+                        R.layout.list_stream_card_item, parent);
             default:
                 Log.e(TAG, "No view type has been considered for holder: [" + type + "]");
                 return new FallbackViewHolder(new View(parent.getContext()));

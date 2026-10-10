@@ -20,7 +20,7 @@ public class RemotePlaylistItemHolder extends PlaylistItemHolder {
         super(infoItemBuilder, parent);
     }
 
-    RemotePlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
+    public RemotePlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                              final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
     }
