@@ -34,8 +34,8 @@ import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import org.schabi.newpipe.pvc.bus.events.PvcEvents;
 import org.schabi.newpipe.pvc.fragments.PvcEventBusBaseListInfoFragment;
+import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.pvc.bus.PvcBus;
 
 public final class CommentRepliesFragment
@@ -205,8 +205,12 @@ public final class CommentRepliesFragment
             final Button backButton = rootView.findViewById(R.id.back_button);
             backButton.setText(
                     Localization.replyCount(requireContext(), comment.getReplyCount()));
-            backButton.setOnClickListener(v -> PvcBus.getBus()
-                    .post(new PvcEvents.EventBackPressedInCommentRepliesFragment()));
+            backButton.setOnClickListener(v -> {
+                final PvcHostFragment host = PvcHostFragment.findHostOf(this);
+                if (host != null) {
+                    host.handleRepliesBackPressed();
+                }
+            });
             layout.setVisibility(View.VISIBLE);
         } else {
             layout.setVisibility(View.GONE);

@@ -10,27 +10,19 @@ import org.schabi.newpipe.pvc.bus.events.PvcEvents;
 import org.schabi.newpipe.pvc.fragments.PvcHostFragment;
 import org.schabi.newpipe.databinding.FragmentVideoDetailBinding;
 import org.schabi.newpipe.pvc.bus.PvcBus;
-import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
-import org.schabi.newpipe.fragments.list.comments.CommentRepliesFragment;
 import org.schabi.newpipe.pvc.views.PvcInterceptTouchRelativeLayout;
 import org.schabi.newpipe.player.ui.VideoPlayerUi;
 import org.schabi.newpipe.util.DeviceUtils;
-
-import androidx.annotation.NonNull;
-import androidx.viewpager.widget.PagerAdapter;
-import androidx.viewpager.widget.ViewPager;
 
 import static org.schabi.newpipe.ktx.ViewUtils.animateRotation;
 
 /**
  * Keeps the pager below the player sized and scrollable for {@link VideoDetailFragment}, and
- * swaps comment replies in and out of its comments tab.
+ * lets the system Back key leave comment replies shown in its comments tab.
  * <p>
- * It receives these events:
+ * It receives this event:
  * <ul>
  * <li>{@link PvcEvents.PrefEventScrollOnlyBelowPlayer}</li>
- * <li>{@link PvcEvents.EventBackPressedInCommentRepliesFragment}</li>
- * <li>{@link PvcEvents.EventShowCommentRepliesFragment}</li>
  * </ul>
  * <p>
  * It sends this event:
@@ -41,9 +33,7 @@ import static org.schabi.newpipe.ktx.ViewUtils.animateRotation;
  * The class is public because EventBus calls its subscriber methods reflectively.
  */
 public final class DetailPagerScrollController
-        implements PvcEvents.EventShowCommentRepliesFragment.Handler,
-        PvcEvents.EventBackPressedInCommentRepliesFragment.Handler,
-        PvcEvents.PrefEventScrollOnlyBelowPlayer.Handler {
+        implements PvcEvents.PrefEventScrollOnlyBelowPlayer.Handler {
     private static final String TAG = "DetailPagerScroll";
 
     private final VideoDetailFragment fragment;
@@ -173,33 +163,6 @@ public final class DetailPagerScrollController
         } else {
             return false;
         }
-    }
-
-    @Override
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void handleEventBackPressedInCommentRepliesFragment(
-            final PvcEvents.EventBackPressedInCommentRepliesFragment event) {
-        PvcHostFragment.handleBackPressed(fragment.getChildFragmentManager());
-    }
-
-    @Override
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void handleEventShowCommentRepliesFragment(
-            final PvcEvents.EventShowCommentRepliesFragment event) {
-        replaceCommentsFragmentInViewPager(
-                event.item,
-                binding.viewPager.getAdapter(),
-                binding.viewPager);
-    }
-
-    private void replaceCommentsFragmentInViewPager(
-            @NonNull final CommentsInfoItem comment,
-            final PagerAdapter pagerAdapter,
-            final ViewPager viewPager) {
-        final TabAdapter customPagerAdapter = (TabAdapter) pagerAdapter;
-        final PvcHostFragment hostFragment =
-                (PvcHostFragment) customPagerAdapter.getItem(viewPager.getCurrentItem());
-        hostFragment.replaceFragment(new CommentRepliesFragment(comment), true);
     }
 
 

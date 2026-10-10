@@ -19,8 +19,6 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.FragmentActivity;
 
 import org.schabi.newpipe.R;
-import org.schabi.newpipe.pvc.bus.PvcBus;
-import org.schabi.newpipe.pvc.bus.events.PvcEvents;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.info_list.InfoItemBuilder;
@@ -32,6 +30,8 @@ import org.schabi.newpipe.util.external_communication.ShareUtils;
 import org.schabi.newpipe.util.image.CoilHelper;
 import org.schabi.newpipe.util.image.ImageStrategy;
 import org.schabi.newpipe.util.text.TextEllipsizer;
+
+import java.util.function.Consumer;
 
 public class CommentInfoItemHolder extends InfoItemHolder {
 
@@ -180,8 +180,10 @@ public class CommentInfoItemHolder extends InfoItemHolder {
     }
 
     private void openCommentReplies(@NonNull final CommentsInfoItem item) {
-        if (PvcBus.Helpers.isPrefCommentRepliesSameWindowEnabled()) {
-            PvcBus.getBus().post(new PvcEvents.EventShowCommentRepliesFragment(item));
+        final Consumer<CommentsInfoItem> listener =
+                itemBuilder.getOnCommentRepliesSelectedListener();
+        if (listener != null) {
+            listener.accept(item);
         } else {
             NavigationHelper.openCommentRepliesFragment((FragmentActivity) itemBuilder.getContext(),
                     item);
