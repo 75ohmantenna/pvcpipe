@@ -157,7 +157,6 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("Reactive Streams", "2014 - 2026", "Reactive Streams contributors", "https://github.com/reactive-streams/reactive-streams-jvm", StandardLicenses.MIT0),
             SoftwareComponent("Rhino", "1997 - 2026", "Mozilla and Rhino contributors", "https://github.com/mozilla/rhino", StandardLicenses.MPL2),
             SoftwareComponent("RxAndroid", "2015", "The RxAndroid authors", "https://github.com/ReactiveX/RxAndroid", StandardLicenses.APACHE2),
-            SoftwareComponent("RxBinding", "2015", "Jake Wharton", "https://github.com/JakeWharton/RxBinding", StandardLicenses.APACHE2),
             SoftwareComponent("RxJava", "2016 - 2020", "RxJava Contributors", "https://github.com/ReactiveX/RxJava", StandardLicenses.APACHE2),
             SoftwareComponent("SearchPreference", "2018", "ByteHamster", "https://github.com/ByteHamster/SearchPreference", StandardLicenses.MIT),
             SoftwareComponent("JSR-305", "2007 - 2015", "FindBugs contributors", "https://github.com/findbugsproject/findbugs", StandardLicenses.APACHE2),

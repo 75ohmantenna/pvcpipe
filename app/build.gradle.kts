@@ -288,8 +288,6 @@ dependencies {
     // Reactive extensions for Java VM
     implementation(libs.reactivex.rxjava)
     implementation(libs.reactivex.rxandroid)
-    // RxJava binding APIs for Android UI widgets
-    implementation(libs.jakewharton.rxbinding)
 
     // Date and time formatting
     implementation(libs.ocpsoft.prettytime)

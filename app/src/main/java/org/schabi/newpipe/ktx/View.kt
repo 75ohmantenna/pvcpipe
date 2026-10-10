@@ -16,6 +16,8 @@ import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import io.reactivex.rxjava3.android.MainThreadDisposable
+import io.reactivex.rxjava3.core.Observable
 
 // logs in this class are disabled by default since it's usually not useful,
 // you can enable them by setting this flag to MainActivity.DEBUG
@@ -297,4 +299,19 @@ enum class AnimationType {
     LIGHT_SCALE_AND_ALPHA,
     SLIDE_AND_ALPHA,
     LIGHT_SLIDE_AND_ALPHA
+}
+
+/**
+ * Emits each click on this view. Replaces the view's click listener for as long as the
+ * subscription lives.
+ *
+ * Subscribe on the main thread; any other thread gets an [IllegalStateException] through
+ * `onError`. Disposing clears the listener on the main thread, whichever thread disposes.
+ */
+fun View.clicks(): Observable<Unit> = Observable.create { emitter ->
+    MainThreadDisposable.verifyMainThread()
+    emitter.setDisposable(object : MainThreadDisposable() {
+        override fun onDispose() = setOnClickListener(null)
+    })
+    setOnClickListener { emitter.onNext(Unit) }
 }
