@@ -27,7 +27,6 @@ import androidx.preference.PreferenceManager;
 
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
-import com.jakewharton.rxbinding4.view.RxView;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.subscription.NotificationMode;
@@ -43,6 +42,7 @@ import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.detail.TabAdapter;
 import org.schabi.newpipe.ktx.AnimationType;
+import org.schabi.newpipe.ktx.ViewUtils;
 import org.schabi.newpipe.local.feed.notifications.NotificationHelper;
 import org.schabi.newpipe.local.subscription.SubscriptionManager;
 import org.schabi.newpipe.util.ChannelTabHelper;
@@ -352,7 +352,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                         "Changing subscription for " + currentInfo.getUrl(), currentInfo));
 
         /* Emit clicks from main thread unto io thread */
-        return RxView.clicks(binding.channelSubscribeButton)
+        return ViewUtils.clicks(binding.channelSubscribeButton)
                 .subscribeOn(AndroidSchedulers.mainThread())
                 .observeOn(Schedulers.io())
                 .debounce(BUTTON_DEBOUNCE_INTERVAL, TimeUnit.MILLISECONDS) // Ignore rapid clicks
