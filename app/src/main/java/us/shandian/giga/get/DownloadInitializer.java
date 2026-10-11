@@ -20,14 +20,15 @@ import static us.shandian.giga.get.DownloadMission.ERROR_HTTP_METHOD_NOT_ALLOWED
 
 public class DownloadInitializer extends Thread {
     private static final String TAG = "DownloadInitializer";
+    @SuppressWarnings("checkstyle:ConstantName")
     static final int mId = 0;
-    private static final int RESERVE_SPACE_DEFAULT = 5 * 1024 * 1024;// 5 MiB
-    private static final int RESERVE_SPACE_MAXIMUM = 150 * 1024 * 1024;// 150 MiB
+    private static final int RESERVE_SPACE_DEFAULT = 5 * 1024 * 1024; // 5 MiB
+    private static final int RESERVE_SPACE_MAXIMUM = 150 * 1024 * 1024; // 150 MiB
 
     private final DownloadMission mMission;
     private HttpURLConnection mConn;
 
-    DownloadInitializer(@NonNull DownloadMission mission) {
+    DownloadInitializer(@NonNull final DownloadMission mission) {
         mMission = mission;
         mConn = null;
     }
@@ -43,8 +44,11 @@ public class DownloadInitializer extends Thread {
     }
 
     @Override
+    @SuppressWarnings("checkstyle:MethodLength")
     public void run() {
-        if (mMission.current > 0) mMission.resetState(false, true, DownloadMission.ERROR_NOTHING);
+        if (mMission.current > 0) {
+            mMission.resetState(false, true, DownloadMission.ERROR_NOTHING);
+        }
 
         int retryCount = 0;
         int httpCode = 204;
@@ -60,7 +64,9 @@ public class DownloadInitializer extends Thread {
                     for (int i = 0; i < mMission.urls.length && mMission.running; i++) {
                         headRequest = httpSession(mMission.urls[i], headRequest, 0, 0);
 
-                        if (Thread.interrupted()) return;
+                        if (Thread.interrupted()) {
+                            return;
+                        }
                         final long length;
                         if (mConn.getResponseCode() == 206) {
                             final ValidatedRange range = ValidatedRange.from(mConn, 0, -1, -1);
@@ -78,8 +84,12 @@ public class DownloadInitializer extends Thread {
                             mMission.length = length;
                         }
 
-                        if (length > 0) finalLength += length;
-                        if (length < lowestSize) lowestSize = length;
+                        if (length > 0) {
+                            finalLength += length;
+                        }
+                        if (length < lowestSize) {
+                            lowestSize = length;
+                        }
                     }
 
                     mMission.nearLength = finalLength;
@@ -90,15 +100,19 @@ public class DownloadInitializer extends Thread {
                             // the length is unknown use the default size
                             mMission.offsets[0] = RESERVE_SPACE_DEFAULT;
                         } else {
-                            // use the smallest resource size to download, otherwise, use the maximum
-                            mMission.offsets[0] = lowestSize < RESERVE_SPACE_MAXIMUM ? lowestSize : RESERVE_SPACE_MAXIMUM;
+                            // use the smallest resource size to download, otherwise, use the
+                            // maximum
+                            mMission.offsets[0] = lowestSize < RESERVE_SPACE_MAXIMUM
+                                    ? lowestSize : RESERVE_SPACE_MAXIMUM;
                         }
                     }
                 } else {
                     // ask for the current resource length
                     headRequest = httpSession(null, headRequest, 0, 0);
 
-                    if (!mMission.running || Thread.interrupted()) return;
+                    if (!mMission.running || Thread.interrupted()) {
+                        return;
+                    }
 
                     httpCode = mConn.getResponseCode();
                     if (httpCode == 206) {
@@ -132,7 +146,9 @@ public class DownloadInitializer extends Thread {
                     final long probeStart = Math.max(0, mMission.length - 10);
                     headRequest = httpSession(null, headRequest, probeStart, mMission.length);
 
-                    if (!mMission.running || Thread.interrupted()) return;
+                    if (!mMission.running || Thread.interrupted()) {
+                        return;
+                    }
 
                     if (mConn.getResponseCode() == 206) {
                         ValidatedRange.from(mConn, probeStart, mMission.length,
@@ -142,7 +158,9 @@ public class DownloadInitializer extends Thread {
                         if (mConn.getResponseCode() == 206) {
                             if (mMission.threadCount > 1) {
                                 int count = (int) (mMission.length / DownloadMission.BLOCK_SIZE);
-                                if ((count * DownloadMission.BLOCK_SIZE) < mMission.length) count++;
+                                if ((count * DownloadMission.BLOCK_SIZE) < mMission.length) {
+                                    count++;
+                                }
 
                                 mMission.blocks = new int[count];
                             } else {
@@ -160,12 +178,15 @@ public class DownloadInitializer extends Thread {
                             mMission.unknownLength = false;
 
                             if (DEBUG) {
-                                Log.d(TAG, "falling back due http response code = " + mConn.getResponseCode());
+                                Log.d(TAG, "falling back due http response code = "
+                                        + mConn.getResponseCode());
                             }
                         }
                     }
 
-                    if (!mMission.running || Thread.interrupted()) return;
+                    if (!mMission.running || Thread.interrupted()) {
+                        return;
+                    }
                 }
 
                 try (SharpStream fs = mMission.storage.getStream()) {
@@ -173,7 +194,9 @@ public class DownloadInitializer extends Thread {
                     fs.seek(mMission.offsets[mMission.current]);
                 }
 
-                if (!mMission.running || Thread.interrupted()) return;
+                if (!mMission.running || Thread.interrupted()) {
+                    return;
+                }
 
                 mMission.bindInitializedRepresentation(mConn);
 
@@ -181,14 +204,17 @@ public class DownloadInitializer extends Thread {
             } catch (InterruptedIOException | ClosedByInterruptException e) {
                 return;
             } catch (Exception e) {
-                if (!mMission.running || super.isInterrupted()) return;
+                if (!mMission.running || super.isInterrupted()) {
+                    return;
+                }
 
                 if (e instanceof ValidatedRange.InvalidRangeException) {
                     mMission.notifyError(e);
                     return;
                 }
 
-                if (e instanceof DownloadMission.HttpError && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
+                if (e instanceof DownloadMission.HttpError
+                        && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     // for youtube streams. The url has expired
                     mMission.doRecover(ERROR_HTTP_FORBIDDEN);
                     return;
@@ -215,7 +241,9 @@ public class DownloadInitializer extends Thread {
     @Override
     public void interrupt() {
         super.interrupt();
-        if (mConn != null) mConn.disconnect();
+        if (mConn != null) {
+            mConn.disconnect();
+        }
     }
 
     // the url parameter can be null if method was called the first time with an url
@@ -242,7 +270,8 @@ public class DownloadInitializer extends Thread {
             openEstablishAndCloseConnectionAfterwards(url, hasHeadMethod, rangeStart, rangeEnd);
         } catch (final Exception e) {
             if (e instanceof DownloadMission.HttpError
-                    && ((DownloadMission.HttpError) e).statusCode == ERROR_HTTP_METHOD_NOT_ALLOWED) {
+                    && ((DownloadMission.HttpError) e).statusCode
+                    == ERROR_HTTP_METHOD_NOT_ALLOWED) {
                 // fallback to GET as HEAD request method is probably not allowed
                 // available for this service.
                 // -> Rumble is known for not supporting HEAD anymore (discovered 20230203)

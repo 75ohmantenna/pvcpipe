@@ -30,27 +30,28 @@ public class DownloadRunnable extends Thread {
 
     private HttpURLConnection mConn;
 
-    DownloadRunnable(DownloadMission mission, int id) {
+    DownloadRunnable(final DownloadMission mission, final int id) {
         mMission = Objects.requireNonNull(mission);
         mId = id;
     }
 
-    private void releaseBlock(Block block, long remain) {
+    private void releaseBlock(final Block block, final long remain) {
         // set the block offset to -1 if it is completed
         mMission.releaseBlock(block.position, remain < 0 ? -1 : block.done);
     }
 
     @Override
+    @SuppressWarnings("checkstyle:MethodLength")
     public void run() {
         boolean retry = false;
         Block block = null;
         int retryCount = 0;
-        SharpStream f;
+        final SharpStream f;
 
         try {
             f = mMission.storage.getStream();
         } catch (IOException e) {
-            mMission.notifyError(e);// this never should happen
+            mMission.notifyError(e); // this never should happen
             return;
         }
 
@@ -60,18 +61,23 @@ public class DownloadRunnable extends Thread {
             }
 
             if (block == null) {
-                if (DEBUG) Log.d(TAG, mId + ":no more blocks left, exiting");
+                if (DEBUG) {
+                    Log.d(TAG, mId + ":no more blocks left, exiting");
+                }
                 break;
             }
 
             if (DEBUG) {
-                if (retry)
-                    Log.d(TAG, mId + ":retry block at position=" + block.position + " from the start");
-                else
-                    Log.d(TAG, mId + ":acquired block at position=" + block.position + " done=" + block.done);
+                if (retry) {
+                    Log.d(TAG, mId + ":retry block at position=" + block.position
+                            + " from the start");
+                } else {
+                    Log.d(TAG, mId + ":acquired block at position=" + block.position
+                            + " done=" + block.done);
+                }
             }
 
-            long start = (long)block.position * DownloadMission.BLOCK_SIZE;
+            long start = (long) block.position * DownloadMission.BLOCK_SIZE;
             long end = start + DownloadMission.BLOCK_SIZE - 1;
 
             start += block.done;
@@ -111,7 +117,8 @@ public class DownloadRunnable extends Thread {
                         mMission.notifyError(new ValidatedRange.InvalidRangeException(
                                 "Resource changed during parallel download; restart required"));
                     } else {
-                        mMission.notifyError(new DownloadMission.HttpError(mConn.getResponseCode()));
+                        mMission.notifyError(
+                                new DownloadMission.HttpError(mConn.getResponseCode()));
                     }
                     break;
                 }
@@ -142,10 +149,13 @@ public class DownloadRunnable extends Thread {
                 }
 
                 if (DEBUG && mMission.running) {
-                    Log.d(TAG, mId + ":position " + block.position + " stopped " + start + "/" + end);
+                    Log.d(TAG, mId + ":position " + block.position + " stopped " + start + "/"
+                            + end);
                 }
             } catch (Exception e) {
-                if (!mMission.running || e instanceof ClosedByInterruptException) break;
+                if (!mMission.running || e instanceof ClosedByInterruptException) {
+                    break;
+                }
 
                 if (e instanceof ValidatedRange.InvalidRangeException) {
                     mMission.notifyError(e);
@@ -174,7 +184,9 @@ public class DownloadRunnable extends Thread {
                     mConn.disconnect();
                     mConn = null;
                 }
-                if (!retry) releaseBlock(block, end - start);
+                if (!retry) {
+                    releaseBlock(block, end - start);
+                }
             }
         }
 
@@ -201,7 +213,9 @@ public class DownloadRunnable extends Thread {
         super.interrupt();
 
         try {
-            if (mConn != null) mConn.disconnect();
+            if (mConn != null) {
+                mConn.disconnect();
+            }
         } catch (Exception e) {
             // nothing to do
         }

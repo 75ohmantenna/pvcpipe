@@ -97,14 +97,14 @@ public class PvcHlsPreProcessor {
         public FetchWithDownloaderImpl() {
         }
 
-        private InputStream stringToInputStream(String input) {
-            byte[] bytes = input.getBytes(StandardCharsets.UTF_8);
+        private InputStream stringToInputStream(final String input) {
+            final byte[] bytes = input.getBytes(StandardCharsets.UTF_8);
             return new ByteArrayInputStream(bytes);
         }
 
-        public InputStream fetchContent(URI uri) throws IOException {
+        public InputStream fetchContent(final URI uri) throws IOException {
             try {
-                Response response = DownloaderImpl.getInstance().get(uri.toString());
+                final Response response = DownloaderImpl.getInstance().get(uri.toString());
                 return stringToInputStream(response.responseBody());
             } catch (ReCaptchaException e) {
                 throw new IOException(e);

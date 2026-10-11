@@ -42,7 +42,8 @@ public class FileStreamSAF extends SharpStream {
 
     private boolean disposed;
 
-    public FileStreamSAF(@NonNull ContentResolver contentResolver, Uri fileUri) throws IOException {
+    public FileStreamSAF(@NonNull final ContentResolver contentResolver, final Uri fileUri)
+            throws IOException {
         // Open file in read-write mode (SAF ensures positioning)
         file = contentResolver.openFileDescriptor(fileUri, "rw");
 
@@ -62,20 +63,20 @@ public class FileStreamSAF extends SharpStream {
     }
 
     @Override
-    public int read(byte[] buffer) throws IOException {
+    public int read(final byte[] buffer) throws IOException {
         return in.read(buffer);
     }
 
     @Override
-    public int read(byte[] buffer, int offset, int count) throws IOException {
+    public int read(final byte[] buffer, final int offset, final int count) throws IOException {
         return in.read(buffer, offset, count);
     }
 
     @Override
-    public long skip(long amount) throws IOException {
-        long currentPos = channel.position();
-        long fileSize = channel.size();
-        long newPos = currentPos + amount;
+    public long skip(final long amount) throws IOException {
+        final long currentPos = channel.position();
+        final long fileSize = channel.size();
+        final long newPos = currentPos + amount;
 
         // Check if backward skip is supported
         if (amount < 0 && newPos < 0) {
@@ -161,27 +162,27 @@ public class FileStreamSAF extends SharpStream {
     }
 
     @Override
-    public void write(byte value) throws IOException {
+    public void write(final byte value) throws IOException {
         out.write(value);
     }
 
     @Override
-    public void write(byte[] buffer) throws IOException {
+    public void write(final byte[] buffer) throws IOException {
         out.write(buffer);
     }
 
     @Override
-    public void write(byte[] buffer, int offset, int count) throws IOException {
+    public void write(final byte[] buffer, final int offset, final int count) throws IOException {
         out.write(buffer, offset, count);
     }
 
     @Override
-    public void setLength(long length) throws IOException {
+    public void setLength(final long length) throws IOException {
         channel.truncate(length);
     }
 
     @Override
-    public void seek(long offset) throws IOException {
+    public void seek(final long offset) throws IOException {
         channel.position(offset);
     }
 
