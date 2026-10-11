@@ -157,3 +157,55 @@ mission UI, **not** a site-extracted, UI-created slow mission. Validator
 replacement, recovery after changed content, HTTP 200/416 on resume, and
 YouTube client-fallback device scenarios remain untested; separate
 deterministic regressions cannot substitute for these device observations.
+
+## Emulator checks for the player and detail screen splits, 2026-10-11
+
+These checks belong to the pull requests that moved code out of `Player.java`
+and `VideoDetailFragment.java` (#101 to #104). They ran on a disposable
+emulator, not on the Pixel: AVD `pvcpipe_ci_api37`, Android 17/API 37,
+x86_64, headless with software rendering. The emulator's hardware video
+decoder fails on this image, so it was started with
+`-feature -HardwareDecoder` and ExoPlayer used the software H.264 decoder.
+Each debug APK was installed with `adb -s emulator-5554 install -r`.
+
+The checks were scripted over adb. Playback state and position came from
+`dumpsys media_session`, rotation from `dumpsys window displays`, and what was
+on screen from `uiautomator dump`. The video was
+`https://www.youtube.com/watch?v=dQw4w9WgXcQ`. Every script also ran on a
+build of `master` from before #101, with the same results.
+
+- **PASS, player broadcasts (9 of 9).** Opening the link from outside the
+  app, starting the main player, and then each action as a real broadcast to
+  the player's receiver: play/pause paused and resumed, fast forward and
+  rewind moved the position, repeat changed the repeat mode, and close stopped
+  the player.
+- **PASS, error recovery (11 of 11).** With the debug build's "crash the
+  player" control, a live-window source error restarted playback, an
+  unspecified error reloaded it and playback went on, and a renderer error
+  shut the player down.
+- **PASS, Back history (6 of 6).** Three videos opened one after another in
+  the same detail screen. Back returned to the second, then to the first, and
+  a third Back left the detail screen.
+- **PASS with one known failure, player modes (23 of 24).** Main player
+  position advanced; the fullscreen button turned the screen and Back left
+  fullscreen; rotating the device through the accelerometer went to landscape
+  and back while playing; a related item was enqueued and a media-next key
+  skipped to it; the popup player showed its window and played; the
+  background player played without a popup window and survived the activity
+  being destroyed and recreated twice by a font-scale change; close stopped
+  each player.
+- **FAIL on every build, `master` included.** A player that was paused before
+  entering fullscreen stayed paused after a play/pause broadcast. The cause is
+  not known. Playback that was running when fullscreen was entered kept
+  running in an earlier form of the same check.
+- **PASS, receiver wiring.** The instrumented `AndroidPlayerBroadcastsTest`
+  passed 4 of 4.
+
+Limits: no physical device, no audio output, and one network at one time.
+During these runs YouTube refused some other videos with a sign-in request,
+and `https://rumble.com/v5a7yh0-spacex-starship-test-flight-5-update.html`
+from the smoke test above failed with "Could not parse the website"; neither
+was looked into. Errors that skip a stream and history entries created by
+the player reporting a new queue were not exercised. The emulator setting
+"resume playback" was switched off for these runs so every flow started its
+video from the beginning.
