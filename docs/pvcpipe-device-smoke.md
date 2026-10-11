@@ -209,3 +209,59 @@ was looked into. Errors that skip a stream and history entries created by
 the player reporting a new queue were not exercised. The emulator setting
 "resume playback" was switched off for these runs so every flow started its
 video from the beginning.
+
+## Correction and Pixel 6a checks, 2026-10-11
+
+Added later the same day. The section above stays as it was written.
+
+**Correction.** The entry "FAIL on every build, `master` included" above does
+not describe a fault in the app. A log trace on the emulator showed that the
+paused player starts playing by itself when fullscreen is entered with the
+on-screen button: `VideoDetailFragment.checkLandscape()` calls `play()` when
+the system orientation is locked and the player is not playing. The check
+then sent a play/pause broadcast, which paused it again, and read that as
+"stayed paused". With that request removed, the step passes on a build of
+`master`: the player is playing in fullscreen without being asked.
+
+**Pixel 6a.** The same scripted checks ran on the Pixel 6a (`bluejay`,
+Android 17/API 37) over Wi-Fi ADB with a debug build of `master` at #104,
+installed with `adb -s <serial> install -r` after confirming that the
+installed package had the same signer. App data was kept. Input was only sent
+while PVCPipe was in the foreground. The app's preference file was saved
+before the run and written back afterwards; a byte comparison confirmed the
+restore. No system setting and no other app's data was changed.
+
+- **PASS, player broadcasts (9 of 9).** As on the emulator.
+- **PASS, playback (11 of 11).** Main player position advanced, a related item
+  was enqueued and a media-next key skipped to it, the background player
+  played while the detail screen kept showing the video, and close stopped
+  each player.
+- **PASS, Back history (6 of 6).** Three videos in the same detail screen,
+  Back to the second, Back to the first, Back leaves the screen.
+- **PASS, error recovery (11 of 11).** Live-window error restarted playback,
+  an unspecified error reloaded it, a renderer error shut the player down.
+- **PASS, scroll fix from #100.** With "scroll only below player" off, the
+  comments were scrolled and swiped back so that the header stayed partly
+  collapsed. After the setting was turned on with the video still open, three
+  swipes each brought a different comment to the top.
+
+Not run on the Pixel: fullscreen, rotation, the popup player and activity
+recreation. They need a system setting or a permission changed on the phone.
+The unfixed build from before #100 was not installed on the Pixel, so the
+scroll result shows the fixed behavior only; the emulator showed both.
+
+Two things the Pixel runs brought out about the checks themselves. A UI dump
+fails while the screen keeps animating, and the helper had been reading the
+previous dump in that case; it now deletes the old dump first. And on a phone
+the link chooser has no option selected, so the helper picks "Show info"
+before "Just once".
+
+**Rumble link.** The emulator section above lists
+`https://rumble.com/v5a7yh0-spacex-starship-test-flight-5-update.html` as
+failing with "Could not parse the website". It did not fail again. From the
+same network the watch page answered HTTP 200 with the title and an embed id,
+a live run of the extractor on the JVM parsed that URL (title, uploader, 173
+seconds, four video streams), and a later attempt in the app on the emulator
+loaded and played it. The failure was not reproduced and its cause was not
+found.
+
