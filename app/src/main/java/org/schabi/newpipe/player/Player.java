@@ -56,6 +56,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.event.PlayerEventListener;
+import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
@@ -202,10 +203,8 @@ public final class Player implements PlaybackListener, Listener {
     private final PlayerBroadcasts broadcasts;
     @NonNull
     private final AndroidPlayerBroadcasts broadcastReceiver;
-    @Nullable
-    private PlayerServiceEventListener fragmentListener = null;
-    @Nullable
-    private PlayerEventListener activityListener = null;
+    @NonNull
+    private final PlayerListeners listeners = new PlayerListeners();
 
     @NonNull
     private final SerialDisposable progressUpdateDisposable = new SerialDisposable();
@@ -816,7 +815,7 @@ public final class Player implements PlaybackListener, Listener {
                                   final int bufferPercent) {
         if (isPrepared) {
             UIs.call(ui -> ui.onUpdateProgress(currentProgress, duration, bufferPercent));
-            notifyProgressUpdateToListeners(currentProgress, duration, bufferPercent);
+            listeners.onProgressUpdate(currentProgress, duration, bufferPercent);
         }
     }
 
@@ -1222,7 +1221,7 @@ public final class Player implements PlaybackListener, Listener {
                         .map(t -> t.getSelectedAudioStreamIndex()
                                 != previousAudioTrack.getSelectedAudioStreamIndex())
                         .orElse(false)) {
-                    notifyAudioTrackUpdateToListeners();
+                    listeners.onAudioTrackUpdate();
                 }
             });
         });
@@ -1344,9 +1343,7 @@ public final class Player implements PlaybackListener, Listener {
             createErrorNotification(error);
         }
 
-        if (fragmentListener != null) {
-            fragmentListener.onPlayerError(error, recovery.isCatchable());
-        }
+        listeners.onPlayerError(error, recovery.isCatchable());
     }
 
     private void createErrorNotification(@NonNull final PlaybackException error) {
@@ -1644,7 +1641,7 @@ public final class Player implements PlaybackListener, Listener {
         registerStreamViewed();
 
         notifyMetadataUpdateToListeners();
-        notifyAudioTrackUpdateToListeners();
+        listeners.onAudioTrackUpdate();
         UIs.call(playerUi -> playerUi.onMetadataChanged(info));
     }
 
@@ -1809,7 +1806,7 @@ public final class Player implements PlaybackListener, Listener {
     //region Activity / fragment binding
 
     public void setFragmentListener(final PlayerServiceEventListener listener) {
-        fragmentListener = listener;
+        listeners.setFragmentListener(listener);
         UIs.call(PlayerUi::onFragmentListenerSet);
         notifyQueueUpdateToListeners();
         notifyMetadataUpdateToListeners();
@@ -1818,13 +1815,11 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public void removeFragmentListener(final PlayerServiceEventListener listener) {
-        if (fragmentListener == listener) {
-            fragmentListener = null;
-        }
+        listeners.removeFragmentListener(listener);
     }
 
     void setActivityListener(final PlayerEventListener listener) {
-        activityListener = listener;
+        listeners.setActivityListener(listener);
         // TODO why not queue update?
         notifyMetadataUpdateToListeners();
         notifyPlaybackUpdateToListeners();
@@ -1832,70 +1827,27 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     void removeActivityListener(final PlayerEventListener listener) {
-        if (activityListener == listener) {
-            activityListener = null;
-        }
+        listeners.removeActivityListener(listener);
     }
 
     void stopActivityBinding() {
-        if (fragmentListener != null) {
-            fragmentListener.onServiceStopped();
-            fragmentListener = null;
-        }
-        if (activityListener != null) {
-            activityListener.onServiceStopped();
-            activityListener = null;
-        }
+        listeners.onServiceStopped();
     }
 
     private void notifyQueueUpdateToListeners() {
-        if (fragmentListener != null && playQueue != null) {
-            fragmentListener.onQueueUpdate(playQueue);
-        }
-        if (activityListener != null && playQueue != null) {
-            activityListener.onQueueUpdate(playQueue);
+        if (playQueue != null) {
+            listeners.onQueueUpdate(playQueue);
         }
     }
 
     private void notifyMetadataUpdateToListeners() {
-        getCurrentStreamInfo().ifPresent(info -> {
-            if (fragmentListener != null) {
-                fragmentListener.onMetadataUpdate(info, playQueue);
-            }
-            if (activityListener != null) {
-                activityListener.onMetadataUpdate(info, playQueue);
-            }
-        });
+        getCurrentStreamInfo().ifPresent(info -> listeners.onMetadataUpdate(info, playQueue));
     }
 
     private void notifyPlaybackUpdateToListeners() {
-        if (fragmentListener != null && !exoPlayerIsNull() && playQueue != null) {
-            fragmentListener.onPlaybackUpdate(currentState, getRepeatMode(),
-                    playQueue.isShuffled(), simpleExoPlayer.getPlaybackParameters());
-        }
-        if (activityListener != null && !exoPlayerIsNull() && playQueue != null) {
-            activityListener.onPlaybackUpdate(currentState, getRepeatMode(),
-                    playQueue.isShuffled(), getPlaybackParameters());
-        }
-    }
-
-    private void notifyProgressUpdateToListeners(final int currentProgress,
-                                                 final int duration,
-                                                 final int bufferPercent) {
-        if (fragmentListener != null) {
-            fragmentListener.onProgressUpdate(currentProgress, duration, bufferPercent);
-        }
-        if (activityListener != null) {
-            activityListener.onProgressUpdate(currentProgress, duration, bufferPercent);
-        }
-    }
-
-    private void notifyAudioTrackUpdateToListeners() {
-        if (fragmentListener != null) {
-            fragmentListener.onAudioTrackUpdate();
-        }
-        if (activityListener != null) {
-            activityListener.onAudioTrackUpdate();
+        if (!exoPlayerIsNull() && playQueue != null) {
+            listeners.onPlaybackUpdate(currentState, getRepeatMode(), playQueue.isShuffled(),
+                    simpleExoPlayer.getPlaybackParameters());
         }
     }
 
@@ -2058,7 +2010,7 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public Optional<PlayerServiceEventListener> getFragmentListener() {
-        return Optional.ofNullable(fragmentListener);
+        return listeners.getFragmentListener();
     }
 
     //endregion

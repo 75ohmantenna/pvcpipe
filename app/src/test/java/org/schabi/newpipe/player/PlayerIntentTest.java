@@ -28,6 +28,7 @@ import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
+import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
@@ -88,6 +89,7 @@ public class PlayerIntentTest {
         setField("playbackSources", playbackSources);
         setField("playbackHistory", history);
         setField("context", mock(Context.class));
+        setField("listeners", new PlayerListeners());
         setField("streamItemDisposable", streamSubscriptions);
         intentCompat = mockStatic(IntentCompat.class);
         serializedCache = mockStatic(SerializedCache.class);

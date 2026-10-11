@@ -17,6 +17,7 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
+import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.ui.PlayerUi;
@@ -98,6 +99,7 @@ public class PlayerAudioTest {
             set(player, "playbackHistory", mock(PlaybackHistory.class));
             set(player, "context", mock(Context.class));
             set(player, "broadcastReceiver", mock(AndroidPlayerBroadcasts.class));
+            set(player, "listeners", new PlayerListeners());
             set(player, "UIs", mock(PlayerUiList.class));
             set(player, "playbackDecision", new SerialDisposable());
             set(player, "progressUpdateDisposable",
