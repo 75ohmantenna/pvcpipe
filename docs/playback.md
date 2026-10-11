@@ -43,6 +43,10 @@ specification of their control flow.
   sorts ExoPlayer error codes by recovery: restart at the live edge, skip the
   stream, reload, or shut down. `Player.onPlayerError` carries out the
   recovery and tells the user about every error except the live-edge restart.
+- **Listeners:** [`PlayerListeners`](../app/src/main/java/org/schabi/newpipe/player/event/PlayerListeners.java)
+  holds the one fragment and the one activity that follow the player and sends
+  them queue, metadata, playback, progress and audio-track updates, fragment
+  first. `Player` decides when an update is due and reads the values.
 - **Proof tokens:** The extractor's
   [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
   delegates Web-client requests to
@@ -85,4 +89,5 @@ changing mutations.
 - Broadcasts: [`PlayerBroadcastsTest`](../app/src/test/java/org/schabi/newpipe/player/broadcast/PlayerBroadcastsTest.java),
   [`AndroidPlayerBroadcastsTest`](../app/src/androidTest/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcastsTest.kt).
 - Error recovery: [`PlaybackErrorsTest`](../app/src/test/java/org/schabi/newpipe/player/error/PlaybackErrorsTest.java).
+- Listener updates: [`PlayerListenersTest`](../app/src/test/java/org/schabi/newpipe/player/event/PlayerListenersTest.java).
 - Queue event ordering: [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java).

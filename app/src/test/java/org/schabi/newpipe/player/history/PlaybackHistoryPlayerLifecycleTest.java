@@ -22,6 +22,7 @@ import org.mockito.MockedStatic;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
+import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.ui.PlayerUiList;
@@ -57,6 +58,7 @@ public class PlaybackHistoryPlayerLifecycleTest {
         setField(player, "simpleExoPlayer", exoPlayer);
         setField(player, "context", mock(Context.class));
         setField(player, "broadcastReceiver", mock(AndroidPlayerBroadcasts.class));
+        setField(player, "listeners", new PlayerListeners());
         setField(player, "UIs", mock(PlayerUiList.class));
         setField(player, "playbackDecision", new SerialDisposable());
         setField(player, "progressUpdateDisposable", new SerialDisposable());
