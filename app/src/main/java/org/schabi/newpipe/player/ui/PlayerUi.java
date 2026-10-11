@@ -104,7 +104,7 @@ public abstract class PlayerUi {
     /**
      * Broadcasts that the player receives will also be notified to UIs here. If you want to
      * register new broadcast actions to receive here, add them to {@link
-     * Player#setupBroadcastReceiver()}.
+     * org.schabi.newpipe.player.broadcast.PlayerBroadcasts}.
      * @param intent the broadcast intent received by the player
      */
     public void onBroadcastReceived(final Intent intent) {

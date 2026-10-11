@@ -32,6 +32,13 @@ specification of their control flow.
   order; resume observes prior writes. Absent, completed or failed history has
   no saved resume position. Watch-history preferences govern persistence, not
   queue recovery.
+- **Broadcasts:** [`PlayerBroadcasts`](../app/src/main/java/org/schabi/newpipe/player/broadcast/PlayerBroadcasts.java)
+  lists the actions the player listens for and maps each one to a player
+  command; it also remembers whether the screen is on.
+  [`AndroidPlayerBroadcasts`](../app/src/main/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcasts.java)
+  owns the receiver and its registration. Every received broadcast runs its
+  command first and then goes to the player UIs. An action that only a UI
+  handles still has to be listed in `PlayerBroadcasts`.
 - **Proof tokens:** The extractor's
   [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
   delegates Web-client requests to
@@ -71,4 +78,6 @@ changing mutations.
   [`WebPoTokenProviderReplacementTest`](../app/src/test/java/org/schabi/newpipe/util/potoken/WebPoTokenProviderReplacementTest.kt),
   [`PoTokenWebViewLifecycleTest`](../app/src/test/java/org/schabi/newpipe/util/potoken/PoTokenWebViewLifecycleTest.kt),
   [`PoTokenWebViewIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/util/potoken/PoTokenWebViewIntegrationTest.kt).
+- Broadcasts: [`PlayerBroadcastsTest`](../app/src/test/java/org/schabi/newpipe/player/broadcast/PlayerBroadcastsTest.java),
+  [`AndroidPlayerBroadcastsTest`](../app/src/androidTest/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcastsTest.kt).
 - Queue event ordering: [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java).

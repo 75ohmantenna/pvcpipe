@@ -27,33 +27,20 @@ import static org.schabi.newpipe.extractor.ServiceList.YouTube;
 import static org.schabi.newpipe.player.helper.PlayerHelper.retrievePlaybackParametersFromPrefs;
 import static org.schabi.newpipe.player.helper.PlayerHelper.retrieveSeekDurationFromPreferences;
 import static org.schabi.newpipe.player.helper.PlayerHelper.savePlaybackParametersToPrefs;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_CLOSE;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_FAST_FORWARD;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_FAST_REWIND;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_PLAY_NEXT;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_PLAY_PAUSE;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_PLAY_PREVIOUS;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_RECREATE_NOTIFICATION;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_REPEAT;
-import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_SHUFFLE;
 import static org.schabi.newpipe.util.ListHelper.getResolutionIndex;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.media.AudioManager;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.IntentCompat;
 import androidx.core.math.MathUtils;
 import androidx.preference.PreferenceManager;
@@ -83,11 +70,12 @@ import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
-import org.schabi.newpipe.fragments.detail.VideoDetailFragment;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.event.PlayerEventListener;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
+import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
+import org.schabi.newpipe.player.broadcast.PlayerBroadcasts;
 import org.schabi.newpipe.player.helper.CustomRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -225,8 +213,10 @@ public final class Player implements PlaybackListener, Listener {
     @SuppressWarnings({"MemberName", "java:S116"}) // keep the unusual member name
     private final PlayerUiList UIs;
 
-    private BroadcastReceiver broadcastReceiver;
-    private IntentFilter intentFilter;
+    @NonNull
+    private final PlayerBroadcasts broadcasts;
+    @NonNull
+    private final AndroidPlayerBroadcasts broadcastReceiver;
     @Nullable
     private PlayerServiceEventListener fragmentListener = null;
     @Nullable
@@ -248,7 +238,6 @@ public final class Player implements PlaybackListener, Listener {
     @NonNull
     private final PlaybackHistory playbackHistory;
 
-    private boolean screenOn = true;
     private final SerialDisposable playbackDecision = new SerialDisposable();
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -277,7 +266,9 @@ public final class Player implements PlaybackListener, Listener {
         prefs = PreferenceManager.getDefaultSharedPreferences(context);
         playbackHistory = new PlaybackHistory(context);
 
-        setupBroadcastReceiver();
+        broadcasts = new PlayerBroadcasts(new BroadcastCommands());
+        broadcastReceiver = new AndroidPlayerBroadcasts(context, broadcasts,
+                this::onBroadcastReceived);
 
         trackSelector = new DefaultTrackSelector(context, PlayerHelper.getQualitySelector());
         final PlayerDataSource dataSource = new PlayerDataSource(context,
@@ -599,7 +590,7 @@ public final class Player implements PlaybackListener, Listener {
 
         playbackAudio = new PlaybackAudio(context, simpleExoPlayer);
 
-        registerBroadcastReceiver();
+        broadcastReceiver.register();
 
         // Setup UIs
         UIs.call(PlayerUi::initPlayer);
@@ -655,7 +646,7 @@ public final class Player implements PlaybackListener, Listener {
         stopActivityBinding();
 
         destroyPlayer();
-        unregisterBroadcastReceiver();
+        broadcastReceiver.unregister();
 
         playbackDecision.set(null);
         progressUpdateDisposable.set(null);
@@ -722,112 +713,55 @@ public final class Player implements PlaybackListener, Listener {
     //////////////////////////////////////////////////////////////////////////*/
     //region Broadcast receiver
 
-    /**
-     * This function prepares the broadcast receiver and is called only in the constructor.
-     * Therefore if you want any PlayerUi to receive a broadcast action, you should add it here,
-     * even if that player ui might never be added to the player. In that case the received
-     * broadcast would not do anything.
-     */
-    private void setupBroadcastReceiver() {
-        if (DEBUG) {
-            Log.d(TAG, "setupBroadcastReceiver() called");
-        }
-
-        broadcastReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(final Context ctx, final Intent intent) {
-                onBroadcastReceived(intent);
-            }
-        };
-        intentFilter = new IntentFilter();
-
-        intentFilter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
-
-        intentFilter.addAction(ACTION_CLOSE);
-        intentFilter.addAction(ACTION_PLAY_PAUSE);
-        intentFilter.addAction(ACTION_PLAY_PREVIOUS);
-        intentFilter.addAction(ACTION_PLAY_NEXT);
-        intentFilter.addAction(ACTION_FAST_REWIND);
-        intentFilter.addAction(ACTION_FAST_FORWARD);
-        intentFilter.addAction(ACTION_REPEAT);
-        intentFilter.addAction(ACTION_SHUFFLE);
-        intentFilter.addAction(ACTION_RECREATE_NOTIFICATION);
-
-        intentFilter.addAction(VideoDetailFragment.ACTION_VIDEO_FRAGMENT_RESUMED);
-        intentFilter.addAction(VideoDetailFragment.ACTION_VIDEO_FRAGMENT_STOPPED);
-
-        intentFilter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
-        intentFilter.addAction(Intent.ACTION_SCREEN_ON);
-        intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
-        intentFilter.addAction(Intent.ACTION_HEADSET_PLUG);
-    }
-
     private void onBroadcastReceived(final Intent intent) {
-        if (intent == null || intent.getAction() == null) {
-            return;
-        }
-
-        if (DEBUG) {
-            Log.d(TAG, "onBroadcastReceived() called with: intent = [" + intent + "]");
-        }
-
-        switch (intent.getAction()) {
-            case AudioManager.ACTION_AUDIO_BECOMING_NOISY:
-                pause();
-                break;
-            case ACTION_CLOSE:
-                service.destroyPlayerAndStopService();
-                break;
-            case ACTION_PLAY_PAUSE:
-                playPause();
-                break;
-            case ACTION_PLAY_PREVIOUS:
-                playPrevious();
-                break;
-            case ACTION_PLAY_NEXT:
-                playNext();
-                break;
-            case ACTION_FAST_REWIND:
-                fastRewind();
-                break;
-            case ACTION_FAST_FORWARD:
-                fastForward();
-                break;
-            case ACTION_REPEAT:
-                cycleNextRepeatMode();
-                break;
-            case ACTION_SHUFFLE:
-                toggleShuffleModeEnabled();
-                break;
-            case Intent.ACTION_SCREEN_OFF:
-                screenOn = false;
-                break;
-            case Intent.ACTION_SCREEN_ON:
-                screenOn = true;
-                break;
-            case Intent.ACTION_CONFIGURATION_CHANGED:
-                if (DEBUG) {
-                    Log.d(TAG, "ACTION_CONFIGURATION_CHANGED received");
-                }
-                break;
-        }
-
         UIs.call(playerUi -> playerUi.onBroadcastReceived(intent));
     }
 
-    private void registerBroadcastReceiver() {
-        // Try to unregister current first
-        unregisterBroadcastReceiver();
-        ContextCompat.registerReceiver(context, broadcastReceiver, intentFilter,
-                ContextCompat.RECEIVER_EXPORTED);
-    }
+    /** Lets {@link PlayerBroadcasts} drive this player. */
+    private final class BroadcastCommands implements PlayerBroadcasts.Commands {
+        @Override
+        public void pause() {
+            Player.this.pause();
+        }
 
-    private void unregisterBroadcastReceiver() {
-        try {
-            context.unregisterReceiver(broadcastReceiver);
-        } catch (final IllegalArgumentException unregisteredException) {
-            Log.w(TAG, "Broadcast receiver already unregistered: "
-                    + unregisteredException.getMessage());
+        @Override
+        public void close() {
+            service.destroyPlayerAndStopService();
+        }
+
+        @Override
+        public void playPause() {
+            Player.this.playPause();
+        }
+
+        @Override
+        public void playPrevious() {
+            Player.this.playPrevious();
+        }
+
+        @Override
+        public void playNext() {
+            Player.this.playNext();
+        }
+
+        @Override
+        public void fastRewind() {
+            Player.this.fastRewind();
+        }
+
+        @Override
+        public void fastForward() {
+            Player.this.fastForward();
+        }
+
+        @Override
+        public void cycleNextRepeatMode() {
+            Player.this.cycleNextRepeatMode();
+        }
+
+        @Override
+        public void toggleShuffleModeEnabled() {
+            Player.this.toggleShuffleModeEnabled();
         }
     }
     //endregion
@@ -2242,6 +2176,6 @@ public final class Player implements PlaybackListener, Listener {
      * @return whether the device screen is turned on.
      */
     public boolean isScreenOn() {
-        return screenOn;
+        return broadcasts.isScreenOn();
     }
 }
