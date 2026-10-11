@@ -24,9 +24,8 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.RecyclerView;
 
-public class NewPipeRecyclerView extends RecyclerView {
+public class NewPipeRecyclerView extends OffsetResettingRecyclerView {
     private static final String TAG = "NewPipeRecyclerView";
 
     private boolean allowDpadScroll = true;
