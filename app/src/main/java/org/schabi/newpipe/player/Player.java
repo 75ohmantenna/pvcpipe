@@ -1,21 +1,5 @@
 package org.schabi.newpipe.player;
 
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NO_PERMISSION;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_UNSPECIFIED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_TIMEOUT;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_UNSPECIFIED;
 import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION;
 import static com.google.android.exoplayer2.Player.DiscontinuityReason;
 import static com.google.android.exoplayer2.Player.Listener;
@@ -76,6 +60,7 @@ import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
 import org.schabi.newpipe.player.broadcast.PlayerBroadcasts;
+import org.schabi.newpipe.player.error.PlaybackErrors;
 import org.schabi.newpipe.player.helper.CustomRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -1320,89 +1305,47 @@ public final class Player implements PlaybackListener, Listener {
 
     /**
      * Process exceptions produced by {@link com.google.android.exoplayer2.ExoPlayer ExoPlayer}.
-     * <p>There are multiple types of errors:</p>
-     * <ul>
-     * <li>{@link PlaybackException#ERROR_CODE_BEHIND_LIVE_WINDOW BEHIND_LIVE_WINDOW}:
-     * If the playback on livestreams are lagged too far behind the current playable
-     * window. Then we seek to the latest timestamp and restart the playback.
-     * This error is <b>catchable</b>.
-     * </li>
-     * <li>From {@link PlaybackException#ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE BAD_IO} to
-     * {@link PlaybackException#ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED UNSUPPORTED_FORMATS}:
-     * If the stream source is validated by the extractor but not recognized by the player,
-     * then we can try to recover playback by signalling an error on the {@link PlayQueue}.</li>
-     * <li>For {@link PlaybackException#ERROR_CODE_TIMEOUT PLAYER_TIMEOUT},
-     * {@link PlaybackException#ERROR_CODE_IO_UNSPECIFIED MEDIA_SOURCE_RESOLVER_TIMEOUT} and
-     * {@link PlaybackException#ERROR_CODE_IO_NETWORK_CONNECTION_FAILED NO_NETWORK}:
-     * We can keep set the recovery record and keep to player at the current state until
-     * it is ready to play by restarting the {@link MediaSourceManager}.</li>
-     * <li>On any ExoPlayer specific issue internal to its device interaction, such as
-     * {@link PlaybackException#ERROR_CODE_DECODER_INIT_FAILED DECODER_ERROR}:
-     * We terminate the playback.</li>
-     * <li>For any other unspecified issue internal: We set a recovery and try to restart
-     * the playback.</li>
-     * For any error above that is <b>not</b> explicitly <b>catchable</b>, the player will
-     * create a notification so users are aware.
-     * </ul>
+     * {@link PlaybackErrors} decides how to recover from each of them. For every error the
+     * player cannot handle by itself, it creates a notification so users are aware.
      *
      * @see com.google.android.exoplayer2.Player.Listener#onPlayerError(PlaybackException)
      */
-    // Any error code not explicitly covered here are either unrelated to NewPipe use case
-    // (e.g. DRM) or not recoverable (e.g. Decoder error). In both cases, the player should
-    // shutdown.
-    @SuppressWarnings("SwitchIntDef")
     @Override
     public void onPlayerError(@NonNull final PlaybackException error) {
         Log.e(TAG, "ExoPlayer - onPlayerError() called with:", error);
 
         saveStreamProgressState();
-        boolean isCatchableException = false;
+        final PlaybackErrors.Recovery recovery = PlaybackErrors.recoveryFor(error.errorCode);
 
-        switch (error.errorCode) {
-            case ERROR_CODE_BEHIND_LIVE_WINDOW:
-                isCatchableException = true;
+        switch (recovery) {
+            case RESTART_AT_LIVE_EDGE:
                 simpleExoPlayer.seekToDefaultPosition();
                 simpleExoPlayer.prepare();
                 // Inform the user that we are reloading the stream by
                 // switching to the buffering state
                 onBuffering();
                 break;
-            case ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE:
-            case ERROR_CODE_IO_BAD_HTTP_STATUS:
-            case ERROR_CODE_IO_FILE_NOT_FOUND:
-            case ERROR_CODE_IO_NO_PERMISSION:
-            case ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED:
-            case ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE:
-            case ERROR_CODE_PARSING_CONTAINER_MALFORMED:
-            case ERROR_CODE_PARSING_MANIFEST_MALFORMED:
-            case ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED:
-            case ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED:
-                // Source errors, signal on playQueue and move on:
+            case SKIP_STREAM:
                 if (!exoPlayerIsNull() && playQueue != null) {
                     playQueue.error();
                 }
                 break;
-            case ERROR_CODE_TIMEOUT:
-            case ERROR_CODE_IO_UNSPECIFIED:
-            case ERROR_CODE_IO_NETWORK_CONNECTION_FAILED:
-            case ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT:
-            case ERROR_CODE_UNSPECIFIED:
-                // Reload playback on unexpected errors:
+            case RELOAD:
                 setRecovery();
                 reloadPlayQueueManager();
                 break;
+            case SHUT_DOWN:
             default:
-                // API, remote and renderer errors belong here:
                 onPlaybackShutdown();
                 break;
         }
 
-        if (!isCatchableException) {
+        if (!recovery.isCatchable()) {
             createErrorNotification(error);
         }
 
         if (fragmentListener != null) {
-            fragmentListener.onPlayerError(error, isCatchableException);
+            fragmentListener.onPlayerError(error, recovery.isCatchable());
         }
     }
 

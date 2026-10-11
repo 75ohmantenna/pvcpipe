@@ -39,6 +39,10 @@ specification of their control flow.
   owns the receiver and its registration. Every received broadcast runs its
   command first and then goes to the player UIs. An action that only a UI
   handles still has to be listed in `PlayerBroadcasts`.
+- **Errors:** [`PlaybackErrors`](../app/src/main/java/org/schabi/newpipe/player/error/PlaybackErrors.java)
+  sorts ExoPlayer error codes by recovery: restart at the live edge, skip the
+  stream, reload, or shut down. `Player.onPlayerError` carries out the
+  recovery and tells the user about every error except the live-edge restart.
 - **Proof tokens:** The extractor's
   [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
   delegates Web-client requests to
@@ -80,4 +84,5 @@ changing mutations.
   [`PoTokenWebViewIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/util/potoken/PoTokenWebViewIntegrationTest.kt).
 - Broadcasts: [`PlayerBroadcastsTest`](../app/src/test/java/org/schabi/newpipe/player/broadcast/PlayerBroadcastsTest.java),
   [`AndroidPlayerBroadcastsTest`](../app/src/androidTest/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcastsTest.kt).
+- Error recovery: [`PlaybackErrorsTest`](../app/src/test/java/org/schabi/newpipe/player/error/PlaybackErrorsTest.java).
 - Queue event ordering: [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java).
