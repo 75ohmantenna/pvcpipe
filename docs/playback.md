@@ -47,6 +47,11 @@ specification of their control flow.
   holds the one fragment and the one activity that follow the player and sends
   them queue, metadata, playback, progress and audio-track updates, fragment
   first. `Player` decides when an update is due and reads the values.
+- **Detail history:** [`DetailStack`](../app/src/main/java/org/schabi/newpipe/fragments/detail/DetailStack.java)
+  is the navigation history behind the detail screen's Back key. It adds an
+  entry when a stream loads or when the player reports a queue with other
+  streams, and hands a stored entry the player's live queue when the streams
+  match. `VideoDetailFragment` decides what to show for the entry Back returns.
 - **Proof tokens:** The extractor's
   [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
   delegates Web-client requests to
@@ -90,4 +95,5 @@ changing mutations.
   [`AndroidPlayerBroadcastsTest`](../app/src/androidTest/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcastsTest.kt).
 - Error recovery: [`PlaybackErrorsTest`](../app/src/test/java/org/schabi/newpipe/player/error/PlaybackErrorsTest.java).
 - Listener updates: [`PlayerListenersTest`](../app/src/test/java/org/schabi/newpipe/player/event/PlayerListenersTest.java).
+- Detail history: [`DetailStackTest`](../app/src/test/java/org/schabi/newpipe/fragments/detail/DetailStackTest.java).
 - Queue event ordering: [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java).
