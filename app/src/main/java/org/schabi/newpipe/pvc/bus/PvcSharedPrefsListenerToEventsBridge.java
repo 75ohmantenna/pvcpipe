@@ -3,21 +3,22 @@ package org.schabi.newpipe.pvc.bus;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import org.schabi.newpipe.R;
-import org.schabi.newpipe.pvc.bus.events.PvcEvents;
-import org.schabi.newpipe.pvc.feature.challenge.PvcCfChallengeConfig;
-
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.preference.PreferenceManager;
 
+import org.schabi.newpipe.R;
+import org.schabi.newpipe.pvc.feature.challenge.PvcCfChallengeConfig;
+
 /**
- * generate Events from some PVCPipe specific config options.
- *
- * Not limited to EventBus Events
+ * Passes PVCPipe settings that are needed outside any screen on to the code that uses them.
+ * <p>
+ * Settings that only matter to the detail screen are followed by
+ * {@link org.schabi.newpipe.fragments.detail.DetailPagerViewModel} instead.
  */
 public class PvcSharedPrefsListenerToEventsBridge
         implements SharedPreferences.OnSharedPreferenceChangeListener {
+
     private final Context context;
 
     public PvcSharedPrefsListenerToEventsBridge(
@@ -30,12 +31,7 @@ public class PvcSharedPrefsListenerToEventsBridge
     public void onSharedPreferenceChanged(
             final SharedPreferences prefs,
             @Nullable final String key) {
-
-        if (hasPrefChanged(R.string.pvc_settings_scroll_only_below_player_key, key)) {
-            postPrefEventScrollOnlyBelowPlayer(prefs);
-        } else if (hasPrefChanged(R.string.pvc_settings_comment_replies_same_window_key, key)) {
-            postPrefEventSameWindowCommentReplies(prefs);
-        } else if (hasPrefChanged(
+        if (hasPrefChanged(
                 R.string.pvc_settings_handle_cloudflare_challenge_interactive_enable_key, key)) {
             postPrefCloudflareChallengeInteractive(prefs);
         }
@@ -47,6 +43,7 @@ public class PvcSharedPrefsListenerToEventsBridge
                 false);
         PvcCfChallengeConfig.INSTANCE.updateFloatingVisible(isInteractive);
     }
+
     private void initPrefCloudflareChallengeInteractive(final SharedPreferences prefs) {
         final boolean isInteractive = prefs.getBoolean(context.getString(
                         R.string.pvc_settings_handle_cloudflare_challenge_interactive_enable_key),
@@ -56,27 +53,7 @@ public class PvcSharedPrefsListenerToEventsBridge
 
     private void initSharedPrefs() {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        postPrefEventScrollOnlyBelowPlayer(prefs);
-        postPrefEventSameWindowCommentReplies(prefs);
         initPrefCloudflareChallengeInteractive(prefs);
-    }
-
-    private void postPrefEventSameWindowCommentReplies(
-            final SharedPreferences prefs) {
-        final boolean doSameWindowCommentReplies = prefs.getBoolean(context.getString(
-                R.string.pvc_settings_comment_replies_same_window_key), false);
-
-        PvcBus.getBus().postSticky(new PvcEvents
-                .PrefEventSameWindowCommentReplies(doSameWindowCommentReplies));
-    }
-
-    private void postPrefEventScrollOnlyBelowPlayer(
-            final SharedPreferences prefs) {
-        final boolean doScrollOnlyInViewPager = prefs.getBoolean(context.getString(
-                R.string.pvc_settings_scroll_only_below_player_key), false);
-
-        PvcBus.getBus().postSticky(new PvcEvents
-                .PrefEventScrollOnlyBelowPlayer(doScrollOnlyInViewPager));
     }
 
     private boolean hasPrefChanged(

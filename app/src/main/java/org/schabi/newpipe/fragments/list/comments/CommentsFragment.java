@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.schabi.newpipe.R;
-import org.schabi.newpipe.pvc.fragments.PvcEventBusBaseListInfoFragment;
+import org.schabi.newpipe.pvc.fragments.PagerHostedListInfoFragment;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.comments.CommentsInfo;
@@ -25,7 +25,7 @@ import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 public class CommentsFragment
-        extends PvcEventBusBaseListInfoFragment<CommentsInfoItem, CommentsInfo> {
+        extends PagerHostedListInfoFragment<CommentsInfoItem, CommentsInfo> {
     private final CompositeDisposable disposables = new CompositeDisposable();
 
     private TextView emptyStateDesc;
