@@ -68,11 +68,12 @@ public class MissionsFragment extends Fragment {
     private AlertDialog clearHistoryDialog;
     private AlertDialog deleteFilesDialog;
     private final ActivityResultLauncher<Intent> requestDownloadSaveAsLauncher =
-            registerForActivityResult(new StartActivityForResult(), this::requestDownloadSaveAsResult);
+            registerForActivityResult(new StartActivityForResult(),
+                    this::requestDownloadSaveAsResult);
     private final ServiceConnection mConnection = new ServiceConnection() {
 
         @Override
-        public void onServiceConnected(ComponentName name, IBinder binder) {
+        public void onServiceConnected(final ComponentName name, final IBinder binder) {
             if (mServiceBinding == null) {
                 return;
             }
@@ -95,7 +96,7 @@ public class MissionsFragment extends Fragment {
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName name) {
+        public void onServiceDisconnected(final ComponentName name) {
             releaseAdapter();
         }
 
@@ -109,8 +110,9 @@ public class MissionsFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.missions, container, false);
+    public View onCreateView(@NonNull final LayoutInflater inflater, final ViewGroup container,
+                             final Bundle savedInstanceState) {
+        final View v = inflater.inflate(R.layout.missions, container, false);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(requireActivity());
         mLinear = mPrefs.getBoolean("linear", false);
@@ -123,7 +125,7 @@ public class MissionsFragment extends Fragment {
         mGridManager = new GridLayoutManager(getActivity(), SPAN_SIZE);
         mGridManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override
-            public int getSpanSize(int position) {
+            public int getSpanSize(final int position) {
                 if (mAdapter == null) {
                     return 1;
                 }
@@ -169,7 +171,7 @@ public class MissionsFragment extends Fragment {
     }
 
     @Override
-    public void onPrepareOptionsMenu(Menu menu) {
+    public void onPrepareOptionsMenu(final Menu menu) {
         mSwitch = menu.findItem(R.id.switch_mode);
         mClear = menu.findItem(R.id.clear_list);
         mStart = menu.findItem(R.id.start_downloads);
@@ -184,8 +186,8 @@ public class MissionsFragment extends Fragment {
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int itemId = item.getItemId();
+    public boolean onOptionsItemSelected(final MenuItem item) {
+        final int itemId = item.getItemId();
         if ((itemId == R.id.switch_mode || itemId == R.id.clear_list
                 || itemId == R.id.start_downloads || itemId == R.id.pause_downloads)
                 && (mAdapter == null || mBinder == null)) {
@@ -203,7 +205,7 @@ public class MissionsFragment extends Fragment {
             return true;
         } else if (itemId == R.id.pause_downloads) {
             mBinder.getDownloadManager().pauseAllMissions(false);
-            mAdapter.refreshMissionItems();// update items view
+            mAdapter.refreshMissionItems(); // update items view
 
             return super.onOptionsItemSelected(item);
         }
@@ -298,7 +300,7 @@ public class MissionsFragment extends Fragment {
         }
     }
 
-    private void recoverMission(@NonNull DownloadMission mission) {
+    private void recoverMission(@NonNull final DownloadMission mission) {
         recoveryState.begin(mission);
 
         NoFileManagerSafeGuard.launchSafe(

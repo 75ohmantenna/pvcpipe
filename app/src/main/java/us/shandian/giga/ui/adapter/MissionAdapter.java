@@ -125,7 +125,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
-    public MissionAdapter(Context context, @NonNull DownloadManager downloadManager, View emptyMessage, View root) {
+    public MissionAdapter(final Context context, @NonNull final DownloadManager downloadManager,
+                          final View emptyMessage, final View root) {
         mContext = context;
 
         mDownloadManager = downloadManager;
@@ -150,22 +151,25 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     @Override
     @NonNull
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public ViewHolder onCreateViewHolder(@NonNull final ViewGroup parent, final int viewType) {
         switch (viewType) {
             case DownloadManager.SPECIAL_PENDING:
             case DownloadManager.SPECIAL_FINISHED:
-                return new ViewHolderHeader(mInflater.inflate(R.layout.missions_header, parent, false));
+                return new ViewHolderHeader(
+                        mInflater.inflate(R.layout.missions_header, parent, false));
         }
 
         return new ViewHolderItem(mInflater.inflate(mLayout, parent, false));
     }
 
     @Override
-    public void onViewRecycled(@NonNull ViewHolder view) {
+    public void onViewRecycled(@NonNull final ViewHolder view) {
         super.onViewRecycled(view);
 
-        if (view instanceof ViewHolderHeader) return;
-        ViewHolderItem h = (ViewHolderItem) view;
+        if (view instanceof ViewHolderHeader) {
+            return;
+        }
+        final ViewHolderItem h = (ViewHolderItem) view;
 
         if (h.item.mission instanceof DownloadMission) {
             mPendingDownloadsItems.remove(h);
@@ -181,37 +185,46 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     @Override
     @SuppressLint("SetTextI18n")
-    public void onBindViewHolder(@NonNull ViewHolder view, @SuppressLint("RecyclerView") int pos) {
-        DownloadManager.MissionItem item = mIterator.getItem(pos);
+    public void onBindViewHolder(@NonNull final ViewHolder view,
+                                 @SuppressLint("RecyclerView") final int pos) {
+        final DownloadManager.MissionItem item = mIterator.getItem(pos);
 
         if (view instanceof ViewHolderHeader) {
-            if (item.special == DownloadManager.SPECIAL_NOTHING) return;
-            int str;
+            if (item.special == DownloadManager.SPECIAL_NOTHING) {
+                return;
+            }
+            final int str;
             if (item.special == DownloadManager.SPECIAL_PENDING) {
                 str = R.string.missions_header_pending;
             } else {
                 str = R.string.missions_header_finished;
-                if (mClear != null) mClear.setVisible(true);
+                if (mClear != null) {
+                    mClear.setVisible(true);
+                }
             }
 
             ((ViewHolderHeader) view).header.setText(str);
             return;
         }
 
-        ViewHolderItem h = (ViewHolderItem) view;
+        final ViewHolderItem h = (ViewHolderItem) view;
         h.item = item;
 
-        Utility.FileType type = Utility.getFileType(item.mission.kind, item.mission.storage.getName());
+        final Utility.FileType type =
+                Utility.getFileType(item.mission.kind, item.mission.storage.getName());
 
         h.icon.setImageResource(Utility.getIconForFileType(type));
         h.name.setText(item.mission.storage.getName());
 
-        h.progress.setColors(Utility.getBackgroundForFileType(mContext, type), Utility.getForegroundForFileType(mContext, type));
+        h.progress.setColors(Utility.getBackgroundForFileType(mContext, type),
+                Utility.getForegroundForFileType(mContext, type));
 
         if (h.item.mission instanceof DownloadMission) {
-            DownloadMission mission = (DownloadMission) item.mission;
+            final DownloadMission mission = (DownloadMission) item.mission;
             String length = Utility.formatBytes(mission.getLength());
-            if (mission.running && !mission.isPsRunning()) length += " --.- kB/s";
+            if (mission.running && !mission.isPsRunning()) {
+                length += " --.- kB/s";
+            }
 
             h.size.setText(length);
             h.pause.setTitle(mission.unknownLength ? R.string.stop : R.string.pause);
@@ -225,8 +238,9 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             h.progress.setProgress(1.0f);
             h.size.setText(Utility.formatBytes(item.mission.length));
 
-            DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
-            Date date = new Date(item.mission.timestamp);
+            final DateFormat dateFormat =
+                    DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
+            final Date date = new Date(item.mission.timestamp);
             h.date.setText(dateFormat.format(date));
         }
     }
@@ -237,26 +251,29 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     }
 
     @Override
-    public int getItemViewType(int position) {
+    public int getItemViewType(final int position) {
         return mIterator.getSpecialAtItem(position);
     }
 
     @SuppressLint("DefaultLocale")
-    private void updateProgress(ViewHolderItem h) {
-        if (h == null || h.item == null || h.item.mission instanceof FinishedMission) return;
+    private void updateProgress(final ViewHolderItem h) {
+        if (h == null || h.item == null || h.item.mission instanceof FinishedMission) {
+            return;
+        }
 
-        DownloadMission mission = (DownloadMission) h.item.mission;
-        double done = mission.done;
-        long length = mission.getLength();
-        long now = System.currentTimeMillis();
-        boolean hasError = mission.errCode != ERROR_NOTHING;
+        final DownloadMission mission = (DownloadMission) h.item.mission;
+        final double done = mission.done;
+        final long length = mission.getLength();
+        final long now = System.currentTimeMillis();
+        final boolean hasError = mission.errCode != ERROR_NOTHING;
 
         // hide on error
         // show if current resource length is not fetched
         // show if length is unknown
-        h.progress.setMarquee(mission.isRecovering() || !hasError && (!mission.isInitialized() || mission.unknownLength));
+        h.progress.setMarquee(mission.isRecovering()
+                || !hasError && (!mission.isInitialized() || mission.unknownLength));
 
-        double progress;
+        final double progress;
         if (mission.unknownLength) {
             progress = Double.NaN;
             h.progress.setProgress(0.0f);
@@ -274,8 +291,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             h.progress.setProgress(progress);
         }
 
-        @StringRes int state;
-        String sizeStr = Utility.formatBytes(length).concat("  ");
+        @StringRes final int state;
+        final String sizeStr = Utility.formatBytes(length).concat("  ");
 
         if (mission.isPsFailed() || mission.errCode == ERROR_POSTPROCESSING_HOLD) {
             h.size.setText(sizeStr);
@@ -304,8 +321,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             return;
         }
 
-        long deltaTime = now - h.lastTimestamp;
-        double deltaDone = done - h.lastDone;
+        final long deltaTime = now - h.lastTimestamp;
+        final double deltaDone = done - h.lastDone;
 
         if (h.lastDone > done) {
             h.lastDone = done;
@@ -314,7 +331,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         if (deltaDone > 0 && deltaTime > 0) {
-            float speed = (float) ((deltaDone * 1000d) / deltaTime);
+            final float speed = (float) ((deltaDone * 1000d) / deltaTime);
             float averageSpeed = speed;
 
             if (h.lastSpeedIdx < 0) {
@@ -327,14 +344,15 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 averageSpeed /= h.lastSpeed.length + 1.0f;
             }
 
-            String speedStr = Utility.formatSpeed(averageSpeed);
-            String etaStr;
+            final String speedStr = Utility.formatSpeed(averageSpeed);
+            final String etaStr;
 
             if (mission.unknownLength) {
                 etaStr = "";
             } else {
-                long eta = (long) Math.ceil((length - done) / averageSpeed);
-                etaStr = Utility.formatBytes((long) done) + "/" + Utility.stringifySeconds(eta) + "  ";
+                final long eta = (long) Math.ceil((length - done) / averageSpeed);
+                etaStr = Utility.formatBytes((long) done) + "/"
+                        + Utility.stringifySeconds(eta) + "  ";
             }
 
             h.size.setText(sizeStr.concat(etaStr).concat(speedStr));
@@ -343,7 +361,9 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             h.lastDone = done;
             h.lastSpeed[h.lastSpeedIdx++] = speed;
 
-            if (h.lastSpeedIdx >= h.lastSpeed.length) h.lastSpeedIdx = 0;
+            if (h.lastSpeedIdx >= h.lastSpeed.length) {
+                h.lastSpeedIdx = 0;
+            }
         }
     }
 
@@ -359,18 +379,23 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
     }
 
-    private void openInternally(Mission mission) {
-        if (checkInvalidFile(mission)) return;
+    private void openInternally(final Mission mission) {
+        if (checkInvalidFile(mission)) {
+            return;
+        }
 
-        String mimeType = resolveMimeType(mission);
+        final String mimeType = resolveMimeType(mission);
 
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.v(TAG, "Mime: " + mimeType);
+        }
 
-        Uri uri = resolveShareableUri(mission);
-        if (uri == null) return;
+        final Uri uri = resolveShareableUri(mission);
+        if (uri == null) {
+            return;
+        }
 
-        Intent intent = new Intent(mContext, LocalPlayerActivity.class);
+        final Intent intent = new Intent(mContext, LocalPlayerActivity.class);
         intent.setDataAndType(uri, mimeType);
         intent.putExtra("segments", mission.segmentsJson);
         intent.setFlags(FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
@@ -378,19 +403,24 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         mContext.startActivity(intent);
     }
 
-    private void openExternally(Mission mission) {
-        if (checkInvalidFile(mission)) return;
+    private void openExternally(final Mission mission) {
+        if (checkInvalidFile(mission)) {
+            return;
+        }
 
-        String mimeType = resolveMimeType(mission);
+        final String mimeType = resolveMimeType(mission);
 
-        if (BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG) {
             Log.v(TAG, "Mime: " + mimeType);
+        }
 
         final Uri uri = resolveShareableUri(mission);
-        if (uri == null) return;
+        if (uri == null) {
+            return;
+        }
         final Intent viewIntent = createExternalViewIntent(uri, mimeType);
 
-        Intent chooserIntent = createChooser(viewIntent, null);
+        final Intent chooserIntent = createChooser(viewIntent, null);
         chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION);
 
         ShareUtils.openIntentInApp(mContext, chooserIntent);
@@ -403,11 +433,15 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return intent;
     }
 
-    private void shareFile(Mission mission) {
-        if (checkInvalidFile(mission)) return;
+    private void shareFile(final Mission mission) {
+        if (checkInvalidFile(mission)) {
+            return;
+        }
 
         final Uri uri = resolveShareableUri(mission);
-        if (uri == null) return;
+        if (uri == null) {
+            return;
+        }
         final Intent shareIntent = createShareIntent(mContext, uri, resolveMimeType(mission),
                 mission.storage.getName());
 
@@ -429,7 +463,12 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return intent;
     }
 
-    /** Direct files are granted individually, without exposing their parent storage volume. */
+    /**
+     * Direct files are granted individually, without exposing their parent storage volume.
+     *
+     * @param mission the mission whose file is shared
+     * @return a URI another app can read, or {@code null} if the file is missing
+     */
     private Uri resolveShareableUri(@NonNull final Mission mission) {
         try {
             return resolveShareableUri(mContext, mission.storage, resolveMimeType(mission));
@@ -450,39 +489,47 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return storage.getUri();
     }
 
-    private static String resolveMimeType(@NonNull Mission mission) {
+    private static String resolveMimeType(@NonNull final Mission mission) {
         String mimeType;
 
         if (!mission.storage.isInvalid()) {
             mimeType = mission.storage.getType();
-            if (mimeType != null && mimeType.length() > 0 && !mimeType.equals(StoredFileHelper.DEFAULT_MIME))
+            if (mimeType != null && mimeType.length() > 0
+                    && !mimeType.equals(StoredFileHelper.DEFAULT_MIME)) {
                 return mimeType;
+            }
         }
 
-        String ext = Utility.getFileExt(mission.storage.getName());
-        if (ext == null) return DEFAULT_MIME_TYPE;
+        final String ext = Utility.getFileExt(mission.storage.getName());
+        if (ext == null) {
+            return DEFAULT_MIME_TYPE;
+        }
 
         mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.substring(1));
 
         return mimeType == null ? DEFAULT_MIME_TYPE : mimeType;
     }
 
-    private boolean checkInvalidFile(@NonNull Mission mission) {
-        if (mission.storage.existsAsFile()) return false;
+    private boolean checkInvalidFile(@NonNull final Mission mission) {
+        if (mission.storage.existsAsFile()) {
+            return false;
+        }
 
         Toast.makeText(mContext, R.string.missing_file, Toast.LENGTH_SHORT).show();
         return true;
     }
 
-    private ViewHolderItem getViewHolder(Object mission) {
-        for (ViewHolderItem h : mPendingDownloadsItems) {
-            if (h.item.mission == mission) return h;
+    private ViewHolderItem getViewHolder(final Object mission) {
+        for (final ViewHolderItem h : mPendingDownloadsItems) {
+            if (h.item.mission == mission) {
+                return h;
+            }
         }
         return null;
     }
 
     @Override
-    public boolean handleMessage(@NonNull Message msg) {
+    public boolean handleMessage(@NonNull final Message msg) {
         if (mStartButton != null && mPauseButton != null) {
             checkMasterButtonsVisibility();
         }
@@ -497,8 +544,10 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 return false;
         }
 
-        ViewHolderItem h = getViewHolder(msg.obj);
-        if (h == null) return false;
+        final ViewHolderItem h = getViewHolder(msg.obj);
+        if (h == null) {
+            return false;
+        }
 
         switch (msg.what) {
             case DownloadManagerService.MESSAGE_FINISHED:
@@ -512,7 +561,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return true;
     }
 
-    private void showError(@NonNull DownloadMission mission) {
+    private void showError(@NonNull final DownloadMission mission) {
         @StringRes int msg = R.string.general_error;
         String msgEx = null;
 
@@ -524,7 +573,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 msg = R.string.error_http_not_found;
                 break;
             case ERROR_NOTHING:
-                return;// this never should happen
+                return; // this never should happen
             case ERROR_FILE_CREATION:
                 msg = R.string.error_file_creation;
                 break;
@@ -551,7 +600,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 break;
             case ERROR_POSTPROCESSING:
             case ERROR_POSTPROCESSING_HOLD:
-                showError(mission, UserAction.DOWNLOAD_POSTPROCESSING, R.string.error_postprocessing_failed);
+                showError(mission, UserAction.DOWNLOAD_POSTPROCESSING,
+                        R.string.error_postprocessing_failed);
                 return;
             case ERROR_INSUFFICIENT_STORAGE:
                 msg = R.string.error_insufficient_storage_left;
@@ -585,12 +635,13 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 break;
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+        final AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
 
-        if (msgEx != null)
+        if (msgEx != null) {
             builder.setMessage(msgEx);
-        else
+        } else {
             builder.setMessage(msg);
+        }
 
         // add report button for non-HTTP errors (range 100-599)
         if (mission.errObject != null && (mission.errCode < 100 || mission.errCode >= 600)) {
@@ -605,16 +656,18 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 .show();
     }
 
-    private void showError(DownloadMission mission, UserAction action, @StringRes int reason) {
-        StringBuilder request = new StringBuilder(256);
+    private void showError(final DownloadMission mission, final UserAction action,
+                           @StringRes final int reason) {
+        final StringBuilder request = new StringBuilder(256);
         request.append(mission.source);
 
         request.append(" [");
         if (mission.recoveryInfo != null) {
-            for (MissionRecoveryInfo recovery : mission.recoveryInfo)
+            for (final MissionRecoveryInfo recovery : mission.recoveryInfo) {
                 request.append(' ')
                         .append(recovery.toString())
                         .append(' ');
+            }
         }
         request.append("]");
 
@@ -630,10 +683,12 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                         request.toString(), service, reason));
     }
 
-    public void clearFinishedDownloads(boolean delete) {
+    public void clearFinishedDownloads(final boolean delete) {
         if (delete && mIterator.hasFinishedMissions() && mHidden.isEmpty()) {
             for (int i = 0; i < mIterator.getOldListSize(); i++) {
-                FinishedMission mission = mIterator.getItem(i).mission instanceof FinishedMission ? (FinishedMission) mIterator.getItem(i).mission : null;
+                final FinishedMission mission =
+                        mIterator.getItem(i).mission instanceof FinishedMission
+                                ? (FinishedMission) mIterator.getItem(i).mission : null;
                 if (mission != null) {
                     mIterator.hide(mission);
                     mHidden.add(mission);
@@ -641,10 +696,10 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
             applyChanges();
 
-            String msg = Localization.deletedDownloadCount(mContext, mHidden.size());
+            final String msg = Localization.deletedDownloadCount(mContext, mHidden.size());
             mSnackbar = Snackbar.make(mView, msg, Snackbar.LENGTH_INDEFINITE);
             mSnackbar.setAction(R.string.undo, s -> {
-                Iterator<Mission> i = mHidden.iterator();
+                final Iterator<Mission> i = mHidden.iterator();
                 while (i.hasNext()) {
                     mIterator.unHide(i.next());
                     i.remove();
@@ -663,24 +718,31 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     }
 
     private void deleteFinishedDownloads() {
-        if (mSnackbar != null) mSnackbar.dismiss();
+        if (mSnackbar != null) {
+            mSnackbar.dismiss();
+        }
 
-        Iterator<Mission> i = mHidden.iterator();
+        final Iterator<Mission> i = mHidden.iterator();
         while (i.hasNext()) {
-            Mission mission = i.next();
+            final Mission mission = i.next();
             if (mission != null) {
                 mDownloadManager.deleteMission(mission, true);
-                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, mission.storage.getUri()));
+                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                        mission.storage.getUri()));
             }
             i.remove();
         }
     }
 
-    private boolean handlePopupItem(@NonNull ViewHolderItem h, @NonNull MenuItem option) {
-        if (h.item == null) return true;
+    private boolean handlePopupItem(@NonNull final ViewHolderItem h,
+                                    @NonNull final MenuItem option) {
+        if (h.item == null) {
+            return true;
+        }
 
-        int id = option.getItemId();
-        DownloadMission mission = h.item.mission instanceof DownloadMission ? (DownloadMission) h.item.mission : null;
+        final int id = option.getItemId();
+        final DownloadMission mission = h.item.mission instanceof DownloadMission
+                ? (DownloadMission) h.item.mission : null;
 
         if (mission != null) {
             if (id == R.id.start) {
@@ -694,7 +756,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 showError(mission);
                 return true;
             } else if (id == R.id.queue) {
-                boolean flag = !h.queue.isChecked();
+                final boolean flag = !h.queue.isChecked();
                 h.queue.setChecked(flag);
                 mission.setEnqueued(flag);
                 updateProgress(h);
@@ -704,10 +766,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                     mission.psContinue(true);
                 } else {
                     mDownloadManager.tryRecover(mission);
-                    if (mission.storage.isInvalid())
+                    if (mission.storage.isInvalid()) {
                         mRecover.tryRecover(mission);
-                    else
+                    } else {
                         recoverMission(mission);
+                    }
                 }
                 return true;
             } else if (id == R.id.cancel) {
@@ -719,12 +782,12 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         if (id == R.id.menu_item_share) {
             shareFile(h.item.mission);
             return true;
-        } else if (id == R.id.delete) {// delete the entry and the file
+        } else if (id == R.id.delete) { // delete the entry and the file
             mDeleter.append(h.item.mission, true);
             applyChanges();
             checkMasterButtonsVisibility();
             return true;
-        } else if (id == R.id.delete_entry) {// just delete the entry
+        } else if (id == R.id.delete_entry) { // just delete the entry
             mDeleter.append(h.item.mission, false);
             applyChanges();
             checkMasterButtonsVisibility();
@@ -737,10 +800,10 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 applyChanges();
                 return true;
             }
-            final NotificationManager notificationManager
-                    = mContext.getSystemService(NotificationManager.class);
-            final NotificationCompat.Builder progressNotificationBuilder
-                    = new NotificationCompat.Builder(mContext,
+            final NotificationManager notificationManager =
+                    mContext.getSystemService(NotificationManager.class);
+            final NotificationCompat.Builder progressNotificationBuilder =
+                    new NotificationCompat.Builder(mContext,
                     mContext.getString(R.string.hash_channel_id))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setSmallIcon(R.drawable.ic_newpipe_triangle_white)
@@ -763,7 +826,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             return true;
         } else if (id == R.id.source) {
             try {
-                Intent intent = NavigationHelper.getIntentByLink(mContext, h.item.mission.source);
+                final Intent intent =
+                        NavigationHelper.getIntentByLink(mContext, h.item.mission.source);
                 intent.addFlags(Intent.FLAG_ACTIVITY_PREVIOUS_IS_TOP);
                 mContext.startActivity(intent);
             } catch (Exception e) {
@@ -786,60 +850,70 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         mIterator.end();
 
         checkEmptyMessageVisibility();
-        if (mClear != null) mClear.setVisible(mIterator.hasFinishedMissions());
+        if (mClear != null) {
+            mClear.setVisible(mIterator.hasFinishedMissions());
+        }
     }
 
     public void forceUpdate() {
         mIterator.start();
         mIterator.end();
 
-        for (ViewHolderItem item : mPendingDownloadsItems) {
+        for (final ViewHolderItem item : mPendingDownloadsItems) {
             item.resetSpeedMeasure();
         }
 
         notifyDataSetChanged();
     }
 
-    public void setLinear(boolean isLinear) {
+    public void setLinear(final boolean isLinear) {
         mLayout = isLinear ? R.layout.mission_item_linear : R.layout.mission_item;
     }
 
-    public void setClearButton(MenuItem clearButton) {
-        if (mClear == null)
+    public void setClearButton(final MenuItem clearButton) {
+        if (mClear == null) {
             clearButton.setVisible(mIterator.hasFinishedMissions());
+        }
 
         mClear = clearButton;
     }
 
-    public void setMasterButtons(MenuItem startButton, MenuItem pauseButton) {
-        boolean init = mStartButton == null || mPauseButton == null;
+    public void setMasterButtons(final MenuItem startButton, final MenuItem pauseButton) {
+        final boolean init = mStartButton == null || mPauseButton == null;
 
         mStartButton = startButton;
         mPauseButton = pauseButton;
 
-        if (init) checkMasterButtonsVisibility();
+        if (init) {
+            checkMasterButtonsVisibility();
+        }
     }
 
     private void checkEmptyMessageVisibility() {
-        int flag = mIterator.getOldListSize() > 0 ? View.GONE : View.VISIBLE;
-        if (mEmptyMessage.getVisibility() != flag) mEmptyMessage.setVisibility(flag);
+        final int flag = mIterator.getOldListSize() > 0 ? View.GONE : View.VISIBLE;
+        if (mEmptyMessage.getVisibility() != flag) {
+            mEmptyMessage.setVisibility(flag);
+        }
     }
 
     public void checkMasterButtonsVisibility() {
-        boolean[] state = mIterator.hasValidPendingMissions();
+        final boolean[] state = mIterator.hasValidPendingMissions();
         Log.d(TAG, "checkMasterButtonsVisibility() running=" + state[0] + " paused=" + state[1]);
         setButtonVisible(mPauseButton, state[0]);
         setButtonVisible(mStartButton, state[1]);
     }
 
-    private static void setButtonVisible(MenuItem button, boolean visible) {
-        if (button != null && button.isVisible() != visible)
+    private static void setButtonVisible(final MenuItem button, final boolean visible) {
+        if (button != null && button.isVisible() != visible) {
             button.setVisible(visible);
+        }
     }
 
     public void refreshMissionItems() {
-        for (ViewHolderItem h : mPendingDownloadsItems) {
-            if (((DownloadMission) h.item.mission).running) continue;
+        for (final ViewHolderItem h : mPendingDownloadsItems) {
+            if (((DownloadMission) h.item.mission).running) {
+                continue;
+            }
             updateProgress(h);
             h.resetSpeedMeasure();
         }
@@ -873,8 +947,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         mHandler.removeCallbacksAndMessages(UPDATER);
     }
 
-    public void recoverMission(DownloadMission mission) {
-        ViewHolderItem h = getViewHolder(mission);
+    public void recoverMission(final DownloadMission mission) {
+        final ViewHolderItem h = getViewHolder(mission);
         mission.errObject = null;
         mission.resetState(true, false, DownloadMission.ERROR_NOTHING);
 
@@ -891,9 +965,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         if (!resumed) {
             return;
         }
-        for (ViewHolderItem h : mPendingDownloadsItems) {
+        for (final ViewHolderItem h : mPendingDownloadsItems) {
             // check if the mission is running first
-            if (!((DownloadMission) h.item.mission).running) continue;
+            if (!((DownloadMission) h.item.mission).running) {
+                continue;
+            }
 
             updateProgress(h);
         }
@@ -903,11 +979,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
     }
 
-    private boolean isNotFinite(double value) {
+    private boolean isNotFinite(final double value) {
         return Double.isNaN(value) || Double.isInfinite(value);
     }
 
-    public void setRecover(@NonNull RecoverHelper callback) {
+    public void setRecover(@NonNull final RecoverHelper callback) {
         mRecover = callback;
     }
 
@@ -940,7 +1016,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         float[] lastSpeed = new float[3];
         String estimatedTimeArrival = UNDEFINED_ETA;
 
-        ViewHolderItem(View view) {
+        ViewHolderItem(final View view) {
             super(view);
 
             progress = new ProgressDrawable();
@@ -954,11 +1030,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
             name.setSelected(true);
 
-            ImageView button = itemView.findViewById(R.id.item_more);
+            final ImageView button = itemView.findViewById(R.id.item_more);
             popupMenu = buildPopup(button);
             button.setOnClickListener(v -> showPopupMenu());
 
-            Menu menu = popupMenu.getMenu();
+            final Menu menu = popupMenu.getMenu();
             retry = menu.findItem(R.id.retry);
             cancel = menu.findItem(R.id.cancel);
             start = menu.findItem(R.id.start);
@@ -973,8 +1049,9 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             itemView.setHapticFeedbackEnabled(true);
 
             itemView.setOnClickListener(v -> {
-                if (item.mission instanceof FinishedMission)
+                if (item.mission instanceof FinishedMission) {
                     openFinishedMission(item);
+                }
             });
 
             itemView.setOnLongClickListener(v -> {
@@ -996,7 +1073,8 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             source.setVisible(false);
             checksum.setVisible(false);
 
-            DownloadMission mission = item.mission instanceof DownloadMission ? (DownloadMission) item.mission : null;
+            final DownloadMission mission = item.mission instanceof DownloadMission
+                    ? (DownloadMission) item.mission : null;
 
             if (mission != null) {
                 if (mission.hasInvalidStorage()) {
@@ -1024,7 +1102,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
                         delete.setVisible(true);
 
-                        boolean flag = !mission.isPsFailed() && mission.urls.length > 0;
+                        final boolean flag = !mission.isPsFailed() && mission.urls.length > 0;
                         start.setVisible(flag);
                         queue.setVisible(flag);
                     }
@@ -1043,7 +1121,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         private PopupMenu buildPopup(final View button) {
-            PopupMenu popup = new PopupMenu(mContext, button);
+            final PopupMenu popup = new PopupMenu(mContext, button);
             popup.inflate(R.menu.mission);
             popup.setOnMenuItemClickListener(option -> handlePopupItem(this, option));
 
@@ -1060,7 +1138,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     static class ViewHolderHeader extends RecyclerView.ViewHolder {
         TextView header;
 
-        ViewHolderHeader(View view) {
+        ViewHolderHeader(final View view) {
             super(view);
             header = itemView.findViewById(R.id.item_name);
         }

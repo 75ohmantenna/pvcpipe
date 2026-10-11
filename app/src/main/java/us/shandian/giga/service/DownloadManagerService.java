@@ -73,17 +73,22 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     private static final String EXTRA_URLS = "DownloadManagerService.extra.urls";
     private static final String EXTRA_KIND = "DownloadManagerService.extra.kind";
     private static final String EXTRA_THREADS = "DownloadManagerService.extra.threads";
-    private static final String EXTRA_POSTPROCESSING_NAME = "DownloadManagerService.extra.postprocessingName";
-    private static final String EXTRA_POSTPROCESSING_ARGS = "DownloadManagerService.extra.postprocessingArgs";
+    private static final String EXTRA_POSTPROCESSING_NAME =
+            "DownloadManagerService.extra.postprocessingName";
+    private static final String EXTRA_POSTPROCESSING_ARGS =
+            "DownloadManagerService.extra.postprocessingArgs";
     private static final String EXTRA_NEAR_LENGTH = "DownloadManagerService.extra.nearLength";
     private static final String EXTRA_PATH = "DownloadManagerService.extra.storagePath";
-    private static final String EXTRA_PARENT_PATH = "DownloadManagerService.extra.storageParentPath";
+    private static final String EXTRA_PARENT_PATH =
+            "DownloadManagerService.extra.storageParentPath";
     private static final String EXTRA_STORAGE_TAG = "DownloadManagerService.extra.storageTag";
     private static final String EXTRA_RECOVERY_INFO = "DownloadManagerService.extra.recoveryInfo";
     private static final String EXTRA_STREAM_INFO = "DownloadManagerService.extra.streamInfo";
 
-    private static final String ACTION_RESET_DOWNLOAD_FINISHED = APPLICATION_ID + ".reset_download_finished";
-    private static final String ACTION_OPEN_DOWNLOADS_FINISHED = APPLICATION_ID + ".open_downloads_finished";
+    private static final String ACTION_RESET_DOWNLOAD_FINISHED =
+            APPLICATION_ID + ".reset_download_finished";
+    private static final String ACTION_OPEN_DOWNLOADS_FINISHED =
+            APPLICATION_ID + ".open_downloads_finished";
 
     private DownloadManagerBinder mBinder;
     private DownloadManager mManager;
@@ -103,7 +108,8 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     private ConnectivityManager.NetworkCallback mNetworkStateListenerL = null;
 
     private SharedPreferences mPrefs = null;
-    private final OnSharedPreferenceChangeListener mPrefChangeListener = this::handlePreferenceChange;
+    private final OnSharedPreferenceChangeListener mPrefChangeListener =
+            this::handlePreferenceChange;
 
     private boolean mLockAcquired = false;
     private LockManager mLock = null;
@@ -124,7 +130,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
      *
      * @param file the downloaded file uri
      */
-    private void notifyMediaScanner(Uri file) {
+    private void notifyMediaScanner(final Uri file) {
         sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, file));
     }
 
@@ -141,9 +147,10 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        mManager = new DownloadManager(this, mHandler, loadMainVideoStorage(), loadMainAudioStorage());
+        mManager = new DownloadManager(this, mHandler, loadMainVideoStorage(),
+                loadMainAudioStorage());
 
-        Intent openDownloadListIntent = new Intent(this, DownloadActivity.class)
+        final Intent openDownloadListIntent = new Intent(this, DownloadActivity.class)
                 .setAction(Intent.ACTION_MAIN);
 
         mOpenDownloadList = PendingIntentCompat.getActivity(this, 0,
@@ -152,7 +159,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         icLauncher = BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher);
 
-        Builder builder = new Builder(this, getString(R.string.notification_channel_id))
+        final Builder builder = new Builder(this, getString(R.string.notification_channel_id))
                 .setContentIntent(mOpenDownloadList)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setLargeIcon(icLauncher)
@@ -166,22 +173,31 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         mNetworkStateListenerL = new ConnectivityManager.NetworkCallback() {
             @Override
-            public void onAvailable(Network network) {
+            public void onAvailable(final Network network) {
                 final Handler handler = mHandler;
-                if (handler != null) handler.post(() -> {
-                    if (mHandler != null) handleConnectivityState(false);
+                if (handler != null) {
+                    handler.post(() -> {
+                    if (mHandler != null) {
+                        handleConnectivityState(false);
+                    }
                 });
+                }
             }
 
             @Override
-            public void onLost(Network network) {
+            public void onLost(final Network network) {
                 final Handler handler = mHandler;
-                if (handler != null) handler.post(() -> {
-                    if (mHandler != null) handleConnectivityState(false);
+                if (handler != null) {
+                    handler.post(() -> {
+                    if (mHandler != null) {
+                        handleConnectivityState(false);
+                    }
                 });
+                }
             }
         };
-        mConnectivityManager.registerNetworkCallback(new NetworkRequest.Builder().build(), mNetworkStateListenerL);
+        mConnectivityManager.registerNetworkCallback(new NetworkRequest.Builder().build(),
+                mNetworkStateListenerL);
 
         mPrefs.registerOnSharedPreferenceChangeListener(mPrefChangeListener);
 
@@ -193,20 +209,23 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     }
 
     @Override
-    public int onStartCommand(final Intent intent, int flags, int startId) {
+    public int onStartCommand(final Intent intent, final int flags, final int startId) {
         if (DEBUG) {
             Log.d(TAG, intent == null ? "Restarting" : "Starting");
         }
 
-        if (intent == null) return START_NOT_STICKY;
+        if (intent == null) {
+            return START_NOT_STICKY;
+        }
 
         Log.i(TAG, "Got intent: " + intent);
-        String action = intent.getAction();
+        final String action = intent.getAction();
         if (action != null) {
             if (action.equals(Intent.ACTION_RUN)) {
                 mHandler.post(() -> startMission(intent));
             } else if (downloadDoneNotification != null) {
-                if (action.equals(ACTION_RESET_DOWNLOAD_FINISHED) || action.equals(ACTION_OPEN_DOWNLOADS_FINISHED)) {
+                if (action.equals(ACTION_RESET_DOWNLOAD_FINISHED)
+                        || action.equals(ACTION_OPEN_DOWNLOADS_FINISHED)) {
                     downloadDoneCount = 0;
                     downloadDoneList.setLength(0);
                 }
@@ -234,8 +253,10 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
 
         if (mNotificationManager != null && downloadDoneNotification != null) {
-            downloadDoneNotification.setDeleteIntent(null);// prevent NewPipe running when is killed, cleared from recent, etc
-            mNotificationManager.notify(DOWNLOADS_NOTIFICATION_ID, downloadDoneNotification.build());
+            // prevent NewPipe running when is killed, cleared from recent, etc
+            downloadDoneNotification.setDeleteIntent(null);
+            mNotificationManager.notify(DOWNLOADS_NOTIFICATION_ID,
+                    downloadDoneNotification.build());
         }
 
         manageLock(false);
@@ -244,9 +265,15 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         mPrefs.unregisterOnSharedPreferenceChangeListener(mPrefChangeListener);
 
-        if (icDownloadDone != null) icDownloadDone.recycle();
-        if (icDownloadFailed != null) icDownloadFailed.recycle();
-        if (icLauncher != null) icLauncher.recycle();
+        if (icDownloadDone != null) {
+            icDownloadDone.recycle();
+        }
+        if (icDownloadFailed != null) {
+            icDownloadFailed.recycle();
+        }
+        if (icLauncher != null) {
+            icLauncher.recycle();
+        }
 
         cancelHlsPreparation();
         mHandler = null;
@@ -254,14 +281,16 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
+    public IBinder onBind(final Intent intent) {
         return mBinder;
     }
 
-    private boolean handleMessage(@NonNull Message msg) {
-        if (mHandler == null) return true;
+    private boolean handleMessage(@NonNull final Message msg) {
+        if (mHandler == null) {
+            return true;
+        }
 
-        DownloadMission mission = (DownloadMission) msg.obj;
+        final DownloadMission mission = (DownloadMission) msg.obj;
 
         switch (msg.what) {
             case MESSAGE_FINISHED:
@@ -284,42 +313,49 @@ public class DownloadManagerService extends PvcDownloadManagerService {
                 break;
         }
 
-        if (msg.what != MESSAGE_ERROR)
+        if (msg.what != MESSAGE_ERROR) {
             mFailedDownloads.remove(mFailedDownloads.indexOfValue(mission));
+        }
 
-        for (Callback observer : mEchoObservers)
+        for (final Callback observer : mEchoObservers) {
             observer.handleMessage(msg);
+        }
 
         return true;
     }
 
-    private void handleConnectivityState(boolean updateOnly) {
-        NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
-        NetworkState status;
+    private void handleConnectivityState(final boolean updateOnly) {
+        final NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
+        final NetworkState status;
 
         if (info == null) {
             status = NetworkState.Unavailable;
             Log.i(TAG, "Active network [connectivity is unavailable]");
         } else {
-            boolean connected = info.isConnected();
-            boolean metered = mConnectivityManager.isActiveNetworkMetered();
+            final boolean connected = info.isConnected();
+            final boolean metered = mConnectivityManager.isActiveNetworkMetered();
 
-            if (connected)
+            if (connected) {
                 status = metered ? NetworkState.MeteredOperating : NetworkState.Operating;
-            else
+            } else {
                 status = NetworkState.Unavailable;
+            }
 
-            Log.i(TAG, "Active network [connected=" + connected + " metered=" + metered + "] " + info.toString());
+            Log.i(TAG, "Active network [connected=" + connected + " metered=" + metered + "] "
+                    + info.toString());
         }
 
-        if (mManager == null) return;// avoid race-conditions while the service is starting
+        if (mManager == null) {
+            return; // avoid race-conditions while the service is starting
+        }
         mManager.handleConnectivityState(status, updateOnly);
     }
 
-    private void handlePreferenceChange(SharedPreferences prefs, @NonNull String key) {
+    private void handlePreferenceChange(final SharedPreferences prefs, @NonNull final String key) {
         if (getString(R.string.downloads_maximum_retry).equals(key)) {
             try {
-                String value = prefs.getString(key, getString(R.string.downloads_maximum_retry_default));
+                final String value = prefs.getString(key,
+                        getString(R.string.downloads_maximum_retry_default));
                 mManager.mPrefMaxRetry = value == null ? 0 : Integer.parseInt(value);
             } catch (Exception e) {
                 mManager.mPrefMaxRetry = 0;
@@ -341,9 +377,12 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         updateForegroundState(mManager.getRunningMissionsCount() > 0);
     }
 
+    @SuppressWarnings("checkstyle:FinalParameters")
     public void updateForegroundState(boolean state) {
         state |= hasHlsPreparation();
-        if (state == mForeground) return;
+        if (state == mForeground) {
+            return;
+        }
 
         if (state) {
             startForeground(FOREGROUND_NOTIFICATION_ID, mNotification);
@@ -357,24 +396,29 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     }
 
     /**
-     * Start a new download mission
+     * Start a new download mission.
      *
      * @param context      the activity context
      * @param urls         array of urls to download
      * @param storage      where the file is saved
      * @param kind         type of file (a: audio  v: video  s: subtitle ?: file-extension defined)
      * @param threads      the number of threads maximal used to download chunks of the file.
-     * @param psName       the name of the required post-processing algorithm, or {@code null} to ignore.
+     * @param psName       the name of the required post-processing algorithm, or {@code null}
+     *                     to ignore.
      * @param streamInfo   stream metadata that may be written into the downloaded file.
      * @param psArgs       the arguments for the post-processing algorithm.
      * @param nearLength   the approximated final length of the file
      * @param recoveryInfo array of MissionRecoveryInfo, in case is required recover the download
+     * @param segments     SponsorBlock segments to store with the mission, or {@code null}
      */
-    public static void startMission(Context context, String[] urls, StoredFileHelper storage,
-                                    char kind, int threads, StreamInfo streamInfo, String psName,
-                                    String[] psArgs, long nearLength,
-                                    ArrayList<MissionRecoveryInfo> recoveryInfo,
-                                    SponsorBlockSegment[] segments) {
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public static void startMission(final Context context, final String[] urls,
+                                    final StoredFileHelper storage, final char kind,
+                                    final int threads, final StreamInfo streamInfo,
+                                    final String psName,
+                                    final String[] psArgs, final long nearLength,
+                                    final ArrayList<MissionRecoveryInfo> recoveryInfo,
+                                    final SponsorBlockSegment[] segments) {
         final Intent intent = new Intent(context, DownloadManagerService.class)
                 .setAction(Intent.ACTION_RUN)
                 .putExtra(EXTRA_URLS, urls)
@@ -393,36 +437,39 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         context.startService(intent);
     }
 
-    private void startMission(Intent intent) {
-        String[] urls = intent.getStringArrayExtra(EXTRA_URLS);
-        Uri path = IntentCompat.getParcelableExtra(intent, EXTRA_PATH, Uri.class);
-        Uri parentPath = IntentCompat.getParcelableExtra(intent, EXTRA_PARENT_PATH, Uri.class);
-        int threads = intent.getIntExtra(EXTRA_THREADS, 1);
-        char kind = intent.getCharExtra(EXTRA_KIND, '?');
-        String psName = intent.getStringExtra(EXTRA_POSTPROCESSING_NAME);
-        String[] psArgs = intent.getStringArrayExtra(EXTRA_POSTPROCESSING_ARGS);
-        long nearLength = intent.getLongExtra(EXTRA_NEAR_LENGTH, 0);
-        String tag = intent.getStringExtra(EXTRA_STORAGE_TAG);
-        StreamInfo streamInfo = (StreamInfo)intent.getSerializableExtra(EXTRA_STREAM_INFO);
+    private void startMission(final Intent intent) {
+        final String[] urls = intent.getStringArrayExtra(EXTRA_URLS);
+        final Uri path = IntentCompat.getParcelableExtra(intent, EXTRA_PATH, Uri.class);
+        final Uri parentPath =
+                IntentCompat.getParcelableExtra(intent, EXTRA_PARENT_PATH, Uri.class);
+        final int threads = intent.getIntExtra(EXTRA_THREADS, 1);
+        final char kind = intent.getCharExtra(EXTRA_KIND, '?');
+        final String psName = intent.getStringExtra(EXTRA_POSTPROCESSING_NAME);
+        final String[] psArgs = intent.getStringArrayExtra(EXTRA_POSTPROCESSING_ARGS);
+        final long nearLength = intent.getLongExtra(EXTRA_NEAR_LENGTH, 0);
+        final String tag = intent.getStringExtra(EXTRA_STORAGE_TAG);
+        final StreamInfo streamInfo = (StreamInfo) intent.getSerializableExtra(EXTRA_STREAM_INFO);
         final var recovery = IntentCompat.getParcelableArrayListExtra(intent, EXTRA_RECOVERY_INFO,
                 MissionRecoveryInfo.class);
         Objects.requireNonNull(recovery);
 
-        SponsorBlockSegment[] segments =
+        final SponsorBlockSegment[] segments =
                 (SponsorBlockSegment[]) intent.getSerializableExtra(EXTRA_SEGMENTS);
 
-        StoredFileHelper storage;
+        final StoredFileHelper storage;
         try {
             storage = new StoredFileHelper(this, parentPath, path, tag);
         } catch (IOException e) {
-            throw new RuntimeException(e);// A saved URI can become inaccessible before service handling.
+            // A saved URI can become inaccessible before service handling.
+            throw new RuntimeException(e);
         }
 
-        Postprocessing ps;
-        if (psName == null)
+        final Postprocessing ps;
+        if (psName == null) {
             ps = null;
-        else
+        } else {
             ps = Postprocessing.getAlgorithm(psName, psArgs, streamInfo);
+        }
 
         final DownloadMission mission = new DownloadMission(urls, storage, kind, ps);
         mission.threadCount = threads;
@@ -434,10 +481,11 @@ public class DownloadManagerService extends PvcDownloadManagerService {
             mission.segmentsJson = SponsorBlockSegment.toJson(segments);
         }
 
-        if (ps != null)
+        if (ps != null) {
             ps.setTemporalDir(DownloadManager.pickAvailableTemporalDir(this));
+        }
 
-        handleConnectivityState(true);// first check the actual network status
+        handleConnectivityState(true); // first check the actual network status
 
         if (Postprocessing.ALGORITHM_PVC_HLS_REMUXER.equals(psName)) {
             pvcLaunchHlsPreProcessor(mission, mManager);
@@ -448,7 +496,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         mManager.startMission(mission);
     }
 
-    public void notifyFinishedDownload(String name) {
+    public void notifyFinishedDownload(final String name) {
         if (!mDownloadNotificationEnable || mNotificationManager == null) {
             return;
         }
@@ -456,8 +504,10 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         if (downloadDoneNotification == null) {
             downloadDoneList = new StringBuilder(name.length());
 
-            icDownloadDone = BitmapFactory.decodeResource(this.getResources(), android.R.drawable.stat_sys_download_done);
-            downloadDoneNotification = new Builder(this, getString(R.string.notification_channel_id))
+            icDownloadDone = BitmapFactory.decodeResource(this.getResources(),
+                    android.R.drawable.stat_sys_download_done);
+            downloadDoneNotification =
+                    new Builder(this, getString(R.string.notification_channel_id))
                     .setAutoCancel(true)
                     .setLargeIcon(icDownloadDone)
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
@@ -470,7 +520,8 @@ public class DownloadManagerService extends PvcDownloadManagerService {
             downloadDoneList.append(name);
 
             downloadDoneNotification.setContentTitle(null);
-            downloadDoneNotification.setContentText(Localization.downloadCount(this, downloadDoneCount));
+            downloadDoneNotification.setContentText(
+                    Localization.downloadCount(this, downloadDoneCount));
             downloadDoneNotification.setStyle(new NotificationCompat.BigTextStyle()
                     .setBigContentTitle(Localization.downloadCount(this, downloadDoneCount))
                     .bigText(name)
@@ -479,23 +530,29 @@ public class DownloadManagerService extends PvcDownloadManagerService {
             downloadDoneList.append('\n');
             downloadDoneList.append(name);
 
-            downloadDoneNotification.setStyle(new NotificationCompat.BigTextStyle().bigText(downloadDoneList));
-            downloadDoneNotification.setContentTitle(Localization.downloadCount(this, downloadDoneCount));
+            downloadDoneNotification.setStyle(
+                    new NotificationCompat.BigTextStyle().bigText(downloadDoneList));
+            downloadDoneNotification.setContentTitle(
+                    Localization.downloadCount(this, downloadDoneCount));
             downloadDoneNotification.setContentText(downloadDoneList);
         }
 
         mNotificationManager.notify(DOWNLOADS_NOTIFICATION_ID, downloadDoneNotification.build());
     }
 
-    public void notifyFailedDownload(DownloadMission mission) {
-        if (!mDownloadNotificationEnable || mFailedDownloads.containsValue(mission)) return;
+    public void notifyFailedDownload(final DownloadMission mission) {
+        if (!mDownloadNotificationEnable || mFailedDownloads.containsValue(mission)) {
+            return;
+        }
 
-        int id = downloadFailedNotificationID++;
+        final int id = downloadFailedNotificationID++;
         mFailedDownloads.put(id, mission);
 
         if (downloadFailedNotification == null) {
-            icDownloadFailed = BitmapFactory.decodeResource(this.getResources(), android.R.drawable.stat_sys_warning);
-            downloadFailedNotification = new Builder(this, getString(R.string.notification_channel_id))
+            icDownloadFailed = BitmapFactory.decodeResource(this.getResources(),
+                    android.R.drawable.stat_sys_warning);
+            downloadFailedNotification =
+                    new Builder(this, getString(R.string.notification_channel_id))
                     .setAutoCancel(true)
                     .setLargeIcon(icDownloadFailed)
                     .setSmallIcon(android.R.drawable.stat_sys_warning)
@@ -510,19 +567,22 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         mNotificationManager.notify(id, downloadFailedNotification.build());
     }
 
-    private PendingIntent makePendingIntent(String action) {
-        Intent intent = new Intent(this, DownloadManagerService.class).setAction(action);
+    private PendingIntent makePendingIntent(final String action) {
+        final Intent intent = new Intent(this, DownloadManagerService.class).setAction(action);
         return PendingIntentCompat.getService(this, intent.hashCode(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT, false);
     }
 
-    private void manageLock(boolean acquire) {
-        if (acquire == mLockAcquired) return;
+    private void manageLock(final boolean acquire) {
+        if (acquire == mLockAcquired) {
+            return;
+        }
 
-        if (acquire)
+        if (acquire) {
             mLock.acquireWifiAndCpu();
-        else
+        } else {
             mLock.releaseWifiAndCpu();
+        }
 
         mLockAcquired = acquire;
     }
@@ -535,10 +595,12 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         return loadMainStorage(R.string.download_path_audio_key, DownloadManager.TAG_AUDIO);
     }
 
-    private StoredDirectoryHelper loadMainStorage(@StringRes int prefKey, String tag) {
+    private StoredDirectoryHelper loadMainStorage(@StringRes final int prefKey, final String tag) {
         String path = mPrefs.getString(getString(prefKey), null);
 
-        if (path == null || path.isEmpty()) return null;
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
 
         if (path.charAt(0) == File.separatorChar) {
             Log.i(TAG, "Old save path style present: " + path);
@@ -582,23 +644,26 @@ public class DownloadManagerService extends PvcDownloadManagerService {
             );
         }
 
-        public void addMissionEventListener(Callback handler) {
+        public void addMissionEventListener(final Callback handler) {
             mEchoObservers.add(handler);
         }
 
-        public void removeMissionEventListener(Callback handler) {
+        public void removeMissionEventListener(final Callback handler) {
             mEchoObservers.remove(handler);
         }
 
         public void clearDownloadNotifications() {
-            if (mNotificationManager == null) return;
+            if (mNotificationManager == null) {
+                return;
+            }
             if (downloadDoneNotification != null) {
                 mNotificationManager.cancel(DOWNLOADS_NOTIFICATION_ID);
                 downloadDoneList.setLength(0);
                 downloadDoneCount = 0;
             }
             if (downloadFailedNotification != null) {
-                for (; downloadFailedNotificationID > DOWNLOADS_NOTIFICATION_ID; downloadFailedNotificationID--) {
+                for (; downloadFailedNotificationID > DOWNLOADS_NOTIFICATION_ID;
+                     downloadFailedNotificationID--) {
                     mNotificationManager.cancel(downloadFailedNotificationID);
                 }
                 mFailedDownloads.clear();
@@ -606,7 +671,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
             }
         }
 
-        public void enableNotifications(boolean enable) {
+        public void enableNotifications(final boolean enable) {
             mDownloadNotificationEnable = enable;
         }
 
