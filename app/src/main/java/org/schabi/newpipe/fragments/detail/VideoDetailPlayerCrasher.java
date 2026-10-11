@@ -2,6 +2,7 @@ package org.schabi.newpipe.fragments.detail;
 
 import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
 import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_DECODING_FAILED;
+import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
 import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_UNSPECIFIED;
 
 import android.content.Context;
@@ -46,6 +47,10 @@ public final class VideoDetailPlayerCrasher {
                     new Pair<>("Source", () -> ExoPlaybackException.createForSource(
                             new IOException(DEFAULT_MSG),
                             ERROR_CODE_BEHIND_LIVE_WINDOW
+                    )),
+                    new Pair<>("Bad HTTP status", () -> ExoPlaybackException.createForSource(
+                            new IOException(DEFAULT_MSG),
+                            ERROR_CODE_IO_BAD_HTTP_STATUS
                     )),
                     new Pair<>("Renderer", () -> ExoPlaybackException.createForRenderer(
                             new Exception(DEFAULT_MSG),
