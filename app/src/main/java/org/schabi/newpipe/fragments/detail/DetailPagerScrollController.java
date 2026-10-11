@@ -90,6 +90,7 @@ final class DetailPagerScrollController {
             binding.detailToggleSecondaryControlsView.setOnClickListener(v ->
                     hideTitleAndSecondaryControls());
             binding.viewPager.addOnLayoutChangeListener(createLayoutListener());
+            republishContentHeight();
         } else {
             binding.detailContentRootLayout.setOnInterceptTouchEventListener(null);
             binding.detailToggleSecondaryControlsView.setOnClickListener(null);
@@ -99,6 +100,23 @@ final class DetailPagerScrollController {
             if (null != onChangeLayoutListener) {
                 binding.viewPager.removeOnLayoutChangeListener(onChangeLayoutListener);
             }
+        }
+    }
+
+    /**
+     * Hands the pager content height out again when the mode is entered.
+     * <p>
+     * The fragments in the pager take their own height back whenever the mode is left, and the
+     * layout listener only reports a height that changed. Without this, switching the setting
+     * off and on again while a video is open left their lists taller than the space below the
+     * player, with their last rows below the bottom of the screen.
+     */
+    private void republishContentHeight() {
+        // Make the layout listener report again even if the height is the one it saw last.
+        lastHeight = -1;
+        if (binding.viewPager.isLaidOut()) {
+            lastHeight = recalcPossibleViewPagersContentHeight();
+            pager.publishPagerContentHeight(lastHeight);
         }
     }
 
