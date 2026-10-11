@@ -19,7 +19,6 @@ core = "1.17.0"
 desugar = "2.1.5"
 documentfile = "1.1.0"
 emoji2 = "1.4.0"
-eventbus = "3.3.1"
 evermind-challengefloatsaway = "1.1.1"
 evermind-hlsdownloader = "1.0.0"
 evermind-logcattoolkit = "1.0.0"
@@ -111,7 +110,6 @@ google-exoplayer-hls = { module = "com.google.android.exoplayer:exoplayer-hls", 
 google-exoplayer-mediasession = { module = "com.google.android.exoplayer:extension-mediasession", version.ref = "exoplayer" }
 google-exoplayer-smoothstreaming = { module = "com.google.android.exoplayer:exoplayer-smoothstreaming", version.ref = "exoplayer" }
 google-exoplayer-ui = { module = "com.google.android.exoplayer:exoplayer-ui", version.ref = "exoplayer" }
-greenrobot-eventbus = { module = "org.greenrobot:eventbus", version.ref = "eventbus" }
 jakewharton-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "phoenix" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { module = "junit:junit", version.ref = "junit" }

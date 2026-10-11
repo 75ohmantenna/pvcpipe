@@ -309,8 +309,6 @@ dependencies {
     // HLS support on Rumble
     implementation(libs.evermind.hlsdownloader)
     implementation(libs.pvcpipe.slimhls.converter)
-    // Event bus
-    implementation(libs.greenrobot.eventbus)
     // Logcat toolkit
     implementation(libs.evermind.logcattoolkit)
     // Cloudflare challenge helper
