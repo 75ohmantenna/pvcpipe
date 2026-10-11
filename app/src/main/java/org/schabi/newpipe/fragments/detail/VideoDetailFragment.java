@@ -574,6 +574,12 @@ public final class VideoDetailFragment
     }
 
     private void toggleTitleAndSecondaryControls() {
+        if (binding.detailContentRootHiding.getVisibility() == View.GONE) {
+            // "Scroll only below player" lets the arrow hide the whole block that holds the
+            // secondary controls. Toggling them now would change a panel nobody can see, and it
+            // would be open the next time the block is shown.
+            return;
+        }
         if (binding.detailSecondaryControlPanel.getVisibility() == View.GONE) {
             binding.detailVideoTitleView.setMaxLines(10);
             animateRotation(binding.detailToggleSecondaryControlsView,
