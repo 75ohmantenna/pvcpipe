@@ -42,24 +42,26 @@ import org.schabi.newpipe.error.ErrorPanelHelper
 import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.local.LocalItemListAdapter
+import org.schabi.newpipe.testUtil.RoomTestExecutors
 import org.schabi.newpipe.util.debounce.DebounceSaver
 
 /** Runs the real mutation error callback, preserves a pending draft, and retries its lifecycle save. */
 class LocalPlaylistMutationFailureTest {
     private lateinit var context: Context
     private lateinit var database: AppDatabase
+    private val roomExecutors = RoomTestExecutors()
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+        database = roomExecutors.applyTo(Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java))
             .allowMainThreadQueries()
             .build()
     }
 
     @After
     fun tearDown() {
-        database.close()
+        roomExecutors.closeWhenIdle(database)
     }
 
     @Test

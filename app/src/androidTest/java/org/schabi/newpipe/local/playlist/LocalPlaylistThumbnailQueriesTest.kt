@@ -20,6 +20,7 @@ import org.schabi.newpipe.database.playlist.model.PlaylistEntity
 import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.extractor.stream.StreamType
+import org.schabi.newpipe.testUtil.RoomTestExecutors
 
 /**
  * Subscribes from the main thread against a database that rejects main-thread queries, as the
@@ -28,20 +29,23 @@ import org.schabi.newpipe.extractor.stream.StreamType
  */
 class LocalPlaylistThumbnailQueriesTest {
     private lateinit var database: AppDatabase
+    private val roomExecutors = RoomTestExecutors()
     private lateinit var manager: LocalPlaylistManager
 
     @Before
     fun setUp() {
-        database = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            AppDatabase::class.java
+        database = roomExecutors.applyTo(
+            Room.inMemoryDatabaseBuilder(
+                ApplicationProvider.getApplicationContext(),
+                AppDatabase::class.java
+            )
         ).build()
         manager = LocalPlaylistManager(database)
     }
 
     @After
     fun tearDown() {
-        database.close()
+        roomExecutors.closeWhenIdle(database)
     }
 
     @Test
