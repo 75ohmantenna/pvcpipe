@@ -36,7 +36,7 @@ import static org.schabi.newpipe.BuildConfig.DEBUG;
 public class DownloadMission extends Mission {
     private static final int CONNECTION_TIMEOUT_MILLIS = 30_000;
     private static final int READ_TIMEOUT_MILLIS = 30_000;
-    private static final long serialVersionUID = 6L;// last bump: 07 october 2019
+    private static final long serialVersionUID = 6L; // last bump: 07 october 2019
 
     static final int BUFFER_SIZE = 64 * 1024;
     static final int BLOCK_SIZE = 512 * 1024;
@@ -63,22 +63,22 @@ public class DownloadMission extends Mission {
     static final int ERROR_HTTP_METHOD_NOT_ALLOWED = 405;
 
     /**
-     * The urls of the file to download
+     * The urls of the file to download.
      */
     public String[] urls;
 
     /**
-     * Number of bytes downloaded and written
+     * Number of bytes downloaded and written.
      */
     public volatile long done;
 
     /**
-     * Indicates a file generated dynamically on the web server
+     * Indicates a file generated dynamically on the web server.
      */
     public boolean unknownLength;
 
     /**
-     * offset in the file where the data should be written
+     * offset in the file where the data should be written.
      */
     public long[] offsets;
 
@@ -87,12 +87,12 @@ public class DownloadMission extends Mission {
      * 0: ready
      * 1: running
      * 2: completed
-     * 3: hold
+     * 3: hold.
      */
     public volatile int psState;
 
     /**
-     * the post-processing algorithm instance
+     * the post-processing algorithm instance.
      */
     public Postprocessing psAlgorithm;
 
@@ -102,12 +102,12 @@ public class DownloadMission extends Mission {
     public Object pvcArbitraryData;
 
     /**
-     * The current resource to download, {@code urls[current]} and {@code offsets[current]}
+     * The current resource to download, {@code urls[current]} and {@code offsets[current]}.
      */
     public int current;
 
     /**
-     * Metadata where the mission state is saved
+     * Metadata where the mission state is saved.
      */
     public transient File metadata;
 
@@ -115,12 +115,12 @@ public class DownloadMission extends Mission {
     public transient boolean checkpointReady;
 
     /**
-     * maximum attempts
+     * maximum attempts.
      */
     public transient int maxRetry;
 
     /**
-     * Approximated final length, this represent the sum of all resources sizes
+     * Approximated final length, this represent the sum of all resources sizes.
      */
     public long nearLength;
 
@@ -132,17 +132,18 @@ public class DownloadMission extends Mission {
     int[] blocks;
 
     /**
-     * Download/File resume offset in fallback mode (if applicable) {@link DownloadRunnableFallback}
+     * Download/File resume offset in fallback mode (if applicable)
+     * {@link DownloadRunnableFallback}.
      */
     volatile long fallbackResumeOffset;
 
     /**
-     * Maximum of download threads running, chosen by the user
+     * Maximum of download threads running, chosen by the user.
      */
     public int threadCount = 3;
 
     /**
-     * information required to recover a download
+     * information required to recover a download.
      */
     public MissionRecoveryInfo[] recoveryInfo;
 
@@ -163,6 +164,8 @@ public class DownloadMission extends Mission {
     private transient long writingToFileNext;
     private transient volatile boolean writingToFile;
 
+    // The name is part of the serialized form of saved missions.
+    @SuppressWarnings("checkstyle:MemberName")
     final Object LOCK = new Lock();
 
     @NonNull
@@ -173,9 +176,11 @@ public class DownloadMission extends Mission {
     private transient long startGeneration;
     private transient boolean reinitialize;
 
-    public DownloadMission(String[] urls, StoredFileHelper storage, char kind, Postprocessing psInstance) {
-        if (Objects.requireNonNull(urls).length < 1)
+    public DownloadMission(final String[] urls, final StoredFileHelper storage, final char kind,
+                           final Postprocessing psInstance) {
+        if (Objects.requireNonNull(urls).length < 1) {
             throw new IllegalArgumentException("urls array is empty");
+        }
         this.urls = urls;
         this.kind = kind;
         this.offsets = new long[urls.length];
@@ -190,7 +195,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Acquire a block
+     * Acquire a block.
      *
      * @return the block or {@code null} if no more blocks left
      */
@@ -199,7 +204,7 @@ public class DownloadMission extends Mission {
         synchronized (LOCK) {
             for (int i = 0; i < blockAcquired.length; i++) {
                 if (!blockAcquired[i] && blocks[i] >= 0) {
-                    Block block = new Block();
+                    final Block block = new Block();
                     block.position = i;
                     block.done = blocks[i];
 
@@ -213,12 +218,13 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Release an block
+     * Release an block.
      *
      * @param position the index of the block
      * @param done     amount of bytes downloaded
      */
-    void releaseBlock(int position, int done) {
+    @SuppressWarnings("checkstyle:HiddenField")
+    void releaseBlock(final int position, final int done) {
         synchronized (LOCK) {
             blockAcquired[position] = false;
             blocks[position] = done;
@@ -226,26 +232,32 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Opens a connection
+     * Opens a connection.
      *
-     * @param headRequest {@code true} for use {@code HEAD} request method, otherwise, {@code GET} is used
+     * @param headRequest {@code true} for use {@code HEAD} request method, otherwise,
+     *                    {@code GET} is used
      * @param rangeStart  range start
      * @param rangeEnd    range end
      * @return a {@link java.net.URLConnection URLConnection} linking to the URL.
      * @throws IOException if an I/O exception occurs.
      */
-    HttpURLConnection openConnection(boolean headRequest, long rangeStart, long rangeEnd) throws IOException {
+    HttpURLConnection openConnection(final boolean headRequest, final long rangeStart,
+                                     final long rangeEnd) throws IOException {
         return openConnection(urls[current], headRequest, rangeStart, rangeEnd);
     }
 
-    HttpURLConnection openConnection(String url, boolean headRequest, long rangeStart, long rangeEnd) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+    HttpURLConnection openConnection(final String url, final boolean headRequest,
+                                     final long rangeStart, final long rangeEnd)
+            throws IOException {
+        final HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setInstanceFollowRedirects(true);
         conn.setRequestProperty("User-Agent", DownloaderImpl.getMediaUserAgent(url));
         conn.setRequestProperty("Accept", "*/*");
         conn.setRequestProperty("Accept-Encoding", "identity");
 
-        if (headRequest) conn.setRequestMethod("HEAD");
+        if (headRequest) {
+            conn.setRequestMethod("HEAD");
+        }
 
         // BUG workaround: switching between networks can freeze the download forever
         conn.setConnectTimeout(CONNECTION_TIMEOUT_MILLIS);
@@ -253,7 +265,9 @@ public class DownloadMission extends Mission {
 
         if (rangeStart >= 0) {
             String req = "bytes=" + rangeStart + "-";
-            if (rangeEnd > 0) req += rangeEnd;
+            if (rangeEnd > 0) {
+                req += rangeEnd;
+            }
 
             conn.setRequestProperty("Range", req);
             applyIfRange(conn, url);
@@ -262,7 +276,7 @@ public class DownloadMission extends Mission {
         return conn;
     }
 
-    void applyIfRange(HttpURLConnection conn, String url) {
+    void applyIfRange(final HttpURLConnection conn, final String url) {
         final ResourceIdentity identity = resourceIdentity;
         if (identity != null && identity.requestUrl.equals(url)
                 && conn.getRequestProperty("Range") != null) {
@@ -270,7 +284,7 @@ public class DownloadMission extends Mission {
         }
     }
 
-    synchronized void bindInitializedRepresentation(HttpURLConnection response)
+    synchronized void bindInitializedRepresentation(final HttpURLConnection response)
             throws IOException {
         final ResourceIdentity candidate = ResourceIdentity.from(response, urls[current]);
         if (hasCurrentBytes() && (candidate != null || resourceIdentity != null)) {
@@ -282,8 +296,8 @@ public class DownloadMission extends Mission {
         updateRecoveryCondition();
     }
 
-    synchronized void validatePartialRepresentation(HttpURLConnection response,
-                                                     String sentIfRange) throws IOException {
+    synchronized void validatePartialRepresentation(final HttpURLConnection response,
+                                                     final String sentIfRange) throws IOException {
         final ResourceIdentity identity = resourceIdentity;
         if (identity != null) {
             identity.verify(response, urls[current], sentIfRange);
@@ -310,7 +324,7 @@ public class DownloadMission extends Mission {
         updateRecoveryCondition();
     }
 
-    synchronized void beginFullRepresentation(HttpURLConnection response) {
+    synchronized void beginFullRepresentation(final HttpURLConnection response) {
         resourceIdentity = ResourceIdentity.from(response, urls[current]);
         unverifiedCurrentBytes = resourceIdentity == null;
         updateRecoveryCondition();
@@ -321,7 +335,7 @@ public class DownloadMission extends Mission {
             return true;
         }
         if (blocks != null) {
-            for (int block : blocks) {
+            for (final int block : blocks) {
                 if (block != 0) {
                     return true;
                 }
@@ -344,8 +358,9 @@ public class DownloadMission extends Mission {
      * @throws IOException if an error occurred connecting to the server.
      * @throws HttpError   if the HTTP Status-Code is not satisfiable
      */
-    void establishConnection(int threadId, HttpURLConnection conn) throws IOException, HttpError {
-        int statusCode = conn.getResponseCode();
+    void establishConnection(final int threadId, final HttpURLConnection conn)
+            throws IOException, HttpError {
+        final int statusCode = conn.getResponseCode();
         if (statusCode == 200 || statusCode == 206) {
             ValidatedRange.requireIdentityEncoding(conn);
         }
@@ -355,7 +370,8 @@ public class DownloadMission extends Mission {
             Log.d(TAG, threadId + ":[request]  Range=" + conn.getRequestProperty("Range"));
             Log.d(TAG, threadId + ":[response] Code=" + statusCode);
             Log.d(TAG, threadId + ":[response] Content-Length=" + conn.getContentLength());
-            Log.d(TAG, threadId + ":[response] Content-Range=" + conn.getHeaderField("Content-Range"));
+            Log.d(TAG, threadId + ":[response] Content-Range="
+                    + conn.getHeaderField("Content-Range"));
         }
 
 
@@ -365,7 +381,7 @@ public class DownloadMission extends Mission {
             case 207:
                 throw new HttpError(statusCode);
             case 416:
-                return;// let the download thread handle this error
+                return; // let the download thread handle this error
             default:
                 if (statusCode < 200 || statusCode > 299) {
                     throw new HttpError(statusCode);
@@ -375,18 +391,20 @@ public class DownloadMission extends Mission {
     }
 
 
-    private void notify(int what) {
+    private void notify(final int what) {
         mHandler.obtainMessage(what, this).sendToTarget();
     }
 
-    synchronized void notifyProgress(long deltaLen) {
+    synchronized void notifyProgress(final long deltaLen) {
         if (unknownLength) {
-            length += deltaLen;// Update length before proceeding
+            length += deltaLen; // Update length before proceeding
         }
 
         done += deltaLen;
 
-        if (metadata == null) return;
+        if (metadata == null) {
+            return;
+        }
 
         if (!writingToFile && (done > writingToFileNext || deltaLen < 0)) {
             writingToFile = true;
@@ -395,7 +413,7 @@ public class DownloadMission extends Mission {
         }
     }
 
-    synchronized void notifyError(Exception err) {
+    synchronized void notifyError(final Exception err) {
         Log.e(TAG, "notifyError()", err);
 
         if (err instanceof FileNotFoundException) {
@@ -415,10 +433,11 @@ public class DownloadMission extends Mission {
         }
     }
 
+    @SuppressWarnings("checkstyle:FinalParameters")
     public synchronized void notifyError(int code, Exception err) {
         Log.e(TAG, "notifyError() code = " + code, err);
         if (err != null && err.getCause() instanceof ErrnoException) {
-            int errno = ((ErrnoException) err.getCause()).errno;
+            final int errno = ((ErrnoException) err.getCause()).errno;
             if (errno == OsConstants.ENOSPC) {
                 code = ERROR_INSUFFICIENT_STORAGE;
                 err = null;
@@ -454,17 +473,23 @@ public class DownloadMission extends Mission {
                 break;
             default:
                 // also checks for server errors
-                if (code < 500 || code > 599) enqueued = false;
+                if (code < 500 || code > 599) {
+                    enqueued = false;
+                }
         }
 
         notify(DownloadManagerService.MESSAGE_ERROR);
 
-        if (running) pauseThreads();
+        if (running) {
+            pauseThreads();
+        }
     }
 
     synchronized void notifyFinished() {
         if (current < urls.length) {
-            if (++finishCount < threads.length) return;
+            if (++finishCount < threads.length) {
+                return;
+            }
 
             if (DEBUG) {
                 Log.d(TAG, "onFinish: downloaded " + (current + 1) + "/" + urls.length);
@@ -500,8 +525,8 @@ public class DownloadMission extends Mission {
         notify(DownloadManagerService.MESSAGE_FINISHED);
     }
 
-    private void notifyPostProcessing(int state) {
-        String action;
+    private void notifyPostProcessing(final int state) {
+        final String action;
         switch (state) {
             case 1:
                 action = "Running";
@@ -532,12 +557,14 @@ public class DownloadMission extends Mission {
      * Start downloading with multiple threads.
      */
     public synchronized void start() {
-        if (running || starting || isFinished() || urls.length < 1) return;
+        if (running || starting || isFinished() || urls.length < 1) {
+            return;
+        }
 
         final Thread previousInitializer = init;
         final Thread[] previousWorkers = threads;
         boolean waiting = previousInitializer != null && previousInitializer.isAlive();
-        for (Thread worker : previousWorkers) {
+        for (final Thread worker : previousWorkers) {
             waiting |= worker.isAlive();
         }
         if (!waiting) {
@@ -552,9 +579,13 @@ public class DownloadMission extends Mission {
         starter = new Thread(() -> {
             try {
                 awaitStopped(previousInitializer);
-                for (Thread worker : previousWorkers) awaitStopped(worker);
+                for (final Thread worker : previousWorkers) {
+                    awaitStopped(worker);
+                }
                 synchronized (DownloadMission.this) {
-                    if (!starting || generation != startGeneration) return;
+                    if (!starting || generation != startGeneration) {
+                        return;
+                    }
                     starting = false;
                     starter = null;
                     startDownload();
@@ -566,8 +597,10 @@ public class DownloadMission extends Mission {
         starter.start();
     }
 
-    private static void awaitStopped(Thread worker) throws InterruptedException {
-        if (worker == null) return;
+    private static void awaitStopped(final Thread worker) throws InterruptedException {
+        if (worker == null) {
+            return;
+        }
         worker.interrupt();
         worker.join();
     }
@@ -612,7 +645,11 @@ public class DownloadMission extends Mission {
             runAsync(1, threads[0]);
         } else {
             int remainingBlocks = 0;
-            for (int block : blocks) if (block >= 0) remainingBlocks++;
+            for (final int block : blocks) {
+                if (block >= 0) {
+                remainingBlocks++;
+            }
+            }
 
             if (remainingBlocks < 1) {
                 notifyFinished();
@@ -624,23 +661,29 @@ public class DownloadMission extends Mission {
             for (int i = 0; i < threads.length; i++) {
                 threads[i] = createDownloadWorker(i);
             }
-            for (int i = 0; i < threads.length; i++) runAsync(i + 1, threads[i]);
+            for (int i = 0; i < threads.length; i++) {
+                runAsync(i + 1, threads[i]);
+            }
         }
     }
 
     synchronized void initializationFinished() {
-        if (!running || init != Thread.currentThread() || init.isInterrupted()) return;
+        if (!running || init != Thread.currentThread() || init.isInterrupted()) {
+            return;
+        }
         startDownload();
     }
 
     synchronized void recoveryFinished() {
         if (!running || Thread.currentThread().isInterrupted() || threads.length != 1
-                || threads[0] != Thread.currentThread()) return;
+                || threads[0] != Thread.currentThread()) {
+            return;
+        }
         startDownload();
     }
 
     /**
-     * Pause the mission
+     * Pause the mission.
      */
     public synchronized void pause() {
         starting = false;
@@ -649,7 +692,9 @@ public class DownloadMission extends Mission {
             starter.interrupt();
             starter = null;
         }
-        if (!running) return;
+        if (!running) {
+            return;
+        }
 
         if (isPsRunning()) {
             if (DEBUG) {
@@ -670,7 +715,8 @@ public class DownloadMission extends Mission {
         }
 
         if (DEBUG && unknownLength) {
-            Log.w(TAG, "pausing a download that can not be resumed (range requests not allowed by the server).");
+            Log.w(TAG, "pausing a download that can not be resumed "
+                    + "(range requests not allowed by the server).");
         }
 
         init = null;
@@ -685,28 +731,35 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Removes the downloaded file and the meta file
+     * Removes the downloaded file and the meta file.
      */
     @Override
     public boolean delete() {
-        if (psAlgorithm != null) psAlgorithm.cleanupTemporalDir();
+        if (psAlgorithm != null) {
+            psAlgorithm.cleanupTemporalDir();
+        }
 
         notify(DownloadManagerService.MESSAGE_DELETED);
 
-        boolean res = deleteMetadata();
+        final boolean res = deleteMetadata();
 
-        if (!super.delete()) return false;
+        if (!super.delete()) {
+            return false;
+        }
         return res;
     }
 
 
     /**
-     * Resets the mission state
+     * Resets the mission state.
      *
      * @param rollback       {@code true} true to forget all progress, otherwise, {@code false}
-     * @param persistChanges {@code true} to commit changes to the metadata file, otherwise, {@code false}
+     * @param persistChanges {@code true} to commit changes to the metadata file, otherwise,
+     *                       {@code false}
+     * @param errorCode      the error code the mission has after the reset
      */
-    public void resetState(boolean rollback, boolean persistChanges, int errorCode) {
+    public void resetState(final boolean rollback, final boolean persistChanges,
+                           final int errorCode) {
         length = 0;
         errCode = errorCode;
         errObject = null;
@@ -718,10 +771,14 @@ public class DownloadMission extends Mission {
         resourceIdentity = null;
         unverifiedCurrentBytes = false;
 
-        if (rollback) current = 0;
+        if (rollback) {
+            current = 0;
+        }
         done = offsets[current] - offsets[0];
         updateRecoveryCondition();
-        if (persistChanges) writeThisToFile();
+        if (persistChanges) {
+            writeThisToFile();
+        }
     }
 
     private void initializer() {
@@ -733,7 +790,7 @@ public class DownloadMission extends Mission {
         return new DownloadInitializer(this);
     }
 
-    Thread createDownloadWorker(int index) {
+    Thread createDownloadWorker(final int index) {
         return new DownloadRunnable(this, index);
     }
 
@@ -744,18 +801,22 @@ public class DownloadMission extends Mission {
     /**
      * Write this {@link DownloadMission} to the meta file asynchronously
      * if no thread is already running.
+     *
+     * @return {@code true} if the mission was written, otherwise, {@code false}
      */
     boolean writeThisToFile() {
         synchronized (LOCK) {
-            if (metadata == null) return false;
-            boolean saved = Utility.writeToFile(metadata, this);
+            if (metadata == null) {
+                return false;
+            }
+            final boolean saved = Utility.writeToFile(metadata, this);
             writingToFile = false;
             return saved;
         }
     }
 
     /**
-     * Indicates if the download if fully finished
+     * Indicates if the download if fully finished.
      *
      * @return true, otherwise, false
      */
@@ -764,7 +825,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates if the download file is corrupt due a failed post-processing
+     * Indicates if the download file is corrupt due a failed post-processing.
      *
      * @return {@code true} if this mission is unrecoverable
      */
@@ -779,7 +840,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates if a post-processing algorithm is running
+     * Indicates if a post-processing algorithm is running.
      *
      * @return true, otherwise, false
      */
@@ -788,7 +849,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicated if the mission is ready
+     * Indicated if the mission is ready.
      *
      * @return true, otherwise, false
      */
@@ -797,7 +858,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Gets the approximated final length of the file
+     * Gets the approximated final length of the file.
      *
      * @return the length in bytes
      */
@@ -808,27 +869,27 @@ public class DownloadMission extends Mission {
         }
 
         calculated = offsets[current < offsets.length ? current : (offsets.length - 1)] + length;
-        calculated -= offsets[0];// don't count reserved space
+        calculated -= offsets[0]; // don't count reserved space
 
         return Math.max(calculated, nearLength);
     }
 
     /**
-     * set this mission state on the queue
+     * set this mission state on the queue.
      *
      * @param queue true to add to the queue, otherwise, false
      */
-    public void setEnqueued(boolean queue) {
+    public void setEnqueued(final boolean queue) {
         enqueued = queue;
         writeThisToFileAsync();
     }
 
     /**
-     * Attempts to continue a blocked post-processing
+     * Attempts to continue a blocked post-processing.
      *
      * @param recover {@code true} to retry, otherwise, {@code false} to cancel
      */
-    public void psContinue(boolean recover) {
+    public void psContinue(final boolean recover) {
         psState = 1;
         errCode = recover ? ERROR_NOTHING : ERROR_POSTPROCESSING;
         threads[0].interrupt();
@@ -844,33 +905,37 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates whatever is possible to start the mission
+     * Indicates whatever is possible to start the mission.
      *
      * @return {@code true} is this mission its "healthy", otherwise, {@code false}
      */
     public boolean isCorrupt() {
-        if (urls.length < 1) return false;
+        if (urls.length < 1) {
+            return false;
+        }
         return (isPsFailed() || errCode == ERROR_POSTPROCESSING_HOLD) || isFinished();
     }
 
     /**
-     * Indicates if mission urls has expired and there an attempt to renovate them
+     * Indicates if mission urls has expired and there an attempt to renovate them.
      *
      * @return {@code true} if the mission is running a recovery procedure, otherwise, {@code false}
      */
     public boolean isRecovering() {
-        return threads.length > 0 && threads[0] instanceof DownloadMissionRecover && threads[0].isAlive();
+        return threads.length > 0 && threads[0] instanceof DownloadMissionRecover
+                && threads[0].isAlive();
     }
 
     private void doPostprocessing() {
         errCode = ERROR_NOTHING;
         errObject = null;
-        Thread thread = Thread.currentThread();
+        final Thread thread = Thread.currentThread();
 
         notifyPostProcessing(1);
 
         if (DEBUG) {
-            thread.setName("[" + TAG + "]  ps = " + psAlgorithm + "  filename = " + storage.getName());
+            thread.setName("[" + TAG + "]  ps = " + psAlgorithm + "  filename = "
+                    + storage.getName());
         }
 
         Exception exception = null;
@@ -880,12 +945,15 @@ public class DownloadMission extends Mission {
         } catch (Exception err) {
             Log.e(TAG, "Post-processing failed. " + psAlgorithm.toString(), err);
 
-            if (err instanceof InterruptedIOException || err instanceof ClosedByInterruptException || thread.isInterrupted()) {
+            if (err instanceof InterruptedIOException
+                    || err instanceof ClosedByInterruptException || thread.isInterrupted()) {
                 notifyError(DownloadMission.ERROR_POSTPROCESSING_STOPPED, null);
                 return;
             }
 
-            if (errCode == ERROR_NOTHING) errCode = ERROR_POSTPROCESSING;
+            if (errCode == ERROR_NOTHING) {
+                errCode = ERROR_POSTPROCESSING;
+            }
 
             exception = err;
         } finally {
@@ -893,7 +961,9 @@ public class DownloadMission extends Mission {
         }
 
         if (errCode != ERROR_NOTHING) {
-            if (exception == null) exception = errObject;
+            if (exception == null) {
+                exception = errObject;
+            }
             notifyError(ERROR_POSTPROCESSING, exception);
             return;
         }
@@ -902,17 +972,19 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Attempts to recover the download
+     * Attempts to recover the download.
      *
      * @param errorCode error code which trigger the recovery procedure
      */
-    synchronized void doRecover(int errorCode) {
-        if (!running) return;
+    synchronized void doRecover(final int errorCode) {
+        if (!running) {
+            return;
+        }
         Log.i(TAG, "Attempting to recover the mission: " + storage.getName());
 
         if (recoveryInfo == null) {
             notifyError(errorCode, null);
-            urls = new String[0];// mark this mission as dead
+            urls = new String[0]; // mark this mission as dead
             return;
         }
 
@@ -928,34 +1000,39 @@ public class DownloadMission extends Mission {
 
     public boolean deleteMetadata() {
         synchronized (LOCK) {
-            if (metadata == null) return true;
+            if (metadata == null) {
+                return true;
+            }
             new AtomicFile(metadata).delete();
-            boolean deleted = !metadata.exists()
+            final boolean deleted = !metadata.exists()
                     && !new File(metadata.getPath() + ".bak").exists()
                     && !new File(metadata.getPath() + ".new").exists();
-            if (deleted) metadata = null;
+            if (deleted) {
+                metadata = null;
+            }
             return deleted;
         }
     }
 
     /**
-     * run a new thread
+     * run a new thread.
      *
      * @param id  id of new thread (used for debugging only)
      * @param who the Runnable whose {@code run} method is invoked.
+     * @return the started thread
      */
-    private Thread runAsync(int id, Runnable who) {
+    private Thread runAsync(final int id, final Runnable who) {
         return runAsync(id, new Thread(who));
     }
 
     /**
-     * run a new thread
+     * run a new thread.
      *
      * @param id  id of new thread (used for debugging only)
      * @param who the Thread whose {@code run} method is invoked when this thread is started
      * @return the passed thread
      */
-    private Thread runAsync(int id, Thread who) {
+    private Thread runAsync(final int id, final Thread who) {
         // known thread ids:
         //   -2:     state saving by  notifyProgress()  method
         //   -1:     wait for saving the state by  pause()  method
@@ -972,11 +1049,11 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Waits at most {@code millis} milliseconds for the thread to die
+     * Waits at most {@code millis} milliseconds for the thread to die.
      *
      * @param millis the time to wait in milliseconds
      */
-    private void joinForThreads(int millis) {
+    private void joinForThreads(final int millis) {
         final Thread currentThread = Thread.currentThread();
 
         if (init != null && init != currentThread && init.isAlive()) {
@@ -997,18 +1074,24 @@ public class DownloadMission extends Mission {
         //      the user is spamming start/pause buttons
         //      start() method called quickly after pause()
 
-        for (Thread thread : threads) {
-            if (!thread.isAlive() || thread == Thread.currentThread()) continue;
+        for (final Thread thread : threads) {
+            if (!thread.isAlive() || thread == Thread.currentThread()) {
+                continue;
+            }
             thread.interrupt();
         }
 
         try {
-            for (Thread thread : threads) {
-                if (thread == currentThread || !thread.isAlive()) continue;
+            for (final Thread thread : threads) {
+                if (thread == currentThread || !thread.isAlive()) {
+                    continue;
+                }
                 if (DEBUG) {
                     Log.w(TAG, "thread alive: " + thread.getName());
                 }
-                if (millis > 0) thread.join(millis);
+                if (millis > 0) {
+                    thread.join(millis);
+                }
             }
         } catch (InterruptedException e) {
             throw new RuntimeException("A download thread is still running", e);
@@ -1019,7 +1102,7 @@ public class DownloadMission extends Mission {
     static class HttpError extends Exception {
         final int statusCode;
 
-        HttpError(int statusCode) {
+        HttpError(final int statusCode) {
             this.statusCode = statusCode;
         }
 
@@ -1034,6 +1117,7 @@ public class DownloadMission extends Mission {
         public int done;
     }
 
+    @SuppressWarnings("checkstyle:FinalClass")
     private static class Lock implements Serializable {
         // java.lang.Object cannot be used because is not serializable
     }

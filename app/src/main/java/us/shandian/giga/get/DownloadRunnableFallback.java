@@ -19,7 +19,7 @@ import static org.schabi.newpipe.BuildConfig.DEBUG;
 import static us.shandian.giga.get.DownloadMission.ERROR_HTTP_FORBIDDEN;
 
 /**
- * Single-threaded fallback mode
+ * Single-threaded fallback mode.
  */
 public class DownloadRunnableFallback extends Thread {
     private static final String TAG = "DLRunnableFallback";
@@ -31,20 +31,26 @@ public class DownloadRunnableFallback extends Thread {
     private SharpStream mF;
     private HttpURLConnection mConn;
 
-    DownloadRunnableFallback(@NonNull DownloadMission mission) {
+    DownloadRunnableFallback(@NonNull final DownloadMission mission) {
         mMission = mission;
     }
 
     private void dispose() {
         try {
-            if (mIs != null) mIs.close();
+            if (mIs != null) {
+                mIs.close();
+            }
         } catch (IOException ignored) {
             // Closing the connection below also stops an in-flight request.
         } finally {
             mIs = null;
-            if (mConn != null) mConn.disconnect();
+            if (mConn != null) {
+                mConn.disconnect();
+            }
             mConn = null;
-            if (mF != null) mF.close();
+            if (mF != null) {
+                mF.close();
+            }
             mF = null;
         }
     }
@@ -141,7 +147,9 @@ public class DownloadRunnableFallback extends Thread {
                 final long endExclusive = range == null ? mMission.length : range.end + 1;
                 while (mMission.running) {
                     final long remaining = endExclusive > 0 ? endExclusive - start : buf.length;
-                    if (endExclusive > 0 && remaining == 0) break;
+                    if (endExclusive > 0 && remaining == 0) {
+                        break;
+                    }
                     final int limit = (int) Math.min(buf.length, remaining);
                     final int len = mIs.read(buf, 0, limit);
                     if (len < 0) {
@@ -150,7 +158,9 @@ public class DownloadRunnableFallback extends Thread {
                         }
                         break;
                     }
-                    if (len == 0) throw new IOException("No progress reading media");
+                    if (len == 0) {
+                        throw new IOException("No progress reading media");
+                    }
                     mF.write(buf, 0, len);
                     start += len;
                     mMission.notifyProgress(len);
@@ -161,7 +171,9 @@ public class DownloadRunnableFallback extends Thread {
                 }
                 dispose();
                 mMission.fallbackResumeOffset = start;
-                if (!mMission.running) return;
+                if (!mMission.running) {
+                    return;
+                }
                 if (range != null && start < range.total) {
                     // Servers may return a valid range shorter than requested.
                     continue;
@@ -171,7 +183,9 @@ public class DownloadRunnableFallback extends Thread {
             } catch (Exception e) {
                 dispose();
                 mMission.fallbackResumeOffset = start;
-                if (!mMission.running || e instanceof ClosedByInterruptException) return;
+                if (!mMission.running || e instanceof ClosedByInterruptException) {
+                    return;
+                }
                 if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
                     mMission.doRecover(ERROR_HTTP_FORBIDDEN);
                     return;
@@ -181,7 +195,9 @@ public class DownloadRunnableFallback extends Thread {
                     mMission.notifyError(e);
                     return;
                 }
-                if (DEBUG) Log.e(TAG, "got exception, retrying...", e);
+                if (DEBUG) {
+                    Log.e(TAG, "got exception, retrying...", e);
+                }
             }
         }
     }

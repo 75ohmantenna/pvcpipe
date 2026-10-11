@@ -9,20 +9,20 @@ import java.util.Calendar;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
 public abstract class Mission implements Serializable {
-    private static final long serialVersionUID = 1L;// last bump: 27 march 2019
+    private static final long serialVersionUID = 1L; // last bump: 27 march 2019
 
     /**
-     * Source url of the resource
+     * Source url of the resource.
      */
     public String source;
 
     /**
-     * Length of the current resource
+     * Length of the current resource.
      */
     public long length;
 
     /**
-     * creation timestamp (and maybe unique identifier)
+     * creation timestamp (and maybe unique identifier).
      */
     public long timestamp;
 
@@ -31,29 +31,32 @@ public abstract class Mission implements Serializable {
     }
 
     /**
-     * pre-defined content type
+     * pre-defined content type.
      */
     public char kind;
 
     /**
-     * The downloaded file
+     * The downloaded file.
      */
     public StoredFileHelper storage;
 
     public String segmentsJson;
 
     /**
-     * Delete the downloaded file
+     * Delete the downloaded file.
      *
-     * @return {@code true] if and only if the file is successfully deleted, otherwise, {@code false}
+     * @return {@code true] if and only if the file is successfully deleted, otherwise,
+     * {@code false}
      */
     public boolean delete() {
-        if (storage != null) return storage.delete();
+        if (storage != null) {
+            return storage.delete();
+        }
         return true;
     }
 
     /**
-     * Indicate if this mission is deleted whatever is stored
+     * Indicate if this mission is deleted whatever is stored.
      */
     public transient boolean deleted = false;
 
@@ -62,6 +65,7 @@ public abstract class Mission implements Serializable {
     public String toString() {
         final Calendar calendar = Calendar.getInstance();
         calendar.setTimeInMillis(timestamp);
-        return "[" + calendar.getTime().toString() + "] " + (storage.isInvalid() ? storage.getName() : storage.getUri());
+        return "[" + calendar.getTime().toString() + "] "
+                + (storage.isInvalid() ? storage.getName() : storage.getUri());
     }
 }

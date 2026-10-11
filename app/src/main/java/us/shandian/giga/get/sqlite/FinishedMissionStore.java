@@ -20,7 +20,7 @@ import us.shandian.giga.get.Mission;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
 /**
- * SQLite helper to store finished {@link us.shandian.giga.get.FinishedMission}'s
+ * SQLite helper to store finished {@link us.shandian.giga.get.FinishedMission}'s.
  */
 public class FinishedMissionStore extends SQLiteOpenHelper {
 
@@ -30,17 +30,18 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 5;
 
     /**
-     * The table name of download missions (old)
+     * The table name of download missions (old).
      */
+    @SuppressWarnings("checkstyle:ConstantName")
     private static final String MISSIONS_TABLE_NAME_v2 = "download_missions";
 
     /**
-     * The table name of download missions
+     * The table name of download missions.
      */
     private static final String FINISHED_TABLE_NAME = "finished_missions";
 
     /**
-     * The key to the urls of a mission
+     * The key to the urls of a mission.
      */
     private static final String KEY_SOURCE = "url";
 
@@ -59,41 +60,43 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     private static final String KEY_SEGMENTS = "segments";
 
     /**
-     * The statement to create the table
+     * The statement to create the table.
      */
     private static final String MISSIONS_CREATE_TABLE =
-            "CREATE TABLE " + FINISHED_TABLE_NAME + " (" +
-                    KEY_PATH + " TEXT NOT NULL, " +
-                    KEY_SOURCE + " TEXT NOT NULL, " +
-                    KEY_DONE + " INTEGER NOT NULL, " +
-                    KEY_TIMESTAMP + " INTEGER NOT NULL, " +
-                    KEY_KIND + " TEXT NOT NULL, " +
-                    KEY_SEGMENTS + " TEXT, " +
-                    " UNIQUE(" + KEY_TIMESTAMP + ", " + KEY_PATH + "));";
+            "CREATE TABLE " + FINISHED_TABLE_NAME + " ("
+                    + KEY_PATH + " TEXT NOT NULL, "
+                    + KEY_SOURCE + " TEXT NOT NULL, "
+                    + KEY_DONE + " INTEGER NOT NULL, "
+                    + KEY_TIMESTAMP + " INTEGER NOT NULL, "
+                    + KEY_KIND + " TEXT NOT NULL, "
+                    + KEY_SEGMENTS + " TEXT, "
+                    + " UNIQUE(" + KEY_TIMESTAMP + ", " + KEY_PATH + "));";
 
 
     private final Context context;
 
-    public FinishedMissionStore(Context context) {
+    public FinishedMissionStore(final Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
         this.context = context;
     }
 
     @Override
-    public void onCreate(SQLiteDatabase db) {
+    public void onCreate(final SQLiteDatabase db) {
         db.execSQL(MISSIONS_CREATE_TABLE);
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+    @SuppressWarnings("checkstyle:FinalParameters")
+    public void onUpgrade(final SQLiteDatabase db, int oldVersion, final int newVersion) {
         if (oldVersion == 2) {
-            db.execSQL("ALTER TABLE " + MISSIONS_TABLE_NAME_v2 + " ADD COLUMN " + KEY_KIND + " TEXT;");
+            db.execSQL("ALTER TABLE " + MISSIONS_TABLE_NAME_v2 + " ADD COLUMN " + KEY_KIND
+                    + " TEXT;");
             oldVersion++;
         }
 
         if (oldVersion == 3) {
-            final String KEY_LOCATION = "location";
-            final String KEY_NAME = "name";
+            final String keyLocation = "location";
+            final String keyName = "name";
 
             db.execSQL(MISSIONS_CREATE_TABLE);
 
@@ -103,7 +106,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
                     db.beginTransaction();
                     try {
                         while (cursor.moveToNext()) {
-                            ContentValues values = new ContentValues();
+                            final ContentValues values = new ContentValues();
                             values.put(
                                     KEY_SOURCE,
                                     cursor.getString(cursor.getColumnIndexOrThrow(KEY_SOURCE))
@@ -121,8 +124,8 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
                             values.put(KEY_PATH, Uri.fromFile(
                                     new File(
                                             cursor.getString(cursor.getColumnIndexOrThrow(
-                                                    KEY_LOCATION)),
-                                            cursor.getString(cursor.getColumnIndexOrThrow(KEY_NAME))
+                                                    keyLocation)),
+                                            cursor.getString(cursor.getColumnIndexOrThrow(keyName))
                                     )
                             ).toString());
 
@@ -140,7 +143,8 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         }
 
         if (oldVersion == 4) {
-            db.execSQL("ALTER TABLE " + FINISHED_TABLE_NAME + " ADD COLUMN " + KEY_SEGMENTS + " TEXT;");
+            db.execSQL("ALTER TABLE " + FINISHED_TABLE_NAME + " ADD COLUMN " + KEY_SEGMENTS
+                    + " TEXT;");
         }
     }
 
@@ -150,8 +154,8 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
      * @param downloadMission the download mission
      * @return the content values
      */
-    private ContentValues getValuesOfMission(@NonNull Mission downloadMission) {
-        ContentValues values = new ContentValues();
+    private ContentValues getValuesOfMission(@NonNull final Mission downloadMission) {
+        final ContentValues values = new ContentValues();
         values.put(KEY_SOURCE, downloadMission.source);
         values.put(KEY_PATH, downloadMission.storage.getUri().toString());
         values.put(KEY_DONE, downloadMission.length);
@@ -161,14 +165,16 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         return values;
     }
 
-    private FinishedMission getMissionFromCursor(Cursor cursor) {
+    private FinishedMission getMissionFromCursor(final Cursor cursor) {
         String kind = Objects.requireNonNull(cursor)
                 .getString(cursor.getColumnIndexOrThrow(KEY_KIND));
-        if (kind == null || kind.isEmpty()) kind = "?";
+        if (kind == null || kind.isEmpty()) {
+            kind = "?";
+        }
 
-        String path = cursor.getString(cursor.getColumnIndexOrThrow(KEY_PATH));
+        final String path = cursor.getString(cursor.getColumnIndexOrThrow(KEY_PATH));
 
-        FinishedMission mission = new FinishedMission();
+        final FinishedMission mission = new FinishedMission();
 
         mission.source = cursor.getString(cursor.getColumnIndexOrThrow(KEY_SOURCE));
         mission.length = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DONE));
@@ -177,7 +183,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         mission.segmentsJson = cursor.getString(cursor.getColumnIndexOrThrow(KEY_SEGMENTS));
 
         try {
-            mission.storage = new StoredFileHelper(context,null, Uri.parse(path), "");
+            mission.storage = new StoredFileHelper(context, null, Uri.parse(path), "");
         } catch (Exception e) {
             Log.e("FinishedMissionStore", "failed to load the storage path of: " + path, e);
             mission.storage = new StoredFileHelper(null, path, "", "");
@@ -192,13 +198,15 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     ///////////////////////////////////
 
     public ArrayList<FinishedMission> loadFinishedMissions() {
-        SQLiteDatabase database = getReadableDatabase();
+        final SQLiteDatabase database = getReadableDatabase();
         try (Cursor cursor = database.query(FINISHED_TABLE_NAME, null, null,
                 null, null, null, KEY_TIMESTAMP + " DESC")) {
-            int count = cursor.getCount();
-            if (count == 0) return new ArrayList<>(1);
+            final int count = cursor.getCount();
+            if (count == 0) {
+                return new ArrayList<>(1);
+            }
 
-            ArrayList<FinishedMission> result = new ArrayList<>(count);
+            final ArrayList<FinishedMission> result = new ArrayList<>(count);
             while (cursor.moveToNext()) {
                 result.add(getMissionFromCursor(cursor));
             }
@@ -207,26 +215,26 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         }
     }
 
-    public boolean addFinishedMission(DownloadMission downloadMission) {
-        ContentValues values = getValuesOfMission(Objects.requireNonNull(downloadMission));
-        SQLiteDatabase database = getWritableDatabase();
+    public boolean addFinishedMission(final DownloadMission downloadMission) {
+        final ContentValues values = getValuesOfMission(Objects.requireNonNull(downloadMission));
+        final SQLiteDatabase database = getWritableDatabase();
         // Replaying a completed checkpoint after a crash must be safe.
         return database.insertWithOnConflict(FINISHED_TABLE_NAME, null, values,
                 SQLiteDatabase.CONFLICT_REPLACE) != -1;
     }
 
-    public void deleteMission(Mission mission) {
-        String ts = String.valueOf(Objects.requireNonNull(mission).timestamp);
+    public void deleteMission(final Mission mission) {
+        final String ts = String.valueOf(Objects.requireNonNull(mission).timestamp);
 
-        SQLiteDatabase database = getWritableDatabase();
+        final SQLiteDatabase database = getWritableDatabase();
 
         if (mission instanceof FinishedMission) {
             if (mission.storage.isInvalid()) {
                 database.delete(FINISHED_TABLE_NAME, KEY_TIMESTAMP + " = ?", new String[]{ts});
             } else {
-                database.delete(FINISHED_TABLE_NAME, KEY_TIMESTAMP + " = ? AND " + KEY_PATH + " = ?", new String[]{
-                        ts, mission.storage.getUri().toString()
-                });
+                database.delete(FINISHED_TABLE_NAME,
+                        KEY_TIMESTAMP + " = ? AND " + KEY_PATH + " = ?",
+                        new String[]{ts, mission.storage.getUri().toString()});
             }
         } else {
             throw new UnsupportedOperationException("DownloadMission");
