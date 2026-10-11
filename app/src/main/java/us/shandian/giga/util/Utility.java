@@ -1,7 +1,5 @@
 package us.shandian.giga.util;
 import android.content.Context;
-import android.os.Environment;
-import android.os.StatFs;
 import android.util.AtomicFile;
 import android.util.Log;
 
@@ -28,6 +26,7 @@ import java.util.Locale;
 
 import okio.ByteString;
 
+@SuppressWarnings("checkstyle:HideUtilityClassConstructor")
 public class Utility {
 
     public enum FileType {
@@ -37,8 +36,8 @@ public class Utility {
         UNKNOWN
     }
 
-    public static String formatBytes(long bytes) {
-        Locale locale = Locale.getDefault();
+    public static String formatBytes(final long bytes) {
+        final Locale locale = Locale.getDefault();
         if (bytes < 1024) {
             return String.format(locale, "%d B", bytes);
         } else if (bytes < 1024 * 1024) {
@@ -50,8 +49,8 @@ public class Utility {
         }
     }
 
-    public static String formatSpeed(double speed) {
-        Locale locale = Locale.getDefault();
+    public static String formatSpeed(final double speed) {
+        final Locale locale = Locale.getDefault();
         if (speed < 1024) {
             return String.format(locale, "%.2f B/s", speed);
         } else if (speed < 1024 * 1024) {
@@ -63,12 +62,14 @@ public class Utility {
         }
     }
 
-    public static boolean writeToFile(@NonNull File file, @NonNull Serializable serializable) {
-        AtomicFile atomicFile = new AtomicFile(file);
+    public static boolean writeToFile(@NonNull final File file,
+                                      @NonNull final Serializable serializable) {
+        final AtomicFile atomicFile = new AtomicFile(file);
         FileOutputStream stream = null;
         try {
             stream = atomicFile.startWrite();
-            ObjectOutputStream output = new ObjectOutputStream(new BufferedOutputStream(stream));
+            final ObjectOutputStream output =
+                    new ObjectOutputStream(new BufferedOutputStream(stream));
             output.writeObject(serializable);
             output.flush();
             // AtomicFile must own/close the underlying stream after it synchronizes the bytes.
@@ -76,14 +77,16 @@ public class Utility {
             return true;
         } catch (Exception e) {
             Log.e("Utility", "Failed to serialize the object to " + file, e);
-            if (stream != null) atomicFile.failWrite(stream);
+            if (stream != null) {
+                atomicFile.failWrite(stream);
+            }
             return false;
         }
     }
 
     @Nullable
     @SuppressWarnings("unchecked")
-    public static <T> T readFromFile(File file) {
+    public static <T> T readFromFile(final File file) {
         try (ObjectInputStream input = new ObjectInputStream(new AtomicFile(file).openRead())) {
             return (T) input.readObject();
         } catch (Exception e) {
@@ -93,6 +96,7 @@ public class Utility {
     }
 
     @Nullable
+    @SuppressWarnings({"checkstyle:InnerAssignment", "checkstyle:FinalParameters"})
     public static String getFileExt(String url) {
         int index;
         if ((index = url.indexOf("?")) > -1) {
@@ -114,7 +118,7 @@ public class Utility {
         }
     }
 
-    public static FileType getFileType(char kind, String file) {
+    public static FileType getFileType(final char kind, final String file) {
         switch (kind) {
             case 'v':
                 return FileType.VIDEO;
@@ -127,10 +131,12 @@ public class Utility {
 
         if (file.endsWith(".srt") || file.endsWith(".vtt") || file.endsWith(".ssa")) {
             return FileType.SUBTITLE;
-        } else if (file.endsWith(".mp3") || file.endsWith(".wav") || file.endsWith(".flac") || file.endsWith(".m4a") || file.endsWith(".opus")) {
+        } else if (file.endsWith(".mp3") || file.endsWith(".wav") || file.endsWith(".flac")
+                || file.endsWith(".m4a") || file.endsWith(".opus")) {
             return FileType.MUSIC;
-        } else if (file.endsWith(".mp4") || file.endsWith(".mpeg") || file.endsWith(".rm") || file.endsWith(".rmvb")
-                || file.endsWith(".flv") || file.endsWith(".webp") || file.endsWith(".webm")) {
+        } else if (file.endsWith(".mp4") || file.endsWith(".mpeg") || file.endsWith(".rm")
+                || file.endsWith(".rmvb") || file.endsWith(".flv") || file.endsWith(".webp")
+                || file.endsWith(".webm")) {
             return FileType.VIDEO;
         }
 
@@ -138,8 +144,8 @@ public class Utility {
     }
 
     @ColorInt
-    public static int getBackgroundForFileType(Context ctx, FileType type) {
-        int colorRes;
+    public static int getBackgroundForFileType(final Context ctx, final FileType type) {
+        final int colorRes;
         switch (type) {
             case MUSIC:
                 colorRes = R.color.audio_left_to_load_color;
@@ -158,8 +164,8 @@ public class Utility {
     }
 
     @ColorInt
-    public static int getForegroundForFileType(Context ctx, FileType type) {
-        int colorRes;
+    public static int getForegroundForFileType(final Context ctx, final FileType type) {
+        final int colorRes;
         switch (type) {
             case MUSIC:
                 colorRes = R.color.audio_already_load_color;
@@ -179,7 +185,7 @@ public class Utility {
     }
 
     @DrawableRes
-    public static int getIconForFileType(FileType type) {
+    public static int getIconForFileType(final FileType type) {
         switch (type) {
             case MUSIC:
                 return R.drawable.ic_headset;
@@ -206,18 +212,21 @@ public class Utility {
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    public static boolean mkdir(File p, boolean allDirs) {
-        if (p.exists()) return true;
+    public static boolean mkdir(final File p, final boolean allDirs) {
+        if (p.exists()) {
+            return true;
+        }
 
-        if (allDirs)
+        if (allDirs) {
             p.mkdirs();
-        else
+        } else {
             p.mkdir();
+        }
 
         return p.exists();
     }
 
-    public static long getContentLength(HttpURLConnection connection) {
+    public static long getContentLength(final HttpURLConnection connection) {
         return connection.getContentLengthLong();
     }
 
@@ -243,7 +252,7 @@ public class Utility {
         return -1;
     }
 
-    private static String pad(int number) {
+    private static String pad(final int number) {
         return number < 10 ? ("0" + number) : String.valueOf(number);
     }
 
@@ -257,8 +266,12 @@ public class Utility {
         if (h < 1 && m < 1) {
             str = "00:";
         } else {
-            if (h > 0) str = pad(h) + ":";
-            if (m > 0) str += pad(m) + ":";
+            if (h > 0) {
+                str = pad(h) + ":";
+            }
+            if (m > 0) {
+                str += pad(m) + ":";
+            }
         }
 
         return str + pad(s);

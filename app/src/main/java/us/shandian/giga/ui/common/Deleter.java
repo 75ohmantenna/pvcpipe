@@ -27,9 +27,9 @@ public class Deleter {
     private static final String NEXT = "next";
     private static final String SHOW = "show";
 
-    private static final int TIMEOUT = 5000;// ms
-    private static final int DELAY = 350;// ms
-    private static final int DELAY_RESUME = 400;// ms
+    private static final int TIMEOUT = 5000; // ms
+    private static final int DELAY = 350; // ms
+    private static final int DELAY_RESUME = 400; // ms
 
     private Snackbar snackbar;
     // list of missions to be deleted, and whether to also delete the corresponding file
@@ -43,7 +43,8 @@ public class Deleter {
     private final Handler mHandler;
     private final View mView;
 
-    public Deleter(View v, Context c, MissionAdapter a, DownloadManager d, MissionIterator i, Handler h) {
+    public Deleter(final View v, final Context c, final MissionAdapter a,
+                   final DownloadManager d, final MissionIterator i, final Handler h) {
         mView = v;
         mContext = c;
         mAdapter = a;
@@ -54,7 +55,7 @@ public class Deleter {
         items = new ArrayList<>(2);
     }
 
-    public void append(Mission item, boolean alsoDeleteFile) {
+    public void append(final Mission item, final boolean alsoDeleteFile) {
         /* If a mission is removed from the list while the Snackbar for a previously
          * removed item is still showing, commit the action for the previous item
          * immediately. This prevents Snackbars from stacking up in reverse order.
@@ -76,7 +77,9 @@ public class Deleter {
     }
 
     private void show() {
-        if (items.size() < 1) return;
+        if (items.size() < 1) {
+            return;
+        }
 
         pause();
         running = true;
@@ -85,14 +88,16 @@ public class Deleter {
     }
 
     private void next() {
-        if (items.size() < 1) return;
+        if (items.size() < 1) {
+            return;
+        }
 
         final Optional<String> fileToBeDeleted = items.stream()
                 .filter(Pair::getSecond)
                 .map(p -> p.getFirst().storage.getName())
                 .findFirst();
 
-        String msg;
+        final String msg;
         if (fileToBeDeleted.isPresent()) {
             msg = mContext.getString(R.string.file_deleted)
                     .concat(":\n")
@@ -110,19 +115,24 @@ public class Deleter {
     }
 
     private void commit() {
-        if (items.size() < 1) return;
+        if (items.size() < 1) {
+            return;
+        }
 
         while (items.size() > 0) {
-            Pair<Mission, Boolean> missionAndAlsoDeleteFile = items.remove(0);
-            Mission mission = missionAndAlsoDeleteFile.getFirst();
-            boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
-            if (mission.deleted) continue;
+            final Pair<Mission, Boolean> missionAndAlsoDeleteFile = items.remove(0);
+            final Mission mission = missionAndAlsoDeleteFile.getFirst();
+            final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
+            if (mission.deleted) {
+                continue;
+            }
 
             mIterator.unHide(mission);
             mDownloadManager.deleteMission(mission, alsoDeleteFile);
 
             if (mission instanceof FinishedMission) {
-                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, mission.storage.getUri()));
+                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                        mission.storage.getUri()));
             }
             break;
         }
@@ -140,7 +150,9 @@ public class Deleter {
         mHandler.removeCallbacksAndMessages(NEXT);
         mHandler.removeCallbacksAndMessages(SHOW);
         mHandler.removeCallbacksAndMessages(COMMIT);
-        if (snackbar != null) snackbar.dismiss();
+        if (snackbar != null) {
+            snackbar.dismiss();
+        }
     }
 
     public void resume() {
@@ -150,13 +162,15 @@ public class Deleter {
     }
 
     public void dispose() {
-        if (items.size() < 1) return;
+        if (items.size() < 1) {
+            return;
+        }
 
         pause();
 
-        for (Pair<Mission, Boolean> missionAndAlsoDeleteFile : items) {
-            Mission mission = missionAndAlsoDeleteFile.getFirst();
-            boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
+        for (final Pair<Mission, Boolean> missionAndAlsoDeleteFile : items) {
+            final Mission mission = missionAndAlsoDeleteFile.getFirst();
+            final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
             mDownloadManager.deleteMission(mission, alsoDeleteFile);
         }
         items = null;

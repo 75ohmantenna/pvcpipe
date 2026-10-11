@@ -142,15 +142,6 @@ tasks.register<Checkstyle>("runCheckstyle") {
     exclude("**/gen/**")
     exclude("**/R.java")
     exclude("**/BuildConfig.java")
-    // Legacy downloader files with existing violations; new files are checked by default.
-    exclude(
-        "main/java/us/shandian/giga/service/DownloadManager.java",
-        "main/java/us/shandian/giga/service/DownloadManagerService.java",
-        "main/java/us/shandian/giga/ui/adapter/MissionAdapter.java",
-        "main/java/us/shandian/giga/ui/common/Deleter.java",
-        "main/java/us/shandian/giga/ui/fragment/MissionsFragment.java",
-        "main/java/us/shandian/giga/util/Utility.java",
-    )
 
     classpath = configurations.getByName("checkstyle")
 
