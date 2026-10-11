@@ -26,16 +26,18 @@ import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.database.stream.model.StreamStateEntity
 import org.schabi.newpipe.extractor.stream.StreamType
+import org.schabi.newpipe.testUtil.RoomTestExecutors
 
 /** Exercises playlist content decisions and persisted effects through the manager interface. */
 class LocalPlaylistContentsTest {
     private lateinit var database: AppDatabase
+    private val roomExecutors = RoomTestExecutors()
     private lateinit var manager: LocalPlaylistManager
 
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+        database = roomExecutors.applyTo(Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java))
             .allowMainThreadQueries()
             .build()
         manager = LocalPlaylistManager(database, Schedulers.trampoline())
@@ -43,7 +45,7 @@ class LocalPlaylistContentsTest {
 
     @After
     fun tearDown() {
-        database.close()
+        roomExecutors.closeWhenIdle(database)
     }
 
     @Test

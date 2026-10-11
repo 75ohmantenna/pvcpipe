@@ -25,22 +25,24 @@ import org.schabi.newpipe.database.playlist.model.PlaylistEntity
 import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.extractor.stream.StreamType
+import org.schabi.newpipe.testUtil.RoomTestExecutors
 
 /** Regressions for accepted playlist mutation ownership, input snapshots, and transactions. */
 class LocalPlaylistCorrectionTest {
     private lateinit var database: AppDatabase
+    private val roomExecutors = RoomTestExecutors()
 
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+        database = roomExecutors.applyTo(Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java))
             .allowMainThreadQueries()
             .build()
     }
 
     @After
     fun tearDown() {
-        database.close()
+        roomExecutors.closeWhenIdle(database)
     }
 
     @Test
