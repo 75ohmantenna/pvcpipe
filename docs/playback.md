@@ -14,6 +14,11 @@ specification of their control flow.
   so a later or failed resolution cannot change an existing source's reload
   decision. Unknown source facts require reconstruction. Queue preloading,
   expiration and timeline management are not source-selection policy.
+- **Queue requests:** [`QueuePlaybackChoice`](../app/src/main/java/org/schabi/newpipe/player/QueuePlaybackChoice.java)
+  decides what the player does with a queue it is asked to play: seek in
+  place, keep the loaded queue, look up a resume position first, or start. The
+  checks run in that order. `Player.handleQueuePlayback` cancels any pending
+  decision before it asks, and carries out the answer.
 - **Audio:** [`PlaybackAudio`](../app/src/main/java/org/schabi/newpipe/player/audio/PlaybackAudio.java)
   owns internal-volume intent, mute, focus and restoration; the
   [`AndroidPlaybackAudioEnvironment`](../app/src/main/java/org/schabi/newpipe/player/audio/AndroidPlaybackAudioEnvironment.java)
@@ -87,6 +92,8 @@ changing mutations.
 - Source policy: [`PlaybackSourcesTest`](../app/src/test/java/org/schabi/newpipe/player/resolver/PlaybackSourcesTest.java),
   [`PlaybackSourcesSafetyTest`](../app/src/test/java/org/schabi/newpipe/player/resolver/PlaybackSourcesSafetyTest.java),
   [`PlaybackSourcesIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/resolver/PlaybackSourcesIntegrationTest.kt).
+- Queue requests: [`QueuePlaybackChoiceTest`](../app/src/test/java/org/schabi/newpipe/player/QueuePlaybackChoiceTest.java),
+  [`PlayerIntentTest`](../app/src/test/java/org/schabi/newpipe/player/PlayerIntentTest.java).
 - Focus/volume: [`PlaybackAudioTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioTest.java),
   [`PlaybackAudioFocusProtocolTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioFocusProtocolTest.java),
   [`PlaybackAudioIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/audio/PlaybackAudioIntegrationTest.kt).

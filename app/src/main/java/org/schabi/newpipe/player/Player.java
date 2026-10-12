@@ -373,35 +373,29 @@ public final class Player implements PlaybackListener, Listener {
          * In those cases time will be saved because re-init of the play queue is a not an instant
          *  task and requires network calls
          * */
-        // seek to timestamp if stream is already playing
-        if (!exoPlayerIsNull()
-                && newQueue.size() == 1 && newQueue.getItem() != null
-                && playQueue != null && playQueue.size() == 1 && playQueue.getItem() != null
-                && newQueue.getItem().isSameItem(playQueue.getItem())
-                && newQueue.getItem().getRecoveryPosition() != PlayQueueItem.RECOVERY_UNSET) {
-            prepareIfIdle();
-            simpleExoPlayer.seekTo(playQueue.getIndex(), newQueue.getItem().getRecoveryPosition());
-            simpleExoPlayer.setPlayWhenReady(playWhenReady);
-
-        } else if (!exoPlayerIsNull()
-                && samePlayQueue
-                && playQueue != null
-                && !playQueue.isDisposed()) {
-            prepareIfIdle();
-            simpleExoPlayer.setPlayWhenReady(playWhenReady);
-
-        } else if (intent.getBooleanExtra(RESUME_PLAYBACK, false)
-                && DependentPreferenceHelper.getResumePlaybackEnabled(context)
-                // !samePlayQueue
-                && (playQueue == null || !playQueue.equalStreamsAndIndex(newQueue))
-                && !newQueue.isEmpty()
-                && newQueue.getItem() != null
-                && newQueue.getItem().getRecoveryPosition() == PlayQueueItem.RECOVERY_UNSET) {
-            resumePlaybackFromHistory(newQueue, playWhenReady);
-        } else {
-            // Good to go...
-            // In a case of equal PlayQueues we can re-init old one but only when it is disposed
-            initPlayback(samePlayQueue ? playQueue : newQueue, playWhenReady);
+        switch (QueuePlaybackChoice.of(!exoPlayerIsNull(), playQueue, newQueue, samePlayQueue,
+                intent.getBooleanExtra(RESUME_PLAYBACK, false),
+                () -> DependentPreferenceHelper.getResumePlaybackEnabled(context))) {
+            case SEEK_IN_PLACE:
+                // seek to timestamp if stream is already playing
+                prepareIfIdle();
+                simpleExoPlayer.seekTo(playQueue.getIndex(),
+                        newQueue.getItem().getRecoveryPosition());
+                simpleExoPlayer.setPlayWhenReady(playWhenReady);
+                break;
+            case KEEP_CURRENT_QUEUE:
+                prepareIfIdle();
+                simpleExoPlayer.setPlayWhenReady(playWhenReady);
+                break;
+            case RESUME_FROM_HISTORY:
+                resumePlaybackFromHistory(newQueue, playWhenReady);
+                break;
+            case START:
+            default:
+                // Good to go...
+                // In a case of equal PlayQueues we can re-init old one but only when it is disposed
+                initPlayback(samePlayQueue ? playQueue : newQueue, playWhenReady);
+                break;
         }
     }
 
