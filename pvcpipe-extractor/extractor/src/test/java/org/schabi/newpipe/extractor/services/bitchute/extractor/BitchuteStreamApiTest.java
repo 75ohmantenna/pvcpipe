@@ -2,6 +2,7 @@ package org.schabi.newpipe.extractor.services.bitchute.extractor;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
@@ -55,6 +56,16 @@ class BitchuteStreamApiTest {
         assertEquals("https://www.bitchute.com/channel/example/", extractor.getUploaderUrl());
         assertEquals("news", extractor.getCategory());
         assertEquals(Set.of("one", "two"), new HashSet<>(extractor.getTags()));
+
+        final Image thumbnail = extractor.getThumbnails().get(0);
+        assertEquals("https://cdn.example/live/cover_images/example/video_640x360.jpg",
+                thumbnail.getUrl());
+        assertEquals(640, thumbnail.getWidth());
+        assertEquals(360, thumbnail.getHeight());
+        final Image avatar = extractor.getUploaderAvatars().get(0);
+        assertEquals("https://cdn.example/live/channel_images/example/avatar_large.jpg",
+                avatar.getUrl());
+        assertEquals(Image.ResolutionLevel.MEDIUM, avatar.getEstimatedResolutionLevel());
 
         final VideoStream stream = extractor.getVideoStreams().get(0);
         assertEquals(DeliveryMethod.HLS, stream.getDeliveryMethod());
@@ -162,7 +173,8 @@ class BitchuteStreamApiTest {
                     + "\"date_created\":\"2020-01-01T00:00:00Z\","
                     + "\"last_video_published\":\"2026-09-18T12:34:56Z\","
                     + "\"subscriber_count\":42,"
-                    + "\"thumbnail_url\":\"https://cdn.example/channel.jpg\"},"
+                    + "\"thumbnail_url\":\"https://cdn.example/live/channel_images/example/"
+                    + "avatar_large.jpg\"},"
                     + "\"date_published\":\"2026-09-18T12:34:56Z\","
                     + "\"description\":\"<p>Example description</p>\","
                     + "\"duration\":\"01:02:03\",\"hashtags\":[\"one\",\"two\"],"
@@ -171,7 +183,8 @@ class BitchuteStreamApiTest {
                     + "\"sensitivity_id\":\"safe\",\"show_adverts\":false,"
                     + "\"show_comments\":true,\"show_rantrave\":false,"
                     + "\"state_id\":\"published\","
-                    + "\"thumbnail_url\":\"https://cdn.example/video.jpg\","
+                    + "\"thumbnail_url\":\"https://cdn.example/live/cover_images/example/"
+                    + "video_640x360.jpg\","
                     + "\"video_id\":\"" + VIDEO_ID + "\","
                     + "\"video_name\":\"Example video\",\"view_count\":321}";
         }

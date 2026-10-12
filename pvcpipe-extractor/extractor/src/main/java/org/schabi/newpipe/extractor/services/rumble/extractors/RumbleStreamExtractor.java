@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,10 +67,12 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     private static final String AUTHOR = "author";
     private static final String TITLE = "title";
     private static final String COVER_IMAGE = "i";
+    private static final String THUMBNAILS = "t";
     private static final String PUBLICATION_DATE = "pubDate";
     private static final String DURATION = "duration";
     private static final String BITRATE = "bitrate";
     private static final String HEIGHT = "h";
+    private static final String WIDTH = "w";
     private static final String STREAMS = "ua";
     private static final String STREAM_METADATA = "meta";
     private static final String STREAM_URL = "url";
@@ -136,8 +139,26 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     public List<Image> getThumbnails() throws ParsingException {
         assertPageFetched();
         final String thumbUrl = embedJsonStreamInfoObj.getString(COVER_IMAGE);
+        int height = Image.HEIGHT_UNKNOWN;
+        int width = Image.WIDTH_UNKNOWN;
+        // the size of the cover image is only given in the list of all thumbnails
+        for (final Object item : embedJsonStreamInfoObj.getArray(THUMBNAILS)) {
+            if (!(item instanceof JsonObject)) {
+                continue;
+            }
+            final JsonObject thumbnail = (JsonObject) item;
+            if (Objects.equals(thumbUrl, thumbnail.getString(COVER_IMAGE))) {
+                height = toImageSize(thumbnail.getInt(HEIGHT), Image.HEIGHT_UNKNOWN);
+                width = toImageSize(thumbnail.getInt(WIDTH), Image.WIDTH_UNKNOWN);
+                break;
+            }
+        }
         return List.of(new Image(thumbUrl,
-                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
+                height, width, Image.ResolutionLevel.fromHeight(height)));
+    }
+
+    private static int toImageSize(final int size, final int unknown) {
+        return size > 0 ? size : unknown;
     }
 
     @Nonnull
@@ -302,8 +323,10 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         try {
             final String thumbnailUrl = RumbleParsingHelper
                     .extractUploaderAvatarUrl(theUserPathToHisAvatar, doc);
+            // the page does not give a size, but Rumble serves these avatars 150px wide and
+            // never taller than that
             return List.of(new Image(thumbnailUrl,
-                    Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
+                    Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.LOW));
         } catch (final Exception e) {
             throw new ParsingException(
                     "Could not extract the avatar url: " + theUserPathToHisAvatar);
