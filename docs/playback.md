@@ -52,6 +52,12 @@ specification of their control flow.
   entry when a stream loads or when the player reports a queue with other
   streams, and hands a stored entry the player's live queue when the streams
   match. `VideoDetailFragment` decides what to show for the entry Back returns.
+- **Detail orientation:** [`DetailOrientation`](../app/src/main/java/org/schabi/newpipe/fragments/detail/DetailOrientation.java)
+  decides what the rotation button does, when a rotation leaves or enters
+  fullscreen, when opening the player rotates the activity, and when landscape
+  starts a player that is not playing. `VideoDetailFragment` reads the device
+  and player facts and makes the activity and player calls. Vertical videos are
+  handled by `MainPlayerUi`.
 - **Proof tokens:** The extractor's
   [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
   delegates Web-client requests to
@@ -96,4 +102,5 @@ changing mutations.
 - Error recovery: [`PlaybackErrorsTest`](../app/src/test/java/org/schabi/newpipe/player/error/PlaybackErrorsTest.java).
 - Listener updates: [`PlayerListenersTest`](../app/src/test/java/org/schabi/newpipe/player/event/PlayerListenersTest.java).
 - Detail history: [`DetailStackTest`](../app/src/test/java/org/schabi/newpipe/fragments/detail/DetailStackTest.java).
+- Detail orientation: [`DetailOrientationTest`](../app/src/test/java/org/schabi/newpipe/fragments/detail/DetailOrientationTest.java).
 - Queue event ordering: [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java).

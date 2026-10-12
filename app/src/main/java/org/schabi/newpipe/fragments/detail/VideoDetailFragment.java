@@ -244,9 +244,9 @@ public final class VideoDetailFragment
             // If the video is playing but orientation changed
             // let's make the video in fullscreen again
             checkLandscape();
-        } else if (playerUi.map(ui -> ui.isFullscreen() && !ui.isVerticalVideo()).orElse(false)
-                // Tablet UI has orientation-independent fullscreen
-                && !DeviceUtils.isTablet(activity)) {
+        } else if (playerUi.map(ui -> DetailOrientation.leavesFullscreenInPortrait(
+                ui.isFullscreen(), ui.isVerticalVideo(), DeviceUtils.isTablet(activity)))
+                .orElse(false)) {
             // Device is in portrait orientation after rotation but UI is in fullscreen.
             // Return back to non-fullscreen state
             playerUi.ifPresent(MainPlayerUi::toggleFullscreen);
@@ -966,9 +966,9 @@ public final class VideoDetailFragment
      *                                       in landscape and screen orientation is locked
      */
     public void openVideoPlayer(final boolean directlyFullscreenIfApplicable) {
-        if (directlyFullscreenIfApplicable
-                && !DeviceUtils.isLandscape(requireContext())
-                && PlayerHelper.globalScreenOrientationLocked(requireContext())) {
+        if (DetailOrientation.rotatesToOpenFullscreen(directlyFullscreenIfApplicable,
+                DeviceUtils.isLandscape(requireContext()),
+                PlayerHelper.globalScreenOrientationLocked(requireContext()))) {
             // Make sure the bottom sheet turns out expanded. When this code kicks in the bottom
             // sheet could not have fully expanded yet, and thus be in the STATE_SETTLING state.
             // When the activity is rotated, and its state is saved and then restored, the bottom
@@ -1733,23 +1733,21 @@ public final class VideoDetailFragment
 
     @Override
     public void onScreenRotationButtonClicked() {
-        // On Android TV screen rotation is not supported
-        // In tablet user experience will be better if screen will not be rotated
-        // from landscape to portrait every time.
-        // Just turn on fullscreen mode in landscape orientation
-        // or portrait & unlocked global orientation
-        final boolean isLandscape = DeviceUtils.isLandscape(requireContext());
-        if (DeviceUtils.isTv(activity) || DeviceUtils.isTablet(activity)
-                && (!globalScreenOrientationLocked(activity) || isLandscape)) {
-            player.UIs().get(MainPlayerUi.class).ifPresent(MainPlayerUi::toggleFullscreen);
-            return;
+        switch (DetailOrientation.onRotationButton(DeviceUtils.isTv(activity),
+                DeviceUtils.isTablet(activity), globalScreenOrientationLocked(activity),
+                DeviceUtils.isLandscape(requireContext()))) {
+            case TOGGLE_FULLSCREEN:
+                player.UIs().get(MainPlayerUi.class).ifPresent(MainPlayerUi::toggleFullscreen);
+                break;
+            case REQUEST_PORTRAIT:
+                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                break;
+            case REQUEST_SENSOR_LANDSCAPE:
+            default:
+                activity.setRequestedOrientation(
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                break;
         }
-
-        final int newOrientation = isLandscape
-                ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
-
-        activity.setRequestedOrientation(newOrientation);
     }
 
     /*
@@ -1895,7 +1893,8 @@ public final class VideoDetailFragment
 
         player.UIs().get(MainPlayerUi.class).ifPresent(MainPlayerUi::checkLandscape);
         // Let's give a user time to look at video information page if video is not playing
-        if (globalScreenOrientationLocked(activity) && !player.isPlaying()) {
+        if (DetailOrientation.startsPlaybackInLandscape(globalScreenOrientationLocked(activity),
+                player.isPlaying())) {
             player.play();
         }
     }
@@ -2064,11 +2063,11 @@ public final class VideoDetailFragment
                         setOverlayElementsClickable(false);
                         hideSystemUiIfNeeded();
                         // Conditions when the player should be expanded to fullscreen
-                        if (DeviceUtils.isLandscape(requireContext())
-                                && isPlayerAvailable()
-                                && player.isPlaying()
-                                && !isFullscreen()
-                                && !DeviceUtils.isTablet(activity)) {
+                        if (DetailOrientation.entersFullscreenWhenExpanded(
+                                DeviceUtils.isLandscape(requireContext()),
+                                isPlayerAvailable() && player.isPlaying(),
+                                isFullscreen(),
+                                DeviceUtils.isTablet(activity))) {
                             player.UIs().get(MainPlayerUi.class)
                                     .ifPresent(MainPlayerUi::toggleFullscreen);
                         }
