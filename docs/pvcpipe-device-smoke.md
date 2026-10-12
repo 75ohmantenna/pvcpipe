@@ -265,3 +265,35 @@ seconds, four video streams), and a later attempt in the app on the emulator
 loaded and played it. The failure was not reproduced and its cause was not
 found.
 
+## Follow-up emulator checks, 2026-10-11 and 2026-10-12
+
+Scripted checks on the same emulator for things the earlier sections left
+open. Each one names the build it ran on.
+
+- **PASS, history entries made by the player.** On a build with two temporary
+  log lines around the detail screen's history, video B was sent from outside
+  to the background player while video A was on the detail screen. The log
+  shows `onQueueUpdate` taking the history from one entry to two, with no
+  stream load involved, and Back then returned to video A.
+- **PASS with one gap, play queue activity.** Opened from the mini player, it
+  showed the playing item, its position text followed playback, and its
+  forward button moved the player to the second item. In an earlier run
+  playback went on after it was closed. Not obtained: a read of the activity
+  showing the second item after the skip.
+- **No difference, D-pad navigation around #100.** Key-by-key recordings on
+  the current build and on a build from before #100 are the same with "scroll
+  only below player" on and off. In both, on a freshly opened detail screen
+  the focus moves through the main screen behind it and the detail lists do
+  not move. After a list had been touched, the focus moved between comments
+  and their reply buttons. The focus path itself was not looked into.
+- **Finding, skip-stream errors.** With the debug control's "Bad HTTP status"
+  entry (#108) and a two-item queue, the skip branch ran and moved the queue
+  index, the player reloaded both sources, and the position discontinuity
+  that followed set the index back to the item ExoPlayer was still on. The
+  first item kept playing. The control cannot break ExoPlayer itself, so this
+  does not show what a real bad-status error does; whether the queue is pulled
+  back to the failing item in that case is not known.
+- **PASS, title row and arrow (#106), and the orientation decisions (#109).**
+  Title and arrow sequence 14 of 14. Player modes 24 of 24, including the
+  fullscreen button, Back out of fullscreen and rotation both ways.
+
