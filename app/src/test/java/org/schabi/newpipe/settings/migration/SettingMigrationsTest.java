@@ -1,7 +1,15 @@
 package org.schabi.newpipe.settings.migration;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.RETURNS_SELF;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import android.content.SharedPreferences;
 
 import org.junit.Test;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -52,6 +60,51 @@ public class SettingMigrationsTest {
                 new Tab.KioskTab(BANDCAMP_ID, "Radio")));
 
         assertEquals(List.of(feed, youtubeChannel), kept);
+    }
+
+    @Test
+    public void instancePreferencesAreRemovedAndAKeptServiceStaysSelected() {
+        final SharedPreferences preferences = mock(SharedPreferences.class);
+        final SharedPreferences.Editor editor =
+                mock(SharedPreferences.Editor.class, RETURNS_SELF);
+        when(preferences.edit()).thenReturn(editor);
+        when(preferences.getString("service", "")).thenReturn("Rumble");
+
+        assertFalse(SettingMigrations.removeServicePreferences(preferences, "service"));
+
+        verify(editor).remove("peertube_selected_instance");
+        verify(editor).remove("peertube_instance_list");
+        verify(editor, never()).remove("service");
+        verify(editor).apply();
+    }
+
+    @Test
+    public void aRemovedSelectedServiceIsCleared() {
+        for (final String name : List.of("media.ccc.de", "PeerTube", "Bandcamp")) {
+            final SharedPreferences preferences = mock(SharedPreferences.class);
+            final SharedPreferences.Editor editor =
+                    mock(SharedPreferences.Editor.class, RETURNS_SELF);
+            when(preferences.edit()).thenReturn(editor);
+            when(preferences.getString("service", "")).thenReturn(name);
+
+            assertTrue(SettingMigrations.removeServicePreferences(preferences, "service"));
+
+            verify(editor).remove("service");
+            verify(editor).apply();
+        }
+    }
+
+    @Test
+    public void aMissingSelectedServiceIsLeftAlone() {
+        final SharedPreferences preferences = mock(SharedPreferences.class);
+        final SharedPreferences.Editor editor =
+                mock(SharedPreferences.Editor.class, RETURNS_SELF);
+        when(preferences.edit()).thenReturn(editor);
+        when(preferences.getString("service", "")).thenReturn("");
+
+        assertFalse(SettingMigrations.removeServicePreferences(preferences, "service"));
+
+        verify(editor, never()).remove("service");
     }
 
     @Test

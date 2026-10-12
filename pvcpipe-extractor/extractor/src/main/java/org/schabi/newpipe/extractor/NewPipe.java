@@ -21,6 +21,7 @@ package org.schabi.newpipe.extractor;
  */
 
 import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
@@ -78,7 +79,7 @@ public final class NewPipe {
         return ServiceList.all().stream()
                 .filter(service -> service.getServiceId() == serviceId)
                 .findFirst()
-                .orElseThrow(() -> new ExtractionException(
+                .orElseThrow(() -> new ContentNotSupportedException(
                         "There's no service with the id = \"" + serviceId + "\""));
     }
 

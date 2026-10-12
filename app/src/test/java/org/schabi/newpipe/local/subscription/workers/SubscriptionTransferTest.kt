@@ -137,7 +137,7 @@ class SubscriptionTransferTest {
 
         val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { progress.add(it) }
 
-        assertEquals(2, (result as SubscriptionTransfer.Outcome.Success).count)
+        assertEquals(SubscriptionTransfer.Outcome.Success(2, skipped = 2), result)
         assertEquals(listOf(kept, alsoKept), operations.extracted)
         assertEquals(listOf(kept, alsoKept), operations.stored.single().map { it.first.toItem() })
         assertTrue(progress.filterIsInstance<SubscriptionTransfer.Progress.Loading>().all { it.total == 2 })
@@ -152,7 +152,7 @@ class SubscriptionTransferTest {
 
         val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
 
-        assertEquals(0, (result as SubscriptionTransfer.Outcome.Success).count)
+        assertEquals(SubscriptionTransfer.Outcome.Success(0, skipped = 1), result)
         assertTrue(operations.extracted.isEmpty())
         assertTrue(operations.stored.isEmpty())
     }

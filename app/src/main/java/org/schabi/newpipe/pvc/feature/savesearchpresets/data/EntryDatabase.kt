@@ -104,3 +104,12 @@ data class DBState(
     val defaults: List<DefaultEntry>,
     val entries: List<Entry>
 )
+
+/**
+ * @param services names of services
+ * @return this state without the presets and the default presets of those services
+ */
+fun DBState.withoutServices(services: Set<String>): DBState = copy(
+    defaults = defaults.filter { it.service !in services },
+    entries = entries.filter { it.service !in services }
+)

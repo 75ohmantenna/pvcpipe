@@ -53,10 +53,27 @@ look a service up by id (`NewPipe.getService`, `Menu.findItem`) and never by
 its position in `ServiceList.all()`.
 
 Settings migration 8 to 9 drops main-page tabs that show a kiosk, channel or
-playlist of a removed service, deletes the PeerTube instance preferences, and
-clears the selected service if it was a removed one. Database rows that carry
-a retired id (subscriptions, history, playlist entries, bookmarked playlists)
-are not deleted.
+playlist of a removed service, deletes the PeerTube instance preferences and
+the saved search presets of the three services, and clears the selected
+service if it was a removed one. It tells the user once if a tab went or the
+selected service changed.
+
+Database rows that carry a retired id are not deleted. This is what the app
+does with them:
+
+- Subscriptions, history entries, playlist entries and bookmarked playlists
+  stay listed, with `<unknown>` where the service name goes. Opening one shows
+  "PVCPipe does not support this content yet", because `NewPipe.getService`
+  throws `ContentNotSupportedException` for an id without a service.
+- A feed refresh leaves such subscriptions out (`FeedLoadManager`), so they
+  are not reported as errors on every refresh.
+- The channel and playlist pickers for main-page tabs do not offer them.
+- A subscription import leaves out channels of services the app does not have
+  and says how many it skipped. Without that, one such channel would fail the
+  whole import.
+
+Use `ServiceHelper.hasService` for any new code that reads a stored service
+id.
 
 ## YouTube "sign in to confirm you're not a bot"
 

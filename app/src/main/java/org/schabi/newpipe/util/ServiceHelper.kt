@@ -106,6 +106,15 @@ object ServiceHelper : PvcServiceHelper() {
     }
 
     /**
+     * Stored data can carry the id of a service that was removed from the app.
+     *
+     * @param serviceId the id of a service
+     * @return whether the app has a service with that id
+     */
+    @JvmStatic
+    fun hasService(serviceId: Int): Boolean = ServiceList.all().any { it.serviceId == serviceId }
+
+    /**
      * @param serviceId the id of the service
      * @return the service corresponding to the provided id
      * @throws java.util.NoSuchElementException if there is no service with the provided id

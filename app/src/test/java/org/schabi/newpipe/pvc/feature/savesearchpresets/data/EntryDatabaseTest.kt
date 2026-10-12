@@ -62,6 +62,22 @@ class EntryDatabaseTest {
     }
 
     @Test
+    fun `presets and defaults of the named services are dropped and the rest keep their order`() {
+        fun entry(service: String, id: Long) = Entry("preset $id", service, id, id, id, listOf(1), listOf(2))
+        val state = empty.copy(
+            defaults = listOf(DefaultEntry("Bandcamp", 2), DefaultEntry("YouTube", 1)),
+            entries = listOf(entry("YouTube", 1), entry("Bandcamp", 2), entry("Rumble", 3), entry("PeerTube", 4))
+        )
+
+        val kept = state.withoutServices(setOf("media.ccc.de", "PeerTube", "Bandcamp"))
+
+        assertEquals(listOf(DefaultEntry("YouTube", 1)), kept.defaults)
+        assertEquals(listOf(entry("YouTube", 1), entry("Rumble", 3)), kept.entries)
+        assertEquals(state.sorting, kept.sorting)
+        assertEquals(state, state.withoutServices(setOf("media.ccc.de")))
+    }
+
+    @Test
     fun `successful save clears pending recovery`() {
         val original = "invalid"
         `when`(prefs.getString(EntryDbKeys.PREF_KEY_JSON_DB, null)).thenReturn(original)

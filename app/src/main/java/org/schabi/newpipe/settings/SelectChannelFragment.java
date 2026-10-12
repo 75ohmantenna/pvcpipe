@@ -19,11 +19,13 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.subscription.SubscriptionEntity;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.local.subscription.SubscriptionManager;
+import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.util.image.CoilHelper;
 
 import java.util.List;
 import java.util.Vector;
+import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Observer;
@@ -98,6 +100,11 @@ public class SelectChannelFragment extends DialogFragment {
 
         final SubscriptionManager subscriptionManager = new SubscriptionManager(requireContext());
         subscriptionManager.subscriptions().toObservable()
+                // a channel of a service the app no longer has could only show an error
+                .map(all -> all.stream()
+                        .filter(subscription ->
+                                ServiceHelper.hasService(subscription.getServiceId()))
+                        .collect(Collectors.toList()))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(getSubscriptionObserver());

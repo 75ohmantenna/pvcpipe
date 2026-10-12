@@ -55,7 +55,16 @@ class SubscriptionImportWorker(
 
             is SubscriptionTransfer.Outcome.Success -> {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(applicationContext, R.string.import_complete_toast, Toast.LENGTH_SHORT).show()
+                    if (outcome.skipped > 0) {
+                        val skipped = applicationContext.resources.getQuantityString(
+                            R.plurals.import_subscriptions_skipped,
+                            outcome.skipped,
+                            outcome.skipped
+                        )
+                        Toast.makeText(applicationContext, skipped, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(applicationContext, R.string.import_complete_toast, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 Result.success()
             }

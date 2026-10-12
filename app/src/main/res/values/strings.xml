@@ -471,6 +471,10 @@
         <item quantity="one">Importing %d subscription…</item>
         <item quantity="other">Importing %d subscriptions…</item>
     </plurals>
+    <plurals name="import_subscriptions_skipped">
+        <item quantity="one">Imported. Skipped %d channel of a service PVCPipe does not support.</item>
+        <item quantity="other">Imported. Skipped %d channels of services PVCPipe does not support.</item>
+    </plurals>
     <string name="import_title">Import</string>
     <string name="import_from">Import from</string>
     <string name="export_to">Export to</string>
@@ -814,6 +818,8 @@
     <string name="migration_info_6_7_message">SoundCloud has discontinued the original Top 50 charts. The corresponding tab has been removed from your main page.</string>
     <string name="migration_info_7_8_title">YouTube combined trending removed</string>
     <string name="migration_info_7_8_message">YouTube discontinued its combined trending page on 21 July 2025. PVCPipe replaced the default trending page with trending livestreams.\n\nYou can select other trending pages in \"Settings > Content > Main page content\".</string>
+    <string name="migration_info_8_9_title">Services removed</string>
+    <string name="migration_info_8_9_message">This version of PVCPipe has fewer services. Main page tabs of the removed services are gone, and if one of them was selected, the default service is selected now.</string>
     <string name="trending_gaming">Gaming trends</string>
     <string name="trending_podcasts">Trending podcasts</string>
     <string name="trending_movies">Trending movies and shows</string>
