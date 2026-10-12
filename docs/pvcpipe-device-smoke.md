@@ -297,3 +297,39 @@ open. Each one names the build it ran on.
   Title and arrow sequence 14 of 14. Player modes 24 of 24, including the
   fullscreen button, Back out of fullscreen and rotation both ways.
 
+## Pixel 6a checks that change phone settings, 2026-10-12
+
+The four checks left out of the earlier Pixel run, on the same phone with a
+debug build of `master` at #111. Each needs something changed outside the
+app, so every value was read first and written back at the end: auto-rotate,
+the user rotation, the font scale, and the "display over other apps"
+permission of the debug app. All four were confirmed restored, and the app's
+preference file matched its backup byte for byte.
+
+- **PASS, 21 of 21.** With auto-rotate off, the fullscreen button turned the
+  screen, playback ran in fullscreen and Back left it. A rotation forced
+  through the system setting went to landscape and back with playback
+  running. The popup player showed its window, played and removed the window
+  on close. The background player kept playing while a font scale change
+  destroyed and recreated the activity twice, and the detail screen came back.
+- The rotation was forced through `user_rotation`, because a phone lying on a
+  desk cannot be turned over adb. It is not the same as turning the phone.
+
+The app's own log was recorded during this run, filtered to its uid. It had no
+crash and no "not responding" report. Three warnings in it led to fixes:
+
+- "Failed to inflate ColorStateList" with a stack trace for every round image
+  view, fixed in #112.
+- "BitmapDrawable created with null Bitmap" twice per video load, fixed in
+  #112.
+- "Broadcast receiver already unregistered" on every player start, fixed in
+  #113.
+
+Seen and left alone: undeliverable RxJava errors when a screen closes during a
+request, which the app's handler expects; ExoPlayer's "Ignoring messages sent
+after release" at teardown, whose caller was not traced; dropped frames of
+about half a second around the activity restarts and rotations the run itself
+caused; and messages from WebView, the codecs and system flags. The leak
+watcher reported nothing, but heap dumps are switched off in this build, so
+it would not have found a leak.
+
