@@ -1,6 +1,6 @@
 package org.schabi.newpipe.fragments.detail;
 
-import static org.schabi.newpipe.util.ListHelper.getUrlAndNonTorrentStreams;
+import static org.schabi.newpipe.util.ListHelper.getUrlStreams;
 
 import android.content.Context;
 import android.widget.Toast;
@@ -37,8 +37,8 @@ final class ExternalStreamDialog {
         final List<VideoStream> videoStreamsForExternalPlayers =
                 ListHelper.getSortedStreamVideosList(
                         activity,
-                        getUrlAndNonTorrentStreams(currentInfo.getVideoStreams()),
-                        getUrlAndNonTorrentStreams(currentInfo.getVideoOnlyStreams()),
+                        getUrlStreams(currentInfo.getVideoStreams()),
+                        getUrlStreams(currentInfo.getVideoOnlyStreams()),
                         false,
                         false
                 );
@@ -76,7 +76,7 @@ final class ExternalStreamDialog {
             return;
         }
 
-        final List<AudioStream> audioStreams = getUrlAndNonTorrentStreams(
+        final List<AudioStream> audioStreams = getUrlStreams(
                 currentInfo.getAudioStreams());
         final List<AudioStream> audioTracks =
                 ListHelper.getFilteredAudioStreams(activity, audioStreams);

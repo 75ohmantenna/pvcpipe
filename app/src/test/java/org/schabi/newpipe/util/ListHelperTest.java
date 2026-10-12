@@ -2,8 +2,10 @@ package org.schabi.newpipe.util;
 
 import org.junit.Test;
 import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.AudioTrackType;
+import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 
 import java.util.ArrayList;
@@ -436,6 +438,59 @@ public class ListHelperTest {
 
         // Can't find a match
         assertEquals(-1, ListHelper.getVideoStreamIndex("100p", null, testList));
+    }
+
+    @Test
+    public void playableStreamsLeaveOutOnlyOpusOverHls() {
+        final AudioStream hlsOpus = generateAudioStream("hls-opus", MediaFormat.OPUS,
+                DeliveryMethod.HLS, true);
+        final AudioStream hlsM4a = generateAudioStream("hls-m4a", MediaFormat.M4A,
+                DeliveryMethod.HLS, true);
+        final AudioStream progressiveOpus = generateAudioStream("progressive-opus",
+                MediaFormat.OPUS, DeliveryMethod.PROGRESSIVE_HTTP, true);
+        final AudioStream dashOpus = generateAudioStream("dash-opus", MediaFormat.OPUS,
+                DeliveryMethod.DASH, true);
+        final AudioStream smoothM4a = generateAudioStream("ss-m4a", MediaFormat.M4A,
+                DeliveryMethod.SS, true);
+
+        for (final int serviceId : List.of(ServiceList.YouTube.getServiceId(),
+                ServiceList.SoundCloud.getServiceId())) {
+            assertEquals(List.of(hlsM4a, progressiveOpus, dashOpus, smoothM4a),
+                    ListHelper.getPlayableStreams(
+                            List.of(hlsOpus, hlsM4a, progressiveOpus, dashOpus, smoothM4a),
+                            serviceId));
+        }
+        assertTrue(ListHelper.getPlayableStreams(null, 0).isEmpty());
+    }
+
+    @Test
+    public void urlStreamsKeepEveryDeliveryMethodAndDropContentThatIsNotAUrl() {
+        final AudioStream manifestText = generateAudioStream("manifest", MediaFormat.M4A,
+                DeliveryMethod.DASH, false);
+        final List<AudioStream> urlStreams = new ArrayList<>();
+        for (final DeliveryMethod deliveryMethod : DeliveryMethod.values()) {
+            urlStreams.add(generateAudioStream(deliveryMethod.name(), MediaFormat.M4A,
+                    deliveryMethod, true));
+        }
+        final List<AudioStream> all = new ArrayList<>(urlStreams);
+        all.add(1, manifestText);
+
+        assertEquals(urlStreams, ListHelper.getUrlStreams(all));
+        assertTrue(ListHelper.getUrlStreams((List<AudioStream>) null).isEmpty());
+    }
+
+    @NonNull
+    private static AudioStream generateAudioStream(@NonNull final String id,
+                                                   @Nullable final MediaFormat mediaFormat,
+                                                   @NonNull final DeliveryMethod deliveryMethod,
+                                                   final boolean isUrl) {
+        return new AudioStream.Builder()
+                .setId(id)
+                .setContent("https://example.invalid/" + id, isUrl)
+                .setMediaFormat(mediaFormat)
+                .setDeliveryMethod(deliveryMethod)
+                .setAverageBitrate(128)
+                .build();
     }
 
     @NonNull

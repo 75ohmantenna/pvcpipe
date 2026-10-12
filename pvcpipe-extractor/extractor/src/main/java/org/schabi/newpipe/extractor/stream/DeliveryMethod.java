@@ -39,15 +39,5 @@ public enum DeliveryMethod {
      * section <i>Microsoft Smooth Streaming (MSS)</i></a> for more information about the
      * SmoothStreaming delivery method
      */
-    SS,
-
-    /**
-     * Used for {@link Stream}s served via a torrent file.
-     *
-     * @see <a href="https://en.wikipedia.org/wiki/BitTorrent">Wikipedia's BitTorrent's page</a>,
-     * <a href="https://en.wikipedia.org/wiki/Torrent_file">Wikipedia's page about torrent files
-     * </a> and <a href="https://www.bittorrent.org">Bitorrent's website</a> for more information
-     * about the BitTorrent protocol
-     */
-    TORRENT
+    SS
 }
