@@ -43,6 +43,24 @@ variants. Rumble and SoundCloud share URL sort-parameter assembly, while their
 content endpoints remain service-specific. When changing filter declarations,
 check both the displayed order and the exact generated search URL.
 
+## YouTube "sign in to confirm you're not a bot"
+
+The app shows "YouTube refused to provide data and requires you to sign in"
+when the extractor throws `SignInConfirmNotBotException`. That only happens
+when YouTube's own player response says `login_required` with a reason that
+mentions "a bot" (`YoutubeStreamExtractor.checkPlayabilityStatus`). For
+streams the extractor asks the Android client first, then visionOS, then iOS
+if that is enabled; the app supplies no proof token for any of the three. If
+none of them returns streams, the restriction one of them reported is the
+error the user sees.
+
+Observed on 2026-10-11 during scripted emulator runs that opened videos over
+and over from one address: some videos were refused this way and loaded again
+minutes later, while others kept loading throughout. No per-client log of a
+refused request was captured, and the refusals stopped before one could be,
+so which clients were refused each time is not known. Nothing in these
+observations points at the app.
+
 ## Source and verification
 
 - Service registration:
