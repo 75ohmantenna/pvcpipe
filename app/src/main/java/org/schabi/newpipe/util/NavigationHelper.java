@@ -1,7 +1,7 @@
 package org.schabi.newpipe.util;
 
 import static android.text.TextUtils.isEmpty;
-import static org.schabi.newpipe.util.ListHelper.getUrlAndNonTorrentStreams;
+import static org.schabi.newpipe.util.ListHelper.getUrlStreams;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -226,7 +226,7 @@ public final class NavigationHelper {
         }
 
         final List<AudioStream> audioStreamsForExternalPlayers =
-                getUrlAndNonTorrentStreams(audioStreams);
+                getUrlStreams(audioStreams);
         if (audioStreamsForExternalPlayers.isEmpty()) {
             Toast.makeText(context, R.string.no_audio_streams_available_for_external_players,
                     Toast.LENGTH_SHORT).show();
@@ -249,7 +249,7 @@ public final class NavigationHelper {
 
         final List<VideoStream> videoStreamsForExternalPlayers =
                 ListHelper.getSortedStreamVideosList(context,
-                        getUrlAndNonTorrentStreams(videoStreams), null, false, false);
+                        getUrlStreams(videoStreams), null, false, false);
         if (videoStreamsForExternalPlayers.isEmpty()) {
             Toast.makeText(context, R.string.no_video_streams_available_for_external_players,
                     Toast.LENGTH_SHORT).show();
@@ -270,7 +270,7 @@ public final class NavigationHelper {
         final DeliveryMethod deliveryMethod = stream.getDeliveryMethod();
         final String mimeType;
 
-        if (!stream.isUrl() || deliveryMethod == DeliveryMethod.TORRENT) {
+        if (!stream.isUrl()) {
             Toast.makeText(context, R.string.selected_stream_external_player_not_supported,
                     Toast.LENGTH_SHORT).show();
             return;
@@ -302,7 +302,7 @@ public final class NavigationHelper {
                 mimeType = "application/vnd.ms-sstr+xml";
                 break;
             default:
-                // Torrent streams are not exposed to external players
+                // every delivery method is handled above
                 mimeType = "";
         }
 

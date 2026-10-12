@@ -277,7 +277,6 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                 return buildHlsMediaSource(dataSource, stream, cacheKey, metadata);
             case SS:
                 return buildSSMediaSource(dataSource, stream, cacheKey, metadata);
-            // Torrent streams are not supported by ExoPlayer
             default:
                 throw new ResolverException("Unsupported delivery type: " + deliveryMethod);
         }
