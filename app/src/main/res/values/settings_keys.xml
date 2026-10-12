@@ -333,9 +333,6 @@
     <string name="stream_info_selected_tab_key">stream_info_selected_tab</string>
     <string name="show_hold_to_append_key">show_hold_to_append</string>
     <string name="content_language_key">content_language</string>
-    <string name="peertube_instance_setup_key">peertube_instance_setup</string>
-    <string name="peertube_selected_instance_key">peertube_selected_instance</string>
-    <string name="peertube_instance_list_key">peertube_instance_list</string>
     <string name="content_country_key">content_country</string>
     <string name="show_age_restricted_content">show_age_restricted_content</string>
     <string name="youtube_restricted_mode_enabled">youtube_restricted_mode_enabled</string>

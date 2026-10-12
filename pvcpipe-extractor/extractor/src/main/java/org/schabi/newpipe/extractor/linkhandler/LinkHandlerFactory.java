@@ -90,12 +90,6 @@ public abstract class LinkHandlerFactory {
         return new LinkHandler(url, url, id);
     }
 
-    public LinkHandler fromId(final String id, final String baseUrl) throws ParsingException {
-        Objects.requireNonNull(id, "ID cannot be null");
-        final String url = getUrl(id, baseUrl);
-        return new LinkHandler(url, url, id);
-    }
-
     /**
      * When a VIEW_ACTION is caught this function will test if the url delivered within the calling
      * Intent was meant to be watched with this Service.

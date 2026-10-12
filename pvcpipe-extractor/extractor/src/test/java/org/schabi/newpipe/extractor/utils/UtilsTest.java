@@ -16,12 +16,6 @@ class UtilsTest {
     }
 
     @Test
-    void testJoin() {
-        assertEquals("some,random,not-null,stuff", Utils.nonEmptyAndNullJoin(",",
-                "some", "null", "random", "", "not-null", null, "stuff"));
-    }
-
-    @Test
     void testGetBaseUrl() throws ParsingException {
         assertEquals("https://www.youtube.com", Utils.getBaseUrl("https://www.youtube.com/watch?v=Hu80uDzh8RY"));
         assertEquals("vnd.youtube", Utils.getBaseUrl("vnd.youtube://www.youtube.com/watch?v=jZViOEv90dI"));

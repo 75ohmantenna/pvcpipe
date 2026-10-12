@@ -24,6 +24,7 @@ import org.schabi.newpipe.util.ChannelTabHelper
 import org.schabi.newpipe.util.ExtractorHelper.getChannelInfo
 import org.schabi.newpipe.util.ExtractorHelper.getChannelTab
 import org.schabi.newpipe.util.ExtractorHelper.getMoreChannelTabItems
+import org.schabi.newpipe.util.ServiceHelper
 
 /** Creates independent refresh runs using the application's extraction and database policy. */
 class FeedLoadManager(private val context: Context) {
@@ -83,7 +84,7 @@ class FeedLoadManager(private val context: Context) {
             groupId: Long,
             outdatedThreshold: OffsetDateTime
         ): Flowable<List<SubscriptionEntity>> {
-            return when (groupId) {
+            val outdated = when (groupId) {
                 FeedGroupEntity.GROUP_ALL_ID -> feedDatabaseManager.outdatedSubscriptions(
                     outdatedThreshold
                 )
@@ -94,6 +95,11 @@ class FeedLoadManager(private val context: Context) {
                 )
 
                 else -> feedDatabaseManager.outdatedSubscriptionsForGroup(groupId, outdatedThreshold)
+            }
+            // A subscription of a service the app no longer has cannot be loaded. Leave it out,
+            // or every refresh would report it as an error.
+            return outdated.map { subscriptions ->
+                subscriptions.filter { ServiceHelper.hasService(it.serviceId) }
             }
         }
 

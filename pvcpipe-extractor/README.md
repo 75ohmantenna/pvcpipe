@@ -29,9 +29,6 @@ Supported sites:
 
 - YouTube
 - SoundCloud
-- media.ccc.de
-- PeerTube (no P2P)
-- Bandcamp
 - BitChute
 - Rumble
 

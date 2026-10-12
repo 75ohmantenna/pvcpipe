@@ -54,11 +54,8 @@ class TimestampLongPressClickableSpan(
                 ServiceList.YouTube ->
                     return relatedStreamUrl + "&t=" + timestampMatchDTO.seconds()
 
-                ServiceList.SoundCloud, ServiceList.MediaCCC ->
+                ServiceList.SoundCloud ->
                     return relatedStreamUrl + "#t=" + timestampMatchDTO.seconds()
-
-                ServiceList.PeerTube ->
-                    return relatedStreamUrl + "?start=" + timestampMatchDTO.seconds()
             }
 
             // Return timestamp text for other services

@@ -31,6 +31,7 @@ import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.local.subscription.SubscriptionManager
 import org.schabi.newpipe.util.ExtractorHelper
+import org.schabi.newpipe.util.ServiceHelper
 
 /** Subscription transfer policy shared by background workers and tests. */
 class SubscriptionTransfer internal constructor(
@@ -44,7 +45,12 @@ class SubscriptionTransfer internal constructor(
     }
 
     sealed class Outcome {
-        data class Success(val count: Int) : Outcome()
+        /**
+         * @param count the number of subscriptions imported or exported
+         * @param skipped the number of channels an import left out, because the app does not
+         * have their service
+         */
+        data class Success(val count: Int, val skipped: Int = 0) : Outcome()
         data class Failure(val cause: Exception) : Outcome()
     }
 
@@ -52,7 +58,7 @@ class SubscriptionTransfer internal constructor(
         input: SubscriptionImportInput,
         progress: suspend (Progress) -> Unit
     ): Outcome {
-        val subscriptions = try {
+        val source = try {
             withContext(ioDispatcher) {
                 when (input) {
                     is SubscriptionImportInput.ChannelUrlMode ->
@@ -71,6 +77,10 @@ class SubscriptionTransfer internal constructor(
             if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
+        // An export may list channels of a service this app does not have (any more). One channel
+        // that cannot be loaded fails the whole import, so those are left out and counted.
+        val subscriptions = source.filter { operations.hasService(it.serviceId) }
+        val skipped = source.size - subscriptions.size
 
         val mutex = Mutex()
         val permits = Semaphore(PARALLEL_EXTRACTIONS)
@@ -109,7 +119,7 @@ class SubscriptionTransfer internal constructor(
             if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
-        return Outcome.Success(qty)
+        return Outcome.Success(qty, skipped)
     }
 
     suspend fun export(destination: String, progress: suspend (Progress) -> Unit): Outcome = try {
@@ -136,6 +146,7 @@ class SubscriptionTransfer internal constructor(
         fun openOutput(url: String): OutputStream?
         fun channelSource(serviceId: Int, url: String): List<SubscriptionItem>
         fun streamSource(serviceId: Int, stream: InputStream, url: String): List<SubscriptionItem>
+        fun hasService(serviceId: Int): Boolean
         suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo>
         suspend fun snapshot(): List<SubscriptionItem>
         fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>)
@@ -159,6 +170,8 @@ class SubscriptionTransfer internal constructor(
             return NewPipe.getService(serviceId).subscriptionExtractor.fromInputStream(stream, contentType)
                 .map { SubscriptionItem(it.serviceId, it.url, it.name) }
         }
+
+        override fun hasService(serviceId: Int): Boolean = ServiceHelper.hasService(serviceId)
 
         override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> {
             val channel = ExtractorHelper.getChannelInfo(item.serviceId, item.url, true).await()

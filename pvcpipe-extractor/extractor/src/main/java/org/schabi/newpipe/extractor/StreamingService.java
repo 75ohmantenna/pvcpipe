@@ -294,14 +294,6 @@ public abstract class StreamingService {
                 id, List.of(tab), List.of()));
     }
 
-    public ChannelTabExtractor getChannelTabExtractorFromIdAndBaseUrl(final String id,
-                                                                      final FilterItem tab,
-                                                                      final String baseUrl)
-            throws ExtractionException {
-        return getChannelTabExtractor(getChannelTabLHFactory().fromQuery(
-                id, List.of(tab), List.of(), baseUrl));
-    }
-
     public PlaylistExtractor getPlaylistExtractor(final String url) throws ExtractionException {
         return getPlaylistExtractor(getPlaylistLHFactory().fromUrl(url));
     }

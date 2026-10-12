@@ -43,6 +43,38 @@ variants. Rumble and SoundCloud share URL sort-parameter assembly, while their
 content endpoints remain service-specific. When changing filter declarations,
 check both the displayed order and the exact generated search URL.
 
+## Removed services
+
+media.ccc.de, PeerTube and Bandcamp were removed from the extractor and the app.
+Their service ids (2, 3 and 4) are retired: the database, backups and saved
+main-page tabs refer to services by id, so a new service must take the next
+unused id and never one of these. Because the ids are no longer contiguous,
+look a service up by id (`NewPipe.getService`, `Menu.findItem`) and never by
+its position in `ServiceList.all()`.
+
+Settings migration 8 to 9 drops main-page tabs that show a kiosk, channel or
+playlist of a removed service, deletes the PeerTube instance preferences and
+the saved search presets of the three services, and clears the selected
+service if it was a removed one. It tells the user once if a tab went or the
+selected service changed.
+
+Database rows that carry a retired id are not deleted. This is what the app
+does with them:
+
+- Subscriptions, history entries, playlist entries and bookmarked playlists
+  stay listed, with `<unknown>` where the service name goes. Opening one shows
+  "PVCPipe does not support this content yet", because `NewPipe.getService`
+  throws `ContentNotSupportedException` for an id without a service.
+- A feed refresh leaves such subscriptions out (`FeedLoadManager`), so they
+  are not reported as errors on every refresh.
+- The channel and playlist pickers for main-page tabs do not offer them.
+- A subscription import leaves out channels of services the app does not have
+  and says how many it skipped. Without that, one such channel would fail the
+  whole import.
+
+Use `ServiceHelper.hasService` for any new code that reads a stored service
+id.
+
 ## YouTube "sign in to confirm you're not a bot"
 
 The app shows "YouTube refused to provide data and requires you to sign in"

@@ -51,24 +51,11 @@ public abstract class ListLinkHandlerFactory extends LinkHandlerFactory {
         return new ListLinkHandler(super.fromId(id));
     }
 
-    @Override
-    public ListLinkHandler fromId(final String id, final String baseUrl) throws ParsingException {
-        return new ListLinkHandler(super.fromId(id, baseUrl));
-    }
-
     public ListLinkHandler fromQuery(final String query,
                                      final List<FilterItem> contentFilter,
                                      final List<FilterItem> sortFilter) throws ParsingException {
         final String url = getUrl(query, contentFilter, sortFilter);
         return new ListLinkHandler(url, url, query, contentFilter, sortFilter);
-    }
-
-    public ListLinkHandler fromQuery(final String id,
-                                     final List<FilterItem> contentFilters,
-                                     final List<FilterItem> sortFilter,
-                                     final String baseUrl) throws ParsingException {
-        final String url = getUrl(id, contentFilters, sortFilter, baseUrl);
-        return new ListLinkHandler(url, url, id, contentFilters, sortFilter);
     }
 
 

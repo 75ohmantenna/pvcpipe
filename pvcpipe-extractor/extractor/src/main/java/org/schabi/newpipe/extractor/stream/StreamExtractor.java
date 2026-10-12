@@ -466,7 +466,7 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * The host of the stream (Eg. peertube.cpy.re).
+     * The host of the stream (Eg. video.example.org).
      * If the host is not available, or if the service doesn't use
      * a federated system, but a centralised system,
      * you can simply return an empty string.
@@ -534,9 +534,7 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * The support information of the stream.
-     * see: https://framatube.org/videos/watch/ee408ec8-07cd-4e35-b884-fb681a4b9d37
-     * (support button).
+     * The support information of the stream (what a "support" button would show).
      * If the support information are not available,
      * you can simply return an empty String.
      *

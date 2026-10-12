@@ -34,9 +34,8 @@ public final class DownloaderTestImpl extends Downloader {
 
         this.clientWrapper = new RateLimitedClientWrapper(builder
                 .readTimeout(30, TimeUnit.SECONDS)
-                // Required for certain services
-                // For example Bandcamp otherwise fails on Windows with Java 17+
-                // as their Fastly-CDN returns 403
+                // Required for certain services whose CDN otherwise returns 403
+                // (seen on Windows with Java 17+)
                 .connectionSpecs(List.of(ConnectionSpec.RESTRICTED_TLS))
                 .build());
     }

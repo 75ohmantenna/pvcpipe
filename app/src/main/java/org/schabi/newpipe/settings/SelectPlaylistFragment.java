@@ -27,10 +27,12 @@ import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.local.playlist.LocalPlaylistManager;
 import org.schabi.newpipe.local.playlist.RemotePlaylistManager;
+import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.image.CoilHelper;
 
 import java.util.List;
 import java.util.Vector;
+import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -92,6 +94,11 @@ public class SelectPlaylistFragment extends DialogFragment {
         final RemotePlaylistManager remotePlaylistManager = new RemotePlaylistManager(database);
 
         disposable = getMergedOrderedPlaylists(localPlaylistManager, remotePlaylistManager)
+                // a playlist of a service the app no longer has could only show an error
+                .map(all -> all.stream()
+                        .filter(playlist -> !(playlist instanceof PlaylistRemoteEntity remote)
+                                || ServiceHelper.hasService(remote.getServiceId()))
+                        .collect(Collectors.toList()))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::displayPlaylists, this::onError);
     }

@@ -321,17 +321,6 @@ public final class Utils {
     }
 
     /**
-     * Concatenate all non-null, non-empty and strings which are not equal to <code>"null"</code>.
-     */
-    @Nonnull
-    public static String nonEmptyAndNullJoin(final CharSequence delimiter,
-                                             final String... elements) {
-        return Arrays.stream(elements)
-                .filter(s -> !isNullOrEmpty(s) && !s.equals("null"))
-                .collect(Collectors.joining(delimiter));
-    }
-
-    /**
      * Find the result of an array of string regular expressions inside an input on the first
      * group ({@code 0}).
      *

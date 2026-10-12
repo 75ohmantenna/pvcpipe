@@ -306,7 +306,7 @@ class PlaybackSourcesIntegrationTest {
     private fun info(
         id: String,
         type: StreamType = StreamType.VIDEO_STREAM,
-        serviceId: Int = ServiceList.MediaCCC.serviceId
+        serviceId: Int = ServiceList.Bitchute.serviceId
     ): StreamInfo = StreamInfo(
         serviceId,
         "https://example.invalid/watch/$id",

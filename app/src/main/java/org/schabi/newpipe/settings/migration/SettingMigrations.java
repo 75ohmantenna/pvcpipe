@@ -17,6 +17,9 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
+import org.schabi.newpipe.pvc.feature.savesearchpresets.data.DBState;
+import org.schabi.newpipe.pvc.feature.savesearchpresets.data.EntryDatabase;
+import org.schabi.newpipe.pvc.feature.savesearchpresets.data.EntryDatabaseKt;
 import org.schabi.newpipe.settings.tabs.Tab;
 import org.schabi.newpipe.settings.tabs.TabsManager;
 
@@ -206,6 +209,103 @@ public final class SettingMigrations {
     };
 
     /**
+     * Ids of the media.ccc.de, PeerTube and Bandcamp services, which were removed. The ids stay
+     * retired; nothing that still refers to them can be loaded.
+     */
+    private static final Set<Integer> REMOVED_SERVICE_IDS = Set.of(2, 3, 4);
+
+    /** The names under which preferences refer to the removed services. */
+    private static final Set<String> REMOVED_SERVICE_NAMES =
+            Set.of("media.ccc.de", "PeerTube", "Bandcamp");
+
+    private static final Migration MIGRATION_8_9 = new Migration(8, 9) {
+        @Override
+        protected void migrate(@NonNull final Context context) {
+            // Main page tabs of a removed service could only show an error, so they are dropped.
+            final TabsManager tabsManager = TabsManager.getManager(context);
+            final List<Tab> tabs = tabsManager.getTabs();
+            final List<Tab> cleanedTabs = withoutRemovedServices(tabs);
+            if (cleanedTabs.isEmpty()) {
+                tabsManager.resetTabs();
+            } else if (tabs.size() != cleanedTabs.size()) {
+                tabsManager.saveTabs(cleanedTabs);
+            }
+
+            final boolean selectedServiceRemoved = removeServicePreferences(sp,
+                    context.getString(R.string.current_service_key));
+
+            // Search presets are only listed for the service being searched, so those of a
+            // removed service could never be seen or deleted again.
+            final EntryDatabase presets = new EntryDatabase(context);
+            final DBState savedPresets = presets.load();
+            final DBState keptPresets =
+                    EntryDatabaseKt.withoutServices(savedPresets, REMOVED_SERVICE_NAMES);
+            if (!keptPresets.equals(savedPresets)) {
+                presets.save(keptPresets);
+            }
+
+            if (tabs.size() != cleanedTabs.size() || selectedServiceRemoved) {
+                // User is informed about the change
+                MigrationManager.addMigrationInfo(uiContext ->
+                        MigrationManager.createMigrationInfoDialog(
+                                        uiContext,
+                                        uiContext.getString(R.string.migration_info_8_9_title),
+                                        uiContext.getString(R.string.migration_info_8_9_message))
+                                .show());
+            }
+        }
+    };
+
+    /**
+     * Removes the preferences that only the removed services used, and the selected service if
+     * it is one of them, so that the default service is selected again.
+     *
+     * @param preferences the preferences to clean
+     * @param selectedServiceKey the key of the preference that holds the selected service's name
+     * @return whether the selected service was a removed one
+     */
+    static boolean removeServicePreferences(final SharedPreferences preferences,
+                                            final String selectedServiceKey) {
+        final boolean selectedServiceRemoved = REMOVED_SERVICE_NAMES.contains(
+                preferences.getString(selectedServiceKey, ""));
+        final SharedPreferences.Editor editor = preferences.edit()
+                // the PeerTube instance settings, which nothing reads any more
+                .remove("peertube_selected_instance")
+                .remove("peertube_instance_list");
+        if (selectedServiceRemoved) {
+            editor.remove(selectedServiceKey);
+        }
+        editor.apply();
+        return selectedServiceRemoved;
+    }
+
+    /**
+     * @param tabs the main page tabs to filter
+     * @return the tabs that do not show a kiosk, channel or playlist of a removed service
+     */
+    static List<Tab> withoutRemovedServices(final List<Tab> tabs) {
+        return tabs.stream()
+                .filter(tab -> !REMOVED_SERVICE_IDS.contains(remoteServiceId(tab)))
+                .collect(Collectors.toUnmodifiableList());
+    }
+
+    /**
+     * @param tab a main page tab
+     * @return the id of the service whose content the tab shows, or -1 if it shows local content
+     *         or follows the selected service
+     */
+    private static int remoteServiceId(final Tab tab) {
+        if (tab instanceof Tab.KioskTab kioskTab) {
+            return kioskTab.getKioskServiceId();
+        } else if (tab instanceof Tab.ChannelTab channelTab) {
+            return channelTab.getChannelServiceId();
+        } else if (tab instanceof Tab.PlaylistTab playlistTab) {
+            return playlistTab.getPlaylistServiceId();
+        }
+        return -1;
+    }
+
+    /**
      * List of all implemented migrations.
      * <p>
      * <b>Append new migrations to the end of the list</b> to keep it sorted ascending.
@@ -219,12 +319,13 @@ public final class SettingMigrations {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
     };
 
     /**
      * Version number for preferences. Must be incremented every time a migration is necessary.
      */
-    private static final int VERSION = 8;
+    private static final int VERSION = 9;
 
 
     static void runMigrationsIfNeeded(@NonNull final Context context) {
