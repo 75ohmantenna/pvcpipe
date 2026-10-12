@@ -302,8 +302,9 @@ public final class NavigationHelper {
                 mimeType = "application/vnd.ms-sstr+xml";
                 break;
             default:
-                // every delivery method is handled above
-                mimeType = "";
+                Toast.makeText(context, R.string.selected_stream_external_player_not_supported,
+                        Toast.LENGTH_SHORT).show();
+                return;
         }
 
         final Intent intent = new Intent();

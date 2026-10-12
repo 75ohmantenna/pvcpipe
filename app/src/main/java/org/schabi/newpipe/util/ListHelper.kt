@@ -213,16 +213,18 @@ object ListHelper {
     ): List<S> {
         val youtubeServiceId = ServiceList.YouTube.serviceId
         return getFilteredStreamList(streamList) { stream ->
-            (
-                stream.deliveryMethod != DeliveryMethod.HLS ||
-                    stream.format != MediaFormat.OPUS
-                ) &&
+            !isOpusOverHls(stream) &&
                 (
                     serviceId != youtubeServiceId ||
                         stream.itagItem == null ||
                         SUPPORTED_ITAG_IDS.contains(stream.itagItem!!.id)
                     )
         }
+    }
+
+    /** ExoPlayer does not support OPUS streams that use HLS as their delivery method. */
+    private fun isOpusOverHls(stream: Stream): Boolean {
+        return stream.deliveryMethod == DeliveryMethod.HLS && stream.format == MediaFormat.OPUS
     }
 
     /**
@@ -326,7 +328,7 @@ object ListHelper {
         val collectedStreams: HashMap<String, AudioStream> = HashMap()
         val cmp = getAudioFormatComparator(context)
         for (stream in audioStreams) {
-            if (stream.deliveryMethod == DeliveryMethod.HLS && stream.format == MediaFormat.OPUS) {
+            if (isOpusOverHls(stream)) {
                 continue
             }
             val trackId = stream.audioTrackId ?: ""
