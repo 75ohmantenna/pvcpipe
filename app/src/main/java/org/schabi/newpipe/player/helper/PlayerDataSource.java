@@ -14,8 +14,6 @@ import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.hls.playlist.DefaultHlsPlaylistTracker;
-import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
-import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
@@ -36,8 +34,6 @@ import java.util.Map;
 
 public class PlayerDataSource {
     public static final String TAG = PlayerDataSource.class.getSimpleName();
-
-    public static final int LIVE_STREAM_EDGE_GAP_MILLIS = 10000;
 
     /**
      * An approximately 4.3 times greater value than the
@@ -112,10 +108,6 @@ public class PlayerDataSource {
 
 
     //region Live media source factories
-    public SsMediaSource.Factory getLiveSsMediaSourceFactory() {
-        return getSSMediaSourceFactory().setLivePresentationDelayMs(LIVE_STREAM_EDGE_GAP_MILLIS);
-    }
-
     public HlsMediaSource.Factory getLiveHlsMediaSourceFactory() {
         return new HlsMediaSource.Factory(cachelessDataSourceFactory)
                 .setAllowChunklessPreparation(true)
@@ -161,12 +153,6 @@ public class PlayerDataSource {
     public ProgressiveMediaSource.Factory getProgressiveMediaSourceFactory() {
         return new ProgressiveMediaSource.Factory(cacheDataSourceFactory)
                 .setContinueLoadingCheckIntervalBytes(progressiveLoadIntervalBytes);
-    }
-
-    public SsMediaSource.Factory getSSMediaSourceFactory() {
-        return new SsMediaSource.Factory(
-                new DefaultSsChunkSource.Factory(cachelessDataSourceFactory),
-                cachelessDataSourceFactory);
     }
 
     public SingleSampleMediaSource.Factory getSingleSampleMediaSourceFactory() {

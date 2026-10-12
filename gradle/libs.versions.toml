@@ -108,7 +108,6 @@ google-exoplayer-database = { module = "com.google.android.exoplayer:exoplayer-d
 google-exoplayer-datasource = { module = "com.google.android.exoplayer:exoplayer-datasource", version.ref = "exoplayer" }
 google-exoplayer-hls = { module = "com.google.android.exoplayer:exoplayer-hls", version.ref = "exoplayer" }
 google-exoplayer-mediasession = { module = "com.google.android.exoplayer:extension-mediasession", version.ref = "exoplayer" }
-google-exoplayer-smoothstreaming = { module = "com.google.android.exoplayer:exoplayer-smoothstreaming", version.ref = "exoplayer" }
 google-exoplayer-ui = { module = "com.google.android.exoplayer:exoplayer-ui", version.ref = "exoplayer" }
 jakewharton-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "phoenix" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }

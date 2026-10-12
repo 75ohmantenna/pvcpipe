@@ -450,15 +450,12 @@ public class ListHelperTest {
                 MediaFormat.OPUS, DeliveryMethod.PROGRESSIVE_HTTP, true);
         final AudioStream dashOpus = generateAudioStream("dash-opus", MediaFormat.OPUS,
                 DeliveryMethod.DASH, true);
-        final AudioStream smoothM4a = generateAudioStream("ss-m4a", MediaFormat.M4A,
-                DeliveryMethod.SS, true);
 
         for (final int serviceId : List.of(ServiceList.YouTube.getServiceId(),
                 ServiceList.SoundCloud.getServiceId())) {
-            assertEquals(List.of(hlsM4a, progressiveOpus, dashOpus, smoothM4a),
+            assertEquals(List.of(hlsM4a, progressiveOpus, dashOpus),
                     ListHelper.getPlayableStreams(
-                            List.of(hlsOpus, hlsM4a, progressiveOpus, dashOpus, smoothM4a),
-                            serviceId));
+                            List.of(hlsOpus, hlsM4a, progressiveOpus, dashOpus), serviceId));
         }
         assertTrue(ListHelper.getPlayableStreams(null, 0).isEmpty());
     }
