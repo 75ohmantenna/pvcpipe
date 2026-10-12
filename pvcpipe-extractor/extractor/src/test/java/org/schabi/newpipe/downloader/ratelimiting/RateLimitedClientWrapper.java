@@ -21,8 +21,6 @@ public class RateLimitedClientWrapper {
     private static final int REQUEST_RATE_LIMITED_WAIT_MS = 5_000;
     private static final Map<Predicate<String>, RateLimiter> FORCED_RATE_LIMITERS = Map.ofEntries(
         Map.entry(host -> host.endsWith("youtube.com"),
-            RateLimiter.create(1.6, Duration.ofSeconds(1))),
-        Map.entry(host -> host.endsWith("bandcamp.com"),
             RateLimiter.create(1.6, Duration.ofSeconds(1)))
     );
 

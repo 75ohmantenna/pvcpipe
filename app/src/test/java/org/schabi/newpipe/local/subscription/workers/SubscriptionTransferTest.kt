@@ -121,6 +121,43 @@ class SubscriptionTransferTest {
     }
 
     @Test
+    fun `channels of services the app does not have are left out of an import`() = runBlocking {
+        val kept = SubscriptionItem(17, "https://example.test/kept", "kept")
+        val alsoKept = SubscriptionItem(18, "https://example.test/also-kept", "also kept")
+        val operations = TestOperations().apply {
+            source = listOf(
+                SubscriptionItem(3, "https://example.test/removed", "removed"),
+                kept,
+                SubscriptionItem(4, "https://example.test/removed-too", "removed too"),
+                alsoKept
+            )
+            missingServices = setOf(2, 3, 4)
+        }
+        val progress = ArrayList<SubscriptionTransfer.Progress>()
+
+        val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { progress.add(it) }
+
+        assertEquals(2, (result as SubscriptionTransfer.Outcome.Success).count)
+        assertEquals(listOf(kept, alsoKept), operations.extracted)
+        assertEquals(listOf(kept, alsoKept), operations.stored.single().map { it.first.toItem() })
+        assertTrue(progress.filterIsInstance<SubscriptionTransfer.Progress.Loading>().all { it.total == 2 })
+    }
+
+    @Test
+    fun `an import with only channels of missing services stores nothing and succeeds`() = runBlocking {
+        val operations = TestOperations().apply {
+            source = listOf(SubscriptionItem(2, "https://example.test/removed", "removed"))
+            missingServices = setOf(2, 3, 4)
+        }
+
+        val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {}
+
+        assertEquals(0, (result as SubscriptionTransfer.Outcome.Success).count)
+        assertTrue(operations.extracted.isEmpty())
+        assertTrue(operations.stored.isEmpty())
+    }
+
+    @Test
     fun `provider source receives its stream and closes it before extraction`() = runBlocking {
         val operations = TestOperations().apply {
             source = items(2)
@@ -570,6 +607,7 @@ class SubscriptionTransferTest {
         var beforeExtract: (suspend (SubscriptionItem) -> Unit)? = null
         var storeError: Exception? = null
         var snapshotError: Exception? = null
+        var missingServices = emptySet<Int>()
         var channelRequest: Pair<Int, String>? = null
         var streamRequest: Pair<Int, String>? = null
         var sourceContents: String? = null
@@ -599,6 +637,8 @@ class SubscriptionTransferTest {
             return source
         }
 
+        override fun hasService(serviceId: Int): Boolean = serviceId !in missingServices
+
         override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> {
             input?.let { assertTrue("source must close before extraction", it.closed) }
             effects.add("extract")
@@ -620,7 +660,8 @@ class SubscriptionTransferTest {
         }
 
         override fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>) {
-            assertEquals("all channels must extract before storage", source.size.takeIf { it > 0 } ?: extracted.size, extracted.size)
+            val expected = source.count { hasService(it.serviceId) }.takeIf { it > 0 } ?: extracted.size
+            assertEquals("all channels must extract before storage", expected, extracted.size)
             effects.add("store")
             storeError?.let { throw it }
             stored.add(channels.toList())

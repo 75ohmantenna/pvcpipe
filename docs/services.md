@@ -43,6 +43,21 @@ variants. Rumble and SoundCloud share URL sort-parameter assembly, while their
 content endpoints remain service-specific. When changing filter declarations,
 check both the displayed order and the exact generated search URL.
 
+## Removed services
+
+media.ccc.de, PeerTube and Bandcamp were removed from the extractor and the app.
+Their service ids (2, 3 and 4) are retired: the database, backups and saved
+main-page tabs refer to services by id, so a new service must take the next
+unused id and never one of these. Because the ids are no longer contiguous,
+look a service up by id (`NewPipe.getService`, `Menu.findItem`) and never by
+its position in `ServiceList.all()`.
+
+Settings migration 8 to 9 drops main-page tabs that show a kiosk, channel or
+playlist of a removed service, deletes the PeerTube instance preferences, and
+clears the selected service if it was a removed one. Database rows that carry
+a retired id (subscriptions, history, playlist entries, bookmarked playlists)
+are not deleted.
+
 ## YouTube "sign in to confirm you're not a bot"
 
 The app shows "YouTube refused to provide data and requires you to sign in"

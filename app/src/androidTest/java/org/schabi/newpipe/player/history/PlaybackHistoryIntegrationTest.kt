@@ -340,7 +340,7 @@ class PlaybackHistoryIntegrationTest {
     ) = PlaybackHistory.Snapshot(info, queue, 0, contentPosition, position)
 
     private fun info(id: String, duration: Long = 120): StreamInfo = StreamInfo(
-        ServiceList.MediaCCC.serviceId,
+        ServiceList.Bitchute.serviceId,
         "https://example.invalid/history/$id",
         "https://example.invalid/history/$id",
         StreamType.VIDEO_STREAM,

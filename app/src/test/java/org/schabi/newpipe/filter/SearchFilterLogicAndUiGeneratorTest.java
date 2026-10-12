@@ -5,13 +5,11 @@ package org.schabi.newpipe.filter;
 
 import org.junit.Test;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.search.filter.FilterContainer;
 import org.schabi.newpipe.extractor.search.filter.FilterGroup;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
-import org.schabi.newpipe.extractor.services.peertube.search.filter.PeertubeFilters;
 import org.schabi.newpipe.extractor.services.youtube.search.filter.YoutubeFilters;
 import org.schabi.newpipe.fragments.list.search.filter.BaseSearchFilterUiGenerator;
 import org.schabi.newpipe.fragments.list.search.filter.SearchFilterLogic;
@@ -40,11 +38,10 @@ import static org.schabi.newpipe.fragments.list.search.filter.SearchFilterLogic.
  */
 public class SearchFilterLogicAndUiGeneratorTest {
 
-    private static final int PEERTUBE_SERVICE_ID = 3;
     private static final int YOUTUBE_SERVICE_ID = 0;
     private final Map<Integer, ElementsWrapper> universalWrapper = new HashMap<>();
     private BaseSearchFilterUiGenerator generator;
-    private StreamingService service;
+    private SearchQueryHandlerFactory searchQHFactory;
     private SearchFilterGeneratorWorkersClass.FilterWorker sortWorker;
     private List<FilterItem> fromCallbackContentFilterItems;
     private List<FilterItem> fromCallbackSortFilterItems;
@@ -54,25 +51,31 @@ public class SearchFilterLogicAndUiGeneratorTest {
     private void setupEach(final boolean withUiWorker,
                            final SearchFilterLogic.Callback callback)
             throws ExtractionException {
-        setupEach(withUiWorker, PEERTUBE_SERVICE_ID, callback);
+        setupEach(withUiWorker, new FakeSearchFilters.QueryHandlerFactory(), callback);
     }
 
     private void setupEach(final boolean withUiWorker,
                            final int serviceId,
                            final SearchFilterLogic.Callback callback)
             throws ExtractionException {
-        service = NewPipe.getService(serviceId);
+        setupEach(withUiWorker, NewPipe.getService(serviceId).getSearchQHFactory(), callback);
+    }
+
+    private void setupEach(final boolean withUiWorker,
+                           final SearchQueryHandlerFactory factory,
+                           final SearchFilterLogic.Callback callback) {
+        searchQHFactory = factory;
 
         logic = SearchFilterLogic.Factory.create(
                 SearchFilterLogic.Factory.Variant.SEARCH_FILTER_LOGIC_DEFAULT,
-                service.getSearchQHFactory(),
+                searchQHFactory,
                 callback);
 
         if (withUiWorker) {
-            generator = new SearchFilterGeneratorWorkersClass(service.getSearchQHFactory(),
+            generator = new SearchFilterGeneratorWorkersClass(searchQHFactory,
                     callback, logic);
         } else {
-            generator = new SearchFilterGeneratorNoWorkersClass(service.getSearchQHFactory(),
+            generator = new SearchFilterGeneratorNoWorkersClass(searchQHFactory,
                     callback, logic);
         }
     }
@@ -91,9 +94,9 @@ public class SearchFilterLogicAndUiGeneratorTest {
 
         // 2. test if initially set some data that should be present in output
         final ArrayList<Integer> contentFiltersWithNoneDefaultId = new ArrayList<>();
-        contentFiltersWithNoneDefaultId.add(PeertubeFilters.ID_CF_MAIN_VIDEOS);
+        contentFiltersWithNoneDefaultId.add(FakeSearchFilters.ID_CF_MAIN_VIDEOS);
         final ArrayList<Integer> sortFiltersWithNoneDefaultId = new ArrayList<>();
-        sortFiltersWithNoneDefaultId.add(PeertubeFilters.ID_SF_SORT_BY_CREATION_DATE);
+        sortFiltersWithNoneDefaultId.add(FakeSearchFilters.ID_SF_SORT_BY_DATE);
 
         logic.restorePreviouslySelectedFilters(contentFiltersWithNoneDefaultId,
                 sortFiltersWithNoneDefaultId);
@@ -101,17 +104,17 @@ public class SearchFilterLogicAndUiGeneratorTest {
         ArrayList<Integer> contentFilterResetResult = logic.getSelectedContentFilters();
         ArrayList<Integer> sortFilterResetResult = logic.getSelectedSortFilters();
 
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_VIDEOS));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_CREATION_DATE));
-        assertFalse(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_CHANNELS));
-        assertFalse(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_VIDEOS));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_DATE));
+        assertFalse(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_CHANNELS));
+        assertFalse(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
 
         logic.reset(); // now go back to default values
 
         contentFilterResetResult = logic.getSelectedContentFilters();
         sortFilterResetResult = logic.getSelectedSortFilters();
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_VIDEOS));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_VIDEOS));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
 
         // 3. test if empty input data results in defaults
         setupEach(false, null);
@@ -121,8 +124,8 @@ public class SearchFilterLogicAndUiGeneratorTest {
                 logic.getSelectedContentFilters();
         final ArrayList<Integer> sortFilterResultNoInput =
                 logic.getSelectedSortFilters();
-        assertTrue(contentFilterResultNoInput.contains(PeertubeFilters.ID_CF_MAIN_VIDEOS));
-        assertTrue(sortFilterResultNoInput.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(contentFilterResultNoInput.contains(FakeSearchFilters.ID_CF_MAIN_VIDEOS));
+        assertTrue(sortFilterResultNoInput.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
 
         // 4. compare 2 and 3 results
         assertArrayEquals(contentFilterResetResult.toArray(),
@@ -141,8 +144,8 @@ public class SearchFilterLogicAndUiGeneratorTest {
         final ArrayList<Integer> defaultSortFilters =
                 logic.getSelectedSortFilters();
 
-        assertTrue(defaultContentFilters.contains(PeertubeFilters.ID_CF_MAIN_VIDEOS));
-        assertTrue(defaultSortFilters.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(defaultContentFilters.contains(FakeSearchFilters.ID_CF_MAIN_VIDEOS));
+        assertTrue(defaultSortFilters.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
     }
 
     @Test
@@ -221,7 +224,7 @@ public class SearchFilterLogicAndUiGeneratorTest {
         setupEach(false, null);
         // content filter can not be empty
         final ArrayList<Integer> contentFiltersWithValidId = new ArrayList<>();
-        contentFiltersWithValidId.add(PeertubeFilters.ID_CF_MAIN_VIDEOS);
+        contentFiltersWithValidId.add(FakeSearchFilters.ID_CF_MAIN_VIDEOS);
         final ArrayList<Integer> sortFiltersWithIllegalIds = new ArrayList<>();
         sortFiltersWithIllegalIds.add(20000);
 
@@ -234,57 +237,57 @@ public class SearchFilterLogicAndUiGeneratorTest {
         setupEach(false, null);
 
         // set only one content filter, keep default sort filters
-        logic.selectContentFilter(PeertubeFilters.ID_CF_MAIN_PLAYLISTS);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS);
         ArrayList<Integer> contentFilterResetResult = logic.getSelectedContentFilters();
         ArrayList<Integer> sortFilterResetResult = logic.getSelectedSortFilters();
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
 
-        logic.selectContentFilter(PeertubeFilters.ID_CF_MAIN_CHANNELS);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_MAIN_CHANNELS);
         contentFilterResetResult = logic.getSelectedContentFilters();
         sortFilterResetResult = logic.getSelectedSortFilters();
-        assertFalse(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_CHANNELS));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertFalse(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_CHANNELS));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
     }
 
     @Test
     public void selectOneContentFilterAndOneSortFilterTest() throws ExtractionException {
         setupEach(false, null);
 
-        logic.selectContentFilter(PeertubeFilters.ID_CF_MAIN_PLAYLISTS);
-        logic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_CREATION_DATE);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS);
+        logic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_DATE);
         ArrayList<Integer> contentFilterResetResult = logic.getSelectedContentFilters();
         ArrayList<Integer> sortFilterResetResult = logic.getSelectedSortFilters();
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertFalse(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_CREATION_DATE));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertFalse(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_DATE));
 
-        logic.selectContentFilter(PeertubeFilters.ID_CF_MAIN_CHANNELS);
-        logic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_DURATION);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_MAIN_CHANNELS);
+        logic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_DURATION);
         contentFilterResetResult = logic.getSelectedContentFilters();
         sortFilterResetResult = logic.getSelectedSortFilters();
-        assertFalse(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_CHANNELS));
-        assertTrue(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_DURATION));
-        assertFalse(sortFilterResetResult.contains(PeertubeFilters.ID_SF_SORT_BY_CREATION_DATE));
+        assertFalse(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_CHANNELS));
+        assertTrue(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_DURATION));
+        assertFalse(sortFilterResetResult.contains(FakeSearchFilters.ID_SF_SORT_BY_DATE));
     }
 
     @Test
     public void selectTwoContentFiltersTest() throws ExtractionException {
         setupEach(false, null);
 
-        logic.selectContentFilter(PeertubeFilters.ID_CF_MAIN_PLAYLISTS);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS);
         ArrayList<Integer> contentFilterResetResult = logic.getSelectedContentFilters();
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertFalse(contentFilterResetResult.contains(PeertubeFilters.ID_CF_SEPIA_SEPIASEARCH));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertFalse(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_OTHER_ITEM));
 
-        // 2nd content filters added from another group of course as PeertubeFilter.ID_CF_MAIN_GRP
+        // 2nd content filters added from another group of course as ID_CF_MAIN_GRP
         // is exclusive group -> only one item per group allowed
-        logic.selectContentFilter(PeertubeFilters.ID_CF_SEPIA_SEPIASEARCH);
+        logic.selectContentFilter(FakeSearchFilters.ID_CF_OTHER_ITEM);
         contentFilterResetResult = logic.getSelectedContentFilters();
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_MAIN_PLAYLISTS));
-        assertTrue(contentFilterResetResult.contains(PeertubeFilters.ID_CF_SEPIA_SEPIASEARCH));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS));
+        assertTrue(contentFilterResetResult.contains(FakeSearchFilters.ID_CF_OTHER_ITEM));
     }
 
     @Test
@@ -302,33 +305,35 @@ public class SearchFilterLogicAndUiGeneratorTest {
         for (final SearchFilterLogic.Factory.Variant variant
                 : SearchFilterLogic.Factory.Variant.values()) {
             final SearchFilterLogic selectionLogic = SearchFilterLogic.Factory.create(
-                    variant, org.schabi.newpipe.extractor.ServiceList.PeerTube.getSearchQHFactory(),
-                    null);
+                    variant, new FakeSearchFilters.QueryHandlerFactory(), null);
             selectionLogic.restorePreviouslySelectedFilters(
-                    new ArrayList<>(List.of(PeertubeFilters.ID_CF_MAIN_PLAYLISTS)),
-                    new ArrayList<>(List.of(PeertubeFilters.ID_SF_SORT_BY_DURATION,
-                            PeertubeFilters.ID_SF_KIND_LIVE)));
+                    new ArrayList<>(List.of(FakeSearchFilters.ID_CF_MAIN_PLAYLISTS)),
+                    new ArrayList<>(List.of(FakeSearchFilters.ID_SF_SORT_BY_DURATION,
+                            FakeSearchFilters.ID_SF_KIND_LIVE)));
 
-            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
-            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_LIVE,
-                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
-            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
-            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_LIVE,
-                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
-            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_KIND_VOD_VIDEOS);
-            assertEquals(List.of(PeertubeFilters.ID_SF_SORT_BY_NAME,
-                    PeertubeFilters.ID_SF_KIND_VOD_VIDEOS),
+            selectionLogic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_VIEWS);
+            assertEquals(List.of(FakeSearchFilters.ID_SF_KIND_LIVE,
+                    FakeSearchFilters.ID_SF_SORT_BY_VIEWS),
                     selectionLogic.getSelectedSortFilters());
-            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
-            assertEquals(List.of(PeertubeFilters.ID_SF_KIND_VOD_VIDEOS,
-                    PeertubeFilters.ID_SF_SORT_BY_NAME), selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_VIEWS);
+            assertEquals(List.of(FakeSearchFilters.ID_SF_KIND_LIVE,
+                    FakeSearchFilters.ID_SF_SORT_BY_VIEWS),
+                    selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(FakeSearchFilters.ID_SF_KIND_VOD_VIDEOS);
+            assertEquals(List.of(FakeSearchFilters.ID_SF_SORT_BY_VIEWS,
+                    FakeSearchFilters.ID_SF_KIND_VOD_VIDEOS),
+                    selectionLogic.getSelectedSortFilters());
+            selectionLogic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_VIEWS);
+            assertEquals(List.of(FakeSearchFilters.ID_SF_KIND_VOD_VIDEOS,
+                    FakeSearchFilters.ID_SF_SORT_BY_VIEWS),
+                    selectionLogic.getSelectedSortFilters());
 
             selectionLogic.reset();
-            selectionLogic.selectSortFilter(PeertubeFilters.ID_SF_SORT_BY_NAME);
+            selectionLogic.selectSortFilter(FakeSearchFilters.ID_SF_SORT_BY_VIEWS);
             assertFalse(selectionLogic.getSelectedSortFilters()
-                    .contains(PeertubeFilters.ID_SF_SORT_BY_RELEVANCE));
+                    .contains(FakeSearchFilters.ID_SF_SORT_BY_RELEVANCE));
             assertTrue(selectionLogic.getSelectedSortFilters()
-                    .contains(PeertubeFilters.ID_SF_SORT_BY_NAME));
+                    .contains(FakeSearchFilters.ID_SF_SORT_BY_VIEWS));
         }
     }
 
@@ -359,7 +364,7 @@ public class SearchFilterLogicAndUiGeneratorTest {
         final ElementsWrapper wrapper = universalWrapper.get(id);
         final SearchFilterLogic legacyLogic = SearchFilterLogic.Factory.create(
                 SearchFilterLogic.Factory.Variant.SEARCH_FILTER_LOGIC_LEGACY,
-                service.getSearchQHFactory(), null);
+                searchQHFactory, null);
         legacyLogic.selectSortFilter(id);
         assertTrue(legacyLogic.getSelectedSortFilters().contains(id));
         legacyLogic.selectSortFilter(id);
@@ -421,7 +426,7 @@ public class SearchFilterLogicAndUiGeneratorTest {
     }
 
     private void expectSortFiltersToBeVisible(final int id) {
-        final FilterContainer sortFilterVariant = service.getSearchQHFactory()
+        final FilterContainer sortFilterVariant = searchQHFactory
                 .getContentFilterSortFilterVariant(id);
         assertTrue(!sortFilterVariant.getFilterGroups().isEmpty());
         for (final FilterGroup group : sortFilterVariant.getFilterGroups()) {
@@ -440,31 +445,31 @@ public class SearchFilterLogicAndUiGeneratorTest {
     @Test
     public void checkIfCorrespondingSortFiltersAreDisplayedTest()
             throws ExtractionException {
-        setupEach(true, PEERTUBE_SERVICE_ID, null);
+        setupEach(true, null);
 
         universalWrapper.clear();
         generator.createSearchUI();
 
         // The default content selection exposes the video sort filters in the UI.
-        expectSortFiltersToBeVisible(PeertubeFilters.ID_CF_MAIN_VIDEOS);
+        expectSortFiltersToBeVisible(FakeSearchFilters.ID_CF_MAIN_VIDEOS);
 
         // Selecting playlists, which has no sort filters, hides the video sort controls.
-        final int contentFilterWithNoSortFilters = PeertubeFilters.ID_CF_MAIN_PLAYLISTS;
+        final int contentFilterWithNoSortFilters = FakeSearchFilters.ID_CF_MAIN_PLAYLISTS;
         logic.selectContentFilter(contentFilterWithNoSortFilters);
-        final FilterContainer noSortFiltersAkaNull = service.getSearchQHFactory()
+        final FilterContainer noSortFiltersAkaNull = searchQHFactory
                 .getContentFilterSortFilterVariant(contentFilterWithNoSortFilters);
         assertNull(noSortFiltersAkaNull);
 
         // get content filter with all sort filters visible in two ways
         // first way
-        final FilterContainer allSortFilters = service.getSearchQHFactory()
-                .getContentFilterSortFilterVariant(PeertubeFilters.ID_CF_MAIN_VIDEOS);
+        final FilterContainer allSortFilters = searchQHFactory
+                .getContentFilterSortFilterVariant(FakeSearchFilters.ID_CF_MAIN_VIDEOS);
         // second way
-        final Optional<FilterGroup> allSortFilters2 = service.getSearchQHFactory()
+        final Optional<FilterGroup> allSortFilters2 = searchQHFactory
                 .getAvailableContentFilter()
                 .getFilterGroups().stream()
                 .filter(filterGroup
-                        -> (filterGroup.getIdentifier() == PeertubeFilters.ID_CF_MAIN_GRP))
+                        -> (filterGroup.getIdentifier() == FakeSearchFilters.ID_CF_MAIN_GRP))
                 .findFirst();
 
         assertNotNull(allSortFilters);
@@ -487,7 +492,7 @@ public class SearchFilterLogicAndUiGeneratorTest {
 
         // 3rd test:
         // select content filter that should have all sort filters visible again
-        final int contentFilterWithAllSortFiltersVisible = PeertubeFilters.ID_CF_MAIN_VIDEOS;
+        final int contentFilterWithAllSortFiltersVisible = FakeSearchFilters.ID_CF_MAIN_VIDEOS;
         logic.selectContentFilter(contentFilterWithAllSortFiltersVisible);
         expectSortFiltersToBeVisible(contentFilterWithAllSortFiltersVisible);
     }

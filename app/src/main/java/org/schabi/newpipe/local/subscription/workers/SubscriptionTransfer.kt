@@ -54,7 +54,7 @@ class SubscriptionTransfer internal constructor(
     ): Outcome {
         val subscriptions = try {
             withContext(ioDispatcher) {
-                when (input) {
+                val source = when (input) {
                     is SubscriptionImportInput.ChannelUrlMode ->
                         operations.channelSource(input.serviceId, input.url)
 
@@ -66,6 +66,9 @@ class SubscriptionTransfer internal constructor(
                     is SubscriptionImportInput.PreviousExportMode ->
                         openInput(input.url).use(ImportExportJsonHelper::readFrom)
                 }
+                // An export may list channels of a service this app does not have (any more).
+                // One channel that cannot be loaded fails the whole import, so leave those out.
+                source.filter { operations.hasService(it.serviceId) }
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -136,6 +139,7 @@ class SubscriptionTransfer internal constructor(
         fun openOutput(url: String): OutputStream?
         fun channelSource(serviceId: Int, url: String): List<SubscriptionItem>
         fun streamSource(serviceId: Int, stream: InputStream, url: String): List<SubscriptionItem>
+        fun hasService(serviceId: Int): Boolean
         suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo>
         suspend fun snapshot(): List<SubscriptionItem>
         fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>)
@@ -159,6 +163,8 @@ class SubscriptionTransfer internal constructor(
             return NewPipe.getService(serviceId).subscriptionExtractor.fromInputStream(stream, contentType)
                 .map { SubscriptionItem(it.serviceId, it.url, it.name) }
         }
+
+        override fun hasService(serviceId: Int): Boolean = NewPipe.getServices().any { it.serviceId == serviceId }
 
         override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> {
             val channel = ExtractorHelper.getChannelInfo(item.serviceId, item.url, true).await()

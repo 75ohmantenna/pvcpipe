@@ -47,7 +47,7 @@ final class LocalNetworkPermissionGate {
     void run(final String url, final Runnable action) {
         final HttpUrl endpoint = HttpUrl.parse(url);
         if (endpoint == null || !endpoint.isHttps()) {
-            Toast.makeText(fragment.requireContext(), R.string.peertube_instance_add_https_only,
+            Toast.makeText(fragment.requireContext(), R.string.https_urls_only,
                     Toast.LENGTH_LONG).show();
             return;
         }

@@ -1,9 +1,6 @@
 package org.schabi.newpipe.extractor;
 
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteService;
-import org.schabi.newpipe.extractor.services.bandcamp.BandcampService;
-import org.schabi.newpipe.extractor.services.media_ccc.MediaCCCService;
-import org.schabi.newpipe.extractor.services.peertube.PeertubeService;
 import org.schabi.newpipe.extractor.services.rumble.RumbleService;
 import org.schabi.newpipe.extractor.services.soundcloud.SoundcloudService;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeService;
@@ -39,19 +36,19 @@ public final class ServiceList {
 
     public static final YoutubeService YouTube = new YoutubeService(0);
     public static final SoundcloudService SoundCloud = new SoundcloudService(1);
-    public static final MediaCCCService MediaCCC = new MediaCCCService(2);
-    public static final PeertubeService PeerTube = new PeertubeService(3);
-    public static final BandcampService Bandcamp = new BandcampService(4);
     public static final BitchuteService Bitchute = new BitchuteService(5);
     public static final RumbleService Rumble = new RumbleService(6);
 
     /**
      * When creating a new service, put this service in the end of this list,
      * and give it the next free id.
+     * <p>
+     * Ids 2, 3 and 4 belonged to services that were removed. They stay retired, because data the
+     * app has stored refers to services by id.
+     * </p>
      */
     private static final List<StreamingService> SERVICES = List.of(
-            YouTube, SoundCloud, MediaCCC, PeerTube, Bandcamp,
-            Bitchute, Rumble);
+            YouTube, SoundCloud, Bitchute, Rumble);
 
     /**
      * Get all the supported services.

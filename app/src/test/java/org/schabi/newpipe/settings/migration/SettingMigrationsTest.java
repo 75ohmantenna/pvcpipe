@@ -1,0 +1,64 @@
+package org.schabi.newpipe.settings.migration;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.settings.tabs.Tab;
+
+import java.util.List;
+
+public class SettingMigrationsTest {
+    private static final int MEDIA_CCC_ID = 2;
+    private static final int PEERTUBE_ID = 3;
+    private static final int BANDCAMP_ID = 4;
+
+    @Test
+    public void tabsOfRemovedServicesAreDropped() {
+        final List<Tab> kept = SettingMigrations.withoutRemovedServices(List.of(
+                new Tab.KioskTab(MEDIA_CCC_ID, "conferences"),
+                new Tab.ChannelTab(PEERTUBE_ID, "https://example.org/c/a", "A"),
+                new Tab.PlaylistTab(BANDCAMP_ID, "https://example.org/album/b", "B")));
+
+        assertTrue(kept.isEmpty());
+    }
+
+    @Test
+    public void otherTabsKeepTheirOrder() {
+        final List<Tab> tabs = List.of(
+                new Tab.DefaultKioskTab(),
+                new Tab.KioskTab(ServiceList.YouTube.getServiceId(), "live"),
+                new Tab.SubscriptionsTab(),
+                new Tab.ChannelTab(ServiceList.Rumble.getServiceId(), "https://example.org/c", "C"),
+                new Tab.PlaylistTab(1L, "Local playlist"),
+                new Tab.PlaylistTab(ServiceList.SoundCloud.getServiceId(),
+                        "https://example.org/sets/d", "D"),
+                new Tab.KioskTab(ServiceList.Bitchute.getServiceId(), "Trending"));
+
+        assertEquals(tabs, SettingMigrations.withoutRemovedServices(tabs));
+    }
+
+    @Test
+    public void onlyTabsOfRemovedServicesAreDroppedFromAMixedList() {
+        final Tab feed = new Tab.FeedTab();
+        final Tab youtubeChannel = new Tab.ChannelTab(
+                ServiceList.YouTube.getServiceId(), "https://example.org/channel/e", "E");
+
+        final List<Tab> kept = SettingMigrations.withoutRemovedServices(List.of(
+                feed,
+                new Tab.KioskTab(PEERTUBE_ID, "Local"),
+                youtubeChannel,
+                new Tab.KioskTab(BANDCAMP_ID, "Radio")));
+
+        assertEquals(List.of(feed, youtubeChannel), kept);
+    }
+
+    @Test
+    public void noRegisteredServiceUsesARemovedId() {
+        for (final var service : ServiceList.all()) {
+            final Tab tab = new Tab.KioskTab(service.getServiceId(), "any");
+            assertEquals(List.of(tab), SettingMigrations.withoutRemovedServices(List.of(tab)));
+        }
+    }
+}

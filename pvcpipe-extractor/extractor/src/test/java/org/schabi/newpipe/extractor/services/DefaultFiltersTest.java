@@ -400,10 +400,9 @@ public abstract class DefaultFiltersTest {
         /**
          * Make results match expected value.
          * <p>
-         * Eg. Peertube calculates in {@link org.schabi.newpipe.extractor.services.peertube.search.filter.PeertubeFilters.PeertubePublishedDateFilterItem}
-         * the date to filter when something was published. So we have each moment we call a test
-         * problems with the expected results. This method tries to fix that by
-         * reading {@link #searchAndReplaceMap} search and replace data.
+         * Eg. a filter item may calculate the date to filter by from the current time. Then the
+         * expected result differs each moment a test is called. This method tries to fix that
+         * by reading {@link #searchAndReplaceMap} search and replace data.
          *
          * @param result the string which should be altered
          * @return the altered string
