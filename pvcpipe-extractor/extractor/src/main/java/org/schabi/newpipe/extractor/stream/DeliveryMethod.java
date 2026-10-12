@@ -29,15 +29,5 @@ public enum DeliveryMethod {
      * page</a> and <a href="https://developer.apple.com/streaming">Apple's developers website page
      * about HTTP Live Streaming</a> for more information about the HLS delivery method
      */
-    HLS,
-
-    /**
-     * Used for {@link Stream}s served using the SmoothStreaming adaptive streaming method.
-     *
-     * @see <a href="https://en.wikipedia.org/wiki/Adaptive_bitrate_streaming#Microsoft_Smooth_Streaming_(MSS)">
-     * Wikipedia's page about adaptive bitrate streaming,
-     * section <i>Microsoft Smooth Streaming (MSS)</i></a> for more information about the
-     * SmoothStreaming delivery method
-     */
-    SS
+    HLS
 }

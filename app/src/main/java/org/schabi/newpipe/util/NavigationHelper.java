@@ -298,9 +298,6 @@ public final class NavigationHelper {
             case DASH:
                 mimeType = "application/dash+xml";
                 break;
-            case SS:
-                mimeType = "application/vnd.ms-sstr+xml";
-                break;
             default:
                 Toast.makeText(context, R.string.selected_stream_external_player_not_supported,
                         Toast.LENGTH_SHORT).show();

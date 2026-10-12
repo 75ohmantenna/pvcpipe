@@ -2,7 +2,6 @@ package org.schabi.newpipe.player.resolver;
 
 import static org.schabi.newpipe.extractor.stream.AudioStream.UNKNOWN_BITRATE;
 import static org.schabi.newpipe.extractor.stream.VideoStream.RESOLUTION_UNKNOWN;
-import static org.schabi.newpipe.player.helper.PlayerDataSource.LIVE_STREAM_EDGE_GAP_MILLIS;
 
 import android.net.Uri;
 import android.util.Log;
@@ -17,9 +16,6 @@ import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
-import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
-import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest;
-import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifestParser;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -51,6 +47,9 @@ import java.util.Objects;
  */
 public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
     String TAG = PlaybackResolver.class.getSimpleName();
+
+    /** How far behind the live edge a live stream is played. */
+    int LIVE_STREAM_EDGE_GAP_MILLIS = 10000;
 
 
     //region Cache key generation
@@ -225,9 +224,6 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                                             final MediaItemTag metadata) throws ResolverException {
         final MediaSource.Factory factory;
         switch (type) {
-            case C.CONTENT_TYPE_SS:
-                factory = dataSource.getLiveSsMediaSourceFactory();
-                break;
             case C.CONTENT_TYPE_DASH:
                 if (metadata.getServiceId() == ServiceList.YouTube.getServiceId()) {
                     factory = dataSource.getLiveYoutubeDashMediaSourceFactory();
@@ -238,8 +234,6 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             case C.CONTENT_TYPE_HLS:
                 factory = dataSource.getLiveHlsMediaSourceFactory();
                 break;
-            case C.CONTENT_TYPE_OTHER:
-            case C.CONTENT_TYPE_RTSP:
             default:
                 throw new ResolverException("Unsupported type: " + type);
         }
@@ -275,8 +269,6 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                 return buildDashMediaSource(dataSource, stream, cacheKey, metadata);
             case HLS:
                 return buildHlsMediaSource(dataSource, stream, cacheKey, metadata);
-            case SS:
-                return buildSSMediaSource(dataSource, stream, cacheKey, metadata);
             default:
                 throw new ResolverException("Unsupported delivery type: " + deliveryMethod);
         }
@@ -358,42 +350,6 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                 .createMediaSource(new MediaItem.Builder()
                         .setTag(metadata)
                         .setUri(manifestUrlToUri(stream.getManifestUrl()))
-                        .setCustomCacheKey(cacheKey)
-                        .build());
-    }
-
-    private static SsMediaSource buildSSMediaSource(final PlayerDataSource dataSource,
-                                                    final Stream stream,
-                                                    final String cacheKey,
-                                                    final MediaItemTag metadata)
-            throws ResolverException {
-        if (stream.isUrl()) {
-            throwResolverExceptionIfUrlNullOrEmpty(stream.getContent());
-            return dataSource.getSSMediaSourceFactory().createMediaSource(
-                    new MediaItem.Builder()
-                            .setTag(metadata)
-                            .setUri(Uri.parse(stream.getContent()))
-                            .setCustomCacheKey(cacheKey)
-                            .build());
-        }
-
-        final Uri manifestUri = manifestUrlToUri(stream.getManifestUrl());
-
-        final SsManifest smoothStreamingManifest;
-        try {
-            final ByteArrayInputStream smoothStreamingManifestInput = new ByteArrayInputStream(
-                    stream.getContent().getBytes(StandardCharsets.UTF_8));
-            smoothStreamingManifest = new SsManifestParser().parse(manifestUri,
-                    smoothStreamingManifestInput);
-        } catch (final IOException e) {
-            throw new ResolverException("Error when parsing manual SS manifest", e);
-        }
-
-        return dataSource.getSSMediaSourceFactory().createMediaSource(
-                smoothStreamingManifest,
-                new MediaItem.Builder()
-                        .setTag(metadata)
-                        .setUri(manifestUri)
                         .setCustomCacheKey(cacheKey)
                         .build());
     }
