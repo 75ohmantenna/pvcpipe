@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -147,7 +146,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
                 continue;
             }
             final JsonObject thumbnail = (JsonObject) item;
-            if (Objects.equals(thumbUrl, thumbnail.getString(COVER_IMAGE))) {
+            if (thumbUrl != null && thumbUrl.equals(thumbnail.getString(COVER_IMAGE))) {
                 height = toImageSize(thumbnail.getInt(HEIGHT), Image.HEIGHT_UNKNOWN);
                 width = toImageSize(thumbnail.getInt(WIDTH), Image.WIDTH_UNKNOWN);
                 break;
@@ -323,8 +322,11 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         try {
             final String thumbnailUrl = RumbleParsingHelper
                     .extractUploaderAvatarUrl(theUserPathToHisAvatar, doc);
-            // the page does not give a size, but Rumble serves these avatars 150px wide and
-            // never taller than that
+            if (thumbnailUrl == null) {
+                return Collections.emptyList(); // a letter is shown in place of an image
+            }
+            // the page does not give a size, but Rumble serves these avatars no larger than
+            // 150px in either direction
             return List.of(new Image(thumbnailUrl,
                     Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.LOW));
         } catch (final Exception e) {
