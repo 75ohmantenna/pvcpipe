@@ -1352,8 +1352,8 @@ public final class VideoDetailFragment
         CoilUtils.dispose(binding.detailSubChannelThumbnailView);
         CoilUtils.dispose(binding.overlayThumbnail);
         CoilUtils.dispose(binding.detailUploaderThumbnailView);
-        binding.detailThumbnailImageView.setImageBitmap(null);
-        binding.detailSubChannelThumbnailView.setImageBitmap(null);
+        binding.detailThumbnailImageView.setImageDrawable(null);
+        binding.detailSubChannelThumbnailView.setImageDrawable(null);
     }
 
     @Override
