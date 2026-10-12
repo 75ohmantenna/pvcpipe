@@ -26,6 +26,7 @@ public final class AndroidPlayerBroadcasts {
     private final BroadcastReceiver receiver;
     @NonNull
     private final IntentFilter filter = new IntentFilter();
+    private boolean registered = false;
 
     /**
      * @param context    the context to register the receiver with
@@ -52,15 +53,22 @@ public final class AndroidPlayerBroadcasts {
         PlayerBroadcasts.actions().forEach(filter::addAction);
     }
 
-    /** Registers the receiver, replacing an earlier registration. */
+    /** Registers the receiver. Does nothing if it is registered already. */
     public void register() {
-        unregister();
+        if (registered) {
+            return;
+        }
         ContextCompat.registerReceiver(context, receiver, filter,
                 ContextCompat.RECEIVER_EXPORTED);
+        registered = true;
     }
 
     /** Unregisters the receiver. Does nothing if it is not registered. */
     public void unregister() {
+        if (!registered) {
+            return;
+        }
+        registered = false;
         try {
             context.unregisterReceiver(receiver);
         } catch (final IllegalArgumentException unregisteredException) {
