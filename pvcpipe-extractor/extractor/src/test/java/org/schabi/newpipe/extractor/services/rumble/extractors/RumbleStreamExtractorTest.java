@@ -3,6 +3,7 @@ package org.schabi.newpipe.extractor.services.rumble.extractors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.downloader.DownloaderFactory;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,6 +60,8 @@ public class RumbleStreamExtractorTest {
         protected static boolean expectedHasVideoStreams = true;
         protected static String expectedArtistProfilePictureInfix = ".rumble.com/live/channel_images/"; // TODO
         protected static long expectedLength = 12948;
+        protected static int expectedThumbnailWidth = 1280;
+        protected static int expectedThumbnailHeight = 720;
 
         @BeforeAll
         public static void setUpExtractor() throws ExtractionException, IOException {
@@ -76,6 +80,8 @@ public class RumbleStreamExtractorTest {
             expectedHasAudioStreams = true;
             expectedHasVideoStreams = true;
             expectedLength = 12948;
+            expectedThumbnailWidth = 1280;
+            expectedThumbnailHeight = 720;
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH + "/streamExtractor"));
 
             extractor = (RumbleStreamExtractor) Rumble
@@ -92,6 +98,21 @@ public class RumbleStreamExtractorTest {
         public void testAvatarThumbnailPicture() throws Exception {
             final String avatarUrl = extractor().getUploaderAvatars().get(0).getUrl();
             assertTrue(!avatarUrl.isEmpty() || avatarUrl == null);
+        }
+
+        @Test
+        public void testThumbnailSize() throws Exception {
+            final Image thumbnail = extractor().getThumbnails().get(0);
+            assertEquals(expectedThumbnailWidth, thumbnail.getWidth());
+            assertEquals(expectedThumbnailHeight, thumbnail.getHeight());
+            assertEquals(Image.ResolutionLevel.fromHeight(expectedThumbnailHeight),
+                    thumbnail.getEstimatedResolutionLevel());
+        }
+
+        @Test
+        public void testAvatarResolutionLevel() throws Exception {
+            final Image avatar = extractor().getUploaderAvatars().get(0);
+            assertEquals(Image.ResolutionLevel.LOW, avatar.getEstimatedResolutionLevel());
         }
 
         @Override
@@ -288,6 +309,9 @@ public class RumbleStreamExtractorTest {
             expectedHasVideoStreams = true;
             expectedArtistProfilePictureInfix = ".rumble.com/live/channel_images/"; // TODO
             expectedLength = 0;
+            // this embed snapshot has no thumbnail list to take the cover image's size from
+            expectedThumbnailWidth = Image.WIDTH_UNKNOWN;
+            expectedThumbnailHeight = Image.HEIGHT_UNKNOWN;
             NewPipe.init(DownloaderFactory.getMockDownloader(MOCK_PATH
                     + "/streamExtractorLiveStream"));
 

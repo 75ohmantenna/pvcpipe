@@ -13,6 +13,7 @@ import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteParserHelper;
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteChannelTabLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.bitchute.misc.BitchuteHelpers;
 import org.schabi.newpipe.extractor.utils.PvcPipeExtractorUtils;
 
 import java.io.IOException;
@@ -62,11 +63,7 @@ public class BitchuteChannelExtractor extends ChannelExtractor {
     @Nonnull
     @Override
     public List<Image> getAvatars() throws ParsingException {
-        return List.of(
-                new Image(channelData.getThumbnailUrl(),
-                        Image.HEIGHT_UNKNOWN,
-                        Image.WIDTH_UNKNOWN,
-                        Image.ResolutionLevel.UNKNOWN));
+        return List.of(BitchuteHelpers.toImage(channelData.getThumbnailUrl()));
     }
 
     @Override

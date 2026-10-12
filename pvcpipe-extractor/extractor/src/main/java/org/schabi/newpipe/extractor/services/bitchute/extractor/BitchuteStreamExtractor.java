@@ -18,6 +18,7 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteParserHelper;
+import org.schabi.newpipe.extractor.services.bitchute.misc.BitchuteHelpers;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.Description;
@@ -139,8 +140,7 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nonnull
     @Override
     public List<Image> getThumbnails() throws ParsingException {
-        return List.of(new Image(streamVideoResults.getThumbnailUrl(),
-                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
+        return List.of(BitchuteHelpers.toImage(streamVideoResults.getThumbnailUrl()));
     }
 
     @Nonnull
@@ -231,8 +231,8 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     @Nonnull
     @Override
     public List<Image> getUploaderAvatars() throws ParsingException {
-        return List.of(new Image(streamVideoResults.getChannel().getThumbnailUrl(),
-                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
+        return List.of(
+                BitchuteHelpers.toImage(streamVideoResults.getChannel().getThumbnailUrl()));
     }
 
     @Nonnull
