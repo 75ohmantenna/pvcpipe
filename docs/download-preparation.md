@@ -24,7 +24,12 @@ an output file it was to overwrite may already have been changed.
 
 ## Checkpoints
 
-A pending mission saves its state as a checkpoint file.
+A pending mission saves its state as a checkpoint file in the app's internal
+storage, `files/pending_downloads`. A checkpoint is a serialized object that
+names the addresses to download and the file to write, so it must not be in
+a place another app can write to. Builds before October 2026 kept
+checkpoints in the external files directory. That directory is not read any
+more, and unfinished downloads from such a build are not carried over.
 
 - A checkpoint replaces the previous one atomically (`Utility.writeToFile`
   uses Android's `AtomicFile`). A write that fails leaves the previous

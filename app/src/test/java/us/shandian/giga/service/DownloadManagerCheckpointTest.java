@@ -48,7 +48,7 @@ public class DownloadManagerCheckpointTest {
         final File backup = new File(pending, "1234.bak");
         assertTrue(backup.createNewFile());
         final Context context = mock(Context.class);
-        when(context.getExternalFilesDir("pending_downloads")).thenReturn(pending);
+        when(context.getFilesDir()).thenReturn(folder.getRoot());
         when(context.getExternalFilesDir(null)).thenReturn(folder.getRoot());
 
         final DownloadMission mission = mock(DownloadMission.class);
@@ -103,10 +103,40 @@ public class DownloadManagerCheckpointTest {
     }
 
     @Test
+    public void checkpointsInTheOldExternalDirectoryAreNotRead() throws Exception {
+        final File internal = folder.newFolder("internal");
+        final File pending = new File(internal, "pending_downloads");
+        // what an older build, or another app on Android 8 to 10, left in shared storage
+        final File external = folder.newFolder("external", "pending_downloads");
+        final File planted = new File(external, "1234");
+        assertTrue(planted.createNewFile());
+        final Context context = mock(Context.class);
+        when(context.getFilesDir()).thenReturn(internal);
+        when(context.getExternalFilesDir("pending_downloads")).thenReturn(external);
+        when(context.getExternalFilesDir(null)).thenReturn(external.getParentFile());
+
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores =
+                     mockConstruction(FinishedMissionStore.class, (store, construction) ->
+                             when(store.loadFinishedMissions()).thenReturn(new ArrayList<>()))) {
+            utility.when(() -> Utility.mkdir(pending, false)).thenAnswer(call -> pending.mkdirs());
+            final DownloadManager manager =
+                    new DownloadManager(context, mock(Handler.class), null, null);
+
+            assertNull(manager.findPendingMission(1234));
+            utility.verify(() -> Utility.readFromFile(any(File.class)), never());
+            assertTrue(pending.isDirectory());
+            // the old file is neither read nor removed
+            assertTrue(planted.exists());
+        }
+    }
+
+    @Test
     public void initialCheckpointFailurePreventsDownloadUntilRetrySucceeds() throws Exception {
         final File pending = folder.newFolder("pending_downloads");
         final Context context = mock(Context.class);
-        when(context.getExternalFilesDir("pending_downloads")).thenReturn(pending);
+        when(context.getFilesDir()).thenReturn(folder.getRoot());
         final DownloadMission mission = mock(DownloadMission.class);
         try (var logs = mockStatic(Log.class);
              var utility = mockStatic(Utility.class);
@@ -144,7 +174,7 @@ public class DownloadManagerCheckpointTest {
         final File checkpoint = new File(pending, "1234");
         assertTrue(checkpoint.createNewFile());
         final Context context = mock(Context.class);
-        when(context.getExternalFilesDir("pending_downloads")).thenReturn(pending);
+        when(context.getFilesDir()).thenReturn(folder.getRoot());
         when(context.getExternalFilesDir(null)).thenReturn(folder.getRoot());
         try (var logs = mockStatic(Log.class);
              var utility = mockStatic(Utility.class);

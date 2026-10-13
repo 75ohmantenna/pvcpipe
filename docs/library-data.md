@@ -69,6 +69,20 @@ It does not validate the database, and the file can change before the
 restore reads it. If the settings it offered are no longer what the file
 holds, the restore stops and asks for a new inspection.
 
+**Imported settings are not trusted.** Before they replace the live ones,
+`ImportedPreferenceTypes` checks their types. A preference the app reads as
+a number must hold that kind of number, or one that converts to it without
+changing its value. Every other preference must have the type of the app's
+live value. A value that fails is replaced by the live value, or dropped so
+that the default applies. Two tables in `BackupRestore` feed this check:
+
+- The numeric preferences. Add a key there when adding a `getInt`,
+  `getLong` or `getFloat` read.
+- The preferences whose type a settings migration changed, with the version
+  of that change. A file from before the change keeps the old type, because
+  the migration runs at the next start and has to read it. Add a key there
+  when a migration changes a type.
+
 **Restore.** A restore never touches the open database:
 
 1. It copies the archive to a private file and takes the database, and the

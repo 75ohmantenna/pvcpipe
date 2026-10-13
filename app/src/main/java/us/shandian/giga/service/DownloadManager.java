@@ -84,13 +84,18 @@ public class DownloadManager {
         loadPendingMissions(context);
     }
 
+    /**
+     * Checkpoints are serialized objects, and a checkpoint names the addresses to download
+     * and the file to write. They are kept in internal storage, which no other app can write
+     * to. Older builds kept them in the external files directory, which other apps could
+     * reach on Android 8 to 10. That directory is never read: nothing tells a checkpoint
+     * this app wrote from one that was put there, also not after an upgrade of Android.
+     *
+     * @param context the context of the application
+     * @return the directory of the checkpoints of unfinished downloads
+     */
     private static File getPendingDir(@NonNull final Context context) {
-        File dir = context.getExternalFilesDir(DOWNLOADS_METADATA_FOLDER);
-        if (testDir(dir)) {
-            return dir;
-        }
-
-        dir = new File(context.getFilesDir(), DOWNLOADS_METADATA_FOLDER);
+        final File dir = new File(context.getFilesDir(), DOWNLOADS_METADATA_FOLDER);
         if (testDir(dir)) {
             return dir;
         }
