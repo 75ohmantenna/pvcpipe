@@ -18,6 +18,7 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -107,7 +108,7 @@ public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
         try (ZipInputStream zipInputStream = new ZipInputStream(contentInputStream)) {
             ZipEntry zipEntry;
             while ((zipEntry = zipInputStream.getNextEntry()) != null) {
-                if (zipEntry.getName().toLowerCase().endsWith(".csv")) {
+                if (zipEntry.getName().toLowerCase(Locale.ROOT).endsWith(".csv")) {
                     try {
                         final List<SubscriptionItem> csvItems = fromCsvInputStream(zipInputStream);
 

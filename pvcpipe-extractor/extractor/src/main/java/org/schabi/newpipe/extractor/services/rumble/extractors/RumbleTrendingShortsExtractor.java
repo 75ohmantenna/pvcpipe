@@ -49,7 +49,6 @@ public class RumbleTrendingShortsExtractor extends KioskExtractor<StreamInfoItem
                     .responseBody();
             parseVideosFromResponse(responseData);
         } catch (final JsonParserException e) {
-            e.printStackTrace();
             throw new ParsingException("Could not parse Rumble featured API response", e);
         }
     }

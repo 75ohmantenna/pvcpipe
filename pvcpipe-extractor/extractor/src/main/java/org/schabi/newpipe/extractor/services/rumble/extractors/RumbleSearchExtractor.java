@@ -3,11 +3,13 @@ package org.schabi.newpipe.extractor.services.rumble.extractors;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.MetaInfo;
 import org.schabi.newpipe.extractor.MultiInfoItemsCollector;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
+import org.schabi.newpipe.extractor.channel.ChannelInfoItemExtractor;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
@@ -90,11 +92,13 @@ public class RumbleSearchExtractor extends SearchExtractor {
             }
             infoItemsListSize = infoItemsList.size();
         } else if (searchType == RumbleFilters.ID_CF_MAIN_CHANNELS) {
-            final List<RumbleChannelSearchInfoItemExtractor> infoItemsList =
+            final List<ChannelInfoItemExtractor> infoItemsList =
                     extractChannelsFromSearchResult();
-            for (final RumbleChannelSearchInfoItemExtractor infoItemExtractor : infoItemsList) {
+            for (final ChannelInfoItemExtractor infoItemExtractor : infoItemsList) {
                 collector.commit(infoItemExtractor);
             }
+            // every channel the page lists counts, also one that could not be read: a page
+            // of unreadable channels still has a next page
             infoItemsListSize = infoItemsList.size();
         }
 
@@ -105,22 +109,76 @@ public class RumbleSearchExtractor extends SearchExtractor {
         return new InfoItemsPage<>(collector, nextPage);
     }
 
-    private List<RumbleChannelSearchInfoItemExtractor> extractChannelsFromSearchResult()
-            throws ParsingException {
+    private List<ChannelInfoItemExtractor> extractChannelsFromSearchResult() {
         final Elements elements = doc.select("article");
-        final List<RumbleChannelSearchInfoItemExtractor> extractors = new ArrayList<>();
+        final List<ChannelInfoItemExtractor> extractors = new ArrayList<>();
 
         for (final Element element : elements) {
             if (element.selectFirst("div[class*=media-subscribe-and-notify], "
                     + "a[href*='/c/']:has(h3), a[href*='/user/']:has(h3)") == null) {
                 continue;
             }
-            final RumbleChannelSearchInfoItemExtractor infoItem =
-                    new RumbleChannelSearchInfoItemExtractor(element, doc);
-            extractors.add(infoItem);
+            try {
+                extractors.add(new RumbleChannelSearchInfoItemExtractor(element, doc));
+            } catch (final ParsingException e) {
+                extractors.add(new UnreadableChannel(e));
+            } catch (final RuntimeException e) {
+                extractors.add(new UnreadableChannel(
+                        new ParsingException("Could not read a channel of the search", e)));
+            }
         }
 
         return extractors;
+    }
+
+    /**
+     * Stands in for a channel whose markup could not be read. The channel extractor reads
+     * everything when it is created, so its failure would otherwise end the whole page. The
+     * collector asks this one for its values, gets the error, records it and goes on to the
+     * next channel.
+     */
+    private static final class UnreadableChannel implements ChannelInfoItemExtractor {
+        private final ParsingException error;
+
+        private UnreadableChannel(final ParsingException error) {
+            this.error = error;
+        }
+
+        @Override
+        public String getName() throws ParsingException {
+            throw error;
+        }
+
+        @Override
+        public String getUrl() throws ParsingException {
+            throw error;
+        }
+
+        @Nonnull
+        @Override
+        public List<Image> getThumbnails() throws ParsingException {
+            throw error;
+        }
+
+        @Override
+        public String getDescription() throws ParsingException {
+            throw error;
+        }
+
+        @Override
+        public long getSubscriberCount() throws ParsingException {
+            throw error;
+        }
+
+        @Override
+        public long getStreamCount() throws ParsingException {
+            throw error;
+        }
+
+        @Override
+        public boolean isVerified() throws ParsingException {
+            throw error;
+        }
     }
 
     @Override

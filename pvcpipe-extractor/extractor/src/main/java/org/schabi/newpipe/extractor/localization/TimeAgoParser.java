@@ -6,6 +6,7 @@ import org.schabi.newpipe.extractor.utils.Parser;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -84,10 +85,11 @@ public class TimeAgoParser {
         }
 
         if (patternsHolder.wordSeparator().isEmpty()) {
-            return textualDate.toLowerCase().contains(agoPhrase.toLowerCase());
+            return textualDate.toLowerCase(Locale.ROOT)
+                    .contains(agoPhrase.toLowerCase(Locale.ROOT));
         }
 
-        final String escapedPhrase = Pattern.quote(agoPhrase.toLowerCase());
+        final String escapedPhrase = Pattern.quote(agoPhrase.toLowerCase(Locale.ROOT));
         final String escapedSeparator = patternsHolder.wordSeparator().equals(" ")
                 // From JDK8 → \h - Treat horizontal spaces as a normal one
                 // (non-breaking space, thin space, etc.)
@@ -100,7 +102,7 @@ public class TimeAgoParser {
         final String pattern =
                 "(^|" + escapedSeparator + ")" + escapedPhrase + "($|" + escapedSeparator + ")";
 
-        return Parser.isMatch(pattern, textualDate.toLowerCase());
+        return Parser.isMatch(pattern, textualDate.toLowerCase(Locale.ROOT));
     }
 
     private DateWrapper getResultFor(final int timeAgoAmount, final ChronoUnit chronoUnit) {

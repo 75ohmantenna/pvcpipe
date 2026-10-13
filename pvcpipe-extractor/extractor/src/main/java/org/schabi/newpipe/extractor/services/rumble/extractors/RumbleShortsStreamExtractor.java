@@ -77,8 +77,7 @@ public class RumbleShortsStreamExtractor extends StreamExtractor {
                 throw new ExtractionException("Short video not found in JSON");
             }
         } catch (final JsonParserException e) {
-            e.printStackTrace();
-            throw new ParsingException("Could not read json from: " + getUrl());
+            throw new ParsingException("Could not read json from: " + getUrl(), e);
         }
     }
 

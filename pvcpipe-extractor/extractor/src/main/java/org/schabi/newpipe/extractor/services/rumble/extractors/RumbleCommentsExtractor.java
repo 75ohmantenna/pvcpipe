@@ -242,8 +242,7 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
                 initImageMap(info.get("css_libs").toString());
             }
         } catch (final JsonParserException e) {
-            e.printStackTrace();
-            throw new ExtractionException("Could not read json from: " + getUrl());
+            throw new ExtractionException("Could not read json from: " + getUrl(), e);
         }
     }
 }

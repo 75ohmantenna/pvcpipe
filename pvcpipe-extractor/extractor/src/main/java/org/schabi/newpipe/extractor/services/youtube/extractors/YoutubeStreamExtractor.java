@@ -392,7 +392,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             }
         }
 
-        if (views.toLowerCase().contains("no views")) {
+        if (views.toLowerCase(Locale.ROOT).contains("no views")) {
             return 0;
         }
 
@@ -463,7 +463,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             }
 
             // This check only works with English localizations!
-            if (likesString != null && likesString.toLowerCase().contains("no likes")) {
+            if (likesString != null && likesString.toLowerCase(Locale.ROOT).contains("no likes")) {
                 return 0;
             }
         }

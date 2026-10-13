@@ -13,6 +13,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.util.List;
+import java.util.Locale;
 
 import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getImagesFromThumbnailsArray;
 import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
@@ -108,7 +109,7 @@ public class YoutubeShortsLockupInfoItemExtractor extends PvcYoutubeShortsLockup
             }
 
             // This approach is language dependent
-            if (viewCountText.toLowerCase().contains("no views")) {
+            if (viewCountText.toLowerCase(Locale.ROOT).contains("no views")) {
                 return 0;
             }
 

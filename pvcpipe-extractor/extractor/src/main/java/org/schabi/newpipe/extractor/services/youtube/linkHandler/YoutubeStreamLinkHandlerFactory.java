@@ -36,6 +36,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -140,7 +141,7 @@ public final class YoutubeStreamLinkHandlerFactory extends LinkHandlerFactory {
         // Using uppercase instead of lowercase, because toLowercase replaces some unicode
         // characters with their lowercase ASCII equivalent. Using toLowercase could result in
         // faultily matching unicode urls.
-        switch (host.toUpperCase()) {
+        switch (host.toUpperCase(Locale.ROOT)) {
             case "WWW.YOUTUBE-NOCOOKIE.COM": {
                 if (path.startsWith("embed/")) {
                     return assertIsId(path.substring(6));

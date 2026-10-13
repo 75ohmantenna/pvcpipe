@@ -9,6 +9,7 @@ import org.schabi.newpipe.extractor.utils.Parser;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.util.List;
+import java.util.Locale;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -53,6 +54,6 @@ public final class SoundcloudChannelLinkHandlerFactory extends ListLinkHandlerFa
 
     @Override
     public boolean onAcceptUrl(final String url) {
-        return Parser.isMatch(URL_PATTERN, url.toLowerCase());
+        return Parser.isMatch(URL_PATTERN, url.toLowerCase(Locale.ROOT));
     }
 }

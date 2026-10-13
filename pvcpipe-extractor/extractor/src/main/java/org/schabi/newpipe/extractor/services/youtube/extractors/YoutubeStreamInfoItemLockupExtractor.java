@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
@@ -409,9 +410,9 @@ public class YoutubeStreamInfoItemLockupExtractor implements StreamInfoItemExtra
     private long getViewCountFromViewCountText(@Nonnull final String viewCountText)
             throws NumberFormatException, ParsingException {
         // These approaches are language dependent
-        if (viewCountText.toLowerCase().contains(NO_VIEWS_LOWERCASE)) {
+        if (viewCountText.toLowerCase(Locale.ROOT).contains(NO_VIEWS_LOWERCASE)) {
             return 0;
-        } else if (viewCountText.toLowerCase().contains("recommended")) {
+        } else if (viewCountText.toLowerCase(Locale.ROOT).contains("recommended")) {
             return -1;
         }
 

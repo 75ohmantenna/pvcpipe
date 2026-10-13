@@ -1032,7 +1032,7 @@ public final class YoutubeParsingHelper {
 
         final String responseContentType = response.getHeader("Content-Type");
         if (responseContentType != null
-                && responseContentType.toLowerCase().contains("text/html")) {
+                && responseContentType.toLowerCase(Locale.ROOT).contains("text/html")) {
             throw new ParsingException("Got HTML document, expected JSON response"
                     + " (latest url was: \"" + response.latestUrl() + "\")");
         }
