@@ -22,6 +22,7 @@ import org.schabi.newpipe.PvcDownloaderImplUtils;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -291,12 +292,21 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
                         continue;
                     }
 
-                    final Response response = DownloaderImpl.getInstance()
-                            .head(stream.getContent());
+                    final Response response;
+                    try {
+                        response = DownloaderImpl.getInstance().head(stream.getContent());
+                    } catch (final IOException | ReCaptchaException e) {
+                        // The size stays unknown; the other streams are still asked.
+                        continue;
+                    }
+                    if (!isSuccessful(response)) {
+                        // The headers of an error page say nothing about the stream.
+                        continue;
+                    }
                     if (changeSize) {
-                        final String contentLength = response.getHeader("Content-Length");
-                        if (!isNullOrEmpty(contentLength)) {
-                            streamsWrapper.setSize(stream, Long.parseLong(contentLength));
+                        final long size = contentLengthOf(response);
+                        if (size >= 0) {
+                            streamsWrapper.setSize(stream, size);
                             hasChanged = true;
                         }
                     }
@@ -312,6 +322,28 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .onErrorReturnItem(true);
+        }
+
+        @VisibleForTesting
+        static boolean isSuccessful(@NonNull final Response response) {
+            return response.responseCode() >= 200 && response.responseCode() < 300;
+        }
+
+        /**
+         * @param response the answer to a request for a stream
+         * @return the length it states, or -1 if it states none that can be read
+         */
+        @VisibleForTesting
+        static long contentLengthOf(@NonNull final Response response) {
+            final String contentLength = response.getHeader("Content-Length");
+            if (isNullOrEmpty(contentLength)) {
+                return -1;
+            }
+            try {
+                return Long.parseLong(contentLength.trim());
+            } catch (final NumberFormatException e) {
+                return -1;
+            }
         }
 
         /**

@@ -202,6 +202,9 @@ public final class DownloaderImpl extends Downloader {
             final Response response = head(url);
             if (response.responseCode() == 405) { // HEAD Method not allowed
                 return PvcDownloaderImplUtils.getContentLengthViaGet(url);
+            } else if (response.responseCode() < 200 || response.responseCode() >= 300) {
+                // The length of an error page is not the length of the content.
+                throw new IOException("HTTP " + response.responseCode() + " for " + url);
             } else {
                 return Long.parseLong(response.getHeader("Content-Length"));
             }
@@ -228,7 +231,8 @@ public final class DownloaderImpl extends Downloader {
         final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
                 .method(httpMethod, requestBody)
                 .url(url)
-                .addHeader("User-Agent", USER_AGENT);
+                // The media hosts that refuse the default one are asked for sizes this way.
+                .addHeader("User-Agent", getMediaUserAgent(url));
 
         headers.forEach((headerName, headerValueList) -> {
             requestBuilder.removeHeader(headerName);

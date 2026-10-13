@@ -458,10 +458,12 @@ public class DownloadMission extends Mission {
         }
 
         if (err instanceof IOException) {
-            if (err.getMessage().contains("Permission denied")) {
+            // An exception may carry no message: EOFException from the muxers has none.
+            final String message = err.getMessage() == null ? "" : err.getMessage();
+            if (message.contains("Permission denied")) {
                 code = ERROR_PERMISSION_DENIED;
                 err = null;
-            } else if (err.getMessage().contains("ENOSPC")) {
+            } else if (message.contains("ENOSPC")) {
                 code = ERROR_INSUFFICIENT_STORAGE;
                 err = null;
             } else if (!storage.canWrite()) {

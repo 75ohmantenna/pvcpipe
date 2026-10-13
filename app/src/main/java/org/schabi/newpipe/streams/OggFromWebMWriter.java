@@ -7,6 +7,7 @@ import android.util.Pair;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.streams.WebMReader.Cluster;
@@ -22,8 +23,11 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -292,16 +296,7 @@ public class OggFromWebMWriter implements Closeable {
 
         if ("A_OPUS".equals(webmTrack.codecId)) {
             final var metadata = new ArrayList<Pair<String, String>>();
-            if (streamInfo != null) {
-                metadata.add(Pair.create("COMMENT", streamInfo.getUrl()));
-                metadata.add(Pair.create("GENRE", streamInfo.getCategory()));
-                metadata.add(Pair.create("ARTIST", streamInfo.getUploaderName()));
-                metadata.add(Pair.create("TITLE", streamInfo.getName()));
-                metadata.add(Pair.create("DATE", streamInfo
-                        .getUploadDate()
-                        .getLocalDateTime()
-                        .format(DateTimeFormatter.ISO_DATE)));
-            }
+            forEachTag(streamInfo, (key, value) -> metadata.add(Pair.create(key, value)));
 
             if (DEBUG) {
                 Log.d("OggFromWebMWriter", "Creating metadata header with this data:");
@@ -322,6 +317,33 @@ public class OggFromWebMWriter implements Closeable {
 
         // not implemented for the desired codec
         return null;
+    }
+
+    /**
+     * Names the tags a stream's metadata gives. Every one of them is optional: the extractor
+     * leaves out what it could not read, and a missing tag must not fail the download.
+     *
+     * @param info the stream, or {@code null} if nothing is known about it
+     * @param tags is called with the key and the value of each tag that has a value
+     */
+    @VisibleForTesting
+    static void forEachTag(@Nullable final StreamInfo info,
+                           @NonNull final BiConsumer<String, String> tags) {
+        if (info == null) {
+            return;
+        }
+        final Map<String, String> values = new LinkedHashMap<>();
+        values.put("COMMENT", info.getUrl());
+        values.put("GENRE", info.getCategory());
+        values.put("ARTIST", info.getUploaderName());
+        values.put("TITLE", info.getName());
+        values.put("DATE", info.getUploadDate() == null ? null
+                : info.getUploadDate().getLocalDateTime().format(DateTimeFormatter.ISO_DATE));
+        values.forEach((key, value) -> {
+            if (value != null) {
+                tags.accept(key, value);
+            }
+        });
     }
 
     /**
