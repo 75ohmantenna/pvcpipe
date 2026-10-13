@@ -94,41 +94,44 @@ public class HistoryRecordManager {
         }
 
         final OffsetDateTime currentTime = OffsetDateTime.now(ZoneOffset.UTC);
-        return Maybe.fromCallable(() -> database.runInTransaction(() -> {
-            final long streamId;
-            final long duration;
-            // Duration will not exist if the item was loaded with fast mode, so fetch it if empty
-            if (info.getDuration() < 0) {
-                final StreamInfo completeInfo = ExtractorHelper.getStreamInfo(
-                        info.getServiceId(),
-                        info.getUrl(),
-                        false
-                )
-                        .subscribeOn(Schedulers.io())
-                        .blockingGet();
-                duration = completeInfo.getDuration();
-                streamId = streamTable.upsert(new StreamEntity(completeInfo));
-            } else {
-                duration = info.getDuration();
-                streamId = streamTable.upsert(new StreamEntity(info));
-            }
+        return Maybe.fromCallable(() -> {
+            // Duration will not exist if the item was loaded with fast mode, so fetch it if
+            // empty. This is a network request and it comes before the transaction: the
+            // database has one writer, and every other write would wait for the website.
+            final StreamInfo completeInfo = info.getDuration() < 0
+                    ? ExtractorHelper.getStreamInfo(info.getServiceId(), info.getUrl(), false)
+                            .subscribeOn(Schedulers.io())
+                            .blockingGet()
+                    : null;
+            return database.runInTransaction(() -> {
+                final long streamId;
+                final long duration;
+                if (completeInfo != null) {
+                    duration = completeInfo.getDuration();
+                    streamId = streamTable.upsert(new StreamEntity(completeInfo));
+                } else {
+                    duration = info.getDuration();
+                    streamId = streamTable.upsert(new StreamEntity(info));
+                }
 
-            // Update the stream progress to the full duration of the video
-            final StreamStateEntity entity = new StreamStateEntity(
-                    streamId,
-                    duration * 1000
-            );
-            streamStateTable.upsert(entity);
+                // Update the stream progress to the full duration of the video
+                final StreamStateEntity entity = new StreamStateEntity(
+                        streamId,
+                        duration * 1000
+                );
+                streamStateTable.upsert(entity);
 
-            // Add a history entry
-            final StreamHistoryEntity latestEntry = streamHistoryTable.getLatestEntry(streamId);
-            if (latestEntry == null) {
-                // never actually viewed: add history entry but with 0 views
-                return streamHistoryTable.insert(new StreamHistoryEntity(streamId, currentTime, 0));
-            } else {
-                return 0L;
-            }
-        })).subscribeOn(Schedulers.io());
+                // Add a history entry
+                final StreamHistoryEntity latestEntry = streamHistoryTable.getLatestEntry(streamId);
+                if (latestEntry == null) {
+                    // never actually viewed: add history entry but with 0 views
+                    return streamHistoryTable.insert(
+                            new StreamHistoryEntity(streamId, currentTime, 0));
+                } else {
+                    return 0L;
+                }
+            });
+        }).subscribeOn(Schedulers.io());
     }
 
     public Maybe<Long> onViewed(final StreamInfo info) {

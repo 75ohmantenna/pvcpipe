@@ -16,6 +16,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers
 import org.schabi.newpipe.R
 import org.schabi.newpipe.database.subscription.NotificationMode
 import org.schabi.newpipe.databinding.FragmentChannelsNotificationsBinding
+import org.schabi.newpipe.error.ErrorUtil
+import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.local.subscription.SubscriptionManager
 
 /**
@@ -103,10 +105,22 @@ class NotificationModeConfigFragment : Fragment() {
     }
 
     private fun updateNotificationMode(item: SubscriptionItem, @NotificationMode mode: Int) {
+        val context = requireContext().applicationContext
         disposables.add(
             subscriptionManager.updateNotificationMode(item.serviceId, item.url, mode)
                 .subscribeOn(Schedulers.io())
-                .subscribe()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                    {},
+                    { throwable ->
+                        ErrorUtil.reportDetached(
+                            context,
+                            throwable,
+                            UserAction.SUBSCRIPTION_UPDATE,
+                            "Changing the notification mode of a channel"
+                        )
+                    }
+                )
         )
     }
 }

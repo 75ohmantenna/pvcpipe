@@ -765,7 +765,9 @@ public class MainActivity extends AppCompatActivity {
                 if (searchString == null) {
                     searchString = "";
                 }
-                final int serviceId = intent.getIntExtra(Constants.KEY_SERVICE_ID, 0);
+                // other apps can reach this through the share target, with any id they like
+                final int serviceId = ServiceHelper.existingOrSelected(this,
+                        intent.getIntExtra(Constants.KEY_SERVICE_ID, 0));
                 NavigationHelper.openSearchFragment(
                         getSupportFragmentManager(),
                         serviceId,

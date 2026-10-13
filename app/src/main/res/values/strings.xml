@@ -329,6 +329,7 @@
     <string name="title_activity_recaptcha">reCAPTCHA challenge</string>
     <string name="subtitle_activity_recaptcha">Press \"Done\" when solved</string>
     <string name="recaptcha_request_toast">reCAPTCHA challenge requested</string>
+    <string name="too_many_requests">%1$s is refusing requests from this network for now. Try again later.</string>
     <string name="recaptcha_solve">Solve</string>
     <string name="done">Done</string>
     <!-- Downloads -->

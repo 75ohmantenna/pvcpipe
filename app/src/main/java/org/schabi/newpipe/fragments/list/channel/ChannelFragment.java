@@ -455,6 +455,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     }
 
     private void setNotify(final boolean isEnabled) {
+        final Context appContext = requireContext().getApplicationContext();
         disposables.add(
                 subscriptionManager
                         .updateNotificationMode(
@@ -463,7 +464,9 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                                 isEnabled ? NotificationMode.ENABLED : NotificationMode.DISABLED)
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe()
+                        .subscribe(() -> { }, throwable -> ErrorUtil.reportDetached(
+                                appContext, throwable, UserAction.SUBSCRIPTION_UPDATE,
+                                "Changing the notification mode of a channel"))
         );
     }
 

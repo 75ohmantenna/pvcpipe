@@ -107,6 +107,29 @@ class ErrorUtil {
         }
 
         /**
+         * Reports an error of work that goes on after the screen that started it has closed,
+         * such as a database change. It does not need a view or an attached fragment. Call it
+         * on the main thread.
+         *
+         * @param context any context; only its application context is used
+         * @param throwable what went wrong
+         * @param userAction what the user was doing
+         * @param request what the app was doing
+         */
+        @JvmStatic
+        fun reportDetached(
+            context: Context,
+            throwable: Throwable,
+            userAction: UserAction,
+            request: String
+        ) {
+            createNotification(
+                context.applicationContext,
+                ErrorInfo(throwable, userAction, request)
+            )
+        }
+
+        /**
          * Create an error notification. Tapping on the notification opens the error activity. Use
          * this method if the exception happens inside a background service (player, subscription
          * import, ...) or there is no activity/fragment from which to extract a root view.

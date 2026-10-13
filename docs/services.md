@@ -51,6 +51,13 @@ Subscriptions, saved playlists, history and queues are kept on the device
 with a service is Odysee's anonymous visitor token, described under
 [Odysee](#odysee).
 
+`DownloaderImpl` reports every HTTP 429 as a `ReCaptchaException`. The app
+can only do something about a captcha from YouTube: `ReCaptchaActivity` keeps
+YouTube's cookies and `DownloaderImpl` sends them back to YouTube only. So
+`ErrorInfo.solvableCaptchaUrl` offers the captcha screen for YouTube and
+Google hosts, and for any other host the app says that the site is refusing
+requests from this network for now.
+
 "Hide paid content videos" in the PVCPipe settings sets a switch in the
 extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). With it on,
 their lists leave out videos that need a membership or a payment.
