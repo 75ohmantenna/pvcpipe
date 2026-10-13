@@ -1,5 +1,6 @@
 package org.schabi.newpipe.extractor.services.soundcloud.linkHandler;
 
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
@@ -58,6 +59,6 @@ public final class SoundcloudStreamLinkHandlerFactory extends LinkHandlerFactory
 
     @Override
     public boolean onAcceptUrl(final String url) throws ParsingException {
-        return Parser.isMatch(URL_PATTERN, url.toLowerCase());
+        return Parser.isMatch(URL_PATTERN, url.toLowerCase(Locale.ROOT));
     }
 }

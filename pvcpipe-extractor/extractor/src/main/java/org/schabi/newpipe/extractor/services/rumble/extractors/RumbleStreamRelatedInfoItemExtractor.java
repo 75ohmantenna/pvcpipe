@@ -97,8 +97,8 @@ public class RumbleStreamRelatedInfoItemExtractor implements StreamInfoItemExtra
             try {
                 return RumbleParsingHelper.getViewCount(element,
                         "div.video-counters--item.video-item--views");
-            } catch (final ParsingException e) {
-                e.printStackTrace();
+            } catch (final ParsingException ignored) {
+                // the view count of a related item is optional
             }
         }
         return -1;

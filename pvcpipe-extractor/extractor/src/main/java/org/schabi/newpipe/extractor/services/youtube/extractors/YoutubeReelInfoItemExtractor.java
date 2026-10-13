@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.util.List;
+import java.util.Locale;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -74,7 +75,7 @@ public class YoutubeReelInfoItemExtractor implements StreamInfoItemExtractor {
         final String viewCountText = getTextFromObject(reelInfo.getObject("viewCountText"));
         if (!isNullOrEmpty(viewCountText)) {
             // This approach is language dependent
-            if (viewCountText.toLowerCase().contains("no views")) {
+            if (viewCountText.toLowerCase(Locale.ROOT).contains("no views")) {
                 return 0;
             }
 

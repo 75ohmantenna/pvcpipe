@@ -45,6 +45,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
@@ -212,7 +213,7 @@ public final class SoundcloudParsingHelper {
         }
         // Make URL lower case and remove m. and www. if it exists.
         // Without doing this, the widget API does not recognize the URL.
-        fixedUrl = Utils.removeMAndWWWFromUrl(fixedUrl.toLowerCase());
+        fixedUrl = Utils.removeMAndWWWFromUrl(fixedUrl.toLowerCase(Locale.ROOT));
 
         final URL url;
         try {

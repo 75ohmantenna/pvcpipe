@@ -94,6 +94,35 @@ class RumbleAdversarialReviewTest {
         assertEquals("https://rumble.com/c/Example", item.getUrl());
     }
 
+    @Test
+    void oneUnreadableChannelDoesNotCostTheOthers() throws Exception {
+        // a follower count without a number makes the channel extractor throw
+        final String html = "<article><a href='/c/First'><h3>First</h3></a></article>"
+                + "<article><a href='/c/Broken'><h3>Broken</h3></a>"
+                + "<span class='channel-item--subscribers'>many followers</span></article>"
+                + "<article><a href='/c/Third'><h3>Third</h3></a></article>";
+        final var page = search(html);
+
+        final List<String> names = new ArrayList<>();
+        for (final var item : page.getItems()) {
+            names.add(item.getName());
+        }
+        assertEquals(List.of("First", "Third"), names);
+        assertEquals(1, page.getErrors().size());
+    }
+
+    @Test
+    void aPageOfUnreadableChannelsStillHasANextPage() throws Exception {
+        final String broken = "<article><a href='/c/Broken'><h3>Broken</h3></a>"
+                + "<span class='channel-item--subscribers'>many followers</span></article>";
+        final var page = search("<html><head><link rel='next' href='?page=2'></head><body>"
+                + broken + broken + "</body></html>");
+
+        assertTrue(page.getItems().isEmpty());
+        assertEquals(2, page.getErrors().size());
+        assertTrue(page.hasNextPage());
+    }
+
     private static org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage<
             org.schabi.newpipe.extractor.InfoItem> search(final String html) throws Exception {
         NewPipe.init(new Downloader() {

@@ -62,6 +62,15 @@
     <module name="SuppressWithPlainTextCommentFilter"/>
 
     <module name="TreeWalker">
+        <!-- Without a Locale these follow the language of the device. In Turkish "I" and "i" are
+             not a pair, which makes host names and addresses stop matching. -->
+        <module name="RegexpSinglelineJava">
+           <property name="format" value="\.to(Lower|Upper)Case\(\)"/>
+           <property name="ignoreComments" value="true"/>
+           <property name="message"
+                     value="Give toLowerCase and toUpperCase a Locale, usually Locale.ROOT."/>
+        </module>
+
         <!-- Checks for Javadoc comments.                     -->
         <!-- See https://checkstyle.org/config_javadoc.html -->
         <module name="InvalidJavadocPosition"/>

@@ -48,6 +48,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -364,9 +365,9 @@ public class YoutubeStreamInfoItemExtractor extends PvcYoutubeStreamInfoItemHelp
                                                final boolean isMixedNumber)
             throws NumberFormatException, ParsingException {
         // These approaches are language dependent
-        if (viewCountText.toLowerCase().contains(NO_VIEWS_LOWERCASE)) {
+        if (viewCountText.toLowerCase(Locale.ROOT).contains(NO_VIEWS_LOWERCASE)) {
             return 0;
-        } else if (viewCountText.toLowerCase().contains("recommended")) {
+        } else if (viewCountText.toLowerCase(Locale.ROOT).contains("recommended")) {
             return -1;
         }
 
@@ -382,7 +383,7 @@ public class YoutubeStreamInfoItemExtractor extends PvcYoutubeStreamInfoItemHelp
                 .getObject("accessibilityData")
                 .getString("label", "");
 
-        if (videoInfoTitleAccessibilityData.toLowerCase().endsWith(NO_VIEWS_LOWERCASE)) {
+        if (videoInfoTitleAccessibilityData.toLowerCase(Locale.ROOT).endsWith(NO_VIEWS_LOWERCASE)) {
             return 0;
         }
 
@@ -469,7 +470,7 @@ public class YoutubeStreamInfoItemExtractor extends PvcYoutubeStreamInfoItemHelp
                                     .equalsIgnoreCase("SHORTS")
                                     || timeOverlay.getObject("icon")
                                     .getString("iconType", "")
-                                    .toLowerCase()
+                                    .toLowerCase(Locale.ROOT)
                                     .contains("shorts"));
                 }
             }
