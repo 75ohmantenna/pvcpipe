@@ -49,7 +49,9 @@ An HLS rendition is downloaded segment by segment and then joined by
   encryption keys as bytes, because a key is binary.
 - Each conversion works in a directory of its own under `ffmpeg_temp` and
   removes it when it ends, also after a failure. Several HLS downloads can
-  be converted at the same time.
+  be converted at the same time. A conversion that starts while no other is
+  running first removes whatever is left in `ffmpeg_temp`: files of a build
+  that had one shared directory, or of a process that was killed half way.
 - A segment that the server refuses fails the mission with the HTTP error,
   and the mission keeps its segments. `DownloadMissionRecover` is not used
   for HLS: it can only find a whole progressive file again. A retry asks for

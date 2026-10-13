@@ -91,6 +91,47 @@ public class PvcFromHlsRemuxerTest {
     }
 
     @Test
+    public void leftoversOfEarlierConversionsAreRemovedWhenNoneIsRunning() throws Exception {
+        final File parent = temporary.newFolder("ffmpeg_temp");
+        // what a build with one shared directory left after a failed conversion
+        final File oldSegment = new File(parent, "segment_1.ts");
+        Files.write(oldSegment.toPath(), new byte[]{1});
+        // and the directory of a conversion whose process was killed
+        final File abandoned = new File(parent, "1000-1-1");
+        assertTrue(abandoned.mkdir());
+        Files.write(new File(abandoned, "output.mp4").toPath(), new byte[]{2});
+
+        PvcFromHlsRemuxer.inWorkDir(parent, 2000, workDir -> {
+            assertFalse(oldSegment.exists());
+            assertFalse(abandoned.exists());
+            assertTrue(workDir.isDirectory());
+        });
+
+        assertEquals(0, parent.list().length);
+    }
+
+    @Test
+    public void aConversionThatStartsDoesNotDisturbOneThatIsRunning() throws Exception {
+        final File parent = temporary.newFolder("ffmpeg_temp");
+
+        PvcFromHlsRemuxer.inWorkDir(parent, 1000, first -> {
+            final File segment = new File(first, "0.ts");
+            Files.write(segment.toPath(), new byte[]{1});
+
+            PvcFromHlsRemuxer.inWorkDir(parent, 2000, second -> {
+                assertNotEquals(first, second);
+                // the first conversion still has what it wrote
+                assertTrue(segment.exists());
+            });
+
+            assertTrue(segment.exists());
+            assertTrue(first.isDirectory());
+        });
+
+        assertEquals(0, parent.list().length);
+    }
+
+    @Test
     public void cleaningUpRemovesSegmentsAndOutput() throws IOException {
         final File dir = PvcFromHlsRemuxer.newWorkDir(temporary.getRoot(), 1);
         final File nested = new File(dir, "segments");

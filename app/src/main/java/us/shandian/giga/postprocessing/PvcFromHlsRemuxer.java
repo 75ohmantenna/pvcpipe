@@ -19,7 +19,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import okio.BufferedSink;
@@ -30,6 +32,8 @@ import us.shandian.giga.get.DownloadMission;
 
 public class PvcFromHlsRemuxer extends Postprocessing {
     private static final AtomicLong WORK_DIR_COUNTER = new AtomicLong();
+    // the directories of the conversions that are running in this process
+    private static final Set<File> ACTIVE_WORK_DIRS = new HashSet<>();
 
     PvcFromHlsRemuxer() {
         super(false, true, ALGORITHM_PVC_HLS_REMUXER);
@@ -94,6 +98,10 @@ public class PvcFromHlsRemuxer extends Postprocessing {
     /**
      * Runs one conversion in a directory of its own and removes the directory afterwards, also
      * when the conversion fails. The failure of the conversion is what the caller gets.
+     * <p>
+     * When no other conversion is running, whatever is in the parent directory was left by a
+     * conversion that never got to clean up: a build from before each conversion had its own
+     * directory, or a process that was killed half way. It is removed first.
      *
      * @param parent           the directory all conversions work under
      * @param missionTimestamp the timestamp of the mission
@@ -104,10 +112,25 @@ public class PvcFromHlsRemuxer extends Postprocessing {
     @VisibleForTesting
     static void inWorkDir(final File parent, final long missionTimestamp,
                           final WorkDirAction action) throws IOException, InterruptedException {
-        final File workDir = newWorkDir(parent, missionTimestamp);
+        final File workDir;
+        synchronized (ACTIVE_WORK_DIRS) {
+            if (ACTIVE_WORK_DIRS.isEmpty()) {
+                final File[] leftovers = parent.listFiles();
+                if (leftovers != null) {
+                    for (final File leftover : leftovers) {
+                        deleteQuietly(leftover);
+                    }
+                }
+            }
+            workDir = newWorkDir(parent, missionTimestamp);
+            ACTIVE_WORK_DIRS.add(workDir);
+        }
         try {
             action.run(workDir);
         } finally {
+            synchronized (ACTIVE_WORK_DIRS) {
+                ACTIVE_WORK_DIRS.remove(workDir);
+            }
             deleteQuietly(workDir);
         }
     }
