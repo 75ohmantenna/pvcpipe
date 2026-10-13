@@ -254,8 +254,14 @@ public class DownloadMission extends Mission {
         conn.setRequestProperty("User-Agent", DownloaderImpl.getMediaUserAgent(url));
         conn.setRequestProperty("Accept", "*/*");
         conn.setRequestProperty("Accept-Encoding", "identity");
+        final String referer = DownloaderImpl.getMediaReferer(url);
+        if (referer != null) {
+            conn.setRequestProperty("Referer", referer);
+        }
 
-        if (headRequest) {
+        // A host whose HEAD says nothing about the file is asked with GET, for the same
+        // range. The callers only read the headers of the answer.
+        if (headRequest && !DownloaderImpl.isHeadUnusable(url)) {
             conn.setRequestMethod("HEAD");
         }
 

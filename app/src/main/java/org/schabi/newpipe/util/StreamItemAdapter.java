@@ -28,6 +28,7 @@ import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.extractor.utils.Utils;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
@@ -271,6 +272,21 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
 
                     if (pvcIfStreamIsHlsCalcAndSetSize(stream, pvcStreamInfo, streamsWrapper)) {
                         hasChanged = true;
+                        continue;
+                    }
+
+                    if (DownloaderImpl.isHeadUnusable(stream.getContent())) {
+                        // The headers of a HEAD answer are not those of the file, so there
+                        // is no format to read from them, and the size is asked for with GET.
+                        if (changeSize) {
+                            try {
+                                streamsWrapper.setSize(stream, DownloaderImpl.getInstance()
+                                        .getContentLength(stream.getContent()));
+                                hasChanged = true;
+                            } catch (final IOException e) {
+                                // The size stays unknown; the other streams are still asked.
+                            }
+                        }
                         continue;
                     }
 

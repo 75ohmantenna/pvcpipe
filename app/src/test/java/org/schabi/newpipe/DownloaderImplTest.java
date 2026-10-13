@@ -1,7 +1,10 @@
 package org.schabi.newpipe;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,6 +16,7 @@ import org.junit.Test;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
@@ -60,6 +64,58 @@ public class DownloaderImplTest {
                 "https://example.org/seed131b.bitchute.com/video.mp4", "not a URL")) {
             assertEquals(DownloaderImpl.USER_AGENT, DownloaderImpl.getMediaUserAgent(url));
         }
+    }
+
+    @Test
+    public void odyseeMediaRequestsNameTheWebsiteAsReferrer() {
+        for (final String url : List.of("https://cloud.odysee.live/content/id/master.m3u8",
+                "https://CLOUD.ODYSEE.LIVE/content/id/1080_1.ts",
+                "https://odysee.live/content/id/master.m3u8",
+                "https://player.odycdn.com/v6/streams/id/file.mp4",
+                "https://player.odycdn.com/v6/streams/id/hash/v0_s000001.ts")) {
+            assertEquals(url, "https://odysee.com/", DownloaderImpl.getMediaReferer(url));
+        }
+    }
+
+    @Test
+    public void mediaReferrerIsNotSentToOtherHosts() {
+        for (final String url : List.of("https://odysee.com/@channel:1/video:2",
+                "https://api.na-backend.odysee.com/api/v1/proxy", "https://rumble.com/video.mp4",
+                "https://cloud.odysee.live.evil.example/master.m3u8",
+                "https://notodysee.live/master.m3u8", "https://notodycdn.com/file.mp4",
+                "https://example.org/player.odycdn.com/file.mp4", "not a URL")) {
+            assertNull(url, DownloaderImpl.getMediaReferer(url));
+            assertFalse(url, DownloaderImpl.isHeadUnusable(url));
+        }
+    }
+
+    @Test
+    public void onlyOdyseeFileHostIsNeverAskedWithHead() {
+        assertTrue(DownloaderImpl.isHeadUnusable(
+                "https://player.odycdn.com/v6/streams/id/file.mp4"));
+        assertTrue(DownloaderImpl.isHeadUnusable("https://PLAYER.ODYCDN.COM/file.mp4"));
+        // the livestream host has no files to ask the size of
+        assertFalse(DownloaderImpl.isHeadUnusable(
+                "https://cloud.odysee.live/content/id/master.m3u8"));
+    }
+
+    @Test
+    public void sizeIsReadFromTheAnswerToARequestForTheFirstByte() throws Exception {
+        assertEquals(1628769, PvcDownloaderImplUtils.contentLength(206, "bytes 0-0/1628769",
+                "1", "url"));
+        // a server that ignores the range sends the whole file
+        assertEquals(42, PvcDownloaderImplUtils.contentLength(200, null, "42", "url"));
+        // an error page has a length too, which is not the size of the file
+        for (final int status : new int[]{401, 403, 404, 429, 500}) {
+            assertThrows(IOException.class,
+                    () -> PvcDownloaderImplUtils.contentLength(status, null, "45", "url"));
+        }
+        assertThrows(IOException.class,
+                () -> PvcDownloaderImplUtils.contentLength(206, "bytes 0-0/*", "1", "url"));
+        assertThrows(IOException.class,
+                () -> PvcDownloaderImplUtils.contentLength(206, null, "1", "url"));
+        assertThrows(IOException.class,
+                () -> PvcDownloaderImplUtils.contentLength(200, null, null, "url"));
     }
 
     private final DownloaderImpl downloader = DownloaderImpl.getInstance();

@@ -36,6 +36,7 @@ public final class DownloaderImpl extends Downloader {
                     + "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36";
     private static final String BITCHUTE_MEDIA_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
+    private static final String ODYSEE_MEDIA_REFERER = "https://odysee.com/";
 
     public static String getMediaUserAgent(final String url) {
         final HttpUrl parsed = HttpUrl.parse(url);
@@ -44,6 +45,39 @@ public final class DownloaderImpl extends Downloader {
         return parsed != null && parsed.host().matches("seed[a-z0-9]+\\.bitchute\\.com")
                 ? BITCHUTE_MEDIA_USER_AGENT : USER_AGENT;
     }
+
+    /**
+     * Odysee's media hosts refuse requests that do not name the website as their referrer:
+     * the livestream host every one of them, the file host every one for a file that is not
+     * in its cache.
+     *
+     * @param url the address of a media request
+     * @return the referrer to send, or {@code null} if the host needs none
+     */
+    @Nullable
+    public static String getMediaReferer(final String url) {
+        final HttpUrl parsed = HttpUrl.parse(url);
+        return parsed != null && (isHostOrSubdomain(parsed.host(), "odysee.live")
+                || isHostOrSubdomain(parsed.host(), "odycdn.com")) ? ODYSEE_MEDIA_REFERER : null;
+    }
+
+    /**
+     * Odysee's file host does not answer a HEAD request with the headers of the file: it
+     * refuses one without the referrer, and with it redirects to an HLS playlist when the
+     * file has been transcoded. Whoever wants the size of such a file has to ask with GET.
+     *
+     * @param url the address of a media file
+     * @return whether a HEAD request to it tells nothing about the file
+     */
+    public static boolean isHeadUnusable(final String url) {
+        final HttpUrl parsed = HttpUrl.parse(url);
+        return parsed != null && isHostOrSubdomain(parsed.host(), "odycdn.com");
+    }
+
+    private static boolean isHostOrSubdomain(final String host, final String domain) {
+        return host.equals(domain) || host.endsWith("." + domain);
+    }
+
     public static final String YOUTUBE_RESTRICTED_MODE_COOKIE_KEY =
             "youtube_restricted_mode_key";
     public static final String YOUTUBE_RESTRICTED_MODE_COOKIE = "PREF=f2=8000000";
@@ -158,6 +192,9 @@ public final class DownloaderImpl extends Downloader {
      */
     public long getContentLength(final String url) throws IOException {
         try {
+            if (isHeadUnusable(url)) {
+                return PvcDownloaderImplUtils.getContentLengthViaGet(url);
+            }
             final Response response = head(url);
             if (response.responseCode() == 405) { // HEAD Method not allowed
                 return PvcDownloaderImplUtils.getContentLengthViaGet(url);
@@ -194,6 +231,12 @@ public final class DownloaderImpl extends Downloader {
             headerValueList.forEach(headerValue ->
                     requestBuilder.addHeader(headerName, headerValue));
         });
+
+        final String mediaReferer = getMediaReferer(url);
+        if (mediaReferer != null
+                && headers.keySet().stream().noneMatch("Referer"::equalsIgnoreCase)) {
+            requestBuilder.addHeader("Referer", mediaReferer);
+        }
 
         try (
                 okhttp3.Response response = client.newCall(requestBuilder.build()).execute()

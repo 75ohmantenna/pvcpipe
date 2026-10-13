@@ -388,6 +388,32 @@
                 <data android:pathPrefix="/user/"/>
             </intent-filter>
 
+            <!-- Odysee filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH"/>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED"/>
+
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+
+                <data android:scheme="http"/>
+                <data android:scheme="https"/>
+                <data android:host="odysee.com"/>
+                <data android:host="www.odysee.com"/>
+                <data android:host="lbry.tv"/>
+                <data android:host="open.lbry.com"/>
+                <!-- channels, and videos published by a channel -->
+                <data android:pathPrefix="/@"/>
+                <!-- videos published without a channel: /name:claimId -->
+                <data android:pathPattern="/.*:.*"/>
+                <!-- embeds, downloads and playlists -->
+                <data android:pathPrefix="/$/embed/"/>
+                <data android:pathPrefix="/$/download/"/>
+                <data android:pathPrefix="/$/playlist/"/>
+                <data android:pathPrefix="/$/list/"/>
+            </intent-filter>
+
         </activity>
 
         <activity

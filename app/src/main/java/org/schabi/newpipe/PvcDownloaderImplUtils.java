@@ -39,17 +39,58 @@ public final class PvcDownloaderImplUtils {
     private PvcDownloaderImplUtils() {
     }
 
-    // some servers eg rumble do not allow HEAD requests anymore (discovered 202300203)
+    /**
+     * Asks for the size of a file with GET, for servers whose HEAD cannot be used: Rumble does
+     * not allow HEAD requests anymore (discovered 20230203), and Odysee's file host answers
+     * them for something else than the file. Only the first byte is asked for, so that the
+     * server does not start sending a whole file that nobody reads.
+     *
+     * @param url the address of the file
+     * @return its size in bytes
+     * @throws IOException if the server refuses or does not tell the size
+     */
     public static long getContentLengthViaGet(final String url) throws IOException {
-        final okhttp3.Request request = new okhttp3.Request.Builder().url(url)
+        final okhttp3.Request.Builder request = new okhttp3.Request.Builder().url(url)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "*/*")
-                .header("Accept-Encoding", "*")
-                .build();
-        try (okhttp3.Response response = DownloaderImpl.getInstance().getClient()
-                .newCall(request).execute()) {
-            return Long.parseLong(response.header("Content-Length"));
+                .header("Accept-Encoding", "identity")
+                .header("Range", "bytes=0-0");
+        final String referer = DownloaderImpl.getMediaReferer(url);
+        if (referer != null) {
+            request.header("Referer", referer);
         }
+        try (okhttp3.Response response = DownloaderImpl.getInstance().getClient()
+                .newCall(request.build()).execute()) {
+            return contentLength(response.code(), response.header("Content-Range"),
+                    response.header("Content-Length"), url);
+        }
+    }
+
+    /**
+     * @param status        the status of the answer to a request for the first byte
+     * @param contentRange  its Content-Range header
+     * @param contentLength its Content-Length header
+     * @param url           the address that was asked, for the error message
+     * @return the size of the whole file
+     */
+    static long contentLength(final int status, @Nullable final String contentRange,
+                              @Nullable final String contentLength, final String url)
+            throws IOException {
+        try {
+            if (status == 206 && contentRange != null) {
+                // "bytes 0-0/1628769": the size is the part after the slash
+                return Long.parseLong(contentRange.substring(contentRange.lastIndexOf('/') + 1)
+                        .trim());
+            }
+            if (status == 200 && contentLength != null) {
+                // a server that ignores the range answers with the whole file
+                return Long.parseLong(contentLength.trim());
+            }
+        } catch (final NumberFormatException e) {
+            throw new IOException("No size in the answer for " + url, e);
+        }
+        // The length of an error page is not the length of the content.
+        throw new IOException("HTTP " + status + " without a size for " + url);
     }
 
     public static void addOrRemoveInterceptors(final OkHttpClient.Builder builder) {
