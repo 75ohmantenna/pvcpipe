@@ -17,7 +17,6 @@ import org.schabi.newpipe.settings.export.BackupFileLocator;
 import org.schabi.newpipe.player.notification.NotificationConstants;
 import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.settings.export.ImportedPreferenceTypes;
-import org.schabi.newpipe.settings.migration.SettingMigrations;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.ZipHelper;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -237,7 +236,8 @@ final class BackupRestore {
         public void normalizeImportedPreferences(final Map<String, Object> values) {
             ImportedPreferenceTypes.conformImport(values, numericPreferenceTypes(),
                     context.getString(R.string.last_used_preferences_version),
-                    SettingMigrations.VERSION,
+                    // settings migration 3 to 4 turned this switch into a set of choices
+                    Map.of(context.getString(R.string.show_search_suggestions_key), 4),
                     PreferenceManager.getDefaultSharedPreferences(context).getAll());
 
             final String tunnelingKey = context.getString(R.string.disable_media_tunneling_key);

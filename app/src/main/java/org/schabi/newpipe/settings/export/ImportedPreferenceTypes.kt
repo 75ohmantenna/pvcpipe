@@ -1,6 +1,6 @@
 package org.schabi.newpipe.settings.export
 
-import kotlin.math.abs
+import java.math.BigDecimal
 
 /**
  * Makes the values of an imported settings file fit the types the app reads them with.
@@ -10,19 +10,23 @@ import kotlin.math.abs
  * [ClassCastException] at the first typed read, which for some keys is the start of the app.
  */
 object ImportedPreferenceTypes {
-    // Every whole number up to here is exactly a Float as well.
-    private const val MAX_EXACT_FLOAT = 1L shl 24
-
     /**
-     * Checks a whole import. The keys the app reads as numbers are always held to their type.
-     * The other keys are held to the type of the app's live value only when the file was
-     * written by the current settings version: an older file may hold a key in the type it had
-     * then, and the settings migrations convert it at the next start.
+     * Checks a whole import.
+     *
+     * A key the app reads as a number is held to that type. Every other key is held to the type
+     * of the app's live value, which for the keys the settings screens define is the type of
+     * their default. A value of another type is converted if that does not change it, and is
+     * otherwise replaced by the live value, or dropped so that the default applies.
+     *
+     * One kind of key is left alone: a key whose type was changed by a settings migration, in a
+     * file from before that migration. The migration runs at the next start and needs the old
+     * value in its old type.
      *
      * @param imported the decoded settings, changed in place
      * @param numericTypes the type of every key the app reads as a number
      * @param versionKey the key of the settings version
-     * @param currentVersion the settings version of this build
+     * @param migratedTypes for each key whose type a migration changed, the settings version
+     * from which it has its present type
      * @param live the settings the app has now
      */
     @JvmStatic
@@ -30,36 +34,27 @@ object ImportedPreferenceTypes {
         imported: MutableMap<String, Any>,
         numericTypes: Map<String, Class<*>>,
         versionKey: String,
-        currentVersion: Int,
+        migratedTypes: Map<String, Int>,
         live: Map<String, *>
     ) {
-        conform(imported, numericTypes, live, liveTypes = false)
-        if (imported[versionKey] == currentVersion) {
-            conform(imported, numericTypes, live, liveTypes = true)
-        }
+        // the version first: it decides which keys are still in an older type
+        conform(imported, numericTypes, live, setOf(versionKey))
+        // SettingMigrations reads a missing version as 0
+        val version = imported[versionKey] as? Int ?: 0
+        val awaitingMigration = migratedTypes.filterValues { version < it }.keys
+        conform(imported, numericTypes, live, imported.keys - awaitingMigration)
     }
 
-    /**
-     * @param imported the decoded settings, changed in place
-     * @param expected the type the app reads a key with, for the keys it reads as a number
-     * @param live the settings the app has now. A live value of the right type replaces an
-     * imported value that cannot be used.
-     * @param liveTypes whether a key that [expected] does not list is held to the type of its
-     * live value, which is the type of its default for the keys the settings screens define
-     */
     private fun conform(
         imported: MutableMap<String, Any>,
-        expected: Map<String, Class<*>>,
+        numericTypes: Map<String, Class<*>>,
         live: Map<String, *>,
-        liveTypes: Boolean
+        keys: Set<String>
     ) {
-        val keys = imported.keys.toList()
-        for (key in keys) {
-            val value = imported.getValue(key)
+        for (key in keys.toList()) {
+            val value = imported[key] ?: continue
             val liveValue = live[key]
-            val type = expected[key]
-                ?: liveValue?.takeIf { liveTypes }?.let(::typeOf)
-                ?: continue
+            val type = numericTypes[key] ?: liveValue?.let(::typeOf) ?: continue
             if (typeOf(value) == type) {
                 continue
             }
@@ -88,30 +83,32 @@ object ImportedPreferenceTypes {
 
     /** @return the same number as [type], or `null` if [type] cannot hold exactly that number */
     private fun convert(value: Any, type: Class<*>): Any? {
-        val whole: Long = when (value) {
-            is Int -> value.toLong()
+        val exact: BigDecimal = when (value) {
+            is Int -> BigDecimal(value)
 
-            is Long -> value
+            is Long -> BigDecimal(value)
 
-            is Float -> if (value.isFinite() && value == Math.rint(value.toDouble()).toFloat() &&
-                abs(value) <= MAX_EXACT_FLOAT.toFloat()
-            ) {
-                value.toLong()
-            } else {
-                return null
-            }
+            // the conversion of a finite Float to Double and on to BigDecimal is exact
+            is Float -> if (value.isFinite()) BigDecimal(value.toDouble()) else return null
 
             else -> return null
         }
         return when (type) {
-            Long::class.javaObjectType -> whole
+            Long::class.javaObjectType -> exact.wholeOrNull()
 
-            Int::class.javaObjectType -> whole.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
+            Int::class.javaObjectType ->
+                exact.wholeOrNull()?.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
 
             Float::class.javaObjectType ->
-                whole.takeIf { it in -MAX_EXACT_FLOAT..MAX_EXACT_FLOAT }?.toFloat()
+                exact.toFloat().takeIf { it.isFinite() && BigDecimal(it.toDouble()).compareTo(exact) == 0 }
 
             else -> null
         }
+    }
+
+    private fun BigDecimal.wholeOrNull(): Long? = try {
+        longValueExact()
+    } catch (e: ArithmeticException) {
+        null
     }
 }

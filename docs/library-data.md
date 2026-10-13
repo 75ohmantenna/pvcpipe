@@ -72,13 +72,16 @@ holds, the restore stops and asks for a new inspection.
 **Imported settings are not trusted.** Before they replace the live ones,
 `ImportedPreferenceTypes` checks their types. A preference the app reads as
 a number must hold that kind of number, or one that converts to it without
-changing its value. For a file written by the current settings version,
-every other preference must have the type of the app's live value. A value
-that fails is dropped, and the live value or the default applies. A file
-from an older settings version is checked for the numeric preferences only,
-because the settings migrations convert the rest at the next start. The
-table of numeric preferences is in `BackupRestore`; add a key there when
-adding a `getInt`, `getLong` or `getFloat` read.
+changing its value. Every other preference must have the type of the app's
+live value. A value that fails is replaced by the live value, or dropped so
+that the default applies. Two tables in `BackupRestore` feed this check:
+
+- The numeric preferences. Add a key there when adding a `getInt`,
+  `getLong` or `getFloat` read.
+- The preferences whose type a settings migration changed, with the version
+  of that change. A file from before the change keeps the old type, because
+  the migration runs at the next start and has to read it. Add a key there
+  when a migration changes a type.
 
 **Restore.** A restore never touches the open database:
 
