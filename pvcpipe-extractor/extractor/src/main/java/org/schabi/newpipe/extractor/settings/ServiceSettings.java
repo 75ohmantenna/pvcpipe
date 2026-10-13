@@ -1,11 +1,12 @@
 package org.schabi.newpipe.extractor.settings;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ServiceSettings {
 
-    private final Map<Integer, Boolean> settings = new HashMap<>();
+    // Written by the client's settings screen while extractor threads read it.
+    private final Map<Integer, Boolean> settings = new ConcurrentHashMap<>();
 
     public void setting(final boolean enable, final int setting) {
         if (enable) {

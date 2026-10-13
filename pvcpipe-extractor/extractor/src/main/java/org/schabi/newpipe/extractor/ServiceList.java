@@ -1,6 +1,7 @@
 package org.schabi.newpipe.extractor;
 
 import org.schabi.newpipe.extractor.services.bitchute.BitchuteService;
+import org.schabi.newpipe.extractor.services.odysee.OdyseeService;
 import org.schabi.newpipe.extractor.services.rumble.RumbleService;
 import org.schabi.newpipe.extractor.services.soundcloud.SoundcloudService;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeService;
@@ -38,6 +39,7 @@ public final class ServiceList {
     public static final SoundcloudService SoundCloud = new SoundcloudService(1);
     public static final BitchuteService Bitchute = new BitchuteService(5);
     public static final RumbleService Rumble = new RumbleService(6);
+    public static final OdyseeService Odysee = new OdyseeService(7);
 
     /**
      * When creating a new service, put this service in the end of this list,
@@ -48,7 +50,7 @@ public final class ServiceList {
      * </p>
      */
     private static final List<StreamingService> SERVICES = List.of(
-            YouTube, SoundCloud, Bitchute, Rumble);
+            YouTube, SoundCloud, Bitchute, Rumble, Odysee);
 
     /**
      * Get all the supported services.

@@ -183,8 +183,15 @@ public class PlayerDataSource {
     private static DataSource.Factory getMediaHttpDataSourceFactory() {
         // User-Agent is supplied through DataSpec so DefaultHttpDataSource must not override it.
         return new ResolvingDataSource.Factory(new DefaultHttpDataSource.Factory(),
-                dataSpec -> dataSpec.withAdditionalHeaders(Map.of("User-Agent",
-                        DownloaderImpl.getMediaUserAgent(dataSpec.uri.toString()))));
+                dataSpec -> dataSpec.withAdditionalHeaders(
+                        mediaHeaders(dataSpec.uri.toString())));
+    }
+
+    private static Map<String, String> mediaHeaders(final String url) {
+        final String userAgent = DownloaderImpl.getMediaUserAgent(url);
+        final String referer = DownloaderImpl.getMediaReferer(url);
+        return referer == null ? Map.of("User-Agent", userAgent)
+                : Map.of("User-Agent", userAgent, "Referer", referer);
     }
 
     private static DefaultDashChunkSource.Factory getDefaultDashChunkSourceFactory(

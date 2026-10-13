@@ -381,6 +381,7 @@
     <string name="no_feed_group_created_yet">No feed group created yet</string>
     <!-- Kiosk Names -->
     <string name="trending">Trending</string>
+    <string name="featured">Featured</string>
     <string name="top_50">Top 50</string>
     <string name="new_and_hot">New and hot</string>
     <string name="local">Local</string>
@@ -903,7 +904,7 @@
     <string name="pvc_about_fork">PVCPipe is a direct fork of BravePipe. Many thanks to its creator, evermind-zz, for building and maintaining the project PVCPipe is based on.</string>
     <string name="pvc_about_title">About this fork</string>
     <string name="pvc_github_url" translatable="false">https://github.com/75ohmantenna/pvcpipe</string>
-    <string name="pvc_supported_platforms" translatable="false">\n\u2022 BitChute\n\u2022 Rumble</string>
+    <string name="pvc_supported_platforms" translatable="false">\n\u2022 BitChute\n\u2022 Rumble\n\u2022 Odysee</string>
     <string name="search_filters_short">Short</string>
     <string name="search_filters_long">Long</string>
     <string name="search_filters_rumbles">Rumbles</string>
@@ -978,8 +979,12 @@
     <string name="pvc_settings_internal_volume_description"><![CDATA[An onscreen loudness slider independent of Android’s media volume. Swipe along the right edge of the player to reveal the dark gray control. You can still use the system volume slider.]]></string>
     <string name="pvc_settings_internal_volume_title">Internal volume control</string>
     <string name="pvc_settings_hide_paid_content_key" translatable="false">pvc_settings_hide_paid_content_key</string>
-    <string name="pvc_settings_hide_paid_content_description"><![CDATA[Hide YouTube and Rumble members-only or premium videos from listings. Restart the app for this to take effect on channels or searches already loaded.]]></string>
+    <string name="pvc_settings_hide_paid_content_description"><![CDATA[Hide YouTube, Rumble and Odysee members-only, premium or paid videos from listings. Restart the app for this to take effect on channels or searches already loaded.]]></string>
     <string name="pvc_settings_hide_paid_content_title">Hide paid content videos</string>
+    <string name="pvc_settings_odysee_counts_key" translatable="false">pvc_settings_odysee_counts_key</string>
+    <string name="pvc_odysee_visitor_token_key" translatable="false">pvc_odysee_visitor_token_key</string>
+    <string name="pvc_settings_odysee_counts_title">Show Odysee view and follower counts</string>
+    <string name="pvc_settings_odysee_counts_description"><![CDATA[Odysee gives these counts only to a registered visitor. PVCPipe registers an anonymous one, as the Odysee website does for everyone who is not signed in, and keeps its token on this device. No name, address or password is involved. Switching this off deletes the token. Restart the app for this to take effect on pages already loaded.]]></string>
     <string name="settings_category_comment_view_handling_title">Comment view handling</string>
     <string translatable="false" name="pvc_settings_comment_replies_same_window_key">pvc_settings_comment_replies_same_window_key</string>
     <string name="pvc_settings_comment_replies_same_window_title">Show comment replies in the same window</string>

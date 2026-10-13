@@ -40,6 +40,14 @@
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
 
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="@string/pvc_settings_odysee_counts_key"
+        android:summary="@string/pvc_settings_odysee_counts_description"
+        android:title="@string/pvc_settings_odysee_counts_title"
+        app:singleLineTitle="false"
+        app:iconSpaceReserved="false" />
+
     <PreferenceCategory
         android:layout="@layout/settings_category_header_layout"
         android:title="@string/settings_category_comment_view_handling_title"

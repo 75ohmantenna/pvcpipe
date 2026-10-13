@@ -14,6 +14,7 @@ object KioskTranslator {
     fun getTranslatedKioskName(kioskId: String, context: Context): String {
         return when (kioskId) {
             "Trending" -> context.getString(R.string.trending)
+            "Featured" -> context.getString(R.string.featured)
             "Top 50" -> context.getString(R.string.top_50)
             "New & hot" -> context.getString(R.string.new_and_hot)
             "live" -> context.getString(R.string.duration_live)

@@ -254,8 +254,16 @@ public class DownloadMission extends Mission {
         conn.setRequestProperty("User-Agent", DownloaderImpl.getMediaUserAgent(url));
         conn.setRequestProperty("Accept", "*/*");
         conn.setRequestProperty("Accept-Encoding", "identity");
+        final String referer = DownloaderImpl.getMediaReferer(url);
+        if (referer != null) {
+            conn.setRequestProperty("Referer", referer);
+        }
 
-        if (headRequest) {
+        // A file whose HEAD says nothing about it is asked with GET. The caller wants the
+        // headers, so where it asked for everything from a position on, one byte is asked for:
+        // the answer names the size of the whole file all the same.
+        final boolean getForHeaders = headRequest && DownloaderImpl.isHeadUnusable(url);
+        if (headRequest && !getForHeaders) {
             conn.setRequestMethod("HEAD");
         }
 
@@ -267,6 +275,8 @@ public class DownloadMission extends Mission {
             String req = "bytes=" + rangeStart + "-";
             if (rangeEnd > 0) {
                 req += rangeEnd;
+            } else if (getForHeaders) {
+                req += rangeStart;
             }
 
             conn.setRequestProperty("Range", req);

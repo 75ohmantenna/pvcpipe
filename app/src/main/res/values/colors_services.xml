@@ -22,4 +22,8 @@
     <color name="light_rumble_accent_color">#000000</color>
     <color name="dark_rumble_primary_color">#36620B</color>
     <color name="dark_rumble_accent_color">#FFFFFF</color>
+    <color name="light_odysee_primary_color">#E50054</color>
+    <color name="light_odysee_accent_color">#000000</color>
+    <color name="dark_odysee_primary_color">#8F0035</color>
+    <color name="dark_odysee_accent_color">#FFFFFF</color>
 </resources>

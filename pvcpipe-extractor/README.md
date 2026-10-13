@@ -31,6 +31,7 @@ Supported sites:
 - SoundCloud
 - BitChute
 - Rumble
+- Odysee
 
 ## License
 
