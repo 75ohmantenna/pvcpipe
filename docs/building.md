@@ -58,6 +58,22 @@ signing a release is a separate step.
 The repository has no GitHub Actions workflows. `make ci` on your own machine
 is the only gate, so run it before you push.
 
+## Versions
+
+PVCPipe has its own version, in `version.properties` at the top of the
+repository. It started at 0.1.0 in October 2026. Before that the version was
+`0.28.8-2.8.2`, the NewPipe version followed by the BravePipe version the
+fork came from.
+
+- The version is `major.minor.patch`, with minor and patch below 100.
+- The app's version code is computed from it (`PvcVersion` in `buildSrc/`):
+  1,000,000 + major x 10,000 + minor x 100 + patch. So 0.1.0 is 1000100 and
+  1.0.0 is 1010000. The base is above 581013, the last code of the old
+  numbering, because Android refuses to install a lower code over a higher
+  one.
+- The bundled extractor has the same version. Its build reads the same file.
+- To release a new version, change the one line in `version.properties`.
+
 ## Tests
 
 - **App unit tests.** `./gradlew :app:testDebugUnitTest`, with

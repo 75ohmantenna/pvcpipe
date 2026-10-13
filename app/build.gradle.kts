@@ -29,6 +29,11 @@ kotlin {
     }
 }
 
+val pvcpipeVersion = PvcVersion.name(
+    providers.fileContents(rootProject.layout.projectDirectory.file("version.properties"))
+        .asText.get()
+)
+
 configure<ApplicationExtension> {
     compileSdk {
         version = release(37) {
@@ -43,9 +48,9 @@ configure<ApplicationExtension> {
         minSdk = 26
         targetSdk = 37
 
-        versionCode = (System.getProperty("versionCodeOverride")?.toInt() ?: 1013) + 580000
-
-        versionName = "0.28.8-2.8.2"
+        // PVCPipe's own version: change it in version.properties, the code follows from it
+        versionName = pvcpipeVersion
+        versionCode = PvcVersion.code(pvcpipeVersion)
         System.getProperty("versionNameSuffix")?.let { versionNameSuffix = it }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
