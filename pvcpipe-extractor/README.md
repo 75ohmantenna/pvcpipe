@@ -1,41 +1,26 @@
-# PVCPipe Extractor
+# PVCPipe extractor
 
-This directory contains PVCPipe's extractor library. It is maintained in the
-parent repository and is not published as a separate artifact. The parent build
-includes the extractor as a composite build and automatically substitutes it for
-the app's extractor dependency.
+The library that reads YouTube, SoundCloud, BitChute, Rumble and Odysee for
+PVCPipe. It descends from NewPipe Extractor.
 
-## Development
-
-From the repository root, run the extractor tests with:
-
-```sh
-./pvcpipe-extractor/gradlew -p pvcpipe-extractor :extractor:test
-```
-
-`:extractor:test` runs the full extractor suite, including tests that may need
-network access. For deterministic offline regression tests, run
-`./gradlew :pvcpipe-extractor:extractor:forkCiTest` from the repository root.
-
-Run all application checks and builds with:
+It lives in the app's repository and is not published as an artifact. The
+app's build includes this directory as a composite build and substitutes it
+for the app's extractor dependency, so the commands below run from the
+repository root.
 
 ```sh
-make ci
+./gradlew :pvcpipe-extractor:extractor:forkCiTest   # Checkstyle and the offline tests
+./gradlew :pvcpipe-extractor:extractor:test         # every test, including those that contact the websites
+make ci                                             # all checks and both APKs
 ```
 
-## Supported sites
+There are three modules. `extractor` is the library. `timeago-parser` reads
+relative dates such as "3 days ago" in many languages, and
+`timeago-generator` builds that parser's pattern classes.
 
-Supported sites:
-
-- YouTube
-- SoundCloud
-- BitChute
-- Rumble
-- Odysee
+[docs/services.md](../docs/services.md) describes each service, and
+[docs/building.md](../docs/building.md) the build and the tests.
 
 ## License
 
-NewPipe Extractor is free software. You may use, study, share, improve, and
-redistribute it under the [GNU General Public License](https://www.gnu.org/licenses/gpl.html)
-as published by the Free Software Foundation, either version 3 or (at your
-option) any later version.
+GPL-3.0-or-later. See [LICENSE](LICENSE).

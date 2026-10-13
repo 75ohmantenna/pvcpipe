@@ -1,10 +1,13 @@
-# Time ago parser raw resources
+# Time-ago parser raw data
 
-This directory holds JSON-formatted time-ago string data for the parser.
-`times/` groups strings by time unit (for example, seconds and years).
-`overview.json` is generated from those files; `unique_patterns.json` is the
-input to the pattern-class generator.
+The JSON files the time-ago parser is generated from.
 
-The overview, coverage-checking, and pattern-generation Java sources are in
-`../../timeago-generator/src/main/java/org/schabi/newpipe/timeago_generator/`,
-not in this directory.
+- `times/` has one file per unit, from `seconds.json` to `years.json`, with
+  the strings for that unit in each language.
+- `overview.json` is generated from the files in `times/`.
+- `unique_patterns.json` is the input of the generator that writes the
+  pattern classes.
+
+The generators are not in this directory. `GenerateOverview`,
+`GeneratePatternClasses` and `CheckAll` are in
+`../../timeago-generator/src/main/java/org/schabi/newpipe/timeago_generator/`.

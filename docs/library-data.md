@@ -1,57 +1,109 @@
-# Library data workflows
+# Library data
 
-The application owns three related workflows; implementation and tests, not this
-guide, define their scheduling, batch sizes, and formats.
+Subscriptions, the feed, playlists, history and settings are kept on the
+device. Three jobs move that data in bulk: the feed refresh, the subscription
+import and export, and backup and restore. This page says what each one
+promises and what it does not. Batch sizes, delays and file formats are in
+the code.
 
-- **Feed refresh:** [`FeedRefresh`](../app/src/main/java/org/schabi/newpipe/local/feed/service/FeedRefresh.kt)
-  selects subscriptions, extracts updates, stores results, and trims stale data.
-  A failed channel extraction is reported alongside successful updates; a query,
-  storage, or cleanup failure fails the run. Result observation starts the run
-  once and replays its outcome; detaching a UI observer does not undo accepted
-  work. Cancellation cooperatively stops new extractions, not requests already
-  running; collected results can still be persisted. This is in-process work,
-  not a process-death durability guarantee.
-- **Subscription transfer:**
-  [`SubscriptionTransfer`](../app/src/main/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransfer.kt)
-  reads import sources, extracts all selected channels before storage, then
-  persists them in order. A later storage failure does not roll back earlier
-  committed batches. Export takes a subscription snapshot and writes it to the
-  selected document. Unavailable streams and failed writes are failures, not
-  successful empty transfers; coroutine cancellation is propagated. The workers
-  retain scheduling and foreground presentation.
-- **Backup and restore:**
-  [`BackupRestore`](../app/src/main/java/org/schabi/newpipe/settings/BackupRestore.java),
-  [`BackupOperations`](../app/src/main/java/org/schabi/newpipe/settings/BackupOperations.java),
-  and
-  [`ImportExportManager`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt)
-  own admission, export, inspection, and accepted restore. Export checkpoints
-  the database and writes the app database plus JSON and legacy preferences;
-  **downloads are excluded**: the separate finished-download database, pending
-  mission metadata, and media files are not backed up. An inspection is advisory,
-  not database validation, and the source can change before restore. JSON
-  settings take precedence over legacy serialization when both exist. A restore
-  prepares a private snapshot before changing live settings, then publishes a
-  pending database for
-  [`PendingDatabaseRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java)
-  to install at startup, before database connections open. Completion means
-  staged with restart requested, **not** installed in the current process. A
-  failed restart leaves activation pending; while pending, further restores and
-  exports are refused. Preference writes and filesystem publication are not one
-  transaction: failures attempt preference recovery, but process-death
-  consistency and compatibility with future database migrations are not
-  guaranteed. Detached observers do not cancel accepted backup work.
+## Feed refresh
 
-## Verification navigation
+[`FeedRefresh`](../app/src/main/java/org/schabi/newpipe/local/feed/service/FeedRefresh.kt)
+is one refresh. It selects the subscriptions that are due, loads each one,
+stores the results in batches and then trims old entries from the feed.
 
-Run `make ci` for unit checks and APK builds. Focused unit coverage:
+- A channel that fails to load is reported next to the ones that worked. A
+  failure of the first query, of a database write or of the trimming fails
+  the whole run.
+- The first observer of `result` starts the run. Later observers get the same
+  outcome replayed. An observer that detaches does not stop the work.
+- `cancel` stops new channel loads from starting. Loads already under way
+  finish, and what was collected is still stored.
+- All of this runs inside the app's process. If Android kills the process,
+  the refresh is gone.
+
+`FeedLoadManager` builds the refresh and does its loading and storing. It
+leaves out subscriptions of services the app does not have, and it uses a
+service's feed extractor in place of loading the channel when the dedicated
+feed setting is on and the service has one
+(see [services.md](services.md#the-services)).
+
+## Subscription import and export
+
+[`SubscriptionTransfer`](../app/src/main/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransfer.kt)
+does both. `SubscriptionImportWorker` and `SubscriptionExportWorker` run it
+in the background and show its progress in a notification.
+
+- An import reads its source: a channel address, a file exported from a
+  service, or an earlier export of this app. It leaves out channels of services the app does not have
+  and counts them. It loads every remaining channel before it stores any, and
+  then stores them in order, in batches.
+- A batch that fails does not undo the batches stored before it.
+- An export takes a snapshot of the subscriptions and writes it to the
+  document the user chose.
+- A source that cannot be opened, a channel that cannot be loaded and a write
+  that fails all come back as `Outcome.Failure`. None of them is reported as
+  an import or export of nothing. A cancelled coroutine stays cancelled and
+  is not turned into a failure.
+
+## Backup and restore
+
+[`BackupRestore`](../app/src/main/java/org/schabi/newpipe/settings/BackupRestore.java)
+is the workflow.
+[`BackupOperations`](../app/src/main/java/org/schabi/newpipe/settings/BackupOperations.java)
+runs it outside the settings screen, so work that was accepted goes on when
+the screen closes.
+[`ImportExportManager`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt)
+reads and writes the archive.
+
+**Export.** The app checkpoints the database and writes a ZIP with three
+entries: `newpipe.db`, `preferences.json` and `newpipe.settings`, the older
+serialized form of the same preferences. Downloads are not in a backup. That
+covers the media files, the separate database of finished downloads and the
+state of unfinished ones.
+
+**Inspection.** Before a restore the app looks at the chosen file and reports
+whether it is a readable ZIP and which form of settings it holds. JSON
+settings are preferred when both forms are there. An inspection is advice.
+It does not validate the database, and the file can change before the
+restore reads it. If the settings it offered are no longer what the file
+holds, the restore stops and asks for a new inspection.
+
+**Restore.** A restore never touches the open database:
+
+1. It copies the archive to a private file and takes the database, and the
+   settings if the user chose them, from that copy.
+2. It replaces the live preferences.
+3. It publishes the new database as a pending restore and restarts the app.
+4. At the next start,
+   [`PendingDatabaseRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java)
+   moves the pending database into place before any database connection is
+   opened.
+
+A restore that completed has therefore staged the database and asked for a
+restart. It has not installed it in the running process. If the restart
+fails, the restore stays pending, and while one is pending the app refuses
+further restores and exports.
+
+Replacing the preferences and publishing the database are two steps, not one
+transaction. If the second fails, the app puts the old preferences back, and
+tries again at the next backup operation if that failed too. A process that
+dies between the steps can leave new settings with the old database. Nothing
+promises that a backup will open after future database migrations.
+
+## Tests
+
+Unit tests, run by `make ci`:
 [`FeedRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedRefreshTest.kt),
 [`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
 [`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
-[`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt),
+[`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt)
 and
 [`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java).
-Device-backed Room/Android coverage:
+
+Instrumentation tests against Room on a device, not in `make ci`:
 [`FeedRefreshDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/feed/service/FeedRefreshDatabaseTest.kt),
-[`SubscriptionTransferDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferDatabaseTest.kt),
+[`SubscriptionTransferDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferDatabaseTest.kt)
 and
 [`BackupRestoreIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreIntegrationTest.java).
+[building.md](building.md) says where it is safe to run them.
