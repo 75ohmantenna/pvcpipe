@@ -1,4 +1,13 @@
-# Pixel 6a device smoke — 2026-10-07
+# Device test records, October 2026
+
+What was seen on a Pixel 6a and on a disposable emulator, in the order it
+happened. These are records. They are not kept in step with the code, and a
+later section corrects an earlier one in place of rewriting it. Pull request
+numbers refer to `75ohmantenna/pvcpipe`.
+[odysee-observations.md](odysee-observations.md) has the runs for the Odysee
+service.
+
+## Pixel 6a smoke, 2026-10-07
 
 The smoke test used commit `169113e7c4605297fa7184c7e307b21a08cd7cdb` on clean
 `master`, a Pixel 6a (`bluejay`) running Android 17/API 37, and Wi-Fi ADB serial
@@ -10,46 +19,46 @@ was preserved. Package: `org.seventyfiveohmantenna.pvcpipe.debug` (debug
 suffix on `org.seventyfiveohmantenna.pvcpipe`). These are **device observations**,
 not inferences from offline tests. All URLs are public; no account was used.
 
-## Startup and playback
+### Startup and playback
 
-- **PASS — Startup/navigation:** YouTube Live loaded. The service picker offered
+- **PASS, startup/navigation.** YouTube Live loaded. The service picker offered
   YouTube and Rumble. Searching `Me at the zoo` returned jawed's public video;
   its 00:19 details and download controls opened. After an app process restart,
   the main feed loaded again without a crash.
-- **PASS — YouTube playback:**
+- **PASS, YouTube playback.**
   `https://www.youtube.com/watch?v=YE7VzlLtp-4` (`Big Buck Bunny`, 09:57)
   showed moving video; detail time advanced 00:21→00:44→00:49. Pause held at
   01:19; seeking moved to 04:49; resume advanced 05:03→05:07. After Home,
   `media_session` was PLAYING; notification Pause produced PAUSED at 404115 ms,
   and its Play action returned to PLAYING.
   [Video frame and details](device-smoke/youtube-playback.webp).
-- **BLOCKED — Client-specific fallback:** Neither the client supplying playback
+- **BLOCKED, client-specific fallback.** Neither the client supplying playback
   nor an Android-failure/visionOS-fallback branch was observable in the player
   UI or bounded logs. No controlled client failure was injected on device.
-- **PASS — Rumble watch:**
+- **PASS, Rumble watch.**
   `https://rumble.com/v5a7yh0-spacex-starship-test-flight-5-update.html`
   opened `SpaceX Starship Test Flight 5 Update`, duration 02:53; moving video
   and progress logs 19168→20166 and 54154→55158 ms; media pause at 98333 ms.
   [Watch video frame and details](device-smoke/rumble-watch.webp).
-- **PASS — Genuine Rumble Short:** The public feed item
+- **PASS, genuine Rumble Short.** The public feed item
   `https://rumble.com/shorts/v7g6wz4` opened
   `hitman 2 Short No Cometary :Golden Handshake Cut scene` (02:58). Playback
   detail time advanced 00:20→00:30; media session paused at 31437 ms.
-- **PASS — Query/fragment routing:** The watch URL above with
+- **PASS, query/fragment routing.** The watch URL above with
   `?next=/shorts/v7g6wz4`, with `#/shorts/v7g6wz4`, and with both still
   resolved to the **02:53 SpaceX watch**, not the 02:58 Short. The watch
   position was retained. Malformed links were not tested on device.
 
-## Downloads and resume
+### Downloads and resume
 
-- **PASS — Small normal download:** The Rumble watch's 360p MP4 used three
+- **PASS, small normal download.** The Rumble watch's 360p MP4 used three
   threads; Downloads displayed **Finished / 100%**, 12.81 MB. The saved file
   measured **13,435,079 bytes**. Local `ffprobe` identified H.264, 640×360,
   AAC, and duration 173.035 seconds; `ffmpeg -v error -i <file> -t 2 -f null -`
   decoded successfully. Opening it through the app into VLC displayed a
   moving frame and 02:53 duration.
   [Decoded saved media](device-smoke/download-decoded.webp).
-- **PASS — Parallel requests observed:** Bounded `DownloadMission` debug logs
+- **PASS, parallel requests observed.** Bounded `DownloadMission` debug logs
   for the 360p mission showed workers 0, 1, and 2 issuing byte ranges and
   receiving compatible `Content-Range` responses with a total of 13,435,079 bytes.
   Final length and decode agreed. Later one-thread 1080p logs showed
@@ -57,14 +66,14 @@ not inferences from offline tests. All URLs are public; no account was used.
   `Range=bytes=81542661-81542671` answered with end 81542670. Those
   initial logs did **not** expose `If-Range`; the controlled transfer below
   observed conditional requests.
-- **PASS — Reopen finished missions:** Leaving and reopening Downloads showed
+- **PASS, reopen finished missions.** Leaving and reopening Downloads showed
   the completed public-media entries at **Finished / 100%**.
 - **Earlier limitation, resolved below:** The 20.43 MB and 77.77 MB public
   missions finished before they could be paused. Rapid taps on a finished card
   also preceded a persistent `Loading Metadata…` overlay. Those missions did
   not test partial resume; a separate controlled transfer did.
 
-### Controlled local-range follow-up
+#### Controlled local-range follow-up
 
 **Hybrid harness/UI, not a normal UI-initiated media download:** A temporary,
 opt-in Android instrumentation method submitted each 4,194,304-byte mission
@@ -79,7 +88,7 @@ deterministic bytes at 4 KiB per 160 ms, HTTP ranges, and the strong ETag
 `0309a3025f9e7f38ad555e11bee5a0cbafea0a1c02e39c7df51cc2f462ad4c61`.
 No phone-wide network or VPN setting was changed.
 
-- **PASS — Active UI pause/resume (mission A):** Downloads showed Pending at
+- **PASS, active UI pause/resume (mission A).** Downloads showed Pending at
   45.80% while writing. Its own More options → Pause stopped the active worker
   at **2,629,632 / 4,194,304 bytes** (62.70%). A device harness read the
   pending mission and twice hashed the partial file, 350 ms apart: both hashes
@@ -88,7 +97,7 @@ No phone-wide network or VPN setting was changed.
   [paused mission](device-smoke/controlled-paused.webp). UI Start resumed it;
   Downloads then showed **Finished / 100%**, and an independent device check
   found the expected 4,194,304-byte length and exact source SHA-256.
-- **PASS — Partial persistence across app restart (mission B):** A distinct
+- **PASS, partial persistence across app restart (mission B).** A distinct
   active mission was paused through the UI at **2,220,032 / 4,194,304 bytes**
   (52.93%). Before and after `am force-stop` of only the debug app, the
   pending mission reported the same progress and unchanged partial SHA-256
@@ -97,7 +106,7 @@ No phone-wide network or VPN setting was changed.
   [recovered mission](device-smoke/controlled-persisted.webp). UI Start
   resumed to **Finished / 100%**; the resulting 4,194,304-byte file matched
   the source SHA-256 above.
-- **PASS — Observed conditional HTTP ranges:** The fixture logged ranged
+- **PASS, observed conditional HTTP ranges.** The fixture logged ranged
   `HEAD` probes and initial `GET Range: bytes=0-` with
   `If-Range: "pvcpipe-smoke-controlled-20261007"`. After pause, mission A
   requested `GET Range: bytes=2629632-` with the **same If-Range**;
@@ -108,7 +117,7 @@ No phone-wide network or VPN setting was changed.
   progress; the paused file hash and final file hashes provide the write
   checks. No different validator or full-response conditional fallback was
   injected.
-- **BLOCKED — Representation replacement/recovery:** No controlled version
+- **BLOCKED, representation replacement/recovery.** No controlled version
   change, validator mismatch, refreshed URL, HTTP 200 replacement, or 416 was
   exercised. Completed downloads do not validate these paths.
 
@@ -120,7 +129,7 @@ metadata overlay is **unconfirmed**: rapid taps hit a finished card and no
 corresponding extraction failure was isolated. Raw device-wide logs, cookies,
 tokens and notification-shade screenshots are deliberately not attached.
 
-## Cleanup and limits
+### Cleanup and limits
 
 The five uniquely named public-media smoke entries/files were removed through
 **Delete file** menus. The test directory
@@ -333,3 +342,15 @@ caused; and messages from WebView, the codecs and system flags. The leak
 watcher reported nothing, but heap dumps are switched off in this build, so
 it would not have found a leak.
 
+## YouTube sign-in refusals, 2026-10-11
+
+Moved here from the services guide, where it was first written down.
+
+During the scripted emulator runs of 2026-10-11, which opened videos over and
+over from one address, YouTube refused some videos with "YouTube refused to
+provide data and requires you to sign in". Those videos loaded again minutes
+later, and other videos kept loading throughout. No log of a refused request
+was captured for each client, and the refusals stopped before one could be,
+so which clients were refused each time is not known. Nothing in these
+observations points at the app. [services.md](services.md#youtube) says when
+the app shows that message.
