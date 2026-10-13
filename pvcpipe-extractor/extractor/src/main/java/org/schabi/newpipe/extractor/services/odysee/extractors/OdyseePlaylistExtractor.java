@@ -8,7 +8,6 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.playlist.PlaylistExtractor;
 import org.schabi.newpipe.extractor.services.odysee.OdyseeApi;
@@ -104,14 +103,7 @@ public class OdyseePlaylistExtractor extends PlaylistExtractor {
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || page.getId() == null) {
-            throw new ParsingException("Invalid Odysee playlist page");
-        }
-        try {
-            return getPage(Integer.parseInt(page.getId()));
-        } catch (final NumberFormatException e) {
-            throw new ParsingException("Invalid Odysee playlist page: " + page.getId(), e);
-        }
+        return getPage(OdyseeItems.pageNumber(page, "playlist"));
     }
 
     // A playlist is a list of claim ids, which are looked up a page at a time.

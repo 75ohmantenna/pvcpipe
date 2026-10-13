@@ -25,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -42,6 +41,7 @@ public final class OdyseeApi {
     public static final String SEARCH_URL = "https://lighthouse.odysee.tv/search";
     public static final String COMMENTS_URL = "https://comments.odysee.tv/api/v2";
     public static final String ACCOUNT_API_URL = "https://api.odysee.com/";
+    public static final String REGISTER_URL = ACCOUNT_API_URL + "user/new";
     public static final String REACTIONS_URL = ACCOUNT_API_URL + "reaction/list";
     public static final String VIEW_COUNT_URL = ACCOUNT_API_URL + "file/view_count";
     public static final String FOLLOWER_COUNT_URL = ACCOUNT_API_URL + "subscription/sub_count";
@@ -58,13 +58,13 @@ public final class OdyseeApi {
     private static final String FORM = "application/x-www-form-urlencoded";
     private static final int HTTP_UNAUTHORIZED = 401;
     private static final int HTTP_FORBIDDEN = 403;
-    private static final Pattern CLAIM_ID = Pattern.compile("[0-9a-f]{40}");
     // The largest list this extractor makes holds 50 claims.
     private static final int MAX_COUNT_REQUEST = 100;
 
     private static final int RESOLVE_CACHE_SIZE = 32;
     private static final long RESOLVE_CACHE_MILLIS = 10 * 60 * 1000L;
     private static final long HOMEPAGE_CACHE_MILLIS = 60 * 60 * 1000L;
+    private static final long COUNTS_RETRY_MILLIS = 60 * 1000L;
 
     private static final Map<String, CachedClaim> RESOLVED = Collections.synchronizedMap(
             new LinkedHashMap<String, CachedClaim>(RESOLVE_CACHE_SIZE, 0.75f, true) {
@@ -75,6 +75,7 @@ public final class OdyseeApi {
             });
 
     private static volatile CachedClaim homepage;
+    private static volatile long countsRetryAt;
 
     private OdyseeApi() {
     }
@@ -164,16 +165,23 @@ public final class OdyseeApi {
     }
 
     /**
-     * @param lbryUri the stream to play
+     * @param lbryUri   the stream to play
+     * @param signature the signature and timestamp of the link the stream was opened with, as
+     *                  {@link OdyseeUrl#signatureOf} returns them, or {@code null}
      * @return the address of its media file
      * @throws PaidContentException if Odysee wants a signed-in buyer or member
      */
     @Nonnull
-    public static String streamingUrl(@Nonnull final String lbryUri)
+    public static String streamingUrl(@Nonnull final String lbryUri,
+                                      @Nullable final String[] signature)
             throws IOException, ExtractionException {
         final JsonObject params = new JsonObject();
         params.put("uri", lbryUri);
         params.put("save_file", false);
+        if (signature != null) {
+            params.put("signature", signature[0]);
+            params.put("signature_ts", signature[1]);
+        }
         final String url;
         try {
             url = callProxy("get", params).getString("streaming_url");
@@ -239,7 +247,7 @@ public final class OdyseeApi {
     @Nonnull
     public static JsonObject reactions(@Nonnull final String claimId)
             throws IOException, ExtractionException {
-        final Object data = callAccountApi("reaction/list", "claim_ids=" + claimId);
+        final Object data = callAccountApi(REACTIONS_URL, "claim_ids=" + claimId);
         return data instanceof JsonObject
                 ? ((JsonObject) data).getObject("others_reactions").getObject(claimId)
                 : new JsonObject();
@@ -254,7 +262,7 @@ public final class OdyseeApi {
      */
     @Nonnull
     public static Map<String, Long> viewCounts(@Nonnull final Collection<String> claimIds) {
-        return counts("file/view_count", claimIds);
+        return counts(VIEW_COUNT_URL, claimIds);
     }
 
     /**
@@ -267,17 +275,19 @@ public final class OdyseeApi {
     @Nonnull
     public static Map<String, Long> followerCounts(
             @Nonnull final Collection<String> channelClaimIds) {
-        return counts("subscription/sub_count", channelClaimIds);
+        return counts(FOLLOWER_COUNT_URL, channelClaimIds);
     }
 
-    private static Map<String, Long> counts(final String path,
+    private static Map<String, Long> counts(final String url,
                                             final Collection<String> claimIds) {
-        if (!OdyseeSettings.getInstance().isSettingEnabled(OdyseeSettings.SHOW_COUNTS)) {
+        // After a count request that got no answer, pages do not each wait for another one.
+        if (!OdyseeSettings.getInstance().isSettingEnabled(OdyseeSettings.SHOW_COUNTS)
+                || System.currentTimeMillis() < countsRetryAt) {
             return Map.of();
         }
         final List<String> ids = new ArrayList<>();
         for (final String claimId : claimIds) {
-            if (claimId != null && CLAIM_ID.matcher(claimId).matches() && !ids.contains(claimId)
+            if (OdyseeUrl.isClaimId(claimId) && !ids.contains(claimId)
                     && ids.size() < MAX_COUNT_REQUEST) {
                 ids.add(claimId);
             }
@@ -292,13 +302,18 @@ public final class OdyseeApi {
                 return Map.of();
             }
             try {
-                final Object data = callAccountApi(path, "auth_token="
+                final Object data = callAccountApi(url, "auth_token="
                         + Utils.encodeUrlUtf8(token) + "&claim_id=" + String.join(",", ids));
                 OdyseeAuth.accepted();
                 return countsByClaim(ids, data);
             } catch (final NotAuthenticatedException e) {
                 OdyseeAuth.discard(token);
             } catch (final IOException | ExtractionException | RuntimeException e) {
+                // A caller that gave up, as when the user leaves the page, says nothing
+                // about whether Odysee would have answered.
+                if (!OdyseeAuth.wasCancelled(e)) {
+                    countsRetryAt = System.currentTimeMillis() + COUNTS_RETRY_MILLIS;
+                }
                 return Map.of();
             }
         }
@@ -323,18 +338,17 @@ public final class OdyseeApi {
     /**
      * Calls the API that Odysee keeps accounts, reactions and counts in.
      *
-     * @param path the method, such as {@code reaction/list}
+     * @param url  the address of the method, such as {@link #REACTIONS_URL}
      * @param form the parameters, as a form body
      * @return the {@code data} of the answer
      * @throws NotAuthenticatedException if the method wants a visitor token and did not get
      *                                   one it accepts
      */
     @Nullable
-    static Object callAccountApi(@Nonnull final String path, @Nonnull final String form)
+    static Object callAccountApi(@Nonnull final String url, @Nonnull final String form)
             throws IOException, ExtractionException {
         final Map<String, List<String>> headers = refererHeaders();
         headers.put("Content-Type", List.of(FORM));
-        final String url = ACCOUNT_API_URL + path;
         final Response response = NewPipe.getDownloader().post(url, headers,
                 form.getBytes(StandardCharsets.UTF_8));
         // Odysee refuses a token with 401 or 403 and says so in its answer. Something in
@@ -414,6 +428,7 @@ public final class OdyseeApi {
     public static void clearCaches() {
         RESOLVED.clear();
         homepage = null;
+        countsRetryAt = 0;
     }
 
     @Nonnull

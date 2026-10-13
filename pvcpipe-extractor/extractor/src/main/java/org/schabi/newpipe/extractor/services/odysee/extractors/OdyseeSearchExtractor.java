@@ -10,7 +10,6 @@ import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.services.odysee.OdyseeApi;
@@ -62,14 +61,7 @@ public class OdyseeSearchExtractor extends SearchExtractor {
     @Override
     public InfoItemsPage<InfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || page.getId() == null) {
-            throw new ParsingException("Invalid Odysee search page");
-        }
-        try {
-            return getPage(Integer.parseInt(page.getId()));
-        } catch (final NumberFormatException e) {
-            throw new ParsingException("Invalid Odysee search page: " + page.getId(), e);
-        }
+        return getPage(OdyseeItems.pageNumber(page, "search"));
     }
 
     /**

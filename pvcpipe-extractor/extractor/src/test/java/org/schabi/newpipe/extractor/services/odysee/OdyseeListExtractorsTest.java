@@ -109,6 +109,20 @@ class OdyseeListExtractorsTest {
     }
 
     @Test
+    void channelWhoseUsualAddressCannotBeReadKeepsTheOneItWasOpenedWith() throws Exception {
+        final JsonObject channel = OdyseeFixtures.channel();
+        channel.put("canonical_url", "lbry://@Exa[mple#8");
+        downloader.onProxy("resolve", resolved(CHANNEL_URI, channel));
+
+        final ChannelInfo info = ChannelInfo.getInfo(Odysee, "https://odysee.com/@Example:8");
+
+        assertEquals("Example Channel", info.getName());
+        assertEquals("@Example:8", info.getId());
+        assertEquals("https://odysee.com/@Example:8", info.getUrl());
+        assertEquals("https://odysee.com/@Example:8", info.getTabs().get(0).getUrl());
+    }
+
+    @Test
     void addressOfAVideoIsNotAChannel() {
         downloader.onProxy("resolve", resolved(CHANNEL_URI, OdyseeFixtures.video()));
 
@@ -157,31 +171,76 @@ class OdyseeListExtractorsTest {
     }
 
     @Test
-    void livestreamsAndPlaylistsTabsAskForTheirKindOfClaim() throws Exception {
+    void playlistsTabAsksForTheChannelsCollections() throws Exception {
         downloader.onProxy("resolve", resolved(CHANNEL_URI, OdyseeFixtures.channel()))
-                .onProxy("claim_search", request -> params(request).has("has_no_source")
-                        ? items(OdyseeFixtures.livestream())
-                        : items(OdyseeFixtures.playlist("a", "b", "c")));
+                .onProxy("claim_search", items(OdyseeFixtures.playlist("a", "b", "c")));
         final ChannelInfo channel = ChannelInfo.getInfo(Odysee, "https://odysee.com/@Example:8");
 
-        final ChannelTabInfo live = ChannelTabInfo.getInfo(Odysee, channel.getTabs().get(1));
         final ChannelTabInfo playlists = ChannelTabInfo.getInfo(Odysee, channel.getTabs().get(2));
-
-        final StreamInfoItem liveItem = (StreamInfoItem) live.getRelatedItems().get(0);
-        assertEquals(StreamType.LIVE_STREAM, liveItem.getStreamType());
-        assertEquals(-1, liveItem.getDuration());
-        final JsonObject liveSearch = params(downloader.requestsTo("?m=claim_search").get(0));
-        assertTrue(liveSearch.getBoolean("has_no_source"));
-        assertFalse(liveSearch.has("has_source"));
-        assertFalse(liveSearch.has("stream_types"));
 
         final PlaylistInfoItem playlist = (PlaylistInfoItem) playlists.getRelatedItems().get(0);
         assertEquals("A playlist", playlist.getName());
         assertEquals("https://odysee.com/$/playlist/" + PLAYLIST_ID, playlist.getUrl());
         assertEquals(3, playlist.getStreamCount());
         assertEquals("Example Channel", playlist.getUploaderName());
-        assertEquals(List.of("collection"),
-                params(downloader.requestsTo("?m=claim_search").get(1)).getArray("claim_type"));
+        final JsonObject search = params(downloader.requestsTo("?m=claim_search").get(0));
+        assertEquals(List.of("collection"), search.getArray("claim_type"));
+        assertFalse(search.has("has_source"));
+        assertFalse(search.has("stream_types"));
+    }
+
+    @Test
+    void livestreamsTabListsOnlyTheBroadcastThatIsOnAir() throws Exception {
+        final JsonObject onAir = claimWithId(OdyseeFixtures.livestream(), "live-now");
+        downloader.onProxy("resolve", resolved(CHANNEL_URI, OdyseeFixtures.channel()))
+                .on(OdyseeApi.LIVESTREAM_URL + "/is_live?channel_claim_id=" + CHANNEL_ID,
+                        "{\"success\":true,\"error\":null,\"data\":{\"Live\":true,"
+                                + "\"ViewerCount\":58,\"VideoURL\":\"https://x/master.m3u8\","
+                                + "\"ActiveClaim\":{\"ClaimID\":\"live-now\"}}}")
+                .onProxy("claim_search", items(onAir));
+        final ChannelInfo channel = ChannelInfo.getInfo(Odysee, "https://odysee.com/@Example:8");
+
+        final ChannelTabInfo live = ChannelTabInfo.getInfo(Odysee, channel.getTabs().get(1));
+
+        assertEquals(1, live.getRelatedItems().size());
+        final StreamInfoItem item = (StreamInfoItem) live.getRelatedItems().get(0);
+        assertEquals(StreamType.LIVE_STREAM, item.getStreamType());
+        assertEquals(58, item.getViewCount());
+        assertEquals(-1, item.getDuration());
+        assertFalse(live.hasNextPage());
+        assertEquals(List.of("live-now"),
+                params(downloader.requestsTo("?m=claim_search").get(0)).getArray("claim_ids"));
+    }
+
+    @Test
+    void livestreamsTabOfAChannelThatIsOffAirIsEmpty() throws Exception {
+        downloader.onProxy("resolve", resolved(CHANNEL_URI, OdyseeFixtures.channel()))
+                .on(OdyseeApi.LIVESTREAM_URL, "{\"success\":true,\"error\":null,\"data\":"
+                        + "{\"Live\":false,\"ViewerCount\":0,\"VideoURL\":\"\","
+                        + "\"ActiveClaim\":{\"ClaimID\":\"\"}}}");
+        final ChannelInfo channel = ChannelInfo.getInfo(Odysee, "https://odysee.com/@Example:8");
+
+        final ChannelTabInfo live = ChannelTabInfo.getInfo(Odysee, channel.getTabs().get(1));
+
+        assertTrue(live.getRelatedItems().isEmpty());
+        assertTrue(live.getErrors().isEmpty(), live.getErrors().toString());
+        assertTrue(downloader.requestsTo("?m=claim_search").isEmpty());
+    }
+
+    @Test
+    void livestreamPagesAreLeftOutOfSearchResults() throws Exception {
+        // most of them belong to a broadcast that is over and cannot be played
+        downloader.on(OdyseeApi.SEARCH_URL, "[{\"claimId\":\"l1\",\"name\":\"a\"},"
+                        + "{\"claimId\":\"v1\",\"name\":\"b\"}]")
+                .onProxy("claim_search", items(
+                        claimWithId(OdyseeFixtures.livestream(), "l1"),
+                        OdyseeFixtures.video("b", "v1", "A video")));
+
+        final SearchInfo search = SearchInfo.getInfo(Odysee,
+                Odysee.getSearchQHFactory().fromQuery("x"));
+
+        assertEquals(1, search.getRelatedItems().size());
+        assertEquals("A video", search.getRelatedItems().get(0).getName());
     }
 
     @Test

@@ -62,14 +62,7 @@ public class OdyseeKioskExtractor extends KioskExtractor<StreamInfoItem> {
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || page.getId() == null) {
-            throw new ParsingException("Invalid Odysee kiosk page");
-        }
-        try {
-            return getPage(Integer.parseInt(page.getId()));
-        } catch (final NumberFormatException e) {
-            throw new ParsingException("Invalid Odysee kiosk page: " + page.getId(), e);
-        }
+        return getPage(OdyseeItems.pageNumber(page, "kiosk"));
     }
 
     private InfoItemsPage<StreamInfoItem> getPage(final int pageNumber)
@@ -78,7 +71,8 @@ public class OdyseeKioskExtractor extends KioskExtractor<StreamInfoItem> {
         if (LIVE.equals(getId())) {
             // For a livestream the number shown is how many are watching it now.
             final Map<String, Long> viewers = liveViewers();
-            OdyseeItems.commitStreams(items, OdyseeApi.claimsByIds(viewers.keySet()), viewers);
+            OdyseeItems.commitLivestreams(items, OdyseeApi.claimsByIds(viewers.keySet()),
+                    viewers);
             return new InfoItemsPage<>(items, null);
         }
 

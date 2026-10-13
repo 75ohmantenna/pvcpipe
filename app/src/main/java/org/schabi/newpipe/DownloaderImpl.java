@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -62,16 +63,22 @@ public final class DownloaderImpl extends Downloader {
     }
 
     /**
-     * Odysee's file host does not answer a HEAD request with the headers of the file: it
-     * refuses one without the referrer, and with it redirects to an HLS playlist when the
-     * file has been transcoded. Whoever wants the size of such a file has to ask with GET.
+     * Odysee's file host does not answer a HEAD request for an uploaded file with the headers
+     * of that file: it refuses one without the referrer, and with it redirects to an HLS
+     * playlist when the file has been transcoded. Whoever wants the size of such a file has
+     * to ask with GET. The playlists and segments of the HLS renditions on the same host
+     * answer HEAD as any file does.
      *
      * @param url the address of a media file
      * @return whether a HEAD request to it tells nothing about the file
      */
     public static boolean isHeadUnusable(final String url) {
         final HttpUrl parsed = HttpUrl.parse(url);
-        return parsed != null && isHostOrSubdomain(parsed.host(), "odycdn.com");
+        if (parsed == null || !isHostOrSubdomain(parsed.host(), "odycdn.com")) {
+            return false;
+        }
+        final String path = parsed.encodedPath().toLowerCase(Locale.ROOT);
+        return !path.endsWith(".ts") && !path.endsWith(".m3u8");
     }
 
     private static boolean isHostOrSubdomain(final String host, final String domain) {
@@ -192,9 +199,6 @@ public final class DownloaderImpl extends Downloader {
      */
     public long getContentLength(final String url) throws IOException {
         try {
-            if (isHeadUnusable(url)) {
-                return PvcDownloaderImplUtils.getContentLengthViaGet(url);
-            }
             final Response response = head(url);
             if (response.responseCode() == 405) { // HEAD Method not allowed
                 return PvcDownloaderImplUtils.getContentLengthViaGet(url);

@@ -18,6 +18,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.collection.SparseArrayCompat;
 
 import org.schabi.newpipe.DownloaderImpl;
+import org.schabi.newpipe.PvcDownloaderImplUtils;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.downloader.Response;
@@ -280,8 +281,8 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
                         // is no format to read from them, and the size is asked for with GET.
                         if (changeSize) {
                             try {
-                                streamsWrapper.setSize(stream, DownloaderImpl.getInstance()
-                                        .getContentLength(stream.getContent()));
+                                streamsWrapper.setSize(stream, PvcDownloaderImplUtils
+                                        .getContentLengthViaGet(stream.getContent()));
                                 hasChanged = true;
                             } catch (final IOException e) {
                                 // The size stays unknown; the other streams are still asked.

@@ -33,6 +33,7 @@ import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
 import org.schabi.newpipe.extractor.exceptions.PaidContentException;
+import org.schabi.newpipe.extractor.services.odysee.extractors.OdyseeStreamExtractor;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.Description;
@@ -113,12 +114,13 @@ class OdyseeStreamExtractorTest {
         final List<VideoStream> streams = info.getVideoStreams();
         assertEquals(3, streams.size());
         assertEquals(DeliveryMethod.HLS, streams.get(0).getDeliveryMethod());
-        assertEquals("1080p@4026k", streams.get(0).getResolution());
+        // the playlist states a peak of 4026000 bits per second; the stream gets 85% of it
+        assertEquals("1080p@3422k", streams.get(0).getResolution());
         assertEquals("https://player.odycdn.com/v6/streams/" + VIDEO_ID + "/786fca06af11/v0.m3u8",
                 streams.get(0).getContent());
         assertEquals(streams.get(0).getContent(), streams.get(0).getManifestUrl());
-        assertEquals(4026000, streams.get(0).getBitrate());
-        assertEquals("360p@655k", streams.get(1).getResolution());
+        assertEquals(3422100, streams.get(0).getBitrate());
+        assertEquals("360p@557k", streams.get(1).getResolution());
         assertEquals(DeliveryMethod.PROGRESSIVE_HTTP, streams.get(2).getDeliveryMethod());
         assertEquals(FILE_URL, streams.get(2).getContent());
         assertEquals(MediaFormat.MPEG_4, streams.get(2).getFormat());
@@ -263,6 +265,82 @@ class OdyseeStreamExtractorTest {
                         + "\"ActiveClaim\":{\"ClaimID\":\"another-claim\"}}}");
 
         assertThrows(ContentNotAvailableException.class, () -> StreamInfo.getInfo(Odysee,
+                "https://odysee.com/@Example:8/a-livestream:d"));
+    }
+
+    @Test
+    void renditionThatStatesItsAverageBitrateIsGivenThatOne() {
+        final List<VideoStream> streams = OdyseeStreamExtractor.parseHlsVariants(
+                "https://cloud.odysee.live/content/x/master.m3u8",
+                "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=6000000,RESOLUTION=1920x1080,"
+                        + "AVERAGE-BANDWIDTH=4500000,FRAME-RATE=30\n1080.m3u8\n"
+                        + "#EXT-X-STREAM-INF:AVERAGE-BANDWIDTH=1000000,BANDWIDTH=2000000\n"
+                        + "https://other.example/480.m3u8\n");
+
+        assertEquals(2, streams.size());
+        assertEquals("1080p@4500k", streams.get(0).getResolution());
+        assertEquals(4500000, streams.get(0).getBitrate());
+        assertEquals("https://cloud.odysee.live/content/x/1080.m3u8", streams.get(0).getContent());
+        // no resolution in the playlist: the stream is listed without one
+        assertEquals("unknown", streams.get(1).getResolution());
+        assertEquals("https://other.example/480.m3u8", streams.get(1).getContent());
+    }
+
+    @Test
+    void signatureOfTheLinkIsPassedOnForAnUnlistedVideo() throws Exception {
+        serveTranscodedVideo(withTags(OdyseeFixtures.video(), "c:unlisted"));
+
+        StreamInfo.getInfo(Odysee, VIDEO_URL + "?signature_ts=1780000000&signature=AB12cd");
+
+        final JsonObject get = params(downloader.requestsTo("?m=get").get(0));
+        assertEquals("AB12cd", get.getString("signature"));
+        assertEquals("1780000000", get.getString("signature_ts"));
+    }
+
+    @Test
+    void linkWithoutASignatureSendsNone() throws Exception {
+        serveTranscodedVideo(OdyseeFixtures.video());
+
+        StreamInfo.getInfo(Odysee, VIDEO_URL + "?r=abc&signature=AB12cd");
+
+        final JsonObject get = params(downloader.requestsTo("?m=get").get(0));
+        assertFalse(get.has("signature"));
+        assertFalse(get.has("signature_ts"));
+    }
+
+    @Test
+    void unlistedVideoOpenedWithoutItsSignedLinkSaysSo() {
+        downloader.onProxy("resolve", resolved(VIDEO_URI,
+                        withTags(OdyseeFixtures.video(), "c:unlisted")))
+                .onProxyError("get", "authentication required");
+
+        final ContentNotAvailableException error = assertThrows(
+                ContentNotAvailableException.class, () -> StreamInfo.getInfo(Odysee, VIDEO_URL));
+        assertTrue(error.getMessage().contains("signed link"), error.getMessage());
+        // with the signature a refusal means what it says
+        assertThrows(PaidContentException.class, () -> StreamInfo.getInfo(Odysee,
+                VIDEO_URL + "?signature=ab&signature_ts=1"));
+    }
+
+    @Test
+    void livestreamForMembersIsReportedAsPaid() {
+        // marked on the claim: nothing more is asked
+        final JsonObject tagged = withTags(OdyseeFixtures.livestream(), "c:members-only");
+        downloader.onProxy("resolve", resolved("lbry://@Example#8/a-livestream#d", tagged));
+        assertThrows(PaidContentException.class, () -> StreamInfo.getInfo(Odysee,
+                "https://odysee.com/@Example:8/a-livestream:d"));
+        assertEquals(1, downloader.requests.size());
+
+        // marked on the broadcast only
+        final JsonObject live = OdyseeFixtures.livestream();
+        downloader = new OdyseeFakeDownloader()
+                .onProxy("resolve", resolved("lbry://@Example#8/a-livestream#d", live))
+                .on(OdyseeApi.LIVESTREAM_URL, "{\"success\":true,\"error\":null,\"data\":"
+                        + "{\"Live\":true,\"VideoURL\":\"https://cloud.odysee.live/x/master.m3u8\","
+                        + "\"ActiveClaim\":{\"ClaimID\":\"" + live.getString("claim_id")
+                        + "\",\"Protected\":true}}}");
+        NewPipe.init(downloader);
+        assertThrows(PaidContentException.class, () -> StreamInfo.getInfo(Odysee,
                 "https://odysee.com/@Example:8/a-livestream:d"));
     }
 

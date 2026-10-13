@@ -194,7 +194,7 @@ public final class OdyseeAuth {
         failures++;
     }
 
-    private static boolean wasCancelled(final Exception e) {
+    static boolean wasCancelled(final Exception e) {
         return Thread.currentThread().isInterrupted()
                 || (e instanceof InterruptedIOException && !(e instanceof SocketTimeoutException));
     }
@@ -206,7 +206,7 @@ public final class OdyseeAuth {
         for (int i = 0; i < APP_ID_LENGTH; i++) {
             appId.append(APP_ID_CHARACTERS.charAt(random.nextInt(APP_ID_CHARACTERS.length())));
         }
-        final Object user = OdyseeApi.callAccountApi("user/new",
+        final Object user = OdyseeApi.callAccountApi(OdyseeApi.REGISTER_URL,
                 "auth_token=&app_id=" + appId + "&language=en");
         final String registered = user instanceof JsonObject
                 ? emptyToNull(((JsonObject) user).getString("auth_token")) : null;

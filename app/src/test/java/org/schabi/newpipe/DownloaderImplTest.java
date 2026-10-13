@@ -90,10 +90,15 @@ public class DownloaderImplTest {
     }
 
     @Test
-    public void onlyOdyseeFileHostIsNeverAskedWithHead() {
+    public void onlyUploadedFilesOnOdyseeFileHostAreNeverAskedWithHead() {
         assertTrue(DownloaderImpl.isHeadUnusable(
                 "https://player.odycdn.com/v6/streams/id/file.mp4"));
-        assertTrue(DownloaderImpl.isHeadUnusable("https://PLAYER.ODYCDN.COM/file.mp4"));
+        assertTrue(DownloaderImpl.isHeadUnusable("https://PLAYER.ODYCDN.COM/file.mp4?x=1"));
+        // the HLS renditions on the same host answer HEAD as any file does
+        assertFalse(DownloaderImpl.isHeadUnusable(
+                "https://player.odycdn.com/v6/streams/id/hash/v0_s000001.ts"));
+        assertFalse(DownloaderImpl.isHeadUnusable(
+                "https://player.odycdn.com/v6/streams/id/hash/master.M3U8"));
         // the livestream host has no files to ask the size of
         assertFalse(DownloaderImpl.isHeadUnusable(
                 "https://cloud.odysee.live/content/id/master.m3u8"));

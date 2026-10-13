@@ -54,6 +54,11 @@ class OdyseeUrlTest {
                 "https://lbry.tv/@lacajadepandora:a/TRUMP-EST%C3%81-BIEN-(720p):1");
         // a plus sign in a path is a plus sign, not a space
         assertStream("@a:1/c++:2", "https://odysee.com/@a:1/c++:2");
+        // LBRY forbids an opening square bracket in a name and allows a closing one
+        assertStream("@a:1/take-2]:2", "https://odysee.com/@a:1/take-2%5D:2");
+        assertEquals("https://odysee.com/@a:1/take-2%5D:2",
+                Odysee.getStreamLHFactory().fromId("@a:1/take-2]:2").getUrl());
+        assertEquals(LinkType.NONE, Odysee.getLinkTypeByUrl("https://odysee.com/@a:1/take%5B2:2"));
     }
 
     @Test

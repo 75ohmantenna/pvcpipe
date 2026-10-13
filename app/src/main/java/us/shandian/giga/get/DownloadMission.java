@@ -259,9 +259,11 @@ public class DownloadMission extends Mission {
             conn.setRequestProperty("Referer", referer);
         }
 
-        // A host whose HEAD says nothing about the file is asked with GET, for the same
-        // range. The callers only read the headers of the answer.
-        if (headRequest && !DownloaderImpl.isHeadUnusable(url)) {
+        // A file whose HEAD says nothing about it is asked with GET. The caller wants the
+        // headers, so where it asked for everything from a position on, one byte is asked for:
+        // the answer names the size of the whole file all the same.
+        final boolean getForHeaders = headRequest && DownloaderImpl.isHeadUnusable(url);
+        if (headRequest && !getForHeaders) {
             conn.setRequestMethod("HEAD");
         }
 
@@ -273,6 +275,8 @@ public class DownloadMission extends Mission {
             String req = "bytes=" + rangeStart + "-";
             if (rangeEnd > 0) {
                 req += rangeEnd;
+            } else if (getForHeaders) {
+                req += rangeStart;
             }
 
             conn.setRequestProperty("Range", req);

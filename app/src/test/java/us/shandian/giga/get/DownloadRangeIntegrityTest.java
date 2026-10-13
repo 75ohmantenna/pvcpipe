@@ -358,10 +358,26 @@ public class DownloadRangeIntegrityTest {
         final DownloadMission mission = mission(new CountDownLatch(1));
         final String file = "https://player.odycdn.com/v6/streams/id/file.mp4";
 
+        // The first request wants the size. One byte tells it; "bytes=0-" would make the
+        // server send the whole file to a caller that only reads the headers.
         final HttpURLConnection probe = mission.openConnection(file, true, 0, 0);
         assertEquals("GET", probe.getRequestMethod());
-        assertEquals("bytes=0-", probe.getRequestProperty("Range"));
+        assertEquals("bytes=0-0", probe.getRequestProperty("Range"));
         assertEquals("https://odysee.com/", probe.getRequestProperty("Referer"));
+
+        // a probe for a closed range, and one without a range, keep what they asked for
+        assertEquals("bytes=90-100",
+                mission.openConnection(file, true, 90, 100).getRequestProperty("Range"));
+        final HttpURLConnection plain = mission.openConnection(file, true, -1, -1);
+        assertEquals("GET", plain.getRequestMethod());
+        assertNull(plain.getRequestProperty("Range"));
+
+        // a segment of an HLS rendition on the same host is asked with HEAD
+        final HttpURLConnection segment = mission.openConnection(
+                "https://player.odycdn.com/v6/streams/id/hash/v0_s000001.ts", true, 0, 0);
+        assertEquals("HEAD", segment.getRequestMethod());
+        assertEquals("bytes=0-", segment.getRequestProperty("Range"));
+        assertEquals("https://odysee.com/", segment.getRequestProperty("Referer"));
 
         final HttpURLConnection block = mission.openConnection(file, false, 0, 99);
         assertEquals("GET", block.getRequestMethod());

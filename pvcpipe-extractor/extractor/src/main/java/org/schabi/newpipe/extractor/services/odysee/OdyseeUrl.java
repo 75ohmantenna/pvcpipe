@@ -15,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Translates between the three ways Odysee names a claim: the website address
@@ -34,11 +35,15 @@ public final class OdyseeUrl {
             Set.of("odysee.com", "www.odysee.com", "lbry.tv", "open.lbry.com");
     private static final String LBRY_SCHEME = "lbry://";
 
-    // The characters the LBRY protocol does not allow in a claim name.
-    private static final String NAME = "[^=&#:$@%?;/\\\\\"<>{}|^~\\[\\]`\\s]+";
+    // The characters the LBRY protocol does not allow in a claim name. It allows a closing
+    // square bracket, though not an opening one.
+    private static final String NAME = "[^=&#:$@%?;/\\\\\"<>{}|^~\\[` ]+";
     private static final Pattern SEGMENT =
             Pattern.compile("(@?" + NAME + ")(?:[:#]([0-9a-fA-F]{1,40}))?");
     private static final Pattern CLAIM_ID = Pattern.compile("[0-9a-f]{40}");
+    private static final Pattern SIGNED_LINK = Pattern.compile(
+            "[?&]signature=([0-9a-fA-F]+).*[?&]signature_ts=([0-9]+)"
+                    + "|[?&]signature_ts=([0-9]+).*[?&]signature=([0-9a-fA-F]+)");
     private static final String UNRESERVED = "-._~!'()*,@:";
 
     private final Type type;
@@ -187,6 +192,32 @@ public final class OdyseeUrl {
         final String path = lbryUri.startsWith(LBRY_SCHEME)
                 ? lbryUri.substring(LBRY_SCHEME.length()) : lbryUri;
         return toWebUrl(path.replace('#', ':'));
+    }
+
+    /**
+     * @param value any text
+     * @return whether it is a complete claim id
+     */
+    public static boolean isClaimId(@Nullable final String value) {
+        return value != null && CLAIM_ID.matcher(value).matches();
+    }
+
+    /**
+     * The publisher of an unlisted video shares it as a link that carries a signature. Odysee
+     * hands the video out only to a request that passes the signature on.
+     *
+     * @param url a website address
+     * @return the signature and its timestamp, or {@code null} if the address carries none
+     */
+    @Nullable
+    public static String[] signatureOf(@Nullable final String url) {
+        final Matcher matcher = url == null ? null : SIGNED_LINK.matcher(url);
+        if (matcher == null || !matcher.find()) {
+            return null;
+        }
+        return matcher.group(1) != null
+                ? new String[]{matcher.group(1), matcher.group(2)}
+                : new String[]{matcher.group(4), matcher.group(3)};
     }
 
     @Nonnull

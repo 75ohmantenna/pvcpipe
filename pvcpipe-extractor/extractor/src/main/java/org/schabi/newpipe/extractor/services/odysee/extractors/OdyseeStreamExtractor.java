@@ -63,6 +63,9 @@ public class OdyseeStreamExtractor extends StreamExtractor {
     private static final Pattern HLS_VARIANT = Pattern.compile(
             "#EXT-X-STREAM-INF:([^\\r\\n]*)\\r?\\n(?:#[^\\r\\n]*\\r?\\n)*([^#\\r\\n][^\\r\\n]*)");
     private static final Pattern HLS_BANDWIDTH = Pattern.compile("(?:^|,)BANDWIDTH=(\\d+)");
+    private static final Pattern HLS_AVERAGE_BANDWIDTH =
+            Pattern.compile("(?:^|,)AVERAGE-BANDWIDTH=(\\d+)");
+    private static final float HLS_PEAK_TO_AVERAGE = 0.85f;
     private static final Pattern HLS_RESOLUTION =
             Pattern.compile("(?:^|,)RESOLUTION=\\d+x(\\d+)");
 
@@ -91,11 +94,10 @@ public class OdyseeStreamExtractor extends StreamExtractor {
                     "This Odysee address holds a " + kind + ", which cannot be played");
         }
 
+        requireFree();
         final boolean live = OdyseeClaim.isLivestream(claim);
         if (live) {
             fetchLivestream();
-        } else {
-            requireFree();
         }
         // Likes and counts are extras that depend neither on each other nor on the media
         // address, so they are asked for while that address is looked up. Each of them
@@ -152,6 +154,10 @@ public class OdyseeStreamExtractor extends StreamExtractor {
         if (!live.getBoolean("Live") || url.isEmpty() || !isThisOne) {
             throw new ContentNotAvailableException("This Odysee livestream is not on air");
         }
+        // Odysee hands the playlist of a protected livestream only to a signed-in member.
+        if (live.getObject("ActiveClaim").getBoolean("Protected")) {
+            throw new PaidContentException("This Odysee livestream is for members of the channel");
+        }
         liveUrl = url;
         // For a livestream the number shown is how many are watching it now.
         viewCount = live.getLong("ViewerCount", -1);
@@ -169,7 +175,20 @@ public class OdyseeStreamExtractor extends StreamExtractor {
     }
 
     private void fetchFile() throws IOException, ExtractionException {
-        final String fileUrl = OdyseeApi.streamingUrl(claim.getString("permanent_url"));
+        final String[] signature = OdyseeUrl.signatureOf(getOriginalUrl());
+        final String fileUrl;
+        try {
+            fileUrl = OdyseeApi.streamingUrl(claim.getString("permanent_url"), signature);
+        } catch (final PaidContentException e) {
+            // Odysee refuses an unlisted video the same way as a paid one when the signature
+            // of the link its publisher shared is missing. The app keeps a video's plain
+            // address, so the signature is only there when the video is opened from the link.
+            if (signature == null && OdyseeClaim.hasTag(claim, OdyseeClaim.TAG_UNLISTED)) {
+                throw new ContentNotAvailableException("This unlisted Odysee video opens only"
+                        + " from the signed link its publisher shared");
+            }
+            throw e;
+        }
         if (getStreamType() == StreamType.AUDIO_STREAM) {
             audioStreams = List.of(new AudioStream.Builder()
                     .setId(ORIGINAL_FILE_ID)
@@ -207,7 +226,7 @@ public class OdyseeStreamExtractor extends StreamExtractor {
      * @return one stream for each rendition the playlist lists
      */
     @Nonnull
-    static List<VideoStream> parseHlsVariants(@Nonnull final String playlistUrl,
+    public static List<VideoStream> parseHlsVariants(@Nonnull final String playlistUrl,
                                               @Nonnull final String playlist) {
         final List<VideoStream> variants = new ArrayList<>();
         final URI base = URI.create(playlistUrl);
@@ -215,8 +234,7 @@ public class OdyseeStreamExtractor extends StreamExtractor {
         while (matcher.find()) {
             final String url = base.resolve(matcher.group(2).trim()).toString();
             final Matcher resolution = HLS_RESOLUTION.matcher(matcher.group(1));
-            final Matcher bandwidth = HLS_BANDWIDTH.matcher(matcher.group(1));
-            final int bitrate = bandwidth.find() ? Integer.parseInt(bandwidth.group(1)) : 0;
+            final int bitrate = hlsBitrate(matcher.group(1));
             final VideoStream stream = new VideoStream.Builder()
                     .setId(HLS_ID)
                     .setContent(url, true)
@@ -234,6 +252,20 @@ public class OdyseeStreamExtractor extends StreamExtractor {
             variants.add(stream);
         }
         return variants;
+    }
+
+    /**
+     * A playlist states the peak bitrate of a rendition and sometimes its average. The app
+     * works out the size of a download from this number, so the average is the one to give.
+     * Without it the peak is scaled by the factor the Rumble extractor measured for HLS.
+     */
+    private static int hlsBitrate(final String attributes) {
+        final Matcher average = HLS_AVERAGE_BANDWIDTH.matcher(attributes);
+        if (average.find()) {
+            return Integer.parseInt(average.group(1));
+        }
+        final Matcher peak = HLS_BANDWIDTH.matcher(attributes);
+        return peak.find() ? (int) (Integer.parseInt(peak.group(1)) * HLS_PEAK_TO_AVERAGE) : 0;
     }
 
     @Nonnull

@@ -42,7 +42,7 @@ import javax.annotation.Nullable;
 @Tag("offline")
 class OdyseeCountsTest {
 
-    private static final String REGISTER_URL = OdyseeApi.ACCOUNT_API_URL + "user/new";
+    private static final String REGISTER_URL = OdyseeApi.REGISTER_URL;
     private static final String OTHER_ID = "e51671357333fe22ae88aad320bde2f6f96b1410";
 
     private OdyseeFakeDownloader downloader;
@@ -246,7 +246,23 @@ class OdyseeCountsTest {
 
         assertTrue(downloader.requestsTo(REGISTER_URL).isEmpty());
         assertTrue(savedTokens.isEmpty());
-        assertEquals(3, downloader.requestsTo(OdyseeApi.VIEW_COUNT_URL).size());
+        // and after one request that got no answer the next pages do not each try again
+        assertEquals(1, downloader.requestsTo(OdyseeApi.VIEW_COUNT_URL).size());
+        assertEquals(Map.of(), OdyseeApi.followerCounts(List.of(CHANNEL_ID)));
+        assertTrue(downloader.requestsTo(OdyseeApi.FOLLOWER_COUNT_URL).isEmpty());
+    }
+
+    @Test
+    void countRequestThatTheCallerAbandonedDoesNotStopTheNextOne() {
+        storeTokensIn("kept");
+        final OdyseeFakeDownloader abandoned = new OdyseeFakeDownloader().onFailure(
+                OdyseeApi.VIEW_COUNT_URL, () -> new java.io.InterruptedIOException("interrupted"));
+        NewPipe.init(abandoned);
+        assertEquals(Map.of(), OdyseeApi.viewCounts(List.of(VIDEO_ID)));
+
+        NewPipe.init(downloader);
+        downloader.on(OdyseeApi.VIEW_COUNT_URL, success("[5]"));
+        assertEquals(Map.of(VIDEO_ID, 5L), OdyseeApi.viewCounts(List.of(VIDEO_ID)));
     }
 
     @Test

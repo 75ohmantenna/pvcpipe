@@ -24,8 +24,9 @@ playback and downloads of returned media URLs use separate app network paths.
 - **Odysee:** public video, audio, livestream, embed, channel and playlist
   links on `odysee.com`, `lbry.tv` and `open.lbry.com`; the uploaded file and,
   where Odysee has transcoded it, HLS renditions; livestreams that are on air;
-  channels with Videos, Livestreams and Playlists tabs; Featured, Trending and
-  Live kiosks; search for videos, audio and channels with sort, date and
+  channels with Videos, Livestreams and Playlists tabs, of which the
+  Livestreams tab holds the broadcast that is on air, if any; Featured,
+  Trending and Live kiosks; search for videos, audio and channels with sort, date and
   length filters; suggestions; comments with likes and replies; like and
   dislike counts; view counts and follower counts through an anonymous
   visitor token. No subscription import, subtitles, or documents and images.
@@ -126,7 +127,14 @@ only a `channel_id`.
 request and, for a transcoded video, the playlist, one after another. Likes,
 the view count and the follower count are asked for at the same time as
 these, on threads of their own, and none of them holds the page up for longer
-than its own request takes.
+than its own request takes. After a count request that got no answer, no
+count is asked for during the next minute, so that pages do not each wait for
+one.
+
+**HLS renditions.** A master playlist states the peak bitrate of each
+rendition. The app estimates the size of an HLS download from the bitrate, so
+a rendition is given the average if the playlist states one and 85% of the
+peak otherwise, the factor the Rumble extractor uses.
 
 **Media.** `get` returns one address on `player.odycdn.com`. That host and
 the livestream host `cloud.odysee.live` want `Referer: https://odysee.com/`.
@@ -161,13 +169,16 @@ Observed on 2026-10-12 and 2026-10-13:
 
 The app therefore sends the referrer on every media request to these two
 hosts (`DownloaderImpl.getMediaReferer`): from the player, from the downloader
-and from the extractor downloader. And because a `HEAD` request to
-`player.odycdn.com` never answers for the file, the app does not send one
-there (`DownloaderImpl.isHeadUnusable`): the downloader asks with `GET` for
-the same range where it would use `HEAD` (`DownloadMission.openConnection`),
-and the size shown in the download dialog comes from a `GET` for the first
-byte, whose `Content-Range` gives the total
-(`PvcDownloaderImplUtils.getContentLengthViaGet`).
+and from the extractor downloader. And because a `HEAD` request for an
+uploaded file on `player.odycdn.com` never answers for the file, the app does
+not send one (`DownloaderImpl.isHeadUnusable`). Where the downloader would
+use `HEAD` it asks with `GET`, and where that request would have asked for
+everything from a position on, it asks for one byte, whose `Content-Range`
+gives the total (`DownloadMission.openConnection`). The size shown in the
+download dialog comes from the same kind of request
+(`PvcDownloaderImplUtils.getContentLengthViaGet`). The playlists and segments
+of the HLS renditions on that host answer `HEAD` like any file (checked on
+2026-10-13), so they are asked as before.
 
 A player outside the app gets the bare address and no referrer, so "open in
 external player" works for an Odysee file only while the file is in the CDN
@@ -192,6 +203,12 @@ all of them showed their counts. An uncached video failed there too with
 HTTP 429. The phone was on the same network as the emulator. No download was
 tried on the phone.
 
+An HLS download of the 144p rendition on the emulator fetched all 42 segments
+from Odysee and then failed in the app's own last step, which runs the bundled
+`libffmpeg.so` to join them: the file was not on disk
+(`lib/x86_64/libffmpeg.so: No such file or directory`). That step is the same
+for every service and this change does not touch it.
+
 **Paid content.** A video that has to be bought, rented or needs a membership
 is marked by tags (`c:purchase`, `c:rental`, `c:members-only`) or an LBC fee,
 and `get` answers "authentication required" for it. The app reports it as paid
@@ -201,7 +218,18 @@ unless "Hide paid content videos" is on.
 **Livestreams.** A stream claim without a file is a livestream page. It plays
 only while its channel is on air with that claim; otherwise the app says it is
 not available. A recording that the publisher later attaches turns the page
-into an ordinary video.
+into an ordinary video. A channel keeps the page of every livestream it ever
+announced, so lists leave livestream pages out unless they are known to be on
+air: the Live kiosk and a channel's Livestreams tab list them, search and
+related videos do not. A broadcast that Odysee marks as protected is for
+members and is reported as paid content.
+
+**Unlisted videos.** Their publisher shares them as a link that carries
+`signature` and `signature_ts`. The extractor passes both to `get`, as yt-dlp
+does. This was written from yt-dlp's code and not tried against a real
+unlisted video. The app stores a video's address without its query, so a
+video reopened from history has no signature; the app then says the video
+opens only from its signed link.
 
 **Suggestions** are the titles of the first search results, which is what the
 website shows while typing. Odysee has no service that completes a query.

@@ -21,10 +21,13 @@ import java.io.IOException;
 import java.util.List;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class OdyseeChannelExtractor extends ChannelExtractor {
 
     private JsonObject claim;
+    @Nullable
+    private String canonicalId;
     private long subscriberCount = UNKNOWN_SUBSCRIBER_COUNT;
 
     public OdyseeChannelExtractor(final StreamingService service,
@@ -40,6 +43,14 @@ public class OdyseeChannelExtractor extends ChannelExtractor {
             throw new ContentNotSupportedException("This Odysee address is not a channel");
         }
         claim = resolved;
+        try {
+            canonicalId = OdyseeChannelLinkHandlerFactory.getInstance()
+                    .getId(OdyseeClaim.webUrl(claim));
+        } catch (final ParsingException e) {
+            // An address this extractor cannot read back is not adopted: the channel keeps
+            // the one it was opened with.
+            canonicalId = null;
+        }
         final String claimId = claim.getString("claim_id", "");
         subscriberCount = OdyseeApi.followerCounts(List.of(claimId))
                 .getOrDefault(claimId, UNKNOWN_SUBSCRIBER_COUNT);
@@ -53,14 +64,13 @@ public class OdyseeChannelExtractor extends ChannelExtractor {
     @Nonnull
     @Override
     public String getId() throws ParsingException {
-        return claim == null ? super.getId()
-                : OdyseeChannelLinkHandlerFactory.getInstance().getId(getUrl());
+        return canonicalId == null ? super.getId() : canonicalId;
     }
 
     @Nonnull
     @Override
     public String getUrl() throws ParsingException {
-        return claim == null ? super.getUrl() : OdyseeClaim.webUrl(claim);
+        return canonicalId == null ? super.getUrl() : OdyseeUrl.toWebUrl(canonicalId);
     }
 
     @Nonnull
