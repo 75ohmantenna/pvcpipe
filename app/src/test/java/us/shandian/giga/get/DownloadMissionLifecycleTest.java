@@ -13,8 +13,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import us.shandian.giga.postprocessing.PvcFromHlsRemuxer;
 import us.shandian.giga.util.Utility;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -77,6 +79,34 @@ public class DownloadMissionLifecycleTest {
             assertEquals(DownloadMission.ERROR_POSTPROCESSING, mission.errCode);
             assertTrue(mission.errObject instanceof EOFException);
             verify(mission.mHandler).obtainMessage(anyInt(), same(mission));
+        }
+    }
+
+    @Test
+    public void anHlsMissionKeepsItsSegmentsWhenOneIsRefused() {
+        try (var logging = mockStatic(Log.class)) {
+            final StoredFileHelper storage = mock(StoredFileHelper.class);
+            when(storage.existsAsFile()).thenReturn(true);
+            when(storage.canWrite()).thenReturn(true);
+            final String[] segments = {"https://example.test/hls/0.ts",
+                    "https://example.test/hls/1.ts", "https://example.test/hls/2.ts"};
+            final DownloadMission mission = new DownloadMission(segments.clone(), storage, 'v',
+                    mock(PvcFromHlsRemuxer.class));
+            mission.mHandler = mock(Handler.class);
+            when(mission.mHandler.obtainMessage(anyInt(), any())).thenReturn(mock(Message.class));
+            // every segment carries the recovery information of the whole rendition
+            mission.recoveryInfo = new MissionRecoveryInfo[]{mock(MissionRecoveryInfo.class),
+                    mock(MissionRecoveryInfo.class), mock(MissionRecoveryInfo.class)};
+            mission.current = 1;
+            mission.running = true;
+
+            mission.doRecover(DownloadMission.ERROR_HTTP_FORBIDDEN);
+
+            assertArrayEquals(segments, mission.urls);
+            assertEquals(DownloadMission.ERROR_HTTP_FORBIDDEN, mission.errCode);
+            assertFalse(mission.isRecovering());
+            assertFalse(mission.running);
+            assertEquals(1, mission.current);
         }
     }
 

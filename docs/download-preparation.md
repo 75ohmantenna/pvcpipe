@@ -39,6 +39,29 @@ A pending mission saves its state as a checkpoint file.
 The media file, the checkpoint and the finished-downloads database are three
 separate things on disk. No transaction spans them.
 
+## HLS downloads
+
+An HLS rendition is downloaded segment by segment and then joined by
+`PvcFromHlsRemuxer`, which runs the bundled ffmpeg.
+
+- `PvcHlsPreProcessor` reads the playlist and replaces the mission's one
+  address with the addresses of the segments. It fetches playlists and
+  encryption keys as bytes, because a key is binary.
+- Each conversion works in a directory of its own under `ffmpeg_temp` and
+  removes it when it ends, also after a failure. Several HLS downloads can
+  be converted at the same time. A conversion that starts while no other is
+  running first removes whatever is left in `ffmpeg_temp`: files of a build
+  that had one shared directory, or of a process that was killed half way.
+- A segment that the server refuses fails the mission with the HTTP error,
+  and the mission keeps its segments. `DownloadMissionRecover` is not used
+  for HLS: it can only find a whole progressive file again. A retry asks for
+  the same segment addresses, so it does not help once they have expired.
+  Reading the playlist again is not implemented.
+
+The Ogg conversion of WebM audio refuses a file that uses block lacing.
+`WebMReader` does not take laced blocks apart, and writing one as a single
+packet would give a file that does not play.
+
 ## Sharing or opening a finished file
 
 Sharing a download that was saved by path, or opening it in another app,

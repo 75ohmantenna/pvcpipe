@@ -42,6 +42,13 @@ make ci                        # every check below, then both APKs
 | `:pvcpipe-extractor:extractor:forkCiTest` | the extractor's Checkstyle and its tests tagged `offline` |
 | `:app:assembleDebug`, `:app:assembleRelease` | both APKs |
 
+Native libraries are packaged the legacy way (`useLegacyPackaging` in
+`app/build.gradle.kts`), so the installer extracts them. The HLS remuxer runs
+`libffmpeg.so` as a program, and Android lets an app execute a file only from
+its native library directory. With the default packaging the file stays
+inside the APK and every HLS download fails at its last step.
+`FfmpegPackagingTest` checks this on a device.
+
 The APKs land in `app/build/outputs/apk/`. The debug build has the
 application id `org.seventyfiveohmantenna.pvcpipe.debug`, so it installs next
 to a release build. The release build is minified and comes out as

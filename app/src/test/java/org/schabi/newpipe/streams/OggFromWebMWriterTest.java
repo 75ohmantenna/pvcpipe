@@ -1,6 +1,7 @@
 package org.schabi.newpipe.streams;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -8,6 +9,7 @@ import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -52,5 +54,22 @@ public class OggFromWebMWriterTest {
     @Test
     public void noStreamNoTags() {
         assertTrue(tags(null).isEmpty());
+    }
+
+    @Test
+    public void lacedBlocksAreRefused() {
+        // Xiph, fixed-size and EBML lacing, alone and with the other flag bits set
+        for (final int flags : new int[]{0x02, 0x04, 0x06, 0x82, 0x85, 0x87}) {
+            assertThrows(IOException.class,
+                    () -> OggFromWebMWriter.requireNoLacing((byte) flags));
+        }
+    }
+
+    @Test
+    public void unlacedBlocksAreAccepted() throws IOException {
+        // nothing set, keyframe, invisible, discardable, and all of those together
+        for (final int flags : new int[]{0x00, 0x80, 0x08, 0x01, 0x89}) {
+            OggFromWebMWriter.requireNoLacing((byte) flags);
+        }
     }
 }

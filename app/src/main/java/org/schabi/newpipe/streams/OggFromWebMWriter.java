@@ -434,11 +434,29 @@ public class OggFromWebMWriter implements Closeable {
             webmCluster = null;
             return getNextBlock();
         }
+        requireNoLacing(res.flags);
 
         webmBlockNearDuration = res.absoluteTimeCodeNs - webmBlockLastTimecode;
         webmBlockLastTimecode = res.absoluteTimeCodeNs;
 
         return res;
+    }
+
+    /**
+     * A laced block holds several frames behind a header that says where each one ends.
+     * {@link WebMReader} does not take that header apart, so writing such a block as one Ogg
+     * packet would give a file that does not play. Refuse it and say why.
+     *
+     * @param flags the flags byte of a block
+     * @throws IOException if the block is laced
+     */
+    @VisibleForTesting
+    static void requireNoLacing(final byte flags) throws IOException {
+        // bits 0x06: 00 no lacing, 01 Xiph, 10 fixed-size, 11 EBML
+        if ((flags & 0x06) != 0) {
+            throw new IOException("This WebM file uses block lacing,"
+                    + " which the Ogg conversion does not support");
+        }
     }
 
     private float getSampleFrequencyFromTrack(final byte[] bMetadata) {
