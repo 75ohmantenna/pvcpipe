@@ -28,6 +28,7 @@ import javax.net.ssl.SSLException;
 
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import us.shandian.giga.postprocessing.Postprocessing;
+import us.shandian.giga.postprocessing.PvcFromHlsRemuxer;
 import us.shandian.giga.service.DownloadManagerService;
 import us.shandian.giga.util.Utility;
 
@@ -993,6 +994,15 @@ public class DownloadMission extends Mission {
             return;
         }
         Log.i(TAG, "Attempting to recover the mission: " + storage.getName());
+
+        if (psAlgorithm instanceof PvcFromHlsRemuxer) {
+            // The addresses of an HLS mission are segments. Recovery only knows how to find
+            // a whole progressive file again, and would write that file's address into one
+            // segment's slot. Report the error and keep the segments, so a retry asks for
+            // the same addresses again.
+            notifyError(errorCode, null);
+            return;
+        }
 
         if (recoveryInfo == null) {
             notifyError(errorCode, null);

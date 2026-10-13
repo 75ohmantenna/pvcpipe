@@ -1,21 +1,24 @@
 package us.shandian.giga.preprocessing;
 
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
+
 import com.github.evermindzz.hlsdownloader.HlsMediaProcessor;
 import com.github.evermindzz.hlsdownloader.common.Fetcher;
 import com.github.evermindzz.hlsdownloader.parser.HlsParser;
 
 import org.schabi.newpipe.DownloaderImpl;
-import org.schabi.newpipe.extractor.downloader.Response;
-import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import us.shandian.giga.get.DownloadMission;
 import us.shandian.giga.get.MissionRecoveryInfo;
 
@@ -91,23 +94,39 @@ public class PvcHlsPreProcessor {
     }
 
     /**
-     * Use {@link DownloaderImpl} to fetch the playlist etc.
+     * Fetches playlists and encryption keys with the app's HTTP client. It hands on the bytes
+     * the server sent: a key is 16 bytes of binary data, which the text of
+     * {@link DownloaderImpl}'s answers cannot carry.
      */
     public static class FetchWithDownloaderImpl implements Fetcher {
+        @Nullable
+        private final OkHttpClient client;
+
         public FetchWithDownloaderImpl() {
+            this(null);
         }
 
-        private InputStream stringToInputStream(final String input) {
-            final byte[] bytes = input.getBytes(StandardCharsets.UTF_8);
-            return new ByteArrayInputStream(bytes);
+        @VisibleForTesting
+        FetchWithDownloaderImpl(@Nullable final OkHttpClient client) {
+            this.client = client;
         }
 
         public InputStream fetchContent(final URI uri) throws IOException {
-            try {
-                final Response response = DownloaderImpl.getInstance().get(uri.toString());
-                return stringToInputStream(response.responseBody());
-            } catch (ReCaptchaException e) {
-                throw new IOException(e);
+            final String url = uri.toString();
+            final Request.Builder request = new Request.Builder().url(url)
+                    .header("User-Agent", DownloaderImpl.getMediaUserAgent(url));
+            final String referer = DownloaderImpl.getMediaReferer(url);
+            if (referer != null) {
+                request.header("Referer", referer);
+            }
+            final OkHttpClient theClient = client != null
+                    ? client : DownloaderImpl.getInstance().getClient();
+            try (Response response = theClient.newCall(request.build()).execute()) {
+                if (!response.isSuccessful()) {
+                    // an error page is neither a playlist nor a key
+                    throw new IOException("HTTP " + response.code() + " for " + url);
+                }
+                return new ByteArrayInputStream(response.body().bytes());
             }
         }
     }

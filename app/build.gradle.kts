@@ -102,6 +102,12 @@ configure<ApplicationExtension> {
     }
 
     packaging {
+        jniLibs {
+            // PvcFromHlsRemuxer runs libffmpeg.so as a program. Android lets an app execute a
+            // file only from its nativeLibraryDir, and the installer extracts libraries to
+            // that directory only with legacy packaging.
+            useLegacyPackaging = true
+        }
         resources {
             // remove two files which belong to jsoup
             // no idea how they ended up in the META-INF dir...

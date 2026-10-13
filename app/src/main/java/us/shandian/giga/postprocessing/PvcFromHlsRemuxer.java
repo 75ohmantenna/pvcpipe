@@ -2,6 +2,9 @@ package us.shandian.giga.postprocessing;
 
 import android.content.Context;
 
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
+
 import com.github.evermindzz.hlsdownloader.FFmpegSegmentCombiner;
 import com.github.evermindzz.hlsdownloader.HlsMediaProcessor;
 import com.github.evermindzz.hlsdownloader.parser.HlsParser;
@@ -17,15 +20,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import okio.BufferedSink;
 import okio.BufferedSource;
 import okio.Okio;
 import okio.Sink;
-import okio.Source;
 import us.shandian.giga.get.DownloadMission;
 
 public class PvcFromHlsRemuxer extends Postprocessing {
+    private static final AtomicLong WORK_DIR_COUNTER = new AtomicLong();
 
     PvcFromHlsRemuxer() {
         super(false, true, ALGORITHM_PVC_HLS_REMUXER);
@@ -62,15 +66,61 @@ public class PvcFromHlsRemuxer extends Postprocessing {
         }
     }
 
+    /**
+     * Makes a directory for one conversion. Conversions of several missions can run at the
+     * same time, so no two may share their segment files or their output file.
+     *
+     * @param parent           the directory all conversions work under
+     * @param missionTimestamp the timestamp of the mission, for a name that can be recognised
+     * @return a new, empty directory
+     * @throws IOException if the directory cannot be created
+     */
+    @VisibleForTesting
+    static File newWorkDir(final File parent, final long missionTimestamp) throws IOException {
+        final File dir = new File(parent, missionTimestamp + "-" + System.nanoTime() + "-"
+                + WORK_DIR_COUNTER.incrementAndGet());
+        if (!dir.mkdirs()) {
+            throw new IOException("Cannot create the conversion directory " + dir);
+        }
+        return dir;
+    }
+
+    /**
+     * Deletes a file or a directory with everything in it. Does not throw: it runs while an
+     * exception of the conversion may be on its way out, and must not replace it.
+     *
+     * @param file what to delete
+     */
+    @VisibleForTesting
+    static void deleteQuietly(@Nullable final File file) {
+        if (file == null) {
+            return;
+        }
+        try {
+            final File[] children = file.listFiles();
+            if (children != null) {
+                for (final File child : children) {
+                    deleteQuietly(child);
+                }
+            }
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+        } catch (final RuntimeException ignored) {
+            // what cannot be deleted stays in the app's own files directory
+        }
+    }
+
     private static class PvcHlsConverterToMp4 {
 
-        private final File tempDir;
+        private final File tempParent;
         private final DownloadMission mission;
 
         PvcHlsConverterToMp4(final DownloadMission mission) {
             this.mission = mission;
             final Context context = App.getInstance().getApplicationContext();
-            this.tempDir = new File(context.getExternalFilesDir(null), "ffmpeg_temp");
+            final File external = context.getExternalFilesDir(null);
+            this.tempParent = new File(external != null ? external : context.getCacheDir(),
+                    "ffmpeg_temp");
         }
 
         private FFmpegSegmentCombiner createCombiner() {
@@ -97,69 +147,58 @@ public class PvcFromHlsRemuxer extends Postprocessing {
                 final SharpStream[] segmentStreams,
                 final SharpStream outputStream)
                 throws IOException, InterruptedException {
-            createTempDir();
+            if (!(mission.pvcArbitraryData instanceof List<?>)) {
+                throw new IOException("The segment list of this HLS download is missing");
+            }
+            @SuppressWarnings("unchecked") final List<HlsParser.Segment> segments =
+                    (List<HlsParser.Segment>) mission.pvcArbitraryData;
 
-            final File remuxedFile = new File(tempDir, "output.mp4");
-            final SegmentInputStreamProvider segmentInputStreamProvider =
-                    new SegmentInputStreamProvider(segmentStreams);
-            final HlsMediaProcessor hlsMediaProcessor = new HlsMediaProcessor(null,
-                    tempDir.getAbsolutePath(), remuxedFile.getAbsolutePath(),
-                    null,
-                    null,
-                    1, null,
-                    createCombiner(),
-                    (progress, total) -> {
-                    },
-                    (state, message) -> {
-                    },
-                    true
-            );
+            final File workDir = newWorkDir(tempParent, mission.timestamp);
+            try {
+                final File remuxedFile = new File(workDir, "output.mp4");
+                final SegmentInputStreamProvider segmentInputStreamProvider =
+                        new SegmentInputStreamProvider(segmentStreams);
+                final HlsMediaProcessor hlsMediaProcessor = new HlsMediaProcessor(null,
+                        workDir.getAbsolutePath(), remuxedFile.getAbsolutePath(),
+                        null,
+                        null,
+                        1, null,
+                        createCombiner(),
+                        (progress, total) -> {
+                        },
+                        (state, message) -> {
+                        },
+                        true
+                );
 
-            if (mission.pvcArbitraryData instanceof List<?>) {
-                @SuppressWarnings("unchecked") final List<HlsParser.Segment> segments =
-                        (List<HlsParser.Segment>) mission.pvcArbitraryData;
                 hlsMediaProcessor.setSegments(segments);
                 hlsMediaProcessor.processSegments(segmentInputStreamProvider);
                 hlsMediaProcessor.finalizeDownload();
 
                 copyFileToStream(remuxedFile, outputStream);
+            } finally {
+                deleteQuietly(workDir);
             }
-
-            cleanupTempFiles(remuxedFile);
         }
 
         private void copyFileToStream(
                 final File inFile,
                 final SharpStream outStream) throws IOException {
-            final Source source = Okio.source(inFile);
             final SharpOutputStream sharpOutputStream = new SharpOutputStream(outStream);
             final Sink sink = Okio.sink(sharpOutputStream);
-
-            final BufferedSource bufferedSource = Okio.buffer(source);
             final BufferedSink bufferedSink = Okio.buffer(sink);
 
-            // Read all data from source to sink
-            bufferedSource.readAll(bufferedSink);
+            // Close only the source, also when the copy fails. The 'out' stream will be
+            // properly closed by the Postprocessing framework in
+            // CircularFileWriter.finalizeFile(). If we close it here the framework would
+            // crash as it can no longer finalize it.
+            try (BufferedSource bufferedSource = Okio.buffer(Okio.source(inFile))) {
+                // Read all data from source to sink
+                bufferedSource.readAll(bufferedSink);
 
-            // Flush the buffered sink to ensure all data is pushed through
-            bufferedSink.flush();
-
-            // close only the source. The 'out' stream will be properly closed by the
-            // Postprocessing framework in CircularFileWriter.finalizeFile().
-            // If we close it here the framework would crash as it can no longer finalize it
-            bufferedSource.close();
-        }
-
-        private void createTempDir() {
-            if (!tempDir.exists()) {
-                tempDir.mkdirs();
+                // Flush the buffered sink to ensure all data is pushed through
+                bufferedSink.flush();
             }
-        }
-
-        private void cleanupTempFiles(
-                final File outputFile) {
-            outputFile.delete();
-            tempDir.delete();
         }
     }
 }
