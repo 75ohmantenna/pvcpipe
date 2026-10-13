@@ -82,6 +82,9 @@ requests.
 - Java follows `checkstyle/checkstyle.xml`, with exceptions in
   `checkstyle/suppressions.xml`. Checkstyle does not ask for Javadoc, but a
   method's Javadoc has to carry a tag for every parameter.
+- The extractor's Checkstyle rejects `toLowerCase()` and `toUpperCase()`
+  without a `Locale`. With the language of the device set to Turkish they
+  turn `i` into `İ` and `I` into `ı`, and host names stop matching.
 - Kotlin follows ktlint. `./gradlew :app:formatKtlint` fixes what it can.
 - Each section of `gradle/libs.versions.toml` stays in alphabetical order.
 
