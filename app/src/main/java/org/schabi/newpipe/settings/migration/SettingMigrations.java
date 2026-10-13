@@ -325,7 +325,7 @@ public final class SettingMigrations {
     /**
      * Version number for preferences. Must be incremented every time a migration is necessary.
      */
-    private static final int VERSION = 9;
+    public static final int VERSION = 9;
 
 
     static void runMigrationsIfNeeded(@NonNull final Context context) {

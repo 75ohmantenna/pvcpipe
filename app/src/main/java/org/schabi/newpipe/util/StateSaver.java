@@ -75,13 +75,21 @@ public final class StateSaver {
      * @param context used to get the available cache dir
      */
     public static void init(final Context context) {
+        // State files are serialized objects and are read back with ObjectInputStream. They
+        // belong in internal storage, which no other app can write to. Older builds used the
+        // external cache, which other apps could reach on Android 8 to 10.
+        cacheDirPath = context.getCacheDir().getAbsolutePath();
+
         final File externalCacheDir = context.getExternalCacheDir();
         if (externalCacheDir != null) {
-            cacheDirPath = externalCacheDir.getAbsolutePath();
+            final File legacyStateDir = new File(externalCacheDir, CACHE_DIR_NAME);
+            FILE_DELETE_EXECUTOR.execute(() ->
+                    StateSaverFileCleanup.deleteDirectory(legacyStateDir));
         }
-        if (TextUtils.isEmpty(cacheDirPath)) {
-            cacheDirPath = context.getCacheDir().getAbsolutePath();
-        }
+    }
+
+    private static File stateDir() {
+        return new File(cacheDirPath, CACHE_DIR_NAME);
     }
 
     /**
@@ -130,6 +138,12 @@ public final class StateSaver {
                             + ", stateObjectsHolder > " + STATE_OBJECTS_HOLDER);
                 }
                 return savedState;
+            }
+
+            // The path comes from a saved bundle. Only a file of our own state directory is
+            // read: a bundle written by an older build may name a file in shared storage.
+            if (!StateSaverFileCleanup.isInside(stateDir(), savedState.getPathFileSaved())) {
+                return null;
             }
 
             final File file = new File(savedState.getPathFileSaved());
@@ -297,9 +311,11 @@ public final class StateSaver {
 
         if (savedState != null && !savedState.getPathFileSaved().isEmpty()) {
             STATE_OBJECTS_HOLDER.remove(savedState.getPrefixFileSaved());
-            final File stateFile = new File(savedState.getPathFileSaved());
-            ACTIVE_STATE_FILES.remove(stateFile.getAbsolutePath());
-            FILE_DELETE_EXECUTOR.execute(() -> StateSaverFileCleanup.delete(stateFile));
+            final String path = savedState.getPathFileSaved();
+            ACTIVE_STATE_FILES.remove(new File(path).getAbsolutePath());
+            final File stateDir = stateDir();
+            FILE_DELETE_EXECUTOR.execute(() ->
+                    StateSaverFileCleanup.deleteIfInside(stateDir, path));
         }
     }
 
@@ -313,7 +329,7 @@ public final class StateSaver {
 
         STATE_OBJECTS_HOLDER.clear();
         ACTIVE_STATE_FILES.clear();
-        final File cacheDir = new File(cacheDirPath, CACHE_DIR_NAME);
+        final File cacheDir = stateDir();
         FILE_DELETE_EXECUTOR.execute(() ->
                 StateSaverFileCleanup.deleteInactiveFiles(cacheDir, ACTIVE_STATE_FILES));
     }

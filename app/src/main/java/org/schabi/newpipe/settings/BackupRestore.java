@@ -14,7 +14,10 @@ import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.settings.export.BackupFileLocator;
+import org.schabi.newpipe.player.notification.NotificationConstants;
 import org.schabi.newpipe.settings.export.ImportExportManager;
+import org.schabi.newpipe.settings.export.ImportedPreferenceTypes;
+import org.schabi.newpipe.settings.migration.SettingMigrations;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.ZipHelper;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -232,6 +235,11 @@ final class BackupRestore {
 
         @Override
         public void normalizeImportedPreferences(final Map<String, Object> values) {
+            ImportedPreferenceTypes.conformImport(values, numericPreferenceTypes(),
+                    context.getString(R.string.last_used_preferences_version),
+                    SettingMigrations.VERSION,
+                    PreferenceManager.getDefaultSharedPreferences(context).getAll());
+
             final String tunnelingKey = context.getString(R.string.disable_media_tunneling_key);
             final String automaticKey =
                     context.getString(R.string.disabled_media_tunneling_automatically_key);
@@ -246,6 +254,34 @@ final class BackupRestore {
                 values.put(context.getString(R.string.media_tunneling_device_blacklist_version),
                         DeviceUtils.MEDIA_TUNNELING_DEVICE_BLACKLIST_VERSION);
             }
+        }
+
+        /**
+         * Every preference the app reads with getInt, getLong or getFloat. A value of another
+         * type under one of these keys throws at the read, for some of them while the app
+         * starts. Add a key here when adding such a read.
+         *
+         * @return the type of each of those keys
+         */
+        private Map<String, Class<?>> numericPreferenceTypes() {
+            final Map<String, Class<?>> types = new HashMap<>();
+            for (final int key : new int[]{R.string.last_used_preferences_version,
+                    R.string.default_download_threads, R.string.popup_saved_x_key,
+                    R.string.popup_saved_y_key, R.string.last_resize_mode,
+                    R.string.disabled_media_tunneling_automatically_key,
+                    R.string.media_tunneling_device_blacklist_version}) {
+                types.put(context.getString(key), Integer.class);
+            }
+            for (final int key : NotificationConstants.SLOT_PREF_KEYS) {
+                types.put(context.getString(key), Integer.class);
+            }
+            types.put(context.getString(R.string.screen_brightness_timestamp_key), Long.class);
+            for (final int key : new int[]{R.string.playback_speed_key,
+                    R.string.playback_pitch_key, R.string.adjustment_step_key,
+                    R.string.screen_brightness_key, R.string.popup_saved_width_key}) {
+                types.put(context.getString(key), Float.class);
+            }
+            return types;
         }
 
         @Override

@@ -24,8 +24,10 @@ import java.util.Set;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.preference.PreferenceManager;
 import okhttp3.Dns;
+import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.JavaNetCookieJar;
 import okhttp3.OkHttpClient;
@@ -257,20 +259,55 @@ public final class PvcDownloaderImplUtils {
                 Collections.emptySet());
 
         final Optional<Interceptor> hostInterceptor = PvcHostInterceptor.getInterceptor(builder);
-        if (selectedHosts.isEmpty()) {
+        final Map<String, String> replaceHosts = parseHostReplacements(selectedHosts);
+        if (replaceHosts.isEmpty()) {
             hostInterceptor.ifPresent(interceptor -> builder.interceptors().remove(interceptor));
         } else {
-            final Map<String, String> replaceHosts = new HashMap<>();
-            for (final String oldAndNewHost : selectedHosts) {
-                final String[] result = oldAndNewHost.split(":");
-                replaceHosts.put(result[0], result[1]);
-            }
-
             if (hostInterceptor.isPresent()) {
                 ((PvcHostInterceptor) hostInterceptor.get()).setHosts(replaceHosts);
             } else {
                 builder.addInterceptor(new PvcHostInterceptor(replaceHosts));
             }
+        }
+    }
+
+    /**
+     * Reads the host replacements of the settings. The settings screen only stores entries of
+     * the form {@code old:new}, but an imported settings file can hold anything, and this runs
+     * while the app starts. An entry that is not of that form is left out.
+     *
+     * @param entries the stored entries
+     * @return the host to replace and its replacement, for every usable entry
+     */
+    @VisibleForTesting
+    static Map<String, String> parseHostReplacements(@Nullable final Set<String> entries) {
+        final Map<String, String> replaceHosts = new HashMap<>();
+        if (entries == null) {
+            return replaceHosts;
+        }
+        for (final String entry : entries) {
+            if (entry == null) {
+                continue;
+            }
+            // the limit keeps an empty part at the end, which marks "old:" as broken
+            final String[] parts = entry.split(":", -1);
+            if (parts.length == 2 && !parts[0].isEmpty() && isHostName(parts[1])) {
+                replaceHosts.put(parts[0], parts[1]);
+            }
+        }
+        return replaceHosts;
+    }
+
+    private static boolean isHostName(final String host) {
+        if (host.isEmpty()) {
+            return false;
+        }
+        try {
+            // PvcHostInterceptor hands the replacement to this same method for every request
+            new HttpUrl.Builder().scheme("https").host(host);
+            return true;
+        } catch (final IllegalArgumentException e) {
+            return false;
         }
     }
 
