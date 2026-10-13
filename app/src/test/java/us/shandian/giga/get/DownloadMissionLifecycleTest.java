@@ -7,6 +7,7 @@ import android.util.Log;
 import org.junit.Test;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
+import java.io.EOFException;
 import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -64,6 +65,18 @@ public class DownloadMissionLifecycleTest {
             mission.start();
             assertEquals(2, started.get());
             assertFalse(mission.running);
+        }
+    }
+
+    @Test
+    public void anErrorWithoutAMessageIsReportedLikeAnyOther() {
+        try (var logging = mockStatic(Log.class)) {
+            final DownloadMission mission = mission();
+            // WebMReader throws EOFException without a message for a truncated source.
+            mission.notifyError(DownloadMission.ERROR_POSTPROCESSING, new EOFException());
+            assertEquals(DownloadMission.ERROR_POSTPROCESSING, mission.errCode);
+            assertTrue(mission.errObject instanceof EOFException);
+            verify(mission.mHandler).obtainMessage(anyInt(), same(mission));
         }
     }
 

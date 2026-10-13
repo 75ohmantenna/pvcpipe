@@ -22,6 +22,7 @@ import org.schabi.newpipe.PvcDownloaderImplUtils;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -262,56 +263,110 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
         public static <X extends Stream> Single<Boolean> fetchMoreInfoForWrapper(
                 final StreamInfo pvcStreamInfo,
                 final StreamInfoWrapper<X> streamsWrapper) {
-            final Callable<Boolean> fetchAndSet = () -> {
-                boolean hasChanged = false;
-                for (final X stream : streamsWrapper.getStreamsList()) {
-                    final boolean changeSize = streamsWrapper.getSizeInBytes(stream) <= SIZE_UNSET;
-                    final boolean changeFormat = stream.getFormat() == null;
-                    if (!changeSize && !changeFormat) {
-                        continue;
-                    }
-
-                    if (pvcIfStreamIsHlsCalcAndSetSize(stream, pvcStreamInfo, streamsWrapper)) {
-                        hasChanged = true;
-                        continue;
-                    }
-
-                    if (DownloaderImpl.isHeadUnusable(stream.getContent())) {
-                        // The headers of a HEAD answer are not those of the file, so there
-                        // is no format to read from them, and the size is asked for with GET.
-                        if (changeSize) {
-                            try {
-                                streamsWrapper.setSize(stream, PvcDownloaderImplUtils
-                                        .getContentLengthViaGet(stream.getContent()));
-                                hasChanged = true;
-                            } catch (final IOException e) {
-                                // The size stays unknown; the other streams are still asked.
-                            }
-                        }
-                        continue;
-                    }
-
-                    final Response response = DownloaderImpl.getInstance()
-                            .head(stream.getContent());
-                    if (changeSize) {
-                        final String contentLength = response.getHeader("Content-Length");
-                        if (!isNullOrEmpty(contentLength)) {
-                            streamsWrapper.setSize(stream, Long.parseLong(contentLength));
-                            hasChanged = true;
-                        }
-                    }
-                    if (changeFormat) {
-                        hasChanged = retrieveMediaFormat(stream, streamsWrapper, response)
-                                || hasChanged;
-                    }
-                }
-                return hasChanged;
-            };
+            final Callable<Boolean> fetchAndSet = () -> fetchMoreInfo(pvcStreamInfo,
+                    streamsWrapper, url -> DownloaderImpl.getInstance().head(url));
 
             return Single.fromCallable(fetchAndSet)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .onErrorReturnItem(true);
+        }
+
+        /** Asks a server for the headers of a stream. */
+        @VisibleForTesting
+        interface HeadRequest {
+            Response head(String url) throws IOException, ReCaptchaException;
+        }
+
+        /**
+         * Fills in the sizes and formats that are still missing. A stream whose server does not
+         * answer, or answers with an error, keeps its size unknown and does not stop the others.
+         *
+         * @param <X>            the stream type's class extending {@link Stream}
+         * @param pvcStreamInfo  the current stream info
+         * @param streamsWrapper the wrapper
+         * @param request        how to ask a server for the headers of a stream
+         * @return whether any size or format was set
+         */
+        @VisibleForTesting
+        static <X extends Stream> boolean fetchMoreInfo(
+                final StreamInfo pvcStreamInfo,
+                final StreamInfoWrapper<X> streamsWrapper,
+                final HeadRequest request) {
+            boolean hasChanged = false;
+            for (final X stream : streamsWrapper.getStreamsList()) {
+                final boolean changeSize = streamsWrapper.getSizeInBytes(stream) <= SIZE_UNSET;
+                final boolean changeFormat = stream.getFormat() == null;
+                if (!changeSize && !changeFormat) {
+                    continue;
+                }
+
+                if (pvcIfStreamIsHlsCalcAndSetSize(stream, pvcStreamInfo, streamsWrapper)) {
+                    hasChanged = true;
+                    continue;
+                }
+
+                if (DownloaderImpl.isHeadUnusable(stream.getContent())) {
+                    // The headers of a HEAD answer are not those of the file, so there
+                    // is no format to read from them, and the size is asked for with GET.
+                    if (changeSize) {
+                        try {
+                            streamsWrapper.setSize(stream, PvcDownloaderImplUtils
+                                    .getContentLengthViaGet(stream.getContent()));
+                            hasChanged = true;
+                        } catch (final IOException e) {
+                            // The size stays unknown; the other streams are still asked.
+                        }
+                    }
+                    continue;
+                }
+
+                final Response response;
+                try {
+                    response = request.head(stream.getContent());
+                } catch (final IOException | ReCaptchaException e) {
+                    // The size stays unknown; the other streams are still asked.
+                    continue;
+                }
+                if (!isSuccessful(response)) {
+                    // The headers of an error page say nothing about the stream.
+                    continue;
+                }
+                if (changeSize) {
+                    final long size = contentLengthOf(response);
+                    if (size >= 0) {
+                        streamsWrapper.setSize(stream, size);
+                        hasChanged = true;
+                    }
+                }
+                if (changeFormat) {
+                    hasChanged = retrieveMediaFormat(stream, streamsWrapper, response)
+                            || hasChanged;
+                }
+            }
+            return hasChanged;
+        }
+
+        @VisibleForTesting
+        static boolean isSuccessful(@NonNull final Response response) {
+            return response.responseCode() >= 200 && response.responseCode() < 300;
+        }
+
+        /**
+         * @param response the answer to a request for a stream
+         * @return the length it states, or -1 if it states none that can be read
+         */
+        @VisibleForTesting
+        static long contentLengthOf(@NonNull final Response response) {
+            final String contentLength = response.getHeader("Content-Length");
+            if (isNullOrEmpty(contentLength)) {
+                return -1;
+            }
+            try {
+                return Long.parseLong(contentLength.trim());
+            } catch (final NumberFormatException e) {
+                return -1;
+            }
         }
 
         /**
