@@ -3,14 +3,25 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.google.protobuf) apply false
 }
 
+// The extractor ships only inside PVCPipe and has the app's version, from the file both builds
+// read. The file is next to this directory, also when the extractor is built by itself.
+val pvcpipeVersion = Properties().apply {
+    load(
+        providers.fileContents(layout.projectDirectory.file("../version.properties"))
+            .asText.get().reader()
+    )
+}.getProperty("version") ?: error("version.properties has no version")
+
 allprojects {
     apply(plugin = "java-library")
 
-    version = "v0.26.5"
+    version = pvcpipeVersion
 
     tasks.withType<JavaCompile> {
         options.encoding = Charsets.UTF_8.toString()
