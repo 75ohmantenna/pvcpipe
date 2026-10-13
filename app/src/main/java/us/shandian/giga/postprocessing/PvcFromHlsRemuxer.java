@@ -85,6 +85,33 @@ public class PvcFromHlsRemuxer extends Postprocessing {
         return dir;
     }
 
+    /** What one conversion does in its directory. */
+    @VisibleForTesting
+    interface WorkDirAction {
+        void run(File workDir) throws IOException, InterruptedException;
+    }
+
+    /**
+     * Runs one conversion in a directory of its own and removes the directory afterwards, also
+     * when the conversion fails. The failure of the conversion is what the caller gets.
+     *
+     * @param parent           the directory all conversions work under
+     * @param missionTimestamp the timestamp of the mission
+     * @param action           the conversion
+     * @throws IOException          if the directory cannot be made or the conversion fails
+     * @throws InterruptedException if the conversion is interrupted
+     */
+    @VisibleForTesting
+    static void inWorkDir(final File parent, final long missionTimestamp,
+                          final WorkDirAction action) throws IOException, InterruptedException {
+        final File workDir = newWorkDir(parent, missionTimestamp);
+        try {
+            action.run(workDir);
+        } finally {
+            deleteQuietly(workDir);
+        }
+    }
+
     /**
      * Deletes a file or a directory with everything in it. Does not throw: it runs while an
      * exception of the conversion may be on its way out, and must not replace it.
@@ -153,8 +180,7 @@ public class PvcFromHlsRemuxer extends Postprocessing {
             @SuppressWarnings("unchecked") final List<HlsParser.Segment> segments =
                     (List<HlsParser.Segment>) mission.pvcArbitraryData;
 
-            final File workDir = newWorkDir(tempParent, mission.timestamp);
-            try {
+            inWorkDir(tempParent, mission.timestamp, workDir -> {
                 final File remuxedFile = new File(workDir, "output.mp4");
                 final SegmentInputStreamProvider segmentInputStreamProvider =
                         new SegmentInputStreamProvider(segmentStreams);
@@ -176,9 +202,7 @@ public class PvcFromHlsRemuxer extends Postprocessing {
                 hlsMediaProcessor.finalizeDownload();
 
                 copyFileToStream(remuxedFile, outputStream);
-            } finally {
-                deleteQuietly(workDir);
-            }
+            });
         }
 
         private void copyFileToStream(

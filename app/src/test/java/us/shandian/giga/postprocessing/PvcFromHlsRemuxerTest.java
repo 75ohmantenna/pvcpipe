@@ -3,6 +3,7 @@ package us.shandian.giga.postprocessing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -44,6 +45,49 @@ public class PvcFromHlsRemuxerTest {
         // a file where the parent directory should be
         final File notADirectory = temporary.newFile("ffmpeg_temp");
         assertThrows(IOException.class, () -> PvcFromHlsRemuxer.newWorkDir(notADirectory, 1));
+    }
+
+    @Test
+    public void aFailedConversionLeavesNothingBehindAndKeepsItsError() {
+        final File parent = new File(temporary.getRoot(), "ffmpeg_temp");
+        final File[] used = new File[1];
+        final IOException failure = new IOException("ffmpeg exited with 1");
+
+        final IOException thrown = assertThrows(IOException.class, () ->
+                PvcFromHlsRemuxer.inWorkDir(parent, 1000, workDir -> {
+                    used[0] = workDir;
+                    // what a conversion has on disk when it fails half way
+                    Files.write(new File(workDir, "0.ts").toPath(), new byte[]{1, 2, 3});
+                    Files.write(new File(workDir, "output.mp4").toPath(), new byte[]{4});
+                    throw failure;
+                }));
+
+        assertSame(failure, thrown);
+        assertTrue(used[0].getPath().startsWith(parent.getPath()));
+        assertFalse(used[0].exists());
+    }
+
+    @Test
+    public void anInterruptedConversionIsCleanedUpToo() {
+        final File[] used = new File[1];
+        assertThrows(InterruptedException.class, () ->
+                PvcFromHlsRemuxer.inWorkDir(temporary.getRoot(), 1000, workDir -> {
+                    used[0] = workDir;
+                    throw new InterruptedException();
+                }));
+        assertFalse(used[0].exists());
+    }
+
+    @Test
+    public void aFinishedConversionRemovesItsDirectory() throws Exception {
+        final File[] used = new File[1];
+        PvcFromHlsRemuxer.inWorkDir(temporary.getRoot(), 1000, workDir -> {
+            used[0] = workDir;
+            assertTrue(workDir.isDirectory());
+            assertEquals(0, workDir.list().length);
+            Files.write(new File(workDir, "output.mp4").toPath(), new byte[]{4});
+        });
+        assertFalse(used[0].exists());
     }
 
     @Test
