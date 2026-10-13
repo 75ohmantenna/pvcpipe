@@ -524,9 +524,21 @@ class FeedFragment : BaseStateFragment<FeedState>() {
         val builder = AlertDialog.Builder(requireContext())
             .setTitle(R.string.feed_load_error)
             .setPositiveButton(R.string.unsubscribe) { _, _ ->
+                val context = requireContext().applicationContext
+                // deleteSubscription observes on the main thread
                 SubscriptionManager(requireContext())
                     .deleteSubscription(subscriptionEntity.serviceId, subscriptionEntity.url!!)
-                    .subscribe()
+                    .subscribe(
+                        {},
+                        { throwable ->
+                            ErrorUtil.reportDetached(
+                                context,
+                                throwable,
+                                UserAction.SUBSCRIPTION_CHANGE,
+                                "Unsubscribing from a channel that failed to load"
+                            )
+                        }
+                    )
                 handleItemsErrors(nextItemsErrors)
             }
             .setNegativeButton(R.string.cancel, null)

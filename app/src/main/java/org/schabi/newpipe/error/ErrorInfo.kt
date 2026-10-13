@@ -10,6 +10,7 @@ import com.google.android.exoplayer2.upstream.Loader
 import java.net.UnknownHostException
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.schabi.newpipe.R
 import org.schabi.newpipe.extractor.Info
 import org.schabi.newpipe.extractor.ServiceList
@@ -83,7 +84,7 @@ class ErrorInfo private constructor(
         getMessage(throwable, userAction, serviceId),
         isReportable(throwable),
         isRetryable(throwable),
-        (throwable as? ReCaptchaException)?.url,
+        solvableCaptchaUrl(throwable),
         openInBrowserUrl,
         PvcLogcatDumper.triggerLogCapture()
     )
@@ -103,7 +104,7 @@ class ErrorInfo private constructor(
         getMessage(throwables.firstOrNull(), userAction, serviceId),
         throwables.any(::isReportable),
         throwables.isEmpty() || throwables.any(::isRetryable),
-        throwables.firstNotNullOfOrNull { it as? ReCaptchaException }?.url,
+        throwables.firstNotNullOfOrNull(::solvableCaptchaUrl),
         openInBrowserUrl,
         PvcLogcatDumper.triggerLogCapture()
     )
@@ -177,6 +178,33 @@ class ErrorInfo private constructor(
             // want to default to SERVICE_NONE
             ServiceList.all().firstOrNull { it.serviceId == serviceId }?.serviceInfo?.name
                 ?: SERVICE_NONE
+
+        // The hosts whose captcha the app can do something about: ReCaptchaActivity keeps
+        // only YouTube's cookies, and DownloaderImpl sends them only to YouTube.
+        private val CAPTCHA_DOMAINS = listOf(
+            "youtube.com",
+            "youtu.be",
+            "youtube-nocookie.com",
+            "google.com",
+            "googleapis.com",
+            "googlevideo.com"
+        )
+
+        /**
+         * The downloader reports every HTTP 429 as a [ReCaptchaException]. Only a few hosts
+         * answer 429 with a captcha that the app can show and whose result it can use. For any
+         * other host 429 means "too many requests, try again later", and a captcha screen
+         * would show an API address and change nothing.
+         *
+         * @return the address to open in the captcha screen, or `null` if [throwable] is not a
+         * captcha the app can solve
+         */
+        @JvmStatic
+        fun solvableCaptchaUrl(throwable: Throwable?): String? {
+            val url = (throwable as? ReCaptchaException)?.url ?: return null
+            val host = url.toHttpUrlOrNull()?.host ?: return null
+            return url.takeIf { CAPTCHA_DOMAINS.any { host == it || host.endsWith(".$it") } }
+        }
 
         fun throwableToStringList(throwable: Throwable) = arrayOf(throwable.stackTraceToString())
 
@@ -275,7 +303,11 @@ class ErrorInfo private constructor(
 
                 // ReCaptchas will be handled in a special way anyway
                 throwable is ReCaptchaException ->
-                    ErrorMessage(R.string.recaptcha_request_toast)
+                    if (solvableCaptchaUrl(throwable) != null) {
+                        ErrorMessage(R.string.recaptcha_request_toast)
+                    } else {
+                        ErrorMessage(R.string.too_many_requests, getServiceName(serviceId))
+                    }
 
                 // test this at the end as many exceptions could be a subclass of IOException
                 throwable != null && throwable.isNetworkRelated ->
@@ -326,6 +358,10 @@ class ErrorInfo private constructor(
 
                 // we know the content is not supported, no need to let the user report it
                 is ContentNotSupportedException -> false
+
+                // a site that is refusing requests for a while is nothing to report; a captcha
+                // that can be solved keeps the handling it had
+                is ReCaptchaException -> solvableCaptchaUrl(throwable) != null
 
                 // happens often when there is no internet connection; we don't use
                 // `throwable.isNetworkRelated` since any `IOException` would make that function

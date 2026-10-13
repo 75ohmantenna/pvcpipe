@@ -3,6 +3,7 @@ package org.schabi.newpipe.local.bookmark;
 import static org.schabi.newpipe.local.bookmark.MergedPlaylistManager.getMergedOrderedPlaylists;
 import static org.schabi.newpipe.util.ThemeHelper.shouldUseGridLayout;
 
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -31,6 +32,7 @@ import org.schabi.newpipe.database.playlist.PlaylistMetadataEntry;
 import org.schabi.newpipe.database.playlist.model.PlaylistRemoteEntity;
 import org.schabi.newpipe.databinding.DialogEditTextBinding;
 import org.schabi.newpipe.error.ErrorInfo;
+import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.local.BaseLocalListFragment;
 import org.schabi.newpipe.local.holder.LocalBookmarkPlaylistItemHolder;
@@ -546,12 +548,15 @@ public final class BookmarkFragment extends BaseLocalListFragment<List<PlaylistL
                 // Not tied to this fragment's disposables: once chosen, the change completes
                 // even if the screen closes first.
                 final long playlistId = selectedItem.getUid();
+                final Context appContext = requireContext().getApplicationContext();
                 localPlaylistManager
                         .getAutomaticPlaylistThumbnailStreamId(playlistId)
                         .flatMapMaybe(thumbnailStreamId -> localPlaylistManager
                                 .changePlaylistThumbnail(playlistId, thumbnailStreamId, false))
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe();
+                        .subscribe(ignored -> { }, throwable -> ErrorUtil.reportDetached(
+                                appContext, throwable, UserAction.REQUESTED_BOOKMARK,
+                                "Unsetting the thumbnail of a playlist"));
             }
         };
 

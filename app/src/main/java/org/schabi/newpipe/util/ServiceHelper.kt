@@ -115,6 +115,17 @@ object ServiceHelper : PvcServiceHelper() {
     fun hasService(serviceId: Int): Boolean = ServiceList.all().any { it.serviceId == serviceId }
 
     /**
+     * An intent from another app can name any service id. A screen that is opened for a
+     * service the app does not have throws while it is being created.
+     *
+     * @param context used to look up the selected service
+     * @param serviceId the id an intent asked for
+     * @return that id if the app has the service, otherwise the id of the selected service
+     */
+    @JvmStatic
+    fun existingOrSelected(context: Context, serviceId: Int): Int = if (hasService(serviceId)) serviceId else getSelectedServiceId(context)
+
+    /**
      * @param serviceId the id of the service
      * @return the service corresponding to the provided id
      * @throws java.util.NoSuchElementException if there is no service with the provided id

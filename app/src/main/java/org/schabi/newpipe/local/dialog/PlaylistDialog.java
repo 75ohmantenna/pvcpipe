@@ -13,6 +13,8 @@ import androidx.fragment.app.FragmentManager;
 
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.database.stream.model.StreamEntity;
+import org.schabi.newpipe.error.ErrorUtil;
+import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.local.playlist.LocalPlaylistManager;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.util.StateSaver;
@@ -149,7 +151,9 @@ public abstract class PlaylistDialog extends DialogFragment implements StateSave
                 .subscribe(hasPlaylists ->
                         onExec.accept(hasPlaylists
                                 ? PlaylistAppendDialog.newInstance(streamEntities)
-                                : PlaylistCreationDialog.newInstance(streamEntities))
+                                : PlaylistCreationDialog.newInstance(streamEntities)),
+                        throwable -> ErrorUtil.reportDetached(context, throwable,
+                                UserAction.REQUESTED_BOOKMARK, "Looking for local playlists")
                 );
     }
 

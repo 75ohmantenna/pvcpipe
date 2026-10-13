@@ -27,29 +27,6 @@ import org.schabi.newpipe.util.external_communication.ShareUtils
 
 abstract class PvcErrorActivity : AppCompatActivity() {
 
-    /**
-     * Skip some traces as we might get TransactionTooLargeException exception.
-     *
-     * @param stackTraces the full stack traces
-     * @return the truncated traces list that will not crash the Binder or whatever.
-     */
-    protected fun pvcTruncateAsNeeded(stackTraces: Array<String>): MutableList<String> {
-        val limit = 104857 // limit to around 100k
-
-        var size = 0
-        val finalList: MutableList<String> = ArrayList()
-
-        for (trace in stackTraces) {
-            if (limit < size) {
-                finalList.add("PVCPipe TRUNCATED trace")
-                break
-            }
-            size += trace.length
-            finalList.add(trace)
-        }
-        return finalList
-    }
-
     protected fun pvcAddLogcatLogAttachmentToMail(
         context: Context,
         emailIntent: Intent,

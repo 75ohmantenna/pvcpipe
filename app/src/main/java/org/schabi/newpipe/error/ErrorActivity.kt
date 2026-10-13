@@ -216,7 +216,7 @@ class ErrorActivity : PvcErrorActivity() {
                 .value("version", BuildConfig.VERSION_NAME)
                 .value("os", osString)
                 .value("time", currentTimeStamp)
-                .array("exceptions", pvcTruncateAsNeeded(errorInfo.stackTraces))
+                .array("exceptions", PvcErrorInfoHelper.truncate(errorInfo.stackTraces).toList())
                 .value("user_comment", binding.errorCommentBox.getText().toString())
                 .end()
                 .done()

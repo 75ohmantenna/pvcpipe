@@ -2,6 +2,9 @@ package org.schabi.newpipe.error
 
 import android.os.Parcel
 import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -18,26 +21,57 @@ object PvcErrorInfoTracesParceler : Parceler<Array<String>> {
     override fun create(parcel: Parcel): Array<String> {
         val byteArray = ByteArray(parcel.readInt())
         parcel.readByteArray(byteArray)
-        val unzipped = ungzip(byteArray)
-
-        return unzipped.split(";").toTypedArray()
+        return decode(byteArray)
     }
 
     override fun Array<String>.write(parcel: Parcel, flags: Int) {
-        val result = this.reduce { result, nr -> "$result; $nr" }
-        val zipped = gzip(result)
+        val zipped = encode(this)
         parcel.writeInt(zipped.size)
         parcel.writeByteArray(zipped)
     }
 
-    private fun gzip(content: String): ByteArray {
-        val byteOutputStream = ByteArrayOutputStream()
-        GZIPOutputStream(byteOutputStream)
-            .bufferedWriter(StandardCharsets.UTF_8).use { it.write(content) }
-
-        return byteOutputStream.toByteArray()
+    /**
+     * Packs traces as a count followed by each trace with its length. A separator character
+     * cannot be used: any character can be part of a trace, and a semicolon is part of most.
+     */
+    internal fun encode(traces: Array<String>): ByteArray {
+        val bytes = ByteArrayOutputStream()
+        DataOutputStream(GZIPOutputStream(bytes)).use { data ->
+            data.writeInt(traces.size)
+            for (trace in traces) {
+                val encoded = trace.toByteArray(StandardCharsets.UTF_8)
+                data.writeInt(encoded.size)
+                data.write(encoded)
+            }
+        }
+        return bytes.toByteArray()
     }
 
-    private fun ungzip(content: ByteArray): String = GZIPInputStream(content.inputStream())
-        .bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+    /**
+     * @return the traces [encode] packed. Bytes this cannot read give one line that says so:
+     * a notification can still hold an error that a build before this format wrote.
+     */
+    internal fun decode(content: ByteArray): Array<String> = try {
+        DataInputStream(GZIPInputStream(content.inputStream())).use { data ->
+            val count = data.readInt()
+            if (count < 0 || count > MAX_TRACES) {
+                throw IOException("Not a list of traces")
+            }
+            Array(count) {
+                val length = data.readInt()
+                if (length < 0 || length > MAX_ENCODED_TRACE) {
+                    throw IOException("Not a trace")
+                }
+                val encoded = ByteArray(length)
+                data.readFully(encoded)
+                String(encoded, StandardCharsets.UTF_8)
+            }
+        }
+    } catch (e: IOException) {
+        arrayOf(UNREADABLE)
+    }
+
+    internal const val UNREADABLE = "The details of this error could not be read."
+    private const val MAX_TRACES = 1000
+    private const val MAX_ENCODED_TRACE = 4 * 1024 * 1024
 }
