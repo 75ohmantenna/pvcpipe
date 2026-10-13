@@ -1,6 +1,7 @@
 package org.schabi.newpipe.error
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.schabi.newpipe.error.PvcErrorInfoTracesParceler.UNREADABLE
 import org.schabi.newpipe.error.PvcErrorInfoTracesParceler.decode
@@ -21,6 +22,27 @@ class PvcErrorInfoTracesParcelerTest {
     fun `several traces keep their number, order and text`() {
         val traces = arrayOf("first", "", " second; ", "third\nline", "\uD83D\uDE00 \u00e9")
         assertArrayEquals(traces, roundTrip(*traces))
+    }
+
+    @Test
+    fun `the reader accepts everything the writer writes`() {
+        // more traces than one error may hold, each of them short
+        val many = Array(PvcErrorInfoHelper.MAX_TRACES + 1) { "trace $it" }
+        val back = decode(encode(many))
+        assertEquals(PvcErrorInfoHelper.MAX_TRACES, back.size)
+        assertArrayEquals(many.copyOfRange(0, PvcErrorInfoHelper.MAX_TRACES), back)
+
+        // exactly as many as allowed
+        val full = Array(PvcErrorInfoHelper.MAX_TRACES) { "t$it" }
+        assertArrayEquals(full, decode(encode(full)))
+
+        // one trace of the longest kind, in characters that take three bytes each
+        val wide = "\u20ac".repeat(PvcErrorInfoHelper.MAX_TRACE_LENGTH)
+        assertArrayEquals(arrayOf(wide), decode(encode(arrayOf(wide))))
+
+        // and one that is too long comes back cut, not refused
+        val tooLong = decode(encode(arrayOf("\u20ac".repeat(PvcErrorInfoHelper.MAX_TRACE_LENGTH + 5))))
+        assertEquals(PvcErrorInfoHelper.MAX_TRACE_LENGTH, tooLong[0].length)
     }
 
     @Test

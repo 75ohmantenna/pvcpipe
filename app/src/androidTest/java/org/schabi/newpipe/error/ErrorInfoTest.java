@@ -14,6 +14,7 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -58,5 +59,49 @@ public class ErrorInfoTest {
         assertEquals(R.string.parsing_error, getMessageFromErrorInfo(infoFromParcel));
 
         parcel.recycle();
+    }
+
+    private static ErrorInfo throughAParcel(final ErrorInfo info) {
+        final Parcel parcel = Parcel.obtain();
+        try {
+            info.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            return (ErrorInfo) ErrorInfo.CREATOR.createFromParcel(parcel);
+        } finally {
+            parcel.recycle();
+        }
+    }
+
+    @Test
+    public void tracesWithSemicolonsSurviveAParcel() {
+        // array types in a trace are written with a semicolon: [Ljava.lang.String;
+        final String[] traces = {
+                "java.lang.ClassCastException: [Ljava.lang.String; cannot be cast\n"
+                        + "\tat A.b(A.java)",
+                "second; trace; with; semicolons",
+                ""};
+        final ErrorInfo info = new ErrorInfo(traces, UserAction.UI_ERROR, "request", null,
+                R.string.app_ui_crash);
+
+        assertArrayEquals(traces, throughAParcel(info).getStackTraces());
+    }
+
+    @Test
+    public void anErrorWithoutTracesSurvivesAParcel() {
+        final ErrorInfo info = new ErrorInfo(new String[0], UserAction.UI_ERROR, "request",
+                null, R.string.app_ui_crash);
+
+        assertEquals(0, throughAParcel(info).getStackTraces().length);
+    }
+
+    @Test
+    public void aHugeTraceIsBoundedBeforeItTravels() {
+        final String[] traces = {"x".repeat(5_000_000)};
+        final ErrorInfo info = new ErrorInfo(traces, UserAction.UI_ERROR, "request", null,
+                R.string.app_ui_crash);
+
+        assertEquals(1, info.getStackTraces().length);
+        assertEquals(PvcErrorInfoHelper.MAX_TRACE_LENGTH, info.getStackTraces()[0].length());
+        assertArrayEquals(info.getStackTraces(), throughAParcel(info).getStackTraces());
     }
 }

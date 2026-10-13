@@ -47,6 +47,13 @@ class PvcErrorInfoHelperTest {
     }
 
     @Test
+    fun `an error holds a limited number of traces`() {
+        val many = Array(PvcErrorInfoHelper.MAX_TRACES + 50) { "t" }
+        assertEquals(PvcErrorInfoHelper.MAX_TRACES, truncate(many).size)
+        assertEquals(PvcErrorInfoHelper.MAX_TRACES, truncate(many.copyOfRange(0, PvcErrorInfoHelper.MAX_TRACES)).size)
+    }
+
+    @Test
     fun `no room at all gives no traces`() {
         assertEquals(0, truncate(arrayOf("a", "b"), perTrace = 10, total = 0).size)
         // too little room for the marker itself

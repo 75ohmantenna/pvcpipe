@@ -33,12 +33,16 @@ object PvcErrorInfoTracesParceler : Parceler<Array<String>> {
     /**
      * Packs traces as a count followed by each trace with its length. A separator character
      * cannot be used: any character can be part of a trace, and a semicolon is part of most.
+     *
+     * The traces are bounded first, with the limits [decode] checks, so that the reader never
+     * refuses what the writer wrote.
      */
     internal fun encode(traces: Array<String>): ByteArray {
+        val bounded = PvcErrorInfoHelper.truncate(traces)
         val bytes = ByteArrayOutputStream()
         DataOutputStream(GZIPOutputStream(bytes)).use { data ->
-            data.writeInt(traces.size)
-            for (trace in traces) {
+            data.writeInt(bounded.size)
+            for (trace in bounded) {
                 val encoded = trace.toByteArray(StandardCharsets.UTF_8)
                 data.writeInt(encoded.size)
                 data.write(encoded)
@@ -54,7 +58,7 @@ object PvcErrorInfoTracesParceler : Parceler<Array<String>> {
     internal fun decode(content: ByteArray): Array<String> = try {
         DataInputStream(GZIPInputStream(content.inputStream())).use { data ->
             val count = data.readInt()
-            if (count < 0 || count > MAX_TRACES) {
+            if (count < 0 || count > PvcErrorInfoHelper.MAX_TRACES) {
                 throw IOException("Not a list of traces")
             }
             Array(count) {
@@ -72,6 +76,7 @@ object PvcErrorInfoTracesParceler : Parceler<Array<String>> {
     }
 
     internal const val UNREADABLE = "The details of this error could not be read."
-    private const val MAX_TRACES = 1000
-    private const val MAX_ENCODED_TRACE = 4 * 1024 * 1024
+
+    // a character takes at most three bytes in UTF-8, and four for a pair of two
+    private const val MAX_ENCODED_TRACE = 3 * PvcErrorInfoHelper.MAX_TRACE_LENGTH
 }
