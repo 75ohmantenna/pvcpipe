@@ -100,7 +100,10 @@ player response says `login_required` with a reason that mentions "a bot"
 
 ## SoundCloud
 
-SoundCloud is audio only. A subscription import takes the address of a
+SoundCloud is audio only. Client-id discovery first reads the mobile discovery
+page's `__NEXT_DATA__.runtimeConfig.clientId`; if that is absent or unavailable,
+it searches the desktop site's JavaScript assets. Cancellation stops discovery.
+A subscription import takes the address of a
 SoundCloud profile and imports the channels that profile follows.
 
 ## BitChute
@@ -124,8 +127,10 @@ SoundCloud profile and imports the channels that profile follows.
 - A channel has Videos and Livestreams tabs. There is no Shorts tab.
 - "Handle Rumble Cloudflare challenge" in the PVCPipe settings adds an
   interceptor for 403 answers from Rumble hosts
-  (`PvcCfChallenge403Interceptor`). It hands the challenge to a WebView, so
-  it needs a working WebView on the device.
+  (`PvcCfChallenge403Interceptor`). Only GET responses identified as Cloudflare
+  challenges open the WebView. Ordinary refusals and POST requests keep their
+  original response; an empty or still-challenged WebView page is not reported
+  as a successful load. This needs a working WebView on the device.
 
 ## Odysee
 
@@ -138,7 +143,8 @@ signed in. They are all in
 | Request | Host | Used for |
 | --- | --- | --- |
 | `resolve`, `claim_search`, `get` | `api.na-backend.odysee.com` | claims by address or id, lists, the media address |
-| `search` | `lighthouse.odysee.tv` | search, suggestions, related videos |
+| `search` | `lighthouse.odysee.tv` | search, suggestions, fallback related videos |
+| `search` | `recsys.odysee.tv` | anonymous related videos |
 | `comment.List`, `reaction.List` | `comments.odysee.tv` | comments and their likes |
 | `reaction/list` | `api.odysee.com` | likes and dislikes of a video |
 | `user/new`, `file/view_count`, `subscription/sub_count` | `api.odysee.com` | the visitor token, view counts, follower counts |
@@ -233,8 +239,11 @@ name, address or password.
   registered for ten minutes, and for twice as long after each further
   failure, up to about ten hours. A registration that was abandoned because
   the user left the page does not count as a failure.
-- Each list page costs one request for the view counts of its videos, and one
-  more for follower counts if it lists channels. A video page asks for its
+- Successful view and follower counts stay in a bounded memory cache for five
+  minutes. Only missing counts are requested. Forgetting the visitor token or
+  replacing its store clears the cache, including requests still in flight.
+- Each uncached list page costs one request for the view counts of its videos,
+  and one more for follower counts if it lists channels. A video page asks for its
   own views and its channel's followers. After a count request that got no
   answer, none is made for a minute.
 - With the token Odysee can tell that the requests of one installation belong

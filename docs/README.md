@@ -30,3 +30,6 @@ a record for evidence, and the guides for how things work today.
 | [local-playlist-mutations.md](local-playlist-mutations.md) | The instrumentation run that uninstalled the app from a phone, and how to test on an installed app without that |
 
 `AGENTS.md` at the top of the repository holds the rules for coding agents.
+
+[Service protocol observations](service-protocol-observations.md) records the
+independent service checks and synthetic regression coverage from 2026-10-14.
