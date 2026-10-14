@@ -39,6 +39,7 @@ import java.util.EnumSet;
 
 import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.COMMENTS;
 import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.VIDEO;
+import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.LIVE;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.POPULAR;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.SUGGESTED;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.TRENDING_DAY;
@@ -50,7 +51,7 @@ public class BitchuteService extends StreamingService {
     public static final String BITCHUTE_LINK = "https://www.bitchute.com/";
 
     public BitchuteService(final int id) {
-        super(id, "BitChute", EnumSet.of(VIDEO, COMMENTS));
+        super(id, "BitChute", EnumSet.of(VIDEO, COMMENTS, LIVE));
     }
 
     @Override
@@ -148,6 +149,9 @@ public class BitchuteService extends StreamingService {
 
             list.addKioskEntry(trendingKioskExtractorFactory,
                     BitchuteKioskLinkHandlerFactory.getInstance(), SUGGESTED);
+            list.addKioskEntry(trendingKioskExtractorFactory,
+                    BitchuteKioskLinkHandlerFactory.getInstance(),
+                    BitchuteKioskLinkHandlerFactory.LIVE);
             list.setDefaultKiosk(TRENDING_DAY);
         } catch (final Exception e) {
             throw new ExtractionException(e);

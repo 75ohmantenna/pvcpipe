@@ -14,6 +14,7 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.pvc.misc.PvcParsingHelper;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
@@ -30,7 +31,11 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 
+import org.schabi.newpipe.extractor.utils.Parser;
+
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -59,7 +64,13 @@ public class BitchuteStreamExtractor extends StreamExtractor {
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
         streamVideoResults = callApiAndGetResultsStreamVideo();
-        streamVideoMediaResults = callApiAndGetResultsStreamVideoMedia();
+        if (getStreamType() == StreamType.LIVE_STREAM) {
+            final String embed = downloader.get("https://www.bitchute.com/embed/" + getId())
+                    .responseBody();
+            streamVideoMediaResults = parseLiveMedia(embed);
+        } else {
+            streamVideoMediaResults = callApiAndGetResultsStreamVideoMedia();
+        }
         // Counts and recommendations must not prevent an available video from playing.
         countsError = null;
         suggestedError = null;
@@ -166,7 +177,8 @@ public class BitchuteStreamExtractor extends StreamExtractor {
 
     @Override
     public long getLength() throws ParsingException {
-        return YoutubeParsingHelper.parseDurationString(streamVideoResults.getDuration());
+        return getStreamType() == StreamType.LIVE_STREAM ? -1
+                : YoutubeParsingHelper.parseDurationString(streamVideoResults.getDuration());
     }
 
     @Override
@@ -273,6 +285,25 @@ public class BitchuteStreamExtractor extends StreamExtractor {
         }
     }
 
+    static ResultsStreamVideoMedia parseLiveMedia(final String embed)
+            throws ExtractionException {
+        try {
+            final String mediaUrl = Parser.matchGroup(
+                    "\\bvar\\s+media_url\\s*=\\s*(['\"])(https://[^'\"\\s<>]+)\\1", embed, 2);
+            final URL parsed = new URL(mediaUrl);
+            if (mediaUrl.contains("\\") || parsed.getUserInfo() != null || parsed.getHost().isEmpty()
+                    || !parsed.getPath().endsWith(".m3u8")) {
+                throw new ParsingException("Invalid BitChute live manifest URL");
+            }
+            return new ResultsStreamVideoMedia(JsonObject.builder()
+                    .value("media_url", mediaUrl)
+                    .value("media_type", "application/vnd.apple.mpegurl").done());
+        } catch (final ParsingException | MalformedURLException e) {
+            throw new ContentNotAvailableException(
+                    "This BitChute livestream has no available HLS source", e);
+        }
+    }
+
     static VideoStream buildVideoStream(final ResultsStreamVideoMedia media)
             throws ParsingException {
         final String videoUrl = media.getMediaUrl();
@@ -362,7 +393,8 @@ public class BitchuteStreamExtractor extends StreamExtractor {
 
     @Override
     public StreamType getStreamType() {
-        return StreamType.VIDEO_STREAM;
+        return "live".equals(streamVideoResults.getStateId())
+                ? StreamType.LIVE_STREAM : StreamType.VIDEO_STREAM;
     }
 
     @Nonnull

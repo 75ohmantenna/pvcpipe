@@ -15,6 +15,7 @@ public class BitchuteKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     public static final String TRENDING_DAY = "Trending Today";
     public static final String TRENDING_MONTH = "Trending This Month";
     public static final String TRENDING_WEEK = "Trending This Week";
+    public static final String LIVE = "live";
     public static final String POPULAR = "Popular";
     public static final String SUGGESTED = "Suggested";
     public static BitchuteKioskLinkHandlerFactory instance = new BitchuteKioskLinkHandlerFactory();
@@ -25,6 +26,9 @@ public class BitchuteKioskLinkHandlerFactory extends ListLinkHandlerFactory {
 
     @Override
     public String getId(final String url) throws ParsingException {
+        if (url.equals(BITCHUTE_LINK + "livenow") || url.equals(BITCHUTE_LINK + "livenow/")) {
+            return LIVE;
+        }
         if (url.equals(BITCHUTE_LINK)) {
             return TRENDING_DAY;
         }
@@ -40,6 +44,9 @@ public class BitchuteKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     public String getUrl(final String id, final List<FilterItem> contentFilter,
                          final List<FilterItem> sortFilter)
             throws ParsingException {
+        if (LIVE.equals(id)) {
+            return BITCHUTE_LINK + "livenow";
+        }
         if (id.equals(TRENDING_DAY)) {
             return BITCHUTE_LINK;
         }
