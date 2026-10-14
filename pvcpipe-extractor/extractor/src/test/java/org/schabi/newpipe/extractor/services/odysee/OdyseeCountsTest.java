@@ -94,6 +94,30 @@ class OdyseeCountsTest {
     }
 
     @Test
+    void onlyMissingCountersAreRequestedAndForgettingTokenClearsThem() {
+        downloader.on(OdyseeApi.VIEW_COUNT_URL, success("[5]"));
+        assertEquals(Map.of(VIDEO_ID, 5L), OdyseeApi.viewCounts(List.of(VIDEO_ID)));
+        assertEquals(Map.of(VIDEO_ID, 5L), OdyseeApi.viewCounts(List.of(VIDEO_ID)));
+        assertEquals(1, downloader.requestsTo(OdyseeApi.VIEW_COUNT_URL).size());
+        assertEquals(Map.of(VIDEO_ID, 5L, OTHER_ID, 5L),
+                OdyseeApi.viewCounts(List.of(VIDEO_ID, OTHER_ID)));
+        assertTrue(body(downloader.requestsTo(OdyseeApi.VIEW_COUNT_URL).get(1))
+                .endsWith("claim_id=" + OTHER_ID));
+        OdyseeAuth.forget();
+        OdyseeApi.viewCounts(List.of(VIDEO_ID));
+        assertEquals(3, downloader.requestsTo(OdyseeApi.VIEW_COUNT_URL).size());
+    }
+
+    @Test
+    void counterResponseFinishingAfterForgetIsDiscarded() {
+        downloader.on(OdyseeApi.VIEW_COUNT_URL, request -> {
+            OdyseeAuth.forget();
+            return ok(request, success("[5]"));
+        });
+        assertEquals(Map.of(), OdyseeApi.viewCounts(List.of(VIDEO_ID)));
+    }
+
+    @Test
     void registersOneVisitorAndUsesItsTokenForEveryCount() {
         storeTokensIn(null);
         downloader.on(OdyseeApi.VIEW_COUNT_URL, success("[8281,356]"))

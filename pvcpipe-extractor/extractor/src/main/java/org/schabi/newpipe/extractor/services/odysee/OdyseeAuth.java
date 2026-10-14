@@ -83,6 +83,7 @@ public final class OdyseeAuth {
             retryAt = 0;
             failures = 0;
             generation++;
+            OdyseeApi.clearCountCache();
         }
     }
 
@@ -96,6 +97,7 @@ public final class OdyseeAuth {
             loaded = true;
             registeredAt = 0;
             generation++;
+            OdyseeApi.clearCountCache();
             keep(null);
         }
     }
