@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.playlist.PlaylistExtractor;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteChannelExtractor;
+import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchutePlaylistExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteChannelTabExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteCommentsExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteRecommendedChannelKioskExtractor;
@@ -29,6 +30,7 @@ import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteCommen
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteSearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteStreamLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchutePlaylistLinkHandlerFactory;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.subscription.SubscriptionExtractor;
 import org.schabi.newpipe.extractor.suggestion.SuggestionExtractor;
@@ -73,7 +75,7 @@ public class BitchuteService extends StreamingService {
 
     @Override
     public ListLinkHandlerFactory getPlaylistLHFactory() {
-        return null;
+        return BitchutePlaylistLinkHandlerFactory.getInstance();
     }
 
     @Override
@@ -169,7 +171,7 @@ public class BitchuteService extends StreamingService {
     @Override
     public PlaylistExtractor getPlaylistExtractor(final ListLinkHandler linkHandler)
             throws ExtractionException {
-        return null;
+        return new BitchutePlaylistExtractor(this, linkHandler);
     }
 
     @Override
