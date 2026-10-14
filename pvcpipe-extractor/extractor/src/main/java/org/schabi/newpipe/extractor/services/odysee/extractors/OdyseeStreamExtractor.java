@@ -457,7 +457,7 @@ public class OdyseeStreamExtractor extends StreamExtractor {
     @Override
     public StreamInfoItemsCollector getRelatedItems() throws IOException, ExtractionException {
         final String claimId = claim.getString("claim_id");
-        final JsonArray hits = OdyseeApi.search("s=" + Utils.encodeUrlUtf8(getName())
+        final JsonArray hits = OdyseeApi.related("s=" + Utils.encodeUrlUtf8(getName())
                 + "&size=" + RELATED_COUNT + "&from=0&nsfw=false&claimType=file"
                 + "&related_to=" + claimId);
         final Set<String> claimIds = new LinkedHashSet<>();

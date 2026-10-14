@@ -76,7 +76,9 @@ public class PvcCfChallenge403InterceptorTest {
         final Response response = prepareResponse(url, 403);
         when(manager.fetchContentViaWebView(url, 30000))
                 .thenReturn(new ChallengeResult(false, null, ""),
-                        new ChallengeResult(true, null, ""));
+                        new ChallengeResult(true, null, ""),
+                        new ChallengeResult(true, "  ", ""));
+        assertSame(response, interceptor.intercept(chain));
         assertSame(response, interceptor.intercept(chain));
         assertSame(response, interceptor.intercept(chain));
         verify(body, never()).close();
@@ -111,6 +113,54 @@ public class PvcCfChallenge403InterceptorTest {
         verifyNoInteractions(manager);
     }
 
+    @Test
+    public void ordinaryForbiddenResponseIsNotAChallenge() throws Exception {
+        final Response response = prepareResponse("https://rumble.com/", 403).newBuilder()
+                .removeHeader("cf-mitigated")
+                .body(ResponseBody.create(okhttp3.MediaType.get("text/plain"), "Access denied"))
+                .build();
+        when(chain.proceed(response.request())).thenReturn(response);
+        assertSame(response, interceptor.intercept(chain));
+        assertEquals("Access denied", response.body().string());
+        verifyNoInteractions(manager);
+    }
+
+    @Test
+    public void challengeHtmlIsRecognizedWithoutHeaderAndRemainsReadable() throws Exception {
+        final String html = "<title>Just a moment</title>"
+                + "<script src='/challenge-platform/x'></script>";
+        final Response response = prepareResponse("https://rumble.com/", 403).newBuilder()
+                .removeHeader("cf-mitigated")
+                .body(ResponseBody.create(okhttp3.MediaType.get("text/html"), html)).build();
+        when(chain.proceed(response.request())).thenReturn(response);
+        when(manager.fetchContentViaWebView(response.request().url().toString(), 30000))
+                .thenReturn(new ChallengeResult(false, null, ""));
+        assertSame(response, interceptor.intercept(chain));
+        assertEquals(html, response.body().string());
+    }
+
+    @Test
+    public void postIsNeverReplacedWithAWebViewGet() throws Exception {
+        final Request request = new Request.Builder().url("https://rumble.com/api")
+                .post(okhttp3.RequestBody.create(null, new byte[0])).build();
+        final Response response = responseFor(request.url().toString(), 403).newBuilder()
+                .request(request).build();
+        when(chain.request()).thenReturn(request);
+        when(chain.proceed(request)).thenReturn(response);
+        assertSame(response, interceptor.intercept(chain));
+        verifyNoInteractions(manager);
+    }
+
+    @Test
+    public void unsolvedChallengeIsNeverReportedAsSuccess() throws Exception {
+        final String url = "https://rumble.com/";
+        final Response response = prepareResponse(url, 403);
+        when(manager.fetchContentViaWebView(url, 30000)).thenReturn(new ChallengeResult(true,
+                "<title>Just a moment</title><script src='/challenge-platform/x'></script>", ""));
+        assertSame(response, interceptor.intercept(chain));
+        verify(body, never()).close();
+    }
+
     private Response prepareResponse(final String url, final int code) throws Exception {
         final Response response = responseFor(url, code);
         when(chain.request()).thenReturn(response.request());
@@ -121,6 +171,7 @@ public class PvcCfChallenge403InterceptorTest {
     private Response responseFor(final String url, final int code) {
         return new Response.Builder()
                 .request(new Request.Builder().url(url).build())
-                .protocol(Protocol.HTTP_1_1).code(code).message("test").body(body).build();
+                .protocol(Protocol.HTTP_1_1).code(code).message("test").body(body)
+                .header("cf-mitigated", "challenge").build();
     }
 }

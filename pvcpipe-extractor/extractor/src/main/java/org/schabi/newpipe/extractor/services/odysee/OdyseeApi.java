@@ -39,6 +39,7 @@ public final class OdyseeApi {
 
     public static final String PROXY_URL = "https://api.na-backend.odysee.com/api/v1/proxy";
     public static final String SEARCH_URL = "https://lighthouse.odysee.tv/search";
+    public static final String RELATED_URL = "https://recsys.odysee.tv/search";
     public static final String COMMENTS_URL = "https://comments.odysee.tv/api/v2";
     public static final String ACCOUNT_API_URL = "https://api.odysee.com/";
     public static final String REGISTER_URL = ACCOUNT_API_URL + "user/new";
@@ -76,6 +77,8 @@ public final class OdyseeApi {
 
     private static volatile CachedClaim homepage;
     private static volatile long countsRetryAt;
+    private static final OdyseeCountCache COUNTS = new OdyseeCountCache(
+            512, java.util.concurrent.TimeUnit.MINUTES.toNanos(5), System::nanoTime);
 
     private OdyseeApi() {
     }
@@ -233,6 +236,23 @@ public final class OdyseeApi {
         }
     }
 
+    /**
+     * @param query the encoded search parameters, including the current claim id
+     * @return recommendations, falling back to search when the recommender is unavailable
+     */
+    @Nonnull
+    public static JsonArray related(@Nonnull final String query)
+            throws IOException, ExtractionException {
+        try {
+            return JsonParser.array().from(get(RELATED_URL + "?" + query + "&free_only=true"));
+        } catch (final IOException | ExtractionException | JsonParserException e) {
+            if (OdyseeAuth.wasCancelled(e)) {
+                throw new java.io.InterruptedIOException("Odysee recommendations cancelled");
+            }
+            return search(query);
+        }
+    }
+
     @Nonnull
     public static JsonObject callComments(@Nonnull final String method,
                                           @Nonnull final JsonObject params)
@@ -295,6 +315,12 @@ public final class OdyseeApi {
         if (ids.isEmpty()) {
             return Map.of();
         }
+        final long startedIn = COUNTS.generation();
+        final Map<String, Long> result = COUNTS.get(url, ids);
+        ids.removeAll(result.keySet());
+        if (ids.isEmpty()) {
+            return result;
+        }
         // A token that Odysee has stopped accepting is replaced once.
         for (int attempt = 0; attempt < 2; attempt++) {
             final String token = OdyseeAuth.token();
@@ -305,7 +331,15 @@ public final class OdyseeApi {
                 final Object data = callAccountApi(url, "auth_token="
                         + Utils.encodeUrlUtf8(token) + "&claim_id=" + String.join(",", ids));
                 OdyseeAuth.accepted();
-                return countsByClaim(ids, data);
+                if (startedIn != COUNTS.generation()
+                        || !OdyseeSettings.getInstance().isSettingEnabled(
+                                OdyseeSettings.SHOW_COUNTS)) {
+                    return Map.of();
+                }
+                final Map<String, Long> fetched = countsByClaim(ids, data);
+                COUNTS.put(url, fetched, startedIn);
+                result.putAll(fetched);
+                return result;
             } catch (final NotAuthenticatedException e) {
                 OdyseeAuth.discard(token);
             } catch (final IOException | ExtractionException | RuntimeException e) {
@@ -428,6 +462,11 @@ public final class OdyseeApi {
     public static void clearCaches() {
         RESOLVED.clear();
         homepage = null;
+        clearCountCache();
+    }
+
+    static void clearCountCache() {
+        COUNTS.clear();
         countsRetryAt = 0;
     }
 

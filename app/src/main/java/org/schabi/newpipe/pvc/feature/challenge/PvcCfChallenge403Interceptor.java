@@ -52,7 +52,9 @@ public class PvcCfChallenge403Interceptor implements Interceptor {
             return response;
         }
 
-        if (response.code() == 403 && isRumbleHost(response.request().url().host())) {
+        if ("GET".equals(request.method()) && "GET".equals(response.request().method())
+                && response.code() == 403 && isRumbleHost(response.request().url().host())
+                && isChallenge(response)) {
             final ChallengeResult bypassResult;
             try {
                 bypassResult = bypassManager.fetchContentViaWebView(
@@ -64,7 +66,9 @@ public class PvcCfChallenge403Interceptor implements Interceptor {
 
             debugMessage("CF_DBG Ic 2.0", response.code());
 
-            if (bypassResult.success && bypassResult.content != null) {
+            if (bypassResult.success && bypassResult.content != null
+                    && !bypassResult.content.trim().isEmpty()
+                    && !isChallengePage(bypassResult.content)) {
                 response.close();
 
                 debugMessage("CF_DBG Ic 2.1 webview success", 200);
@@ -88,6 +92,22 @@ public class PvcCfChallenge403Interceptor implements Interceptor {
 
     private static boolean isRumbleHost(final String host) {
         return host.equals("rumble.com") || host.endsWith(".rumble.com");
+    }
+
+    private static boolean isChallenge(final Response response) throws IOException {
+        if ("challenge".equalsIgnoreCase(response.header("cf-mitigated"))) {
+            return true;
+        }
+        try {
+            return isChallengePage(response.peekBody(8192).string());
+        } catch (final IOException e) {
+            response.close();
+            throw e;
+        }
+    }
+
+    private static boolean isChallengePage(final String body) {
+        return body.contains("challenge-platform") && body.contains("Just a moment");
     }
 
     private void debugMessage(

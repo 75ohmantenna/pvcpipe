@@ -106,6 +106,28 @@ public final class SoundcloudParsingHelper {
 
         final Downloader dl = NewPipe.getDownloader();
 
+        try {
+            final Response mobile = dl.get("https://m.soundcloud.com/discover");
+            if (mobile.responseCode() == 200) {
+                final Element data = Jsoup.parse(mobile.responseBody())
+                        .getElementById("__NEXT_DATA__");
+                if (data != null) {
+                    final String candidate = JsonParser.object().from(data.data())
+                            .getObject("runtimeConfig").getString("clientId");
+                    if (candidate != null && candidate.matches("[A-Za-z0-9_-]{32}")) {
+                        clientId = candidate;
+                        return clientId;
+                    }
+                }
+            }
+        } catch (final java.io.InterruptedIOException e) {
+            if (!(e instanceof java.net.SocketTimeoutException)) {
+                throw e;
+            }
+        } catch (final IOException | JsonParserException | ReCaptchaException ignored) {
+            // The desktop site's asset discovery remains available if mobile discovery fails.
+        }
+
         final Response download = dl.get("https://soundcloud.com");
         final String responseBody = download.responseBody();
         final String clientIdPattern = ",client_id:\"(.*?)\"";

@@ -396,7 +396,22 @@ public class YoutubeStreamInfoItemLockupExtractor implements StreamInfoItemExtra
                     "Could not get view count: no metadata part in the metadata parts array");
         }
 
-        // View count is always returned as the first metadata part, then date text
+        // Collaboration credits can precede the count. The icon identifies the number
+        // independently of both its position and the localized accessibility label.
+        for (final Object part : metadataPartsRow) {
+            if (part instanceof JsonObject) {
+                final JsonObject metadata = (JsonObject) part;
+                if ("PLAY_ARROW_OUTLINED".equals(
+                        metadata.getObject("leadingIcon").getString("name"))) {
+                    final String count = getTextContentFromMetadataPart(metadata);
+                    if (!isNullOrEmpty(count)) {
+                        return getViewCountFromViewCountText(count);
+                    }
+                }
+            }
+        }
+
+        // Older layouts return the view count as the first metadata part, then date text.
         // For members only content, view count isn't returned, so there is only the date text
         // in the metadata row
         final String viewCountText = getTextContentFromMetadataPart(
@@ -523,7 +538,7 @@ public class YoutubeStreamInfoItemLockupExtractor implements StreamInfoItemExtra
                         "Could not get date text: no metadata part in the metadata parts array");
             }
 
-            // View count is always returned as the first metadata part, then date text
+            // The date remains the last metadata part, including collaboration layouts.
             // For members only content, view count isn't returned, so there is only the date text
             // in the metadata row
             cachedDateText = getTextContentFromMetadataPart(
