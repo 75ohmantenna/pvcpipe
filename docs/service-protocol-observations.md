@@ -8,6 +8,9 @@ implementation and synthetic fixtures were written independently; no Grayjay
 implementation code, fixtures or documentation text was incorporated.
 This statement describes these changes, not an audit of historical code.
 
+This record describes the checks and changes made on that date. For current
+service capabilities and request behavior, see [services.md](services.md).
+
 ## SoundCloud discovery
 
 A GET of <https://m.soundcloud.com/discover> returned HTTP 200. The page's

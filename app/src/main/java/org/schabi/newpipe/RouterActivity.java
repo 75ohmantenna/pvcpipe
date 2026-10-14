@@ -587,14 +587,12 @@ public class RouterActivity extends AppCompatActivity {
             }
 
             if (linkType == LinkType.STREAM) {
-                // download is redundant for linkType CHANNEL AND PLAYLIST
-                // (till playlist downloading is not supported )
+                // The router offers downloads only for individual stream links.
                 returnedItems.add(new AdapterChoiceItem(getString(R.string.download_key),
                         getString(R.string.download),
                         R.drawable.ic_file_download));
 
-                // Add to playlist is not necessary for CHANNEL and PLAYLIST linkType
-                // since those can not be added to a playlist
+                // Local playlists contain streams, not nested channels or playlists.
                 returnedItems.add(new AdapterChoiceItem(getString(R.string.add_to_playlist_key),
                         getString(R.string.add_to_playlist),
                         R.drawable.ic_playlist_add));

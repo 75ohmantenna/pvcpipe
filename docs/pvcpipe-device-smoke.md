@@ -1,9 +1,9 @@
 # Device test records, October 2026
 
-What was seen on a Pixel 6a and on a disposable emulator, in the order it
-happened. These are records. They are not kept in step with the code, and a
-later section corrects an earlier one in place of rewriting it. Pull request
-numbers refer to `75ohmantenna/pvcpipe`.
+Observations from a Pixel 6a and a disposable emulator, in chronological
+order. Results apply to the stated builds and test conditions. Later
+sections record follow-ups without changing the earlier observations. Pull
+request numbers refer to `75ohmantenna/pvcpipe`.
 [odysee-observations.md](odysee-observations.md) has the runs for the Odysee
 service.
 

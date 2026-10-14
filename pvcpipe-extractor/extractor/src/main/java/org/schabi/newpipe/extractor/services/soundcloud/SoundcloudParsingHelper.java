@@ -99,6 +99,12 @@ public final class SoundcloudParsingHelper {
     private SoundcloudParsingHelper() {
     }
 
+    /**
+     * Reuses the cached id, or discovers one from mobile configuration and then desktop assets.
+     * A mobile-page socket timeout permits fallback; other interrupted I/O stops discovery.
+     *
+     * @return the public client id used by anonymous API requests
+     */
     public static synchronized String clientId() throws ExtractionException, IOException {
         if (!isNullOrEmpty(clientId)) {
             return clientId;

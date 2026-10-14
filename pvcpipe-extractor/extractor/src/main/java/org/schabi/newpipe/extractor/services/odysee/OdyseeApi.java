@@ -275,7 +275,7 @@ public final class OdyseeApi {
 
     /**
      * Asks how often claims were viewed. The answer is empty, and nothing is thrown, when the
-     * counts are switched off or cannot be had just now: they are an extra.
+     * counts are disabled, in backoff or unavailable. Cached values avoid requests for those ids.
      *
      * @param claimIds the claims to ask about
      * @return the view count of each claim Odysee answered for
@@ -300,7 +300,7 @@ public final class OdyseeApi {
 
     private static Map<String, Long> counts(final String url,
                                             final Collection<String> claimIds) {
-        // After a count request that got no answer, pages do not each wait for another one.
+        // Disabled counts and the failure backoff suppress cache reads as well as requests.
         if (!OdyseeSettings.getInstance().isSettingEnabled(OdyseeSettings.SHOW_COUNTS)
                 || System.currentTimeMillis() < countsRetryAt) {
             return Map.of();

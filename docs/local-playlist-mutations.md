@@ -5,9 +5,10 @@
 tests in `app/src/androidTest/java/org/schabi/newpipe/local/playlist/` say
 how those changes and their transactions work.
 
-The rest of this page is about something else: what one Gradle test task did
-to an installed app, and how to test on a phone without repeating it. It
-comes from a run that was watched, not from the manager's code.
+Current playlist behavior is described in
+[library-data.md](library-data.md#local-playlists).
+The incident below records what one Gradle test run did to an installed app.
+The final section gives the procedure for testing an existing installation.
 
 ## What the playlist tests touch
 
@@ -96,7 +97,8 @@ adb -s '<serial>' shell am instrument -w \
 
 Check the installed packages and the test results afterwards. Run this way
 in October 2026, all 26 playlist tests of that time passed on the Pixel and
-nothing was uninstalled. The package has 32 tests now.
+nothing was uninstalled. The test package has since changed; inspect its
+current sources before selecting it for another run.
 
 If the signing, the isolation of the tests or the cleanup is in doubt, use a
 disposable device or profile and leave the user's installation alone.

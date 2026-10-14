@@ -25,6 +25,7 @@ import java.util.List;
 
 import javax.annotation.Nonnull;
 
+/** Public playlists with row-offset pagination; unavailable rows still consume an offset. */
 public final class BitchutePlaylistExtractor extends PlaylistExtractor {
     private static final String API = "https://api.bitchute.com/api/beta/playlist";
     private JsonObject playlist;

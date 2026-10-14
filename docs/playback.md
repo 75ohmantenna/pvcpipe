@@ -13,8 +13,9 @@ off needs a new source (`requiresReload`).
 [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java)
 supplies the preferences and builds the ExoPlayer sources.
 [`PlaybackResolver`](../app/src/main/java/org/schabi/newpipe/player/resolver/PlaybackResolver.java)
-still holds the code that builds a source for each delivery method and its
-manifests.
+builds sources for each supported delivery method and its manifests. Service
+extractors supply stream types and media URLs; the resolver does not discover
+service-specific playback endpoints.
 
 What was chosen travels with the source in its
 [`StreamInfoTag`](../app/src/main/java/org/schabi/newpipe/player/mediaitem/StreamInfoTag.java).
@@ -128,10 +129,12 @@ vertical videos by itself.
 
 ## YouTube proof tokens
 
-YouTube's web client has to present a proof token.
+PVCPipe provides YouTube web-client proof tokens through the extractor's
+`PoTokenProvider` interface.
 [`PoTokenProviderImpl`](../app/src/main/java/org/schabi/newpipe/util/potoken/PoTokenProviderImpl.kt)
 is what the extractor calls. It answers for the web client only and returns
-nothing for the embedded web, Android and iOS clients.
+nothing for the embedded web, Android and iOS clients. The visionOS request
+path does not call a proof-token provider.
 [`WebPoTokenProvider`](../app/src/main/java/org/schabi/newpipe/util/potoken/WebPoTokenProvider.kt)
 keeps the session: who is making one, when it expires and when it is
 replaced.

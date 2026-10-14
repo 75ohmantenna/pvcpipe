@@ -1,9 +1,10 @@
 # Odysee observations, October 2026
 
-A record of what Odysee's servers answered and what the app did on two devices
-while the Odysee service was written. It is dated and it is not derived from
-the code. [services.md](services.md#odysee) says what the code does with all
-of this.
+A dated record of server responses and tests on two devices during Odysee
+development. These observations describe the tested builds and conditions.
+[services.md](services.md#odysee) describes the current implementation;
+[service-protocol-observations.md](service-protocol-observations.md) records
+the later recommendation and cache work.
 
 Everything was seen from one home network. The tools were `curl`, the
 extractor's `OdyseeLiveTest`, a disposable emulator (AVD `pvcpipe_ci_api37`,

@@ -45,8 +45,7 @@ public abstract class Mission implements Serializable {
     /**
      * Delete the downloaded file.
      *
-     * @return {@code true] if and only if the file is successfully deleted, otherwise,
-     * {@code false}
+     * @return {@code true} when no storage is assigned, or the storage deletion result
      */
     public boolean delete() {
         if (storage != null) {
@@ -56,7 +55,7 @@ public abstract class Mission implements Serializable {
     }
 
     /**
-     * Indicate if this mission is deleted whatever is stored.
+     * Marks the mission as deleted, independently of whether its output file was removed.
      */
     public transient boolean deleted = false;
 

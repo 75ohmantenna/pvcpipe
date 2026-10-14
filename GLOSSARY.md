@@ -1,4 +1,4 @@
-# PVCPipe
+# Glossary
 
 PVCPipe plays remote streams and stores viewing data and settings locally.
 
@@ -68,13 +68,19 @@ application process remains running.
 Importing subscriptions from a channel source or saved file, or exporting followed
 channels to a saved file.
 
-## Local playlists
+## Playlists
+
+**Remote playlist**:
+A playlist fetched from a supported service. Bookmarking its address does not
+copy its contents into a local playlist or subscribe to its owner.
 
 **Local playlist**:
 An ordered collection of saved streams. A stream may appear more than once.
 
 **Automatic playlist thumbnail**:
-A playlist image chosen from its current streams, or the default image when empty.
+An image associated with a stream still in the playlist. When that stream is
+removed, the first remaining stream supplies the image; an empty playlist
+uses the default image.
 
 **Permanent playlist thumbnail**:
 A fixed playlist image retained independently of playlist contents.

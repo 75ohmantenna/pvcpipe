@@ -21,22 +21,18 @@ import androidx.collection.SparseArrayCompat;
 import static org.schabi.newpipe.extractor.search.filter.FilterContainer.ITEM_IDENTIFIER_UNKNOWN;
 
 /**
- * This class handles all the user interaction with the content and sort filters
- * of NewPipeExtractor.
+ * Tracks selected content and sort filters for the extractor.
  * <p>
- * It also facilitates the generation of the Ui's according to the implemented
- * {@link ICreateUiForFiltersWorker}'s.
+ * {@link ICreateUiForFiltersWorker} implementations build and update their UI controls.
  */
 public class SearchFilterLogic {
 
     /**
-     * This list is used to communicate with NewPipeExtractor.
-     * It contains only the content filter ids that the user has selected from the UI.
+     * Selected content filter objects passed to the extractor.
      */
     private final List<FilterItem> userSelectedContentFilters = new ArrayList<>();
     /**
-     * This list is used to communicate with NewPipeExtractor.
-     * It contains only the sort filter ids that the user has selected from the UI.
+     * Selected sort filter objects available for the current content selection.
      */
     private final List<FilterItem> userSelectedSortFilters = new ArrayList<>();
     private final SearchQueryHandlerFactory searchQHFactory;
@@ -50,16 +46,14 @@ public class SearchFilterLogic {
             new SparseArrayCompat<>();
     private Callback callback;
     /**
-     * This list is used to store via Icepick and eventual store as preset
-     * It contains all the content filter ids that the user has selected. It
-     * contains the same ids than {@link #userSelectedContentFilters}
+     * Content filter ids exposed for Bundle state and saved search presets.
+     * These identify the objects in {@link #userSelectedContentFilters}.
      */
     private List<Integer> selectedContentFilters = new ArrayList<>();
     /**
-     * This list is used to store via Icepick and eventual store as preset
-     * It contains all the sort filter ids that the user has selected and also
-     * default id of none visible but selected sort filters.
-     * It is a superset to {@link #userSelectedContentFilters}.
+     * Sort filter ids exposed for Bundle state and saved search presets.
+     * Includes selected defaults hidden by the current content selection, so it can contain
+     * more ids than the active objects in {@link #userSelectedSortFilters}.
      */
     private List<Integer> selectedSortFilters = new ArrayList<>();
 
@@ -505,12 +499,10 @@ public class SearchFilterLogic {
     }
 
     /**
-     * Prepare the content and sort filters {@link FilterItem}'s lists for a now filtered
-     * search.
+     * Prepares content and sort filter objects for a search.
      * <p>
-     * If a callback is registered it will be called with copy's of the local sort and
-     * content lists. To avoid concurrently modification of the lists. As they are progressed
-     * through async javarx calls. Note: The members aka {@link FilterItem}'s are not copied.
+     * The callback receives copies of both lists so later selection changes cannot alter
+     * lists already passed to asynchronous work. The {@link FilterItem} objects are shared.
      */
     public void prepareForSearch() {
         createContentFilterItemListFromIdentifierList();
@@ -777,7 +769,7 @@ public class SearchFilterLogic {
                 @Nullable final Callback callback) {
             switch (logicVariant) {
 
-                case SEARCH_FILTER_LOGIC_LEGACY: // the case we are using SearchFragmentLegacy
+                case SEARCH_FILTER_LOGIC_LEGACY: // Action-menu controls require explicit toggling.
                     return new SearchFilterLogic(searchQHFactory, callback) {
                         @Override
                         protected void handleIdInNonExclusiveGroup(

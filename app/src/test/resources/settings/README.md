@@ -1,7 +1,7 @@
 # Settings import fixtures
 
-The ZIP files here are made-up backup archives for the settings import tests.
-They are not anyone's backup. A file's name says which entries it has:
+The ZIP files are synthetic backup archives for settings-import tests. They
+contain no user backup data. Their names describe the entries:
 
 - `db` or `nodb`: whether `newpipe.db` is in it.
 - `ser`, `vulnser` or `noser`: whether `newpipe.settings` holds ordinary

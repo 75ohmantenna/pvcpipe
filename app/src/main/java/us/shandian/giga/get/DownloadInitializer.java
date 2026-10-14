@@ -273,9 +273,7 @@ public class DownloadInitializer extends Thread {
             if (e instanceof DownloadMission.HttpError
                     && ((DownloadMission.HttpError) e).statusCode
                     == ERROR_HTTP_METHOD_NOT_ALLOWED) {
-                // fallback to GET as HEAD request method is probably not allowed
-                // available for this service.
-                // -> Rumble is known for not supporting HEAD anymore (discovered 20230203)
+                // Retry with GET after HTTP 405, preserving the requested byte range.
                 hasHeadMethod = false;
                 openEstablishAndCloseConnectionAfterwards(url, hasHeadMethod, rangeStart, rangeEnd);
             } else {

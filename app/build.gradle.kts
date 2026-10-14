@@ -114,8 +114,7 @@ configure<ApplicationExtension> {
             useLegacyPackaging = true
         }
         resources {
-            // remove two files which belong to jsoup
-            // no idea how they ended up in the META-INF dir...
+            // Exclude dependency metadata that is not needed in the APK.
             excludes += setOf(
                 "META-INF/README.md",
                 "META-INF/CHANGES",
@@ -297,7 +296,7 @@ dependencies {
     /** PVCPipe libraries **/
     // JavaNetCookieJar, see https://github.com/75ohmantenna/pvcpipe-extractor/issues/123
     implementation(libs.squareup.okhttp.urlconnection)
-    // HLS support on Rumble
+    // HLS parsing, downloading and remuxing shared by supported services
     implementation(libs.evermind.hlsdownloader)
     implementation(libs.pvcpipe.slimhls.converter)
     // Logcat toolkit

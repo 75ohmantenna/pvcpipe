@@ -285,6 +285,7 @@ public class BitchuteStreamExtractor extends StreamExtractor {
         }
     }
 
+    // Live details use the embed page's HTTPS HLS source instead of the ordinary media endpoint.
     static ResultsStreamVideoMedia parseLiveMedia(final String embed)
             throws ExtractionException {
         try {

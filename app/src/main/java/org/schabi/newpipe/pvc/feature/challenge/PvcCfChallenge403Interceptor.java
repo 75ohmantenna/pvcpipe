@@ -18,7 +18,8 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 /**
- * Handle 403 in case cloudflare questions a human using the app.
+ * Opens WebView recovery for identified Cloudflare challenges on Rumble GET requests.
+ * Only successful, nonblank pages without challenge markers replace the original response.
  */
 public class PvcCfChallenge403Interceptor implements Interceptor {
 

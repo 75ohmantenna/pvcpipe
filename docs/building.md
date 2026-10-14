@@ -6,14 +6,15 @@
   API 26, Android 8.0, and later.
 - JDK 17 for the app, JDK 11 for the extractor and JDK 21 for Checkstyle in
   both. Gradle finds them as toolchains, so all three have to be installed.
-- Nothing else. The Gradle wrapper fetches Gradle 9.6.1.
+- The Gradle wrapper downloads Gradle 9.6.1. Initial builds also need access
+  to the dependency repositories declared in the Gradle settings files.
 
 ## Layout
 
 | Path | What is in it |
 | --- | --- |
 | `app/` | The Android app. Room schemas are in `app/schemas/`. |
-| `pvcpipe-extractor/` | The extractor library, in the modules `extractor`, `timeago-parser` and `timeago-generator`. |
+| `pvcpipe-extractor/` | The `extractor` and `timeago-generator` Gradle projects; `timeago-parser/` supplies additional Java sources to `extractor`. |
 | `buildSrc/` | The `checkDependenciesOrder` task. |
 | `checkstyle/` | The Checkstyle rules for the app. The extractor has its own in `pvcpipe-extractor/checkstyle/`. |
 | `docs/` | The guides and records listed in [README.md](README.md). |
@@ -52,8 +53,9 @@ inside the APK and every HLS download fails at its last step.
 The APKs land in `app/build/outputs/apk/`. The debug build has the
 application id `org.seventyfiveohmantenna.pvcpipe.debug`, so it installs next
 to a release build. The release build is minified and comes out as
-`app-release-unsigned.apk`. The build has no signing configuration, so
-signing a release is a separate step.
+`app-release-unsigned.apk`. No release signing configuration is declared,
+so signing a release is a separate step. Android tooling signs the debug APK
+with the debug key.
 
 The repository has no GitHub Actions workflows. `make ci` on your own machine
 is the only gate, so run it before you push.
@@ -89,9 +91,9 @@ fork came from.
 - **Instrumentation tests** under `app/src/androidTest/` need a device and
   are not part of `make ci`.
 
-Run instrumentation only on a disposable emulator. `connectedDebugAndroidTest`
-was seen uninstalling the debug app and its test package from a phone when it
-finished, and an uninstall deletes the app's data.
+Use a disposable emulator for Gradle-managed instrumentation.
+`connectedDebugAndroidTest` was observed uninstalling the debug app and its
+test package from a phone after testing. Uninstalling deletes app data.
 [local-playlist-mutations.md](local-playlist-mutations.md) has the record and
 the way to run a test package on an existing installation without that.
 

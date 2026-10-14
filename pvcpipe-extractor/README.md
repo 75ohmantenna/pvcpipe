@@ -14,9 +14,11 @@ repository root.
 make ci                                             # all checks and both APKs
 ```
 
-There are three modules. `extractor` is the library. `timeago-parser` reads
-relative dates such as "3 days ago" in many languages, and
-`timeago-generator` builds that parser's pattern classes.
+The settings file includes two Gradle projects: `extractor`, the library,
+and `timeago-generator`, the tools that generate relative-date patterns.
+The `extractor` source set also compiles Java sources from `timeago-parser/`,
+which reads dates such as "3 days ago" in many languages. That directory is
+not a separately included Gradle project.
 
 [docs/services.md](../docs/services.md) describes each service, and
 [docs/building.md](../docs/building.md) the build and the tests.

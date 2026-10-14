@@ -6,7 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.LongSupplier;
 
-/** Bounded, memory-only counters. Requests started before a clear cannot refill the cache. */
+/**
+ * Memory-only counters with access-order eviction and expiry measured from insertion.
+ * Entries are keyed by endpoint and claim id. A clear invalidates writes from earlier requests.
+ */
 final class OdyseeCountCache {
     private final int capacity;
     private final long lifetime;

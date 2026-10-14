@@ -1,9 +1,9 @@
 # Services
 
 A service is a website the app can browse and play from. This page says what
-each one supports and where its code is. It describes the code. What the
-websites themselves did on a given day is in the records, mainly
-[odysee-observations.md](odysee-observations.md).
+each one supports and where its code is. Dated service responses are recorded
+in [odysee-observations.md](odysee-observations.md) and
+[service-protocol-observations.md](service-protocol-observations.md).
 
 ## How a service is put together
 
@@ -88,9 +88,10 @@ as `RumbleFiltersTest` and `OdyseeFiltersTest`, pin both.
 `YoutubeStreamExtractor.onFetchPage` asks YouTube's Android client for a
 video first. If that client says the video is age-restricted, it asks the
 embedded web client. It then asks the visionOS client, and the iOS client if
-that is switched on. The app supplies a proof token only for web clients (see
-[playback.md](playback.md)). If no client returns a player response, a
-restriction that one client reported is shown in preference to another
+that is switched on. The app supplies proof tokens only through the
+web-client provider, not the embedded-web, Android or iOS providers
+(see [playback.md](playback.md)). If no client returns a player response,
+a restriction that one client reported is shown in preference to another
 client's network error.
 
 The app shows "YouTube refused to provide data and requires you to sign in"
@@ -98,18 +99,27 @@ when the extractor throws `SignInConfirmNotBotException`. That happens when a
 player response says `login_required` with a reason that mentions "a bot"
 (`YoutubeStreamExtractor.checkPlayabilityStatus`).
 
+`YoutubeStreamInfoItemLockupExtractor` reads channel-card view counts from
+the metadata part marked `PLAY_ARROW_OUTLINED`, so creator credits before
+that part do not become the count. Cards without the marker use the older
+positional layout.
+
 ## SoundCloud
 
 SoundCloud is audio only. Client-id discovery first reads the mobile discovery
 page's `__NEXT_DATA__.runtimeConfig.clientId`; if that is absent or unavailable,
-it searches the desktop site's JavaScript assets. Cancellation stops discovery.
-A subscription import takes the address of a
-SoundCloud profile and imports the channels that profile follows.
+it searches the desktop site's JavaScript assets. The discovered id is cached
+in memory. A mobile-page socket timeout allows the desktop fallback; other
+interrupted I/O stops discovery. A subscription import takes a SoundCloud
+profile address and imports the channels that profile follows.
 
 ## BitChute
 
-- Links: video, embed and torrent addresses on `bitchute.com`,
-  `www.bitchute.com` and `old.bitchute.com`, and channel addresses.
+- Links: video, embed, torrent, channel and public playlist addresses on
+  `bitchute.com`, `www.bitchute.com` and `old.bitchute.com`. Public playlists
+  use `/playlist/<id>/` or `/video/playlist?playlistId=<id>`; the extractor
+  accepts 12-character ids made of letters, digits, `_` and `-`. Android
+  link handling includes `/playlist/` and `/video/`.
 - A video comes as one stream, progressive or HLS, whichever the site gives.
   Livestreams use the HLS source from the embed page; the media API can return
   a placeholder MP4 for those. There are no separate audio tracks or subtitles.
@@ -118,8 +128,9 @@ SoundCloud profile and imports the channels that profile follows.
 - Public playlist links open with their description, owner name and ordered
   videos. Pagination advances by the number of returned rows, including
   deleted entries, because the server may adjust the requested page size.
-  Private account playlists are unsupported. Playlist owners are profiles,
-  so their names are not linked to unrelated channel subscriptions.
+  Empty pages or a reached total end pagination. Private or restricted
+  playlists are unavailable. Playlist owners are profiles, so their names
+  are not linked to unrelated channel subscriptions.
 - A channel has one tab, Videos.
 - The player and the downloader send a Firefox user agent to BitChute's
   `seed` media hosts, which close connections from the default one
@@ -136,9 +147,13 @@ SoundCloud profile and imports the channels that profile follows.
 - "Handle Rumble Cloudflare challenge" in the PVCPipe settings adds an
   interceptor for 403 answers from Rumble hosts
   (`PvcCfChallenge403Interceptor`). Only GET responses identified as Cloudflare
-  challenges open the WebView. Ordinary refusals and POST requests keep their
-  original response; an empty or still-challenged WebView page is not reported
-  as a successful load. This needs a working WebView on the device.
+  challenges open the WebView. Both the original request and the response
+  after redirects must be GETs on Rumble hosts. Detection uses the
+  `cf-mitigated: challenge` header or the first 8 KiB of the response body
+  containing both `challenge-platform` and `Just a moment`. Ordinary refusals
+  and POST requests keep their original response. A WebView result replaces
+  it only when marked successful, nonblank and free of those challenge
+  markers. This needs a working WebView on the device.
 
 ## Odysee
 
@@ -159,8 +174,9 @@ signed in. They are all in
 | `livestream/is_live`, `livestream/all` | `api.odysee.live` | who is on air |
 | `$/api/content/v2/get` | `odysee.com` | the channels behind the Featured kiosk |
 
-Odysee documents none of this. yt-dlp's `lbry.py` and the source of Odysee's
-own Android app were the references for the request shapes.
+The implementation uses the request shapes in `OdyseeApi`. The development
+records describe the external references and live checks used to establish
+those shapes; they are evidence for the implementation, not an API contract.
 
 ### Addresses
 
@@ -197,8 +213,11 @@ video keeps the address it was opened with.
 - The Featured kiosk is the website's own featured row: recent uploads of a
   list of channels that the website's homepage names. Trending is the
   site-wide trending order. Both leave out mature and paid content.
-- Suggestions are the titles of the first search results. Odysee has no
-  service that completes a query.
+- Suggestions are titles from the first search results.
+- Related videos first use `recsys.odysee.tv` with the current claim id, title,
+  `free_only=true` and `nsfw=false`. A network, extraction or JSON-parsing
+  failure falls back to Lighthouse search. Cancellation stops the request.
+  Returned claim ids are resolved before the usual content filtering.
 - A repost counts as the claim it reposts.
 
 ### Who published a claim
@@ -247,13 +266,18 @@ name, address or password.
   registered for ten minutes, and for twice as long after each further
   failure, up to about ten hours. A registration that was abandoned because
   the user left the page does not count as a failure.
-- Successful view and follower counts stay in a bounded memory cache for five
-  minutes. Only missing counts are requested. Forgetting the visitor token or
-  replacing its store clears the cache, including requests still in flight.
-- Each uncached list page costs one request for the view counts of its videos,
-  and one more for follower counts if it lists channels. A video page asks for its
-  own views and its channel's followers. After a count request that got no
-  answer, none is made for a minute.
+- Successful view and follower counts share a memory-only cache of at most
+  512 entries, keyed by endpoint and claim id. Entries expire five minutes
+  after insertion using a monotonic clock; reads do not extend their life.
+  Requests contain only cache misses, up to 100 distinct valid claim ids.
+  Clearing caches, forgetting the visitor token or replacing its store
+  invalidates entries and prevents earlier requests from repopulating them.
+- Each uncached list page requests view counts for its videos and follower
+  counts for its channels in separate batches. A video page asks for its own
+  views and its channel's followers. Uncancelled I/O, extraction or parsing
+  failures suppress count lookups for a minute, including cache reads. A
+  failed request for missing counts returns no counts for that call, even
+  if some were cached.
 - With the token Odysee can tell that the requests of one installation belong
   together. Counts are an extra. A page opens the same without them, with the
   numbers missing.

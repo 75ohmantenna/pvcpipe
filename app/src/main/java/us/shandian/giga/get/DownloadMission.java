@@ -812,8 +812,7 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Write this {@link DownloadMission} to the meta file asynchronously
-     * if no thread is already running.
+     * Writes the checkpoint synchronously under the mission lock.
      *
      * @return {@code true} if the mission was written, otherwise, {@code false}
      */
@@ -829,16 +828,16 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates if the download if fully finished.
+     * Checks whether all resources and any post-processing have finished.
      *
-     * @return true, otherwise, false
+     * @return whether the mission is complete
      */
     public boolean isFinished() {
         return current >= urls.length && (psAlgorithm == null || psState == 2);
     }
 
     /**
-     * Indicates if the download file is corrupt due a failed post-processing.
+     * Checks whether failed post-processing may have damaged the output in place.
      *
      * @return {@code true} if this mission is unrecoverable
      */
@@ -853,18 +852,18 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates if a post-processing algorithm is running.
+     * Checks whether post-processing is active or waiting for a retry decision.
      *
-     * @return true, otherwise, false
+     * @return whether post-processing is in state 1 or 3
      */
     public boolean isPsRunning() {
         return psAlgorithm != null && (psState == 1 || psState == 3);
     }
 
     /**
-     * Indicated if the mission is ready.
+     * Checks whether initialization has assigned the download blocks.
      *
-     * @return true, otherwise, false
+     * @return whether block metadata is available
      */
     public boolean isInitialized() {
         return blocks != null; // DownloadMissionInitializer was executed

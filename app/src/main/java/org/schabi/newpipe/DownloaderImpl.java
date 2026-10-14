@@ -48,12 +48,11 @@ public final class DownloaderImpl extends Downloader {
     }
 
     /**
-     * Odysee's media hosts refuse requests that do not name the website as their referrer:
-     * the livestream host every one of them, the file host every one for a file that is not
-     * in its cache.
+     * Supplies Odysee's website referrer for odysee.live and odycdn.com, including subdomains.
+     * See docs/odysee-observations.md for the media-host responses behind this policy.
      *
      * @param url the address of a media request
-     * @return the referrer to send, or {@code null} if the host needs none
+     * @return the configured referrer, or {@code null} for other or invalid URLs
      */
     @Nullable
     public static String getMediaReferer(final String url) {
@@ -63,14 +62,12 @@ public final class DownloaderImpl extends Downloader {
     }
 
     /**
-     * Odysee's file host does not answer a HEAD request for an uploaded file with the headers
-     * of that file: it refuses one without the referrer, and with it redirects to an HLS
-     * playlist when the file has been transcoded. Whoever wants the size of such a file has
-     * to ask with GET. The playlists and segments of the HLS renditions on the same host
-     * answer HEAD as any file does.
+     * Selects GET-based size probes for odycdn.com URLs other than .ts and .m3u8 paths.
+     * HEAD can redirect an uploaded file to an HLS playlist and report that playlist's size.
+     * The extension check is case-insensitive and excludes the query string.
      *
      * @param url the address of a media file
-     * @return whether a HEAD request to it tells nothing about the file
+     * @return whether the URL uses the GET-probe policy
      */
     public static boolean isHeadUnusable(final String url) {
         final HttpUrl parsed = HttpUrl.parse(url);
@@ -103,8 +100,6 @@ public final class DownloaderImpl extends Downloader {
         final OkHttpClient.Builder theBuilder =
                 builder != null ? builder : client.newBuilder();
         theBuilder.readTimeout(30, TimeUnit.SECONDS);
-//                .cache(new Cache(new File(context.getExternalCacheDir(), "okhttp"),
-//                        16 * 1024 * 1024))
         PvcDownloaderImplUtils.addOrRemoveInterceptors(theBuilder);
         PvcDownloaderImplUtils.addCookieManager(theBuilder);
         if (theBuilder.networkInterceptors().stream()

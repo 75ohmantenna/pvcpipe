@@ -2,9 +2,36 @@
 
 Subscriptions, the feed, playlists, history and settings are kept on the
 device. Three jobs move that data in bulk: the feed refresh, the subscription
-import and export, and backup and restore. This page says what each one
-promises and what it does not. Batch sizes, delays and file formats are in
-the code.
+import and export, and backup and restore. Local playlist edits also update
+the database. This page describes their behavior and failure boundaries;
+the code defines batch sizes, delays and file formats.
+
+## Local playlists
+
+`LocalPlaylistManager` stores ordered stream references, including repeated
+entries. `LocalPlaylistFragment` keeps the draft currently being edited.
+Appending, replacing and filtering contents each run in a Room transaction,
+with automatic-thumbnail updates in the same transaction.
+
+- Append operations copy the input list and its stream entities; replacement
+  and removal operations snapshot their stream ids when requested. Later UI
+  edits cannot change those pending operations.
+- These mutations use a shared serial write scheduler and cache their result,
+  so multiple observers do not repeat the write. Playlist creation instead
+  uses a deferred, uncached I/O operation and reads its input on subscription.
+- Duplicate removal keeps the first occurrence. Watched-item removal uses
+  both history and saved progress; finished-only removal also checks the
+  saved completion state. A pending draft is applied in the same transaction
+  before filtering.
+- An automatic thumbnail keeps its stream while that stream remains in the
+  playlist. Otherwise it uses the first remaining stream, or the default
+  image when empty. Permanent thumbnails are not adjusted by content edits.
+- The fragment tracks draft revisions so a completed save does not mark newer
+  edits as saved or replace them with an older result.
+
+The Room instrumentation tests live in
+`app/src/androidTest/java/org/schabi/newpipe/local/playlist/`. Follow
+[the device-safety procedure](local-playlist-mutations.md) before running them.
 
 ## Feed refresh
 
@@ -35,9 +62,9 @@ does both. `SubscriptionImportWorker` and `SubscriptionExportWorker` run it
 in the background and show its progress in a notification.
 
 - An import reads its source: a channel address, a file exported from a
-  service, or an earlier export of this app. It leaves out channels of services the app does not have
-  and counts them. It loads every remaining channel before it stores any, and
-  then stores them in order, in batches.
+  service, or an earlier export of this app. It counts and skips channels
+  from unsupported services. It loads every remaining channel before storing
+  any, then stores them in order, in batches.
 - A batch that fails does not undo the batches stored before it.
 - An export takes a snapshot of the subscriptions and writes it to the
   document the user chose.

@@ -5,8 +5,9 @@ SoundCloud, BitChute, Rumble and Odysee without an account on any of them.
 Subscriptions, playlists and history stay on the device.
 
 It is a fork of [BravePipe](https://github.com/bravepipeproject/BravePipe),
-which is based on [NewPipe](https://github.com/TeamNewPipe/NewPipe). It is in
-development and has no release yet. It runs on Android 8.0 and later.
+which is based on [NewPipe](https://github.com/TeamNewPipe/NewPipe). It runs
+on Android 8.0 and later. The app and bundled extractor share the version in
+[version.properties](version.properties).
 
 ## Build
 
@@ -18,8 +19,10 @@ make ci                        # checks, unit tests and both APKs
 You need Android SDK platform 37 and JDK 11, 17 and 21.
 [docs/building.md](docs/building.md) has the details.
 
-Run instrumentation tests only on a disposable emulator.
-`connectedDebugAndroidTest` can uninstall the app and erase its data.
+Use a disposable emulator for Gradle-managed instrumentation tests.
+`connectedDebugAndroidTest` can uninstall the app and erase its data. For an
+existing installation, follow the
+[device-safety procedure](docs/local-playlist-mutations.md#testing-on-an-existing-installation).
 
 ## Documentation
 

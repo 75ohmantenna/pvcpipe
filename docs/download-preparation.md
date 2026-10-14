@@ -46,8 +46,11 @@ separate things on disk. No transaction spans them.
 
 ## HLS downloads
 
-An HLS rendition is downloaded segment by segment and then joined by
-`PvcFromHlsRemuxer`, which runs the bundled ffmpeg.
+An HLS media playlist is downloaded segment by segment and then joined by
+`PvcFromHlsRemuxer`, which runs the bundled ffmpeg. `PvcHlsPreProcessor`
+rejects master playlists; the selected download must already identify a
+rendition. The detail screen hides its download action for livestreams,
+including BitChute live streams.
 
 - `PvcHlsPreProcessor` reads the playlist and replaces the mission's one
   address with the addresses of the segments. It fetches playlists and
