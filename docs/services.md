@@ -32,7 +32,7 @@ extractors return.
 | --- | --- | --- | --- | --- | --- |
 | YouTube | 0 | audio, video, live | `live`, `Trending`, `trending_gaming`, `trending_music`, `trending_movies_and_shows`, `trending_podcasts_episodes` | yes | yes |
 | SoundCloud | 1 | audio | `New & hot` | yes | yes |
-| BitChute | 5 | video | `Trending Today`, `Trending This Week`, `Trending This Month`, `Popular`, `Suggested` | no | no |
+| BitChute | 5 | video, live | `Trending Today`, `Trending This Week`, `Trending This Month`, `Popular`, `Suggested`, `live` | yes | no |
 | Rumble | 6 | audio, video, live | `Today's Battle Leaderboard Top 50`, `Editor Picks`, `Live`, `Trending Today`, `Latest`, `Shorts` | no | no |
 | Odysee | 7 | audio, video, live | `Featured`, `Trending`, `live` | yes | no |
 
@@ -111,7 +111,15 @@ SoundCloud profile and imports the channels that profile follows.
 - Links: video, embed and torrent addresses on `bitchute.com`,
   `www.bitchute.com` and `old.bitchute.com`, and channel addresses.
 - A video comes as one stream, progressive or HLS, whichever the site gives.
-  There are no separate audio tracks, subtitles or livestreams.
+  Livestreams use the HLS source from the embed page; the media API can return
+  a placeholder MP4 for those. There are no separate audio tracks or subtitles.
+- The Live kiosk lists the site's current livestream snapshot. Live cards have
+  no fixed duration and may have no publication date.
+- Public playlist links open with their description, owner name and ordered
+  videos. Pagination advances by the number of returned rows, including
+  deleted entries, because the server may adjust the requested page size.
+  Private account playlists are unsupported. Playlist owners are profiles,
+  so their names are not linked to unrelated channel subscriptions.
 - A channel has one tab, Videos.
 - The player and the downloader send a Firefox user agent to BitChute's
   `seed` media hosts, which close connections from the default one
