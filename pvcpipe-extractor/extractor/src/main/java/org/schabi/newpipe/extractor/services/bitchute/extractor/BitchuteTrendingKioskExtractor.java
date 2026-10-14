@@ -81,6 +81,10 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
             final String category,
             final int currentPageNumber) throws IOException, ExtractionException {
 
+        if ("live".equals(category)) {
+            return new ResultsStreamVideos(BitchuteParserHelper.callJsonApi(JsonObject.builder(),
+                    "https://api.bitchute.com/api/beta9/cache/livestreams"));
+        }
         final int offset = BitchuteSearchExtractor.LIMIT_RESULTS_PER_QUERY * currentPageNumber;
 
 
@@ -97,6 +101,8 @@ public class BitchuteTrendingKioskExtractor extends KioskExtractor<StreamInfoIte
 
     private String getApiSelection() {
         switch (getId()) {
+            case "live":
+                return "live";
             case SUGGESTED:
                 return "suggested";
             case POPULAR:

@@ -26,7 +26,8 @@ public abstract class BitchuteChannelStreamInfoItemExtractor implements StreamIn
 
     @Override
     public StreamType getStreamType() throws ParsingException {
-        return StreamType.VIDEO_STREAM;
+        return "live".equals(video.getStateId())
+                ? StreamType.LIVE_STREAM : StreamType.VIDEO_STREAM;
     }
 
     @Override
@@ -36,7 +37,8 @@ public abstract class BitchuteChannelStreamInfoItemExtractor implements StreamIn
 
     @Override
     public long getDuration() throws ParsingException {
-        return YoutubeParsingHelper.parseDurationString(video.getDuration());
+        return "live".equals(video.getStateId()) ? -1
+                : YoutubeParsingHelper.parseDurationString(video.getDuration());
     }
 
     @Override
@@ -56,7 +58,9 @@ public abstract class BitchuteChannelStreamInfoItemExtractor implements StreamIn
         if (getTextualUploadDate() == null || getTextualUploadDate().isEmpty()) {
             return null;
         }
-        return new DateWrapper(PvcParsingHelper.parseDateFrom(getTextualUploadDate()));
+        final String date = getTextualUploadDate();
+        return date == null || date.isEmpty() ? null
+                : new DateWrapper(PvcParsingHelper.parseDateFrom(date));
     }
 
     @Override

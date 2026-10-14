@@ -62,6 +62,33 @@ The network remained challenged, so this is not evidence of successful
 Rumble playback or of TLS browser impersonation. No native HTTP replacement
 or IP-discovery service was added.
 
+## BitChute public playlists and live playback
+
+The live website's `js/app.d1922799.js` confirmed the public playlist and
+playlist-video POST endpoints under `https://api.bitchute.com/api/beta/`.
+An anonymous request for public playlist `RIFWcsKn7jt0` returned HTTP 200,
+`is_public: true`, metadata identifying its owner as a profile, and
+`video_count: 64`. The videos response wraps each video in a row containing
+`position` and `video`. Requests with offsets 0 and 2 and limit 2 returned
+ten rows starting at positions 0 and 2 respectively. The extractor therefore
+advances by the actual row count, without dropping intentional duplicates.
+These requests also succeeded using PVCPipe's default user agent and no
+account cookies. Captured content is not included in the fixtures.
+
+The live site's code and a POST to `/api/beta9/cache/livestreams` confirmed
+a `videos` array whose live entries have `state_id: live`, a null publication
+date and duration `0:00`. For one such entry, `/api/beta9/video` confirmed the
+live state, but `/api/beta/video/media` supplied a placeholder MP4 address.
+The video's `/embed/<id>` page instead assigned an HTTPS `.m3u8` address to
+`media_url`. That address returned HTTP 200 with an HLS master containing five
+renditions, including when requested with PVCPipe's default media headers.
+This verifies source extraction and manifest access, not playback on a device.
+
+Synthetic regression tests cover URL ownership, malformed query strings,
+private playlists, empty and malformed pages, foreign continuation pages,
+deleted and duplicated entries, server-adjusted page lengths, live media
+selection, missing manifests and nullable live publication dates.
+
 ## Scope
 
 Grayjay's Widevine sources and YouTube UMP/SABR request executors require

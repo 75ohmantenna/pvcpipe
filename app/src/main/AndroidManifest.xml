@@ -362,6 +362,8 @@
                 <data android:pathPrefix="/torrent/"/>
                 <data android:pathPrefix="/api/beta9/embed/"/>
                 <data android:pathPrefix="/api/beta9/selfembed/"/>
+                <!-- public playlist prefix -->
+                <data android:pathPrefix="/playlist/"/>
                 <!-- channel prefix-->
                 <data android:pathPrefix="/channel/"/>
             </intent-filter>

@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.playlist.PlaylistExtractor;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteChannelExtractor;
+import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchutePlaylistExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteChannelTabExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteCommentsExtractor;
 import org.schabi.newpipe.extractor.services.bitchute.extractor.BitchuteRecommendedChannelKioskExtractor;
@@ -29,6 +30,7 @@ import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteCommen
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteSearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteStreamLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchutePlaylistLinkHandlerFactory;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.subscription.SubscriptionExtractor;
 import org.schabi.newpipe.extractor.suggestion.SuggestionExtractor;
@@ -37,6 +39,7 @@ import java.util.EnumSet;
 
 import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.COMMENTS;
 import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.VIDEO;
+import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.LIVE;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.POPULAR;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.SUGGESTED;
 import static org.schabi.newpipe.extractor.services.bitchute.linkHandler.BitchuteKioskLinkHandlerFactory.TRENDING_DAY;
@@ -48,7 +51,7 @@ public class BitchuteService extends StreamingService {
     public static final String BITCHUTE_LINK = "https://www.bitchute.com/";
 
     public BitchuteService(final int id) {
-        super(id, "BitChute", EnumSet.of(VIDEO, COMMENTS));
+        super(id, "BitChute", EnumSet.of(VIDEO, COMMENTS, LIVE));
     }
 
     @Override
@@ -73,7 +76,7 @@ public class BitchuteService extends StreamingService {
 
     @Override
     public ListLinkHandlerFactory getPlaylistLHFactory() {
-        return null;
+        return BitchutePlaylistLinkHandlerFactory.getInstance();
     }
 
     @Override
@@ -146,6 +149,9 @@ public class BitchuteService extends StreamingService {
 
             list.addKioskEntry(trendingKioskExtractorFactory,
                     BitchuteKioskLinkHandlerFactory.getInstance(), SUGGESTED);
+            list.addKioskEntry(trendingKioskExtractorFactory,
+                    BitchuteKioskLinkHandlerFactory.getInstance(),
+                    BitchuteKioskLinkHandlerFactory.LIVE);
             list.setDefaultKiosk(TRENDING_DAY);
         } catch (final Exception e) {
             throw new ExtractionException(e);
@@ -169,7 +175,7 @@ public class BitchuteService extends StreamingService {
     @Override
     public PlaylistExtractor getPlaylistExtractor(final ListLinkHandler linkHandler)
             throws ExtractionException {
-        return null;
+        return new BitchutePlaylistExtractor(this, linkHandler);
     }
 
     @Override
