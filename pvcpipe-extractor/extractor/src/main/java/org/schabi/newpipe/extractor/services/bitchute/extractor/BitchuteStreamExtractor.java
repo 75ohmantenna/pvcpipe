@@ -291,7 +291,8 @@ public class BitchuteStreamExtractor extends StreamExtractor {
             final String mediaUrl = Parser.matchGroup(
                     "\\bvar\\s+media_url\\s*=\\s*(['\"])(https://[^'\"\\s<>]+)\\1", embed, 2);
             final URL parsed = new URL(mediaUrl);
-            if (mediaUrl.contains("\\") || parsed.getUserInfo() != null || parsed.getHost().isEmpty()
+            if (mediaUrl.contains("\\") || parsed.getUserInfo() != null
+                    || parsed.getHost().isEmpty()
                     || !parsed.getPath().endsWith(".m3u8")) {
                 throw new ParsingException("Invalid BitChute live manifest URL");
             }
