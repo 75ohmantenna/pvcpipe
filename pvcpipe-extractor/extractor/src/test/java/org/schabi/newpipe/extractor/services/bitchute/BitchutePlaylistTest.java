@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
+import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
@@ -136,6 +137,9 @@ class BitchutePlaylistTest {
             assertFalse(factory.onAcceptUrl(bad), bad);
         }
         assertThrows(ParsingException.class, () -> factory.getUrl("../bad"));
+        assertEquals(StreamingService.LinkType.PLAYLIST, Bitchute.getLinkTypeByUrl(URL));
+        assertEquals(StreamingService.LinkType.PLAYLIST, Bitchute.getLinkTypeByUrl(
+                "https://www.bitchute.com/video/playlist?playlistId=" + ID));
         assertFalse(Bitchute.getStreamLHFactory().onAcceptUrl(
                 "https://www.bitchute.com/video/playlist?playlistId=" + ID));
     }
