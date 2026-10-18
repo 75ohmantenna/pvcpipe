@@ -30,7 +30,7 @@ extractors return.
 
 | Service | Id | Media | Kiosks, default first | Playlists | Subscription import |
 | --- | --- | --- | --- | --- | --- |
-| YouTube | 0 | audio, video, live | `live`, `Trending`, `trending_gaming`, `trending_music`, `trending_movies_and_shows`, `trending_podcasts_episodes` | yes | yes |
+| YouTube | 0 | audio, video, live | `live`, `trending_gaming`, `trending_music`, `trending_movies_and_shows`, `trending_podcasts_episodes` | yes | yes |
 | SoundCloud | 1 | audio | `New & hot` | yes | yes |
 | BitChute | 5 | video, live | `Trending Today`, `Trending This Week`, `Trending This Month`, `Popular`, `Suggested`, `live` | yes | no |
 | Rumble | 6 | audio, video, live | `Today's Battle Leaderboard Top 50`, `Editor Picks`, `Live`, `Trending Today`, `Latest`, `Shorts` | no | no |
@@ -41,9 +41,7 @@ table are the ids the code uses. `KioskTranslator` turns the ones it knows
 into display names.
 
 These are implemented extractor capabilities, not a promise that every
-website or every item is available on a particular network. For example,
-YouTube still registers the legacy `Trending` kiosk even though its service
-code notes that YouTube removed that interface in July 2025.
+website or every item is available on a particular network.
 
 YouTube also has a feed extractor. The feed refresh uses it in place of
 loading each channel when the dedicated feed setting
@@ -89,6 +87,15 @@ and the exact address or request the search produces. The filter tests, such
 as `RumbleFiltersTest` and `OdyseeFiltersTest`, pin both.
 
 ## YouTube
+
+YouTube's general `Trending` page is no longer offered in the drawer or kiosk
+selector. YouTube [announced its retirement in July 2025](https://support.google.com/youtube/thread/356702168/changes-to-discovering-trending-content-on-youtube?hl=en).
+Live and the category feeds remain available; the English movies-and-shows
+label is shortened to "Trending movies/shows" to fit the drawer.
+Settings migration 9 → 10 removes any dedicated YouTube `Trending` tabs that
+were added after the earlier retirement migration. Other tabs keep their
+order, including Odysee's `Trending`; if no custom tabs remain, the default
+main-page tabs are restored.
 
 `YoutubeStreamExtractor.onFetchPage` asks YouTube's Android client for a
 video first. If that client says the video is age-restricted, it asks the

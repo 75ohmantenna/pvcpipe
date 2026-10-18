@@ -824,7 +824,7 @@
     <string name="migration_info_8_9_message">This version of PVCPipe has fewer services. Main page tabs of the removed services are gone, and if one of them was selected, the default service is selected now.</string>
     <string name="trending_gaming">Gaming trends</string>
     <string name="trending_podcasts">Trending podcasts</string>
-    <string name="trending_movies">Trending movies and shows</string>
+    <string name="trending_movies">Trending movies/shows</string>
     <string name="trending_music">Trending music</string>
     <string name="entry_deleted">Entry deleted</string>
     <string name="player_http_403">Received HTTP error 403 from the server during playback, possibly because the streaming URL expired or the IP address was banned</string>

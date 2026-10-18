@@ -175,20 +175,14 @@ public final class SettingMigrations {
     private static final Migration MIGRATION_7_8 = new Migration(7, 8) {
         @Override
         protected void migrate(@NonNull final Context context) {
-            // YouTube remove the combined Trending kiosk, see
-            // https://github.com/TeamNewPipe/NewPipe/discussions/12445 for more information.
-            // If the user has a dedicated YouTube/Trending kiosk tab,
-            // it is removed and replaced with the new live kiosk tab.
+            // YouTube removed the combined Trending kiosk. Remove dedicated tabs for it.
+            // https://github.com/TeamNewPipe/NewPipe/discussions/12445
             // The default trending kiosk tab is not touched
             // because it uses the default kiosk provided by the extractor
             // and is thus updated automatically.
             final TabsManager tabsManager = TabsManager.getManager(context);
             final List<Tab> tabs = tabsManager.getTabs();
-            final List<Tab> cleanedTabs = tabs.stream()
-                    .filter(tab -> !(tab instanceof Tab.KioskTab kioskTab
-                            && kioskTab.getKioskServiceId() == YouTube.getServiceId()
-                            && kioskTab.getKioskId().equals("Trending")))
-                    .collect(Collectors.toUnmodifiableList());
+            final List<Tab> cleanedTabs = withoutYoutubeTrending(tabs);
             if (tabs.size() != cleanedTabs.size()) {
                 tabsManager.saveTabs(cleanedTabs);
             }
@@ -256,6 +250,33 @@ public final class SettingMigrations {
         }
     };
 
+    private static final Migration MIGRATION_9_10 = new Migration(9, 10) {
+        @Override
+        protected void migrate(@NonNull final Context context) {
+            // The retired feed remained selectable after migration 7 -> 8.
+            final TabsManager tabsManager = TabsManager.getManager(context);
+            final List<Tab> tabs = tabsManager.getTabs();
+            final List<Tab> cleanedTabs = withoutYoutubeTrending(tabs);
+            if (cleanedTabs.isEmpty()) {
+                tabsManager.resetTabs();
+            } else if (tabs.size() != cleanedTabs.size()) {
+                tabsManager.saveTabs(cleanedTabs);
+            }
+        }
+    };
+
+    /**
+     * @param tabs the main page tabs to filter
+     * @return tabs other than YouTube's retired combined Trending feed, in their original order
+     */
+    static List<Tab> withoutYoutubeTrending(final List<Tab> tabs) {
+        return tabs.stream()
+                .filter(tab -> !(tab instanceof Tab.KioskTab kioskTab
+                        && kioskTab.getKioskServiceId() == YouTube.getServiceId()
+                        && kioskTab.getKioskId().equals("Trending")))
+                .collect(Collectors.toUnmodifiableList());
+    }
+
     /**
      * Removes the preferences that only the removed services used, and the selected service if
      * it is one of them, so that the default service is selected again.
@@ -320,12 +341,13 @@ public final class SettingMigrations {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
     };
 
     /**
      * Version number for preferences. Must be incremented every time a migration is necessary.
      */
-    private static final int VERSION = 9;
+    private static final int VERSION = 10;
 
 
     static void runMigrationsIfNeeded(@NonNull final Context context) {
