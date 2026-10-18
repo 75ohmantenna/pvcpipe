@@ -7,7 +7,7 @@ playlists and history stay on your device. No service account required.
 
 **Supported sites:** [YouTube](https://www.youtube.com/),
 [SoundCloud](https://soundcloud.com/), [BitChute](https://www.bitchute.com/),
-[Rumble](https://rumble.com/) and [Odysee](https://odysee.com/).
+[Rumble](https://rumble.com/), [Odysee](https://odysee.com/) and [Kick](https://kick.com/).
 
 ## Casting
 

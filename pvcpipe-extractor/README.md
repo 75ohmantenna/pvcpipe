@@ -1,10 +1,10 @@
 # PVCPipe extractor
 
-The library that reads YouTube, SoundCloud, BitChute, Rumble and Odysee for
-PVCPipe. It descends from NewPipe Extractor.
+The library that reads YouTube, SoundCloud, BitChute, Rumble, Odysee and Kick
+for PVCPipe. It descends from NewPipe Extractor.
 
 Service ids are persistent data identifiers: YouTube is 0, SoundCloud 1,
-BitChute 5, Rumble 6 and Odysee 7. Removed services' ids 2, 3 and 4 remain
+BitChute 5, Rumble 6, Odysee 7 and Kick 8. Removed services' ids 2, 3 and 4 remain
 retired; see `ServiceList` rather than treating a service id as a list index.
 
 It lives in the app's repository and is not published as an artifact. The

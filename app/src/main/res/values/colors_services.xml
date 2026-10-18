@@ -26,4 +26,8 @@
     <color name="light_odysee_accent_color">#000000</color>
     <color name="dark_odysee_primary_color">#8F0035</color>
     <color name="dark_odysee_accent_color">#FFFFFF</color>
+    <color name="light_kick_primary_color">#53FC18</color>
+    <color name="light_kick_accent_color">#000000</color>
+    <color name="dark_kick_primary_color">#246D0A</color>
+    <color name="dark_kick_accent_color">#FFFFFF</color>
 </resources>

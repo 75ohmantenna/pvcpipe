@@ -16,7 +16,7 @@ A guide describes the code as it is now and names the classes to read.
 | Page | What it covers |
 | --- | --- |
 | [building.md](building.md) | Requirements, layout, `make ci`, the test suites |
-| [services.md](services.md) | The five services, their search filters, removed services, adding a service |
+| [services.md](services.md) | Supported services, search filters, removed services, adding a service |
 | [playback.md](playback.md) | The player: sources, FCast casting, queue, audio focus, history, errors, the detail screen, proof tokens |
 | [library-data.md](library-data.md) | Local playlists, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Downloads: preparation, checkpoints, sharing a finished file |
@@ -34,6 +34,6 @@ guides and implementation for current behavior.
 | [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) | Manual runs on a Pixel 6a and an emulator, October 2026 |
 | [odysee-observations.md](odysee-observations.md) | What Odysee's servers answered while its service was written, October 2026 |
 | [local-playlist-mutations.md](local-playlist-mutations.md) | The uninstalling instrumentation run and the procedure for testing an existing installation |
-| [service-protocol-observations.md](service-protocol-observations.md) | Independent protocol checks and implementation provenance, October 14, 2026 |
+| [service-protocol-observations.md](service-protocol-observations.md) | Independent protocol checks and implementation provenance, October 14 and 18, 2026 |
 
 `AGENTS.md` at the top of the repository holds the rules for coding agents.

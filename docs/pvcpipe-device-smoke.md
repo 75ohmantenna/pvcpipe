@@ -630,3 +630,65 @@ reported `0.2.1` / code `1000201` for debug and release, and the bundled extract
 produced `extractor-0.2.1.jar`. The rebuilt debug APK was installed and its
 simplified drawer was verified again on the emulator. The release APK is unsigned;
 this record does not establish new playback, receiver or physical-device UI coverage.
+
+## Kick service smoke, 2026-10-18
+
+The current debug APK was installed with `install -r` on the disposable
+`castout_api26` emulator (Android 8.0/API 26, x86_64, headless software
+rendering). No instrumentation, uninstall or data-clear command was run.
+The connected Pixel was not used.
+
+- The service selector listed Kick as the sixth service. Selecting it opened
+  Featured with the Kick theme and live broadcast cards.
+- Native search suggestions and channel results for `xqc` loaded. Opening
+  xQc showed channel metadata, Videos and Live tabs, and retained VODs.
+  A local subscription changed to Subscribed and was then removed, returning
+  to Subscribe.
+- An external Android VIEW intent for `kick.com/sjc_official` opened the
+  normal router and live details. The internal player rendered broadcast
+  video and its media session reported PLAYING. Background and Popup controls
+  were visible; no finished-recording Download control was offered.
+- A VIEW intent for
+  `kick.com/cazmilligan/videos/01a14728-1a88-7fe2-a32b-88a6b8b9eda4`
+  showed `BRAND RISK 16 WATCH ALONG`, duration 4:29:07. The player rendered
+  video and reported PLAYING. The download dialog offered 1080p, 720p, 480p,
+  360p and 160p; it was cancelled without starting a mission.
+- A channel that had gone offline showed Content unavailable. An xQc VOD
+  marked mature respected the existing age-content setting and was blocked;
+  that setting was not changed.
+
+The app was force-stopped after the smoke without clearing its data. These
+checks establish actual API 26 UI and rendered playback, not smooth-playback
+performance, a completed download, notification delivery, external-player
+playback, casting or physical-device behavior. API 37 did not finish booting
+and API 35 repeatedly lost its system server before the new APK could be
+installed, so neither supplies runtime evidence for this change.
+
+Release-artifact inspection initially found all three Kick service themes
+missing, despite the working debug theme. A dedicated `res/raw/` keep file
+corrected this; the shrinker required normalized names such as
+`LightTheme_Kick`, not the dotted XML declaration name. After rebuilding,
+`aapt2 dump resources` confirmed `LightTheme.Kick`, `DarkTheme.Kick` and
+`BlackTheme.Kick`, each with its three color attributes. The native smoke
+above preceded this resource-retention-only correction; extractor and
+player code did not change afterward.
+
+The final `make ci` passed after the keep-file correction: build-logic and
+app unit tests, offline extractor regressions, Checkstyle, ktlint, dependency
+ordering, Android lint, and debug/release assembly. The release APK remains
+unsigned. All 43 local Markdown file/heading references in the affected
+guides and records resolved.
+
+## PVCPipe 0.2.2 release build, 2026-10-18
+
+The shared version was bumped to `0.2.2` for the Kick integration. `make ci`
+passed before the release commit. APK inspection reported version `0.2.2`,
+code `1000202`, for both debug and release; the composite build produced
+`extractor-0.2.2.jar`. The unsigned release retained all three dynamically
+selected Kick themes and their color attributes.
+
+The debug APK's signing certificate matched the existing Pixel installation,
+which was version `0.2.1` / code `1000201`, allowing an in-place update of
+the same application id. This build/version check adds no new physical-device
+playback claim to the earlier Kick smoke.
+

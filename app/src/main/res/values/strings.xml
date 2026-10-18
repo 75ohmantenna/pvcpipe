@@ -905,7 +905,7 @@
     <string name="pvc_about_fork">PVCPipe is a direct fork of BravePipe. Many thanks to its creator, evermind-zz, for building and maintaining the project PVCPipe is based on.</string>
     <string name="pvc_about_title">About this fork</string>
     <string name="pvc_github_url" translatable="false">https://github.com/75ohmantenna/pvcpipe</string>
-    <string name="pvc_supported_platforms" translatable="false">\n\u2022 BitChute\n\u2022 Rumble\n\u2022 Odysee</string>
+    <string name="pvc_supported_platforms" translatable="false">\n\u2022 BitChute\n\u2022 Rumble\n\u2022 Odysee\n\u2022 Kick</string>
     <string name="search_filters_short">Short</string>
     <string name="search_filters_long">Long</string>
     <string name="search_filters_rumbles">Rumbles</string>

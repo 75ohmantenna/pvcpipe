@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dynamic ThemeHelper lookups; the shrinker uses normalized R names, not dotted XML names. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@style/LightTheme_Kick,@style/DarkTheme_Kick,@style/BlackTheme_Kick" />

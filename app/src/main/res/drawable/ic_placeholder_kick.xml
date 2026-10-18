@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- A play tile drawn for this app, not Kick's logo. -->
+    <path
+        android:fillColor="#53FC18"
+        android:pathData="M3,3h18v18h-18z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,7l8,5l-8,5z" />
+</vector>

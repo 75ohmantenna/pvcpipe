@@ -35,10 +35,11 @@ extractors return.
 | BitChute | 5 | video, live | `Trending Today`, `Trending This Week`, `Trending This Month`, `Popular`, `Suggested`, `live` | yes | no |
 | Rumble | 6 | audio, video, live | `Today's Battle Leaderboard Top 50`, `Editor Picks`, `Live`, `Trending Today`, `Latest`, `Shorts` | no | no |
 | Odysee | 7 | audio, video, live | `Featured`, `Trending`, `live` | yes | no |
+| Kick | 8 | video, live | `Featured` | no | no |
 
-All five have comments, search and search suggestions. The kiosk names in the
-table are the ids the code uses. `KioskTranslator` turns the ones it knows
-into display names.
+YouTube, SoundCloud, BitChute, Rumble and Odysee have comments. All six have
+search and search suggestions. The kiosk names in the table are the ids the
+code uses. `KioskTranslator` turns the ones it knows into display names.
 
 The main drawer contains local-library shortcuts, Settings and About, plus the
 service selector. It has no service-specific Live/Trending browse section.
@@ -85,6 +86,7 @@ app shows them.
 | BitChute | videos, channels |
 | Rumble | videos, channels |
 | Odysee | all, videos, tracks, channels |
+| Kick | channels |
 
 Rumble, SoundCloud and Odysee build the sort part of a search address with
 `QuerySortFilterItem`. When changing a filter class, check the displayed order
@@ -343,6 +345,62 @@ A player outside the app gets the bare address and no referrer.
 answered with and without it, and the HTTP 429 answers that kept uncached
 files from being checked.
 
+## Kick
+
+Kick supports public live broadcasts and retained VODs without a service
+account. Search returns up to 50 channels; suggestions return up to ten
+channel names. A channel exposes Videos and Livestreams tabs and can be
+subscribed to locally. Featured is a single live-discovery list. These lists
+do not invent continuation pages when the endpoint supplies none.
+
+[`KickApi`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/KickApi.java)
+uses the following public resources:
+
+| Host and path | Purpose |
+| --- | --- |
+| `kick.com/api/v2/channels/{slug}` | channel metadata and current broadcast state |
+| `kick.com/api/v2/channels/{slug}/playback-url` | fresh signed live HLS master |
+| `web.kick.com/api/v1/channels/{id}/videos` | retained VOD list |
+| `web.kick.com/api/v1/channels/{id}/videos/{uuid}` | current VOD metadata and recording URL |
+| `kick.com/api/v1/video/{uuid}` | older shared VOD UUIDs |
+| `search.kick.com/api/v1/channels/search` | channel search and suggestions |
+| `web.kick.com/api/v1/livestreams/featured?language=en` | Featured |
+
+Plain `kick.com/{slug}` links open the current broadcast; `/{slug}/videos`
+and `/{slug}/about` open the channel. VOD links use
+`/{slug}/videos/{uuid}`; older `/video/{uuid}` links are also understood.
+Some real legacy channel slugs begin with `@`; that character is preserved.
+Current VOD lookup falls back to the older UUID API only after HTTP 404,
+not after a private, expired, blocked or malformed response.
+
+Live feed items and extracted live streams use
+`/{slug}?live={start-time-in-UTC-seconds}` as a broadcast-specific identity.
+The extractor preserves this marker and rejects a marked link when the
+current broadcast has a different start time. This keeps successive
+broadcasts distinct in feed/history storage. Subscription URLs remain
+`/{slug}/videos`. Live start dates are retained for feed notification
+eligibility.
+
+Both live and VOD extraction expose combined audio/video HLS renditions,
+including URLs usable by the external-player chooser. The internal live
+player uses the master playlist. VOD download selections use rendition
+playlists, not the master. Ongoing broadcasts are omitted from the VOD tab;
+opening an ongoing recording link switches to live playback instead of
+offering an incomplete recording as a finished download.
+
+Kick information and loaded-source caching is limited to one minute because
+live playback tokens expire quickly. A playback URL alone does not prove
+that a channel is live. Viewer counts are omitted when visibility is false
+or unknown; legacy channel responses do not carry that visibility flag.
+Ordinary HTTP 403 errors are not treated as challenges without a challenge
+header or HTML markers.
+
+Clips, playlists, comments, live chat and remote following import are not
+implemented. PVCPipe has no live-chat surface. Playback does not depend on a
+Pusher or Centrifugo connection. See the
+[dated protocol checks](service-protocol-observations.md#kick-follow-up--2026-10-18)
+for the observed transport negotiation and verification limits.
+
 ## Removed services
 
 media.ccc.de, PeerTube and Bandcamp were removed from the extractor and the
@@ -383,6 +441,12 @@ id.
   `colors_services.xml` named after the service, an icon in
   `PvcServiceHelper`, a link filter in `AndroidManifest.xml`, and names for
   any new kiosk in `KioskTranslator`.
+- Themes resolved by `ThemeHelper` through `getIdentifier` need an explicit
+  [resource keep file](https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep)
+  under `res/raw/`, with `tools:keep` on its root `<resources>` element.
+  Kick uses normalized R names such as `@style/LightTheme_Kick` in
+  `pvcpipe_kick_keep.xml`, not the dotted XML style names. Inspect the shrunk
+  APK's resource table: a working debug theme does not prove release retention.
 - Tests are in
   `pvcpipe-extractor/extractor/src/test/java/org/schabi/newpipe/extractor/services/`,
   one directory per service. Tests tagged `offline` run in `make ci`. The
@@ -394,6 +458,7 @@ id.
 ./gradlew :pvcpipe-extractor:extractor:test --tests '*services.rumble*'
 ./gradlew :pvcpipe-extractor:extractor:test --tests '*services.bitchute*'
 ./gradlew :pvcpipe-extractor:extractor:test --tests '*OdyseeLiveTest*'
+./gradlew :pvcpipe-extractor:extractor:test --tests '*services.kick*'
 ```
 
 An offline test shows that the code handles a recorded or made-up answer. It

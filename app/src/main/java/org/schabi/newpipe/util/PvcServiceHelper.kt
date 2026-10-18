@@ -22,6 +22,7 @@ abstract class PvcServiceHelper {
             5 -> R.drawable.ic_placeholder_bitchute
             6 -> R.drawable.ic_placeholder_rumble
             7 -> R.drawable.ic_placeholder_odysee
+            8 -> R.drawable.ic_placeholder_kick
             else -> default
         }
     }

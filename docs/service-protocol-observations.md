@@ -97,3 +97,73 @@ selection, missing manifests and nullable live publication dates.
 Grayjay's Widevine sources and YouTube UMP/SABR request executors require
 separate player architecture work. These changes keep PVCPipe's current
 account-free service model and do not add a Grayjay runtime dependency.
+
+## Kick follow-up — 2026-10-18
+
+The [Grayjay Kick plugin](https://gitlab.futo.org/videostreaming/plugins/kick)
+was consulted for protocol ideas. Its license is AGPL-3.0. The new Java
+implementation and synthetic fixtures were written independently; no
+Grayjay implementation code was incorporated.
+
+Direct workstation `curl` and Python HTTP requests, using PVCPipe's
+Chrome/145 user agent, returned HTTP 200 for public channel metadata,
+current channel search, Featured, current VOD details and the dedicated
+live playback-URL endpoint. Missing-channel and missing-video probes
+returned JSON with HTTP 404.
+
+Both a current live broadcast and an xQc recording supplied HLS masters
+whose rendition playlists and a media segment returned HTTP 200. These
+direct requests worked without Origin/Referer; repeating the master
+requests with Kick Origin/Referer also returned HTTP 200. No global Kick
+media-header workaround was added. This describes this network and these
+requests, not every media host or future access policy.
+
+The current VOD resource uses a different UUID from the older video API
+for the same recording. Current durations are seconds; older
+`livestream.duration` values are milliseconds. The channel video list also
+contains an ongoing broadcast with `is_live: true` and an empty
+`recording_url`; it is not a completed downloadable VOD.
+
+Live tokens observed in channel and fresh playback responses expired about
+ten minutes after issuance. The current website's playback query uses a
+294-second stale time and 300-second garbage-collection time. Legacy
+channel metadata can retain a playback URL while the channel is offline.
+It also omits viewer-count visibility even when the Featured response for
+the same channel says `show_view_count: false`.
+
+Current search returned a real legacy channel with slug `@xqc`; both its
+channel API and website route remained available. The first JVM smoke
+successfully fetched live media but reported a search-item parsing error
+for this slug. The slug grammar was corrected rather than hiding the item
+or ignoring the extraction error.
+
+The current website negotiates chat transport with
+`POST https://web.kick.com/api/v1/realtime/connection` and the corresponding
+`/api/v1/realtime/channels/{channelId}/chat/connection` endpoint. Direct
+anonymous probes offering both Pusher and Centrifugo returned HTTP 200
+and selected `mode: websocket`, provider `centrifugo`. The site code retains
+the `chatrooms.{chatroomId}.v2` topic and `App\Events\ChatMessageEvent`.
+This is not evidence that Grayjay's older hard-coded Pusher endpoint is a
+universal current transport. No WebSocket chat session was exercised, and
+no chat UI or viewer-tracking connection was added to PVCPipe.
+
+Separate adversarial correctness and security reviews found live-source
+list, viewer-visibility, feed-date/identity, ongoing-recording, ordinary-403,
+and encoded-query-boundary defects. They were corrected with regressions,
+including stale broadcast rejection and preserving query-value boundaries.
+Execution also caught a private-content exception being swallowed by the
+older-UUID fallback; that fallback is now restricted to a genuine HTTP 404.
+
+After those corrections, all 48 Kick regression cases passed with
+Checkstyle enabled. A throwaway JVM runner using the real OkHttp test
+downloader exercised complete `KioskInfo`, `StreamInfo`, `SearchInfo`,
+`ChannelInfo` and `ChannelTabInfo` models: Featured → sjc_official live
+playback, and search → xQc → a 33,751-second VOD. Both live and VOD masters,
+one rendition and one media segment returned HTTP 200; each master had five
+video renditions. The missing-channel scenario remained typed unavailable.
+This establishes JVM extraction and media access, not hardware playback.
+
+The [API 26 UI smoke](pvcpipe-device-smoke.md#kick-service-smoke-2026-10-18)
+records rendered live/VOD playback, service selection, search, channel tabs
+and local subscription interaction, together with the untested paths.
+

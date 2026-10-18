@@ -83,4 +83,19 @@
         <item name="colorPrimaryDark">@color/dark_odysee_primary_color</item>
         <item name="colorAccent">@color/dark_odysee_accent_color</item>
     </style>
+    <style name="LightTheme.Kick" parent="LightTheme">
+        <item name="colorPrimary">@color/light_kick_primary_color</item>
+        <item name="colorPrimaryDark">@color/light_kick_primary_color</item>
+        <item name="colorAccent">@color/light_kick_accent_color</item>
+    </style>
+    <style name="DarkTheme.Kick" parent="DarkTheme">
+        <item name="colorPrimary">@color/dark_kick_primary_color</item>
+        <item name="colorPrimaryDark">@color/dark_kick_primary_color</item>
+        <item name="colorAccent">@color/dark_kick_accent_color</item>
+    </style>
+    <style name="BlackTheme.Kick" parent="BlackTheme">
+        <item name="colorPrimary">@color/dark_kick_primary_color</item>
+        <item name="colorPrimaryDark">@color/dark_kick_primary_color</item>
+        <item name="colorAccent">@color/dark_kick_accent_color</item>
+    </style>
 </resources>

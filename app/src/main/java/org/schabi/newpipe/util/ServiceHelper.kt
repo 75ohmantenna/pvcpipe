@@ -150,10 +150,11 @@ object ServiceHelper : PvcServiceHelper() {
 
     @JvmStatic
     fun getCacheExpirationMillis(serviceId: Int): Long {
-        return if (serviceId == ServiceList.SoundCloud.serviceId) {
-            TimeUnit.MILLISECONDS.convert(5, TimeUnit.MINUTES)
-        } else {
-            TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS)
+        // Kick live URLs expire after about ten minutes; channel URLs also change broadcasts.
+        return when (serviceId) {
+            ServiceList.Kick.serviceId -> TimeUnit.MINUTES.toMillis(1)
+            ServiceList.SoundCloud.serviceId -> TimeUnit.MINUTES.toMillis(5)
+            else -> TimeUnit.HOURS.toMillis(1)
         }
     }
 
