@@ -40,6 +40,11 @@ All five have comments, search and search suggestions. The kiosk names in the
 table are the ids the code uses. `KioskTranslator` turns the ones it knows
 into display names.
 
+The main drawer contains local-library shortcuts, Settings and About, plus the
+service selector. It has no service-specific Live/Trending browse section.
+Kiosks remain available as main-page tabs through **Settings → Content →
+Main page content**; removing their drawer shortcuts does not remove saved tabs.
+
 These are implemented extractor capabilities, not a promise that every
 website or every item is available on a particular network.
 
@@ -88,10 +93,10 @@ as `RumbleFiltersTest` and `OdyseeFiltersTest`, pin both.
 
 ## YouTube
 
-YouTube's general `Trending` page is no longer offered in the drawer or kiosk
-selector. YouTube [announced its retirement in July 2025](https://support.google.com/youtube/thread/356702168/changes-to-discovering-trending-content-on-youtube?hl=en).
-Live and the category feeds remain available; the English movies-and-shows
-label is shortened to "Trending movies/shows" to fit the drawer.
+YouTube's general `Trending` page is no longer offered in the kiosk selector.
+YouTube [announced its retirement in July 2025](https://support.google.com/youtube/thread/356702168/changes-to-discovering-trending-content-on-youtube?hl=en).
+Live and the category feeds remain available as main-page tabs; the English
+movies-and-shows label is shortened to "Trending movies/shows".
 Settings migration 9 → 10 removes any dedicated YouTube `Trending` tabs that
 were added after the earlier retirement migration. Other tabs keep their
 order, including Odysee's `Trending`; if no custom tabs remain, the default

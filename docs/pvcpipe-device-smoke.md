@@ -611,3 +611,22 @@ regression remains. The release APK is unsigned.
 All 133 local Markdown file/heading references checked across the root,
 guides, records and fixture READMEs resolved. Historical observations were
 preserved rather than rewritten to claim current hardware coverage.
+
+## PVCPipe 0.2.1 menu release review, 2026-10-18
+
+The main drawer's service-specific Live/Trending section was removed, including
+its menu group and selection handler. Existing main-page tabs and the kiosk
+selector under Settings → Content → Main page content remain available.
+
+On a disposable API 26 emulator, the actual drawer contained only Subscriptions,
+What's New, Bookmarked playlists, Downloads, History, Settings and About & FAQ.
+Repeated service-selector toggles and switches through all five services did not
+restore feed shortcuts or duplicate entries. Settings opened successfully, the
+four existing main-page tabs remained, and the kiosk selector still offered
+YouTube Live and the category feeds. No instrumentation was run on the Pixel.
+
+After the version bump, `make ci` passed, including both APK builds. APK metadata
+reported `0.2.1` / code `1000201` for debug and release, and the bundled extractor
+produced `extractor-0.2.1.jar`. The rebuilt debug APK was installed and its
+simplified drawer was verified again on the emulator. The release APK is unsigned;
+this record does not establish new playback, receiver or physical-device UI coverage.
