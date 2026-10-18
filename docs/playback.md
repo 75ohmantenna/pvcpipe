@@ -90,6 +90,9 @@ explicit end event, so completion is inferred conservatively from a playing
 to idle transition near a known duration; a remote Stop exactly there is
 indistinguishable from natural completion on that old protocol.
 
+The sender SDK is MIT-licensed. Its attribution and the Java Native Access
+(JNA) attribution are available in the app's **About → Licenses** tab.
+
 [`FCastDiscovery`](../app/src/main/java/org/schabi/newpipe/player/cast/FCastDiscovery.kt)
 browses only `_fcast._tcp` with Android NSD while the picker is open. It keeps
 resolved addresses and TXT security records, and releases callbacks and the
