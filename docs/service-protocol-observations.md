@@ -167,3 +167,52 @@ The [API 26 UI smoke](pvcpipe-device-smoke.md#kick-service-smoke-2026-10-18)
 records rendered live/VOD playback, service selection, search, channel tabs
 and local subscription interaction, together with the untested paths.
 
+### Image metadata follow-up — 2026-10-18
+
+Kick artwork originally supplied neither dimensions nor an estimated quality,
+so the Description tab labeled thumbnails and uploader avatars `?x?`.
+Direct image downloads succeeded with both the app's ordinary OkHttp user
+agent and the browser user agent; this was not evidence for adding image
+Referer headers or bypass logic.
+
+Live CDN WebP variants measured 1920×1080, 1280×720, 853×480, 640×360 and
+284×160 for filenames `1080`, `720`, `480`, `360` and `160`, respectively.
+The observed srcset width descriptors for the 480- and 360-high variants
+were incorrect, so the extractor records only the filename's known height.
+Converted avatar widths measured 150 for `medium` and 350 for `fullsize`.
+Fullsize samples included 350×350, 350×438 and 350×387; assuming square
+avatars would be wrong. Original search avatars need not share these sizes.
+Two current VOD preview endpoints returned 1280×720 images; these receive
+an estimated High quality classification while retaining unknown exact axes.
+
+All 61 Kick regression cases passed, including 13 image-metadata cases
+covering partial dimensions, portrait avatars, quality estimates and
+unrecognized or misleading URLs. The seven new metadata expectations failed
+before the correction. `make ci` then passed with debug/release assembly.
+An API 26 emulator running the fixed debug build visibly rendered the
+cazmilligan VOD artwork and avatar; its Description tab displayed
+`THUMBNAILS High quality` and `UPLOADER AVATARS 350x?`. This is emulator
+UI evidence, not a new physical-device playback claim.
+
+### Refresh and seek follow-up — 2026-10-18
+
+The `0.2.3` review found that a retained Livestreams tab handler kept its
+embedded channel snapshot indefinitely. A standalone runner using complete
+`ChannelInfo` and `ChannelTabInfo` models exercised one handler across
+offline → live → offline fixture responses. The frozen `0.2.2` extractor
+returned item counts `0 → 0 → 0`; the corrected extractor returned
+`0 → 1 → 0`.
+
+The same runner opened a retained recording with `?t=25`. The old extractor
+returned start position zero; the correction returned 25 seconds without
+changing the canonical recording URL. Regression execution also exposed
+oversized offsets that would overflow playback's time conversions. Invalid
+or unrepresentable optional offsets now default to zero; they do not make
+an otherwise playable recording unavailable. Live playback ignores these
+recording offsets.
+
+These are controlled extraction scenarios, not new live-site availability
+or hardware-playback evidence. The
+[0.2.3 runtime record](pvcpipe-device-smoke.md#023-adversarial-review-2026-10-18)
+describes the separate casting and proxy checks.
+

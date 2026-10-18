@@ -1,19 +1,21 @@
 # Downloads
 
-A download goes through two parts of the code:
+Download preparation and execution are separate:
 
-- `app/src/main/java/org/schabi/newpipe/download/` prepares it.
-  `DownloadPreparation` turns what the user picked in the download dialog
-  into a plan and hands it to the download service. The dialog shows things
-  and receives the answers of the system's folder and document pickers.
-- `app/src/main/java/us/shandian/giga/` carries it out. `DownloadMission` is
-  one download, `DownloadManager` keeps the pending and finished ones, and
+- `app/src/main/java/org/schabi/newpipe/download/` prepares the request.
+  `DownloadPreparation` turns the dialog's selection into a plan, resolves
+  destination conflicts and submits it to the download service. The dialog
+  presents choices and receives folder/document picker results.
+- `app/src/main/java/us/shandian/giga/` executes it. `DownloadMission` owns
+  one download, `DownloadManager` tracks pending and finished missions, and
   `DownloadManagerService` runs them.
 
-Which streams can be combined, how files are named and where they go, the
-range and validator checks on a resumed download, and the processing after a
-download are all in that code. This page covers what the code promises about
-state on disk.
+Preparation accepts progressive media URLs and video HLS rendition URLs.
+Split progressive video/audio can require postprocessing; arbitrary DASH
+manifests and audio-only HLS are not accepted by this preparation path.
+The implementation defines format combinations, filenames, destination
+handling, resume checks and postprocessing. This guide focuses on selection,
+submission and persisted state.
 
 `DownloadPreparation.Selection` captures the selected streams, sizes and
 primary media format before destination preparation. The format comes from
@@ -24,19 +26,19 @@ selection changes do not alter the pending plan.
 
 ## What "submitted" means
 
-A download is submitted once `DownloadManagerService.startMission` has
-accepted the request to start the service. It has not started yet, and
-nothing about it is saved yet. If a later step of the same submission fails,
-an output file it was to overwrite may already have been changed.
+A download is submitted after `DownloadManagerService.startMission` accepts
+the service-start request. Submission does not guarantee that execution has
+started or that a checkpoint has been saved. Destination preparation happens
+first: an existing file selected for overwrite may already have been changed
+if dispatch then fails.
 
 ## Checkpoints
 
-A pending mission saves its state as a checkpoint file in the app's internal
-storage, `files/pending_downloads`. A checkpoint is a serialized object that
-names the addresses to download and the file to write, so it must not be in
-a place another app can write to. Builds before October 2026 kept
-checkpoints in the external files directory. That directory is not read any
-more, and unfinished downloads from such a build are not carried over.
+A pending mission stores a serialized checkpoint under the app's private
+`files/pending_downloads` directory. It contains media URLs and the output
+destination, so it must not be writable by another app. Older builds used the
+external files directory; that legacy location is no longer read, and its
+unfinished downloads are not migrated.
 
 - A checkpoint replaces the previous one atomically (`Utility.writeToFile`
   uses Android's `AtomicFile`). A write that fails leaves the previous
@@ -53,11 +55,11 @@ separate things on disk. No transaction spans them.
 
 ## HLS downloads
 
-An HLS media playlist is downloaded segment by segment and then joined by
-`PvcFromHlsRemuxer`, which runs the bundled ffmpeg. `PvcHlsPreProcessor`
-rejects master playlists; the selected download must already identify a
-rendition. The detail screen hides its download action for livestreams,
-including BitChute live streams.
+An HLS media playlist is downloaded segment by segment, then remuxed with
+the bundled ffmpeg by `PvcFromHlsRemuxer`. `PvcHlsPreProcessor` rejects master
+playlists: the selected download must identify a rendition. The detail screen
+hides the download action for livestreams, including BitChute and Kick live
+broadcasts.
 
 - `PvcHlsPreProcessor` reads the playlist and replaces the mission's one
   address with the addresses of the segments. It fetches playlists and
@@ -66,17 +68,17 @@ including BitChute live streams.
   attempts to remove it when it ends, also after a failure. Several HLS
   downloads can be converted at the same time. A conversion that starts while
   no other is running first attempts to remove leftovers in `ffmpeg_temp`:
-  files of a build that had one shared directory, or of a process that was
-  killed half way. Cleanup is best effort (`PvcFromHlsRemuxer.deleteQuietly`).
+  files left by an older build's shared directory or by an interrupted
+  process. Cleanup is best effort (`PvcFromHlsRemuxer.deleteQuietly`).
 - A segment that the server refuses fails the mission with the HTTP error,
   and the mission keeps its segments. `DownloadMissionRecover` is not used
   for HLS: it can only find a whole progressive file again. A retry asks for
   the same segment addresses, so it does not help once they have expired.
   Reading the playlist again is not implemented.
 
-The Ogg conversion of WebM audio refuses a file that uses block lacing.
-`WebMReader` does not take laced blocks apart, and writing one as a single
-packet would give a file that does not play.
+WebM Opus-to-Ogg conversion rejects block-laced input. `WebMReader` does not
+split laced blocks into packets, so treating a whole block as one packet
+would produce an invalid output file.
 
 ## Sharing or opening a finished file
 
@@ -108,5 +110,5 @@ instrumentation tests and need a device. Before running any instrumentation
 on a phone that has the app installed, read
 [local-playlist-mutations.md](local-playlist-mutations.md).
 
-[pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) records downloads that
-were paused, resumed and checked against their checksums on a phone.
+[pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) records dated phone checks
+of download pause/resume behavior and media checksums.

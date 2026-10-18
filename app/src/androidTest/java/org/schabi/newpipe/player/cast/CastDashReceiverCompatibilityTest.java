@@ -18,7 +18,7 @@ import org.junit.Test;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 
-/** Exercises the real Android receiver parser using only in-memory manifests. */
+/** Checks this app's ExoPlayer DASH parser, not an installed receiver's androidx.media3 parser. */
 public class CastDashReceiverCompatibilityTest {
     @Test
     public void pairedTracksParseWithDistinctAdaptationIdsAndRetainTheirIndexes() throws Exception {

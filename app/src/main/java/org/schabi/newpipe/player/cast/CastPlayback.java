@@ -424,7 +424,7 @@ public final class CastPlayback implements FCastSession.Listener {
 
     @Override
     public void onStopped() {
-        if (!active || !canControlReceiver()) {
+        if (closed || !active || reloadOnConnection || session.getConnectionState() != 2) {
             return;
         }
         returnToDevice(false);

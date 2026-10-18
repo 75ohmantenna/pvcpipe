@@ -82,7 +82,7 @@ public final class KickService extends StreamingService {
 
     @Override
     public SubscriptionExtractor getSubscriptionExtractor() {
-        // Following export requires an authenticated Kick account; local subscriptions use tabs.
+        // Remote following import is not implemented; local subscriptions use channel tabs.
         return null;
     }
 

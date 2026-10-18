@@ -19,6 +19,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
     private static final int MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
     private static final int MAX_ROUTES = 8192;
     private static final int MAX_HEADER_BYTES = 32768;
+    private static final long HEADER_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(15);
     private static final Pattern TEMPLATE = Pattern.compile("\\$(Number|Time)(%0[1-9][0-9]?d)?\\$");
     private static final List<String> RESPONSE_HEADERS = List.of("Content-Type", "Content-Length",
             "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Cache-Control");
@@ -66,6 +68,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
     private final String prefix = "/" + UUID.randomUUID() + "/";
     private final String origin;
     private volatile boolean closed;
+    private boolean preparing = true;
 
     CastMediaServer(final InetAddress address) throws IOException {
         if (address.isAnyLocalAddress() || address.isMulticastAddress()) {
@@ -100,6 +103,11 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
         return add(new Resource("", mimeType, bytes, -1));
     }
 
+    /** Initial manifests must retain every capability they publish, including their own routes. */
+    synchronized void finishPreparation() {
+        preparing = false;
+    }
+
     private String add(final Resource resource) throws IOException {
         if (closed || Thread.currentThread().isInterrupted()) {
             throw new IOException("Cast source was closed");
@@ -110,6 +118,9 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
         final String key = resource.url + "\n" + resource.mimeType;
         String path = resource.content == null ? keys.get(key) : null;
         if (path == null) {
+            if (preparing && routes.size() >= MAX_ROUTES) {
+                throw new IOException("Cast preparation references too many media resources");
+            }
             path = prefix + UUID.randomUUID();
             routes.put(path, resource);
             if (resource.content == null) {
@@ -166,7 +177,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
         while (!closed) {
             try {
                 final Socket socket = server.accept();
-                socket.setSoTimeout(15000);
+                final long headerDeadline = System.nanoTime() + HEADER_TIMEOUT_NANOS;
                 sockets.add(socket);
                 if (closed) {
                     socket.close();
@@ -174,7 +185,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
                     return;
                 }
                 try {
-                    workers.execute(() -> serve(socket));
+                    workers.execute(() -> serve(socket, headerDeadline));
                 } catch (final java.util.concurrent.RejectedExecutionException error) {
                     sockets.remove(socket);
                     socket.close();
@@ -187,9 +198,9 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
         }
     }
 
-    private void serve(final Socket socket) {
+    private void serve(final Socket socket, final long headerDeadline) {
         try (socket) {
-            final InputStream input = new BufferedInputStream(socket.getInputStream());
+            final InputStream input = new HeaderInputStream(socket, headerDeadline);
             final ResponseOutput output = new ResponseOutput(socket.getOutputStream());
             try {
                 final int[] remaining = {MAX_HEADER_BYTES};
@@ -609,6 +620,42 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
             super("HTTP " + status);
             this.status = status;
             this.headers = headers;
+        }
+    }
+
+    /** One worker reads each request; response-body streaming has independent upstream timeouts. */
+    private static final class HeaderInputStream extends BufferedInputStream {
+        private final Socket socket;
+        private final long deadline;
+
+        private HeaderInputStream(final Socket socket, final long deadline) throws IOException {
+            super(socket.getInputStream());
+            this.socket = socket;
+            this.deadline = deadline;
+        }
+
+        private void beforeRead() throws IOException {
+            // Buffered bytes cannot stall a worker; update the timeout only for a socket read.
+            if (pos >= count) {
+                final long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    throw new SocketTimeoutException("Cast request headers timed out");
+                }
+                socket.setSoTimeout((int) (TimeUnit.NANOSECONDS.toMillis(remaining) + 1));
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            beforeRead();
+            return super.read();
+        }
+
+        @Override
+        public int read(final byte[] buffer, final int offset, final int length)
+                throws IOException {
+            beforeRead();
+            return super.read(buffer, offset, length);
         }
     }
 

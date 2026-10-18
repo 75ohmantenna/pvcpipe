@@ -152,9 +152,9 @@ final class CastManifest {
                 rewriteSegment(copy, base, element, urls);
                 element.appendChild(copy);
             }
-            // SegmentBase and unsegmented representations fetch this exact resource, never a
-            // client-selected path under a directory proxy.
-            if (segment == null || "SegmentBase".equals(name(segment))) {
+            // Implicit single-file ranges need this exact resource as their representation base,
+            // never the MPD itself or a client-selected path under a directory proxy.
+            if (usesRepresentationBase(segment)) {
                 final Element localBase = element.getOwnerDocument().createElementNS(
                         element.getNamespaceURI(), "BaseURL");
                 localBase.setTextContent(urls.register(base, ""));
@@ -199,6 +199,21 @@ final class CastManifest {
         for (final Element child : children(element, null)) {
             rewriteSegment(child, base, representation, urls);
         }
+    }
+
+    private static boolean usesRepresentationBase(final Element segment) {
+        if (segment == null || "SegmentBase".equals(name(segment))) {
+            return true;
+        }
+        if ("SegmentList".equals(name(segment))) {
+            for (final Element child : children(segment, null)) {
+                if ("Initialization".equals(name(child)) && !child.hasAttribute("sourceURL")
+                        || "SegmentURL".equals(name(child)) && !child.hasAttribute("media")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isSegment(final Element element) {

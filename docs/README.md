@@ -1,8 +1,8 @@
 # Documentation
 
-The code and its tests say what the app does. These pages say where to look
-and why things are the way they are. If a page and the code disagree, the
-page is wrong.
+The implementation and tests define PVCPipe's behavior. These pages explain
+that behavior, its limits and the code behind it. If a guide disagrees with
+the implementation, the guide needs correcting.
 
 PVCPipe is in development. The guides describe implemented behavior and
 limits, not a claim that all supported sites, receivers or devices have
@@ -15,11 +15,11 @@ A guide describes the code as it is now and names the classes to read.
 
 | Page | What it covers |
 | --- | --- |
-| [building.md](building.md) | Requirements, layout, `make ci`, the test suites |
-| [services.md](services.md) | Supported services, search filters, removed services, adding a service |
-| [playback.md](playback.md) | The player: sources, FCast casting, queue, audio focus, history, errors, the detail screen, proof tokens |
-| [library-data.md](library-data.md) | Local playlists, feed refresh, subscription transfers, backup and restore |
-| [download-preparation.md](download-preparation.md) | Downloads: preparation, checkpoints, sharing a finished file |
+| [building.md](building.md) | SDK and JDK requirements, build tasks, application IDs, signing, versioning and safe testing |
+| [services.md](services.md) | Service IDs, extraction capabilities, search filters, Kick metadata, retired services and integration requirements |
+| [playback.md](playback.md) | Source selection, FCast setup and limits, queue control, audio focus, history, errors and YouTube proof tokens |
+| [library-data.md](library-data.md) | Local playlists, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
+| [download-preparation.md](download-preparation.md) | Download selection and submission, checkpoints, HLS processing and finished-file sharing |
 | [../GLOSSARY.md](../GLOSSARY.md) | The terms the code and these pages use |
 
 ## Records
@@ -31,9 +31,9 @@ guides and implementation for current behavior.
 
 | Page | What it records |
 | --- | --- |
-| [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) | Manual runs on a Pixel 6a and an emulator, October 2026 |
+| [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) | Dated device and emulator runs, FCast receiver recovery, and the 0.2.3 adversarial review, October 2026 |
 | [odysee-observations.md](odysee-observations.md) | What Odysee's servers answered while its service was written, October 2026 |
 | [local-playlist-mutations.md](local-playlist-mutations.md) | The uninstalling instrumentation run and the procedure for testing an existing installation |
-| [service-protocol-observations.md](service-protocol-observations.md) | Independent protocol checks and implementation provenance, October 14 and 18, 2026 |
+| [service-protocol-observations.md](service-protocol-observations.md) | Protocol observations, implementation provenance and controlled extraction follow-ups, October 2026 |
 
 `AGENTS.md` at the top of the repository holds the rules for coding agents.

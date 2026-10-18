@@ -5,15 +5,16 @@ PVCPipe plays remote streams and stores viewing data and settings locally.
 ## Backup and restore
 
 **Backup archive**:
-A saved copy of PVCPipe's local database that may also contain application settings.
+A ZIP archive of PVCPipe's local library database, optionally including
+application settings. Downloaded media and download-manager state are excluded.
 
 **Backup inspection**:
 An assessment of a selected backup archive that helps the user choose what to
 restore. Inspection does not guarantee that restoration will succeed.
 
 **Restore**:
-Replacement of PVCPipe's local database from a backup archive, optionally including
-application settings.
+Replacement of PVCPipe's local library database from a backup archive, optionally
+including application settings. The database is activated at the next app start.
 
 **Accepted restore**:
 A restore request accepted by the application for completion even if the
@@ -45,6 +46,10 @@ mean the download has started or finished.
 
 **Subscription**:
 A channel the user follows for stream updates.
+
+**Service heading**:
+A section label grouping subscribed channels by their stored service ID.
+These sections do not change membership in custom feed groups.
 
 **Feed refresh**:
 An attempt to load and store stream updates for selected subscriptions.
@@ -126,4 +131,4 @@ not disconnect it.
 **Cast media proxy**:
 The phone's per-load HTTP server that serves extracted media and rewritten
 manifests to the receiver through opaque, allowlisted routes. FCast v4
-encrypts control traffic, not this HTTP media path.
+encrypts control traffic; the proxy's HTTP media traffic remains unencrypted.

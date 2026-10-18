@@ -123,6 +123,7 @@ public final class FCastDialog extends DialogFragment implements FCastDiscovery.
         if (discovery == null && binding != null && casting != null
                 && PermissionHelper.hasLocalNetworkPermission(requireContext())) {
             discoveryError = null;
+            binding.castDevices.removeAllViews();
             discovery = new FCastDiscovery(requireContext(), this);
             discovery.start();
         }

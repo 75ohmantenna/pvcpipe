@@ -1,13 +1,15 @@
 # PVCPipe
 
 PVCPipe is a video and audio app for **Android 8.0+**. Subscriptions,
-playlists and history stay on your device. No service account required.
+playlists and history stay on your device. No service account is required.
 
 **Still in development.** Expect bugs and changes in site support.
 
 **Supported sites:** [YouTube](https://www.youtube.com/),
 [SoundCloud](https://soundcloud.com/), [BitChute](https://www.bitchute.com/),
 [Rumble](https://rumble.com/), [Odysee](https://odysee.com/) and [Kick](https://kick.com/).
+
+Subscriptions are grouped by service in both list and grid layouts.
 
 ## Casting
 

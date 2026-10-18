@@ -17,6 +17,7 @@ public final class KickUrl {
     private static final Pattern UUID = Pattern.compile(
             "[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}");
     private static final Pattern LIVE_TIME = Pattern.compile("[1-9][0-9]{0,18}");
+    private static final Pattern VOD_TIME = Pattern.compile("[0-9]+");
     private static final Set<String> RESERVED = Set.of("api", "search", "categories", "category",
             "browse", "following", "subscriptions", "settings", "dashboard", "login", "signup",
             "register", "auth", "logout", "clips", "video", "videos", "terms-of-service",
@@ -109,6 +110,35 @@ public final class KickUrl {
             }
         }
         return timestamp;
+    }
+
+    /** Reads the optional website seek offset without decoding query parameter boundaries. */
+    public static long vodTime(final String url) throws ParsingException {
+        final String query = parse(url).getRawQuery();
+        if (query == null) {
+            return 0;
+        }
+        for (final String parameter : query.split("&")) {
+            final String[] pair = parameter.split("=", 2);
+            if ("t".equals(URLDecoder.decode(pair[0], StandardCharsets.UTF_8))) {
+                if (pair.length != 2) {
+                    return 0;
+                }
+                final String value = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
+                if (!VOD_TIME.matcher(value).matches()) {
+                    return 0;
+                }
+                try {
+                    final long seconds = Long.parseLong(value);
+                    // Playback converts seconds to both milliseconds and microseconds.
+                    return seconds <= Long.MAX_VALUE / 1_000_000 ? seconds : 0;
+                } catch (final NumberFormatException e) {
+                    // An invalid optional seek must not make otherwise playable content fail.
+                    return 0;
+                }
+            }
+        }
+        return 0;
     }
 
     public static String channelId(final String url) throws ParsingException {

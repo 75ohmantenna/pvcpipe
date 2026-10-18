@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
 import java.util.Collections
 import java.util.Locale
@@ -27,6 +28,9 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
     private val context = context.applicationContext
     private val nsd = this.context.getSystemService(NsdManager::class.java)
     private val main = Handler(Looper.getMainLooper())
+
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private val tracksServiceInfo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
     private val services = linkedMapOf<String, Service>()
     private val devices = linkedMapOf<String, FCastDevice>()
     private val pending = ArrayDeque<Service>()
@@ -67,7 +71,7 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
             if (services.containsKey(name)) return@onMain
             val service = Service(serviceInfo)
             services[name] = service
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (tracksServiceInfo) {
                 trackService(service)
             } else {
                 pending.addLast(service)
@@ -108,7 +112,10 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
             }
 
             override fun onServiceLost() = onMain {
-                if (isCurrent(service)) removeService(service.info.serviceName)
+                // Tracking loss is recoverable without another browse-level onServiceFound.
+                if (isCurrent(service) && devices.remove(service.info.serviceName) != null) {
+                    notifyDevices()
+                }
             }
 
             override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) = onMain {
@@ -198,7 +205,7 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
 
     @Suppress("DEPRECATION")
     private fun publish(service: Service, resolved: NsdServiceInfo) {
-        val addresses = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val addresses = if (tracksServiceInfo) {
             resolved.hostAddresses
         } else {
             listOfNotNull(resolved.host)
@@ -221,7 +228,7 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
 
     private fun removeService(name: String) {
         val service = services.remove(name) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) unregister(service)
+        if (tracksServiceInfo) unregister(service)
         if (devices.remove(name) != null) notifyDevices()
     }
 
@@ -251,7 +258,7 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
                 Log.w(TAG, "Could not stop FCast discovery", error)
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (tracksServiceInfo) {
             services.values.forEach(::unregister)
         }
         services.clear()
@@ -264,6 +271,7 @@ class FCastDiscovery(context: Context, private val listener: Listener) : AutoClo
             }
         }
         multicastLock = null
+        listener.onDevicesChanged(emptyList())
     }
 
     private fun notifyDevices() {

@@ -74,15 +74,7 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     @Volatile var volumeSupported: Boolean = false
         private set
 
-    // Main-thread playback snapshot; SDK progress is measured in seconds.
-    private var playbackState = 0
-    private var positionMs = 0L
-    private var durationMs = 0L
-    private var speed = 1.0
-    private var pauseOnLoad = false
-    private var endedReported = false
-    private var legacyReceiver = false
-    private var mediaLoaded = false
+    private val playback = FCastPlaybackState(listener) { command { it.pausePlayback() } }
     private var timeout: Runnable? = null
 
     // Accessed only by the IO executor, never from a native callback.
@@ -179,13 +171,9 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
         thumbnail: String?
     ) = onMain {
         if (closed) return@onMain
-        this.positionMs = positionMs.coerceAtLeast(0L)
-        durationMs = 0L
-        this.speed = speed.toDouble()
-        playbackState = 3
-        pauseOnLoad = !playWhenReady
-        endedReported = false
-        mediaLoaded = true
+        val source = media.url()?.let { Source.Url(it, media.mimeType()) }
+            ?: Source.Content(requireNotNull(media.content()))
+        playback.load(source, positionMs, speed.toDouble(), playWhenReady)
         command { device ->
             val metadata = Metadata(title, thumbnail)
             val requestedSpeed = if (speedSupported) speed.toDouble() else null
@@ -212,20 +200,21 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
             device.load(request, 500uL)
             if (!playWhenReady) device.pausePlayback()
         }
-        emitPlayback()
+        playback.emit()
     }
 
     fun pause() = onMain {
-        pauseOnLoad = false
+        playback.clearPauseOnLoad()
         command { it.pausePlayback() }
     }
 
     fun resume() = onMain {
-        pauseOnLoad = false
+        playback.clearPauseOnLoad()
         command { it.resumePlayback() }
     }
 
     fun seek(positionMs: Long) = onMain {
+        playback.seek(positionMs)
         command { it.seek(positionMs.coerceAtLeast(0L) / 1000.0) }
     }
 
@@ -251,6 +240,7 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
         localAddress = null
         speedSupported = false
         volumeSupported = false
+        resetPlayback()
         io.execute { releaseActive(previous, true) }
         io.shutdown()
     }
@@ -300,13 +290,17 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
                             val canSetVolume = device.supportsFeature(DeviceFeature.SET_VOLUME)
                             // FCast v2 lacks explicit end events; LOAD_IMAGE was introduced in v3.
                             val isLegacyReceiver = !device.supportsFeature(DeviceFeature.LOAD_IMAGE)
+                            // Some SDK-v3 peers retain v2 playback updates without source/end events.
+                            val legacyCompletionWithoutEcho =
+                                device.supportsFeature(DeviceFeature.LOAD_PLAYLIST)
                             val address = state.localAddr.toInetAddress()
                             post(attempt) {
                                 cancelTimeout()
                                 localAddress = address
                                 speedSupported = canSetSpeed
                                 volumeSupported = canSetVolume
-                                legacyReceiver = isLegacyReceiver
+                                playback.legacyReceiver = isLegacyReceiver
+                                playback.legacyCompletionWithoutEcho = legacyCompletionWithoutEcho
                                 connectionState = 2
                                 listener.onConnectionChanged()
                             }
@@ -336,73 +330,26 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
             }
         }
 
-        override fun timeChanged(time: Double) = post(attempt) {
-            if (time.isFinite()) {
-                positionMs = secondsToMillis(time)
-                emitPlayback()
-            }
-        }
+        override fun timeChanged(time: Double) = post(attempt) { playback.timeChanged(time) }
 
         override fun durationChanged(duration: Double) = post(attempt) {
-            if (duration.isFinite()) {
-                durationMs = secondsToMillis(duration)
-                emitPlayback()
-            }
+            playback.durationChanged(duration)
         }
 
-        override fun speedChanged(speed: Double) = post(attempt) {
-            if (speed.isFinite() && speed > 0.0) {
-                this@FCastSession.speed = speed
-                emitPlayback()
-            }
-        }
+        override fun speedChanged(speed: Double) = post(attempt) { playback.speedChanged(speed) }
 
         override fun playbackStateChanged(state: PlaybackState) = post(attempt) {
-            val ended = mediaLoaded && (
-                state == PlaybackState.ENDED ||
-                    (
-                        state == PlaybackState.IDLE && isLegacyFCastCompletion(
-                            legacyReceiver,
-                            mediaLoaded,
-                            playbackState == 1,
-                            positionMs,
-                            durationMs
-                        )
-                        )
-                )
-            playbackState = when (state) {
-                PlaybackState.PLAYING -> 1
-                PlaybackState.PAUSED -> 2
-                PlaybackState.BUFFERING -> 3
-                PlaybackState.IDLE, PlaybackState.ENDED -> 0
-            }
-            if (pauseOnLoad && (state == PlaybackState.PLAYING || state == PlaybackState.PAUSED)) {
-                pauseOnLoad = false
-                if (state == PlaybackState.PLAYING) command { it.pausePlayback() }
-            }
-            if (state == PlaybackState.PLAYING) endedReported = false
-            emitPlayback()
-            if (isCurrent(attempt.generation) && ended && !endedReported) {
-                endedReported = true
-                listener.onEnded()
-            }
+            playback.playbackStateChanged(state)
         }
 
-        override fun playbackStopped() = post(attempt) {
-            if (!mediaLoaded) return@post
-            mediaLoaded = false
-            playbackState = 0
-            pauseOnLoad = false
-            emitPlayback()
-            if (isCurrent(attempt.generation)) listener.onStopped()
-        }
+        override fun playbackStopped() = post(attempt) { playback.stopped() }
 
         override fun playbackError(message: String) = post(attempt) { listener.onError(message) }
         override fun commandError(error: ReceiverError) = post(attempt) {
             listener.onError("FCast receiver: ${error.name.lowercase(Locale.ROOT).replace('_', ' ')}")
         }
 
-        override fun sourceChanged(source: Source) = Unit
+        override fun sourceChanged(source: Source) = post(attempt) { playback.sourceChanged(source) }
         override fun tracksAvailable(tracks: List<MediaTrack>) = Unit
         override fun trackSelected(id: UInt?, typ: MediaTrackType) = Unit
         override fun tracksChanged(tracks: TrackList) = Unit
@@ -447,19 +394,8 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     }
 
     private fun resetPlayback() {
-        playbackState = 0
-        positionMs = 0L
-        durationMs = 0L
-        speed = 1.0
+        playback.reset()
         currentVolume = 1.0
-        pauseOnLoad = false
-        endedReported = false
-        legacyReceiver = false
-        mediaLoaded = false
-    }
-
-    private fun emitPlayback() {
-        if (!closed) listener.onPlaybackChanged(playbackState, positionMs, durationMs, speed)
     }
 
     private fun cancelTimeout() {
@@ -481,8 +417,6 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
         if (Looper.myLooper() == Looper.getMainLooper()) action() else main.post { action() }
     }
 
-    private fun secondsToMillis(seconds: Double) = (seconds.coerceAtLeast(0.0) * 1000.0).toLong()
-
     private companion object {
         const val TAG = "FCastSession"
         const val CONNECTION_TIMEOUT_MS = 15_000L
@@ -490,16 +424,194 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     }
 }
 
-/** v2 has no Ended event; never infer completion from an initial idle or unknown/live duration. */
-internal fun isLegacyFCastCompletion(
-    legacyReceiver: Boolean,
-    mediaLoaded: Boolean,
-    wasPlaying: Boolean,
-    positionMs: Long,
-    durationMs: Long
-): Boolean {
-    if (!legacyReceiver || !mediaLoaded || !wasPlaying || positionMs <= 0L || durationMs <= 0L) return false
-    val tolerance = minOf(1_000L, durationMs / 10L)
-    val remaining = durationMs - positionMs
-    return remaining >= -tolerance && remaining <= tolerance
+/**
+ * Main-thread playback policy, independent of the SDK connection and Android event loop.
+ * Receiver state and duration are connection-wide: SDK 0.6.1 deduplicates unchanged v2/v3 values.
+ * Source echoes are learned from matching acknowledgements, not SDK feature/version guesses:
+ * some working receivers never echo their own loads, including observed SDK-v3 connections.
+ * Until an own-load echo is observed, readiness must use playback evidence; the protocol
+ * cannot distinguish an old source's pending progress from the new load's progress.
+ */
+internal class FCastPlaybackState(
+    private val listener: FCastSession.Listener,
+    private val pause: () -> Unit
+) {
+    var legacyReceiver = false
+    var legacyCompletionWithoutEcho = false
+    private var sourceEchoObserved = false
+    private var receiverState = PlaybackState.IDLE
+    private var expectedSource: Source? = null
+    private var sourceAcknowledged = false
+    private var pendingLoad = false
+    private var positionMs = 0L
+    private var durationMs = 0L
+    private var speed = 1.0
+    private var pauseOnLoad = false
+    private var endedReported = false
+    private var playedThisLoad = false
+    private var revision = 0L
+
+    fun load(source: Source, positionMs: Long, speed: Double, playWhenReady: Boolean) {
+        revision++
+        expectedSource = source
+        sourceAcknowledged = false
+        pendingLoad = true
+        this.positionMs = positionMs.coerceAtLeast(0L)
+        this.speed = speed
+        pauseOnLoad = !playWhenReady
+        endedReported = false
+        playedThisLoad = false
+    }
+
+    fun sourceChanged(source: Source) {
+        val expected = expectedSource ?: return
+        if (source == expected) {
+            sourceAcknowledged = true
+            sourceEchoObserved = true
+        } else if (sourceAcknowledged || !pendingLoad) {
+            relinquish()
+        }
+        // Pending Initial/older in-flight loads can still report their source. Once this
+        // connection has echoed our loads, block their callbacks until our next matching echo.
+    }
+
+    fun timeChanged(time: Double) {
+        if (!acceptsPlayback() || !time.isFinite()) return
+        val next = secondsToMillis(time)
+        if (pendingLoad && receiverState == PlaybackState.PLAYING && next > positionMs) {
+            // A playing receiver need not send another PLAYING callback after load().
+            pendingLoad = false
+            playedThisLoad = true
+            applyPauseOnLoad()
+        }
+        positionMs = next
+        emit()
+    }
+
+    fun durationChanged(duration: Double) {
+        if (!duration.isFinite()) return
+        // Cache even initial or pending-source snapshots: an unchanged duration is not re-emitted.
+        durationMs = secondsToMillis(duration)
+        if (acceptsPlayback()) emit()
+    }
+
+    fun speedChanged(speed: Double) {
+        if (!acceptsPlayback() || !speed.isFinite() || speed <= 0.0) return
+        this.speed = speed
+        emit()
+    }
+
+    fun playbackStateChanged(state: PlaybackState) {
+        val previous = receiverState
+        receiverState = state
+        if (!acceptsPlayback()) return
+        // An initial idle/ended snapshot can precede the receiver accepting a load.
+        if (pendingLoad && (state == PlaybackState.IDLE || state == PlaybackState.ENDED)) return
+        pendingLoad = false
+        val completed = state == PlaybackState.ENDED || legacyCompletion(previous, state)
+        if (state == PlaybackState.IDLE && !completed && !endedReported) {
+            relinquish()
+            return
+        }
+        if (state == PlaybackState.PLAYING) {
+            playedThisLoad = true
+            endedReported = false
+        }
+        applyPauseOnLoad()
+        val reportEnd = completed && !endedReported
+        if (reportEnd) endedReported = true
+        val current = revision
+        emit()
+        // A consumer can replace/disconnect the load while observing its final playback snapshot.
+        if (current == revision && reportEnd) listener.onEnded()
+    }
+
+    fun stopped() {
+        // SDK v4 can relay a stop of the previous source before accepting our pending load.
+        if (expectedSource != null && !pendingLoad) relinquish()
+    }
+
+    fun clearPauseOnLoad() {
+        pauseOnLoad = false
+    }
+
+    fun seek(positionMs: Long) {
+        if (durationMs <= 0L || positionMs < durationMs) endedReported = false
+    }
+
+    fun reset() {
+        revision++
+        legacyReceiver = false
+        legacyCompletionWithoutEcho = false
+        sourceEchoObserved = false
+        receiverState = PlaybackState.IDLE
+        expectedSource = null
+        sourceAcknowledged = false
+        pendingLoad = false
+        positionMs = 0L
+        durationMs = 0L
+        speed = 1.0
+        pauseOnLoad = false
+        endedReported = false
+        playedThisLoad = false
+    }
+
+    fun emit() {
+        if (expectedSource == null) return
+        val state = if (pendingLoad) {
+            3
+        } else {
+            when (receiverState) {
+                PlaybackState.PLAYING -> 1
+                PlaybackState.PAUSED -> 2
+                PlaybackState.BUFFERING -> 3
+                PlaybackState.IDLE, PlaybackState.ENDED -> 0
+            }
+        }
+        listener.onPlaybackChanged(state, positionMs, if (pendingLoad) 0L else durationMs, speed)
+    }
+
+    private fun acceptsPlayback() = expectedSource != null &&
+        (!sourceEchoObserved || sourceAcknowledged)
+
+    private fun relinquish() {
+        revision++
+        expectedSource = null
+        sourceAcknowledged = false
+        pendingLoad = false
+        pauseOnLoad = false
+        listener.onStopped()
+    }
+
+    private fun applyPauseOnLoad() {
+        if (pauseOnLoad && (receiverState == PlaybackState.PLAYING || receiverState == PlaybackState.PAUSED)) {
+            pauseOnLoad = false
+            if (receiverState == PlaybackState.PLAYING) pause()
+        }
+    }
+
+    private fun legacyCompletion(previous: PlaybackState, state: PlaybackState): Boolean {
+        val canInferCompletion = legacyReceiver ||
+            (legacyCompletionWithoutEcho && !sourceEchoObserved)
+        if (!canInferCompletion || !playedThisLoad || previous != PlaybackState.PLAYING ||
+            positionMs <= 0L || durationMs <= 0L
+        ) {
+            return false
+        }
+        val tolerance = minOf(1_000L, durationMs / 10L)
+        val remaining = durationMs - positionMs
+        return when (state) {
+            PlaybackState.IDLE -> remaining in -tolerance..tolerance
+
+            // Android Receiver 2.1.5 maps STATE_ENDED to PAUSED. Apply this fallback only to
+            // v2 or SDK-v3 peers with no observed own-source echo, never to v4. Require the
+            // known duration, not merely near it. Without explicit source/end notifications,
+            // a manual pause/seek exactly at the end is indistinguishable from completion.
+            PlaybackState.PAUSED -> remaining in -tolerance..0L
+
+            else -> false
+        }
+    }
+
+    private fun secondsToMillis(seconds: Double) = (seconds.coerceAtLeast(0.0) * 1000.0).toLong()
 }

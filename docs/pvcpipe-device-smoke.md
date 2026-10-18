@@ -633,7 +633,7 @@ this record does not establish new playback, receiver or physical-device UI cove
 
 ## Kick service smoke, 2026-10-18
 
-The current debug APK was installed with `install -r` on the disposable
+The Kick-enabled debug APK was installed with `install -r` on the disposable
 `castout_api26` emulator (Android 8.0/API 26, x86_64, headless software
 rendering). No instrumentation, uninstall or data-clear command was run.
 The connected Pixel was not used.
@@ -691,4 +691,195 @@ The debug APK's signing certificate matched the existing Pixel installation,
 which was version `0.2.1` / code `1000201`, allowing an in-place update of
 the same application id. This build/version check adds no new physical-device
 playback claim to the earlier Kick smoke.
+
+## Kick image-metadata debug update, 2026-10-18
+
+The post-release image-metadata fix was installed on the Pixel as an in-place
+debug update, still version `0.2.2` / code `1000202`. The candidate application
+id and signing certificate matched the installed package before `adb install -r`.
+Installation succeeded; app id `10326`, the private data directory and the
+original `2026-10-07 10:06:01` first-install timestamp remained unchanged.
+The installed APK's SHA-256 matched the fixed build:
+`987875d38ed97b1be55a73d272143cfc44c03f67f351e9e73fd72d705505bfa2`.
+No uninstall, data-clear or instrumentation task was run.
+
+The [image-metadata follow-up](service-protocol-observations.md#image-metadata-follow-up--2026-10-18)
+records the API 26 native UI verification and release gate. This installation
+added no physical-device playback evidence, and no new release tag was created.
+
+## Kick full-width channel banners, 2026-10-18
+
+On the API 26 emulator, xQc's channel reproduced a small, centered header
+photo with large side gaps. The shared channel banner view used `fitCenter`
+inside a height cap. Switching that view to `centerCrop` preserved the
+artwork's aspect ratio and visibly filled the entire 720-pixel screen width.
+Sonwabile's wider banner was also checked on the native channel screen.
+The change leaves the existing banner-height cap and no-banner handling intact.
+`:app:assembleDebug` and `:app:lintDebug` passed.
+
+The rebuilt debug APK was installed on the Pixel with `adb install -r`
+after application-id and certificate checks. App id `10326`, its private
+data directory and first-install timestamp remained unchanged. The installed
+APK matched the build SHA-256:
+`4a85552f7ba1932a6bf9cf7ff20ebae925a08068dfa00d979feb9973d3bdfaf2`.
+No data-clear, uninstall or instrumentation task was run. This debug update
+retained version `0.2.2`; no new tag or physical-device rendering claim was added.
+
+## Subscription service grouping, 2026-10-18
+
+The API 26 emulator used isolated subscription fixtures for YouTube, SoundCloud,
+Kick and retired service id `3`, including identical account names across services
+and a custom feed group spanning YouTube and Kick. No phone database was read or
+modified for these fixtures, and no instrumentation task was run.
+
+The original installed build displayed a mixed alphabetical account list. With
+the grouped build, the native Subscriptions tab displayed service headings and
+alphabetical accounts within each service. Both list and two-column grid layouts
+were inspected; service headings occupied the full width. Retired-service
+accounts remained visible under `<unknown>`.
+
+Tapping the Kick account opened Sonwabile's subscribed channel. Its metadata
+update preserved the subscription id and both custom-group memberships.
+Long-pressing the last retired-service account and choosing Unsubscribe removed
+the account and its heading immediately without removing the following Kick
+section. Restoring the original empty database showed the normal import/export
+hint with no empty service headings. The emulator database and preferences were
+restored after the scenario.
+
+`make ci` passed, including app/build-logic tests, offline extractor regressions,
+lint, Checkstyle, ktlint, dependency ordering and debug/release assembly.
+
+The debug build was then installed on the Pixel using `adb install -r`, with
+matching application id and signing certificate. No active phone cast session
+was present before installation. App id `10326`, its private data directory and
+first-install timestamp remained unchanged. The installed APK matched the build
+SHA-256 `59f2ed12fdd5ceb9edeb2bde5c90a44d23629abcdab3652b3aff1029a400ef88`.
+No phone data-clear, uninstall or instrumentation task was run; native rendering
+verification above used the emulator, not the phone.
+
+## FCast receiver recovery, 2026-10-18
+
+The Pixel's post-release `0.2.2` debug build connected to the real
+`FCast-Amazon-AFTKM` receiver, running FCast Receiver Android `2.1.5-playstore`,
+but the TV remained on its ready screen. The phone stayed in remote buffering.
+The control connection alone did not establish playback.
+
+A temporary plaintext protocol relay captured a valid HLS Play command.
+The phone's receiver-facing proxy returned HTTP 200 for the rewritten playlist
+and HTTP 206 for a MPEG-TS byte range. A separate minimal request for a public
+MP4 bypassed both Kick and PVCPipe's proxy; the receiver accepted that request
+but still reported no playback clock or player error. Its cached source was
+present without a playback position. Receiver ADB access was unavailable.
+
+Opening the receiver's ready screen did not restore playback. After the user
+rebooted the Fire Stick and opened FCast Receiver, a fresh normal PVCPipe
+connection played the same Kick VOD. The receiver reported PLAYING with its
+clock advancing from 269.329 to 277.350 seconds; the phone reported remote
+PLAYING. The user confirmed both TV picture and audio, and the cast was left
+playing under the normal controls.
+
+No FCast code, protocol override, retry policy or APK update was needed for
+that recovery. The receiver source contains a pending-play guard, but its
+internal state was not observable; attributing the failure to that guard would
+be an inference. The temporary relay, ADB reverse tunnel and diagnostic files
+were removed. This verifies that Kick VOD on that build and receiver, not
+secure-v4 interoperability, every service or later casting changes.
+
+## 0.2.3 adversarial review, 2026-10-18
+
+The review covered the Kick integration and artwork metadata, shared channel
+header cropping, service-grouped subscriptions, FCast session policy,
+discovery and the receiver-facing media proxy. Current guides and comments
+were reconciled with the implementation; earlier dated results remain
+evidence for their original builds.
+
+### Controlled media and protocol checks
+
+A standalone JVM runner used production proxy and manifest-rewriter classes
+against a loopback HTTP origin. An implicit single-file DASH SegmentList
+previously returned MPD XML bytes for media ranges; after correction,
+initialization and media requests returned the expected `AB` and `CD` payloads
+with HTTP 206. An inline HLS load that previously published a manifest whose
+first segment returned 404 now failed preparation before publication, leaving
+its existing segment capability usable. Regression coverage also exercises
+the exact capacity boundary, paired manifests and bounded route replacement
+after preparation for long-running live playback.
+
+Seven unauthenticated clients sent incomplete headers and continued dripping
+bytes while an eighth worker served a valid media stream. The corrected
+server closed the incomplete requests after 15.010–15.017 seconds, accepted a
+fresh capability request and delivered the valid stream's final byte after
+the header deadline. The origin deliberately held that stream open for
+18 seconds. This establishes the header-reading bound, not immunity to
+arbitrary sustained connection floods.
+
+### Native Android app and controlled receiver
+
+Direct, targeted instrumentation ran only on the isolated API 26 emulator.
+A disposable driver seeded two in-memory stream-info fixtures, opened the
+normal main player and used the real native FCast SDK against a controlled
+TCP receiver. A generated 120-second H.264/AAC MP4 supplied actual local
+video decoding and ranged proxy requests. An initial public MP4 fixture
+returned HTTP 403 and was discarded; that failed setup was not used as
+FCast evidence. No production network-security override was added.
+
+The installed `0.2.2` build reproduced unchanged-state buffering: the
+receiver was connected, fetched MP4 bytes with HTTP 206 and advanced its
+clock, but the app remained preparing. The `0.2.3` build left buffering on
+that same protocol pattern. Its ordinary player controls visibly showed
+active casting rather than the loading indicator.
+
+The corrected build also exercised:
+
+- A v2 receiver returning to idle released local cast ownership.
+- A v3-advertising peer that sent neither Initial nor own-load PlayUpdate
+  notifications became ready from playback progress. Its paused-at-duration
+  update advanced the real two-item queue and produced a second native Play.
+- A source-echoing v3 peer replacing the current video caused PVCPipe to
+  relinquish ownership without sending Stop to the replacement.
+- Actual Android NSD registration, picker background/foreground, receiver
+  removal and rediscovery. The retained picker view had one receiver before
+  stopping discovery and none after restart; registering the fixture again
+  restored its row.
+- The existing DASH compatibility instrumentation passed against the app's
+  local ExoPlayer parser. It does not run the installed receiver's parser.
+
+Pure-policy regressions additionally cover unchanged duration callbacks,
+once-only completion and repeat, initial versus terminal idle, pending-source
+identity, and v4's explicit-end behavior. API 34 service-info callback recovery
+uses controlled framework callbacks in JVM regressions; the API 26 emulator
+does not exercise that newer Android API.
+
+These results do not establish real receiver decoding, secure-v4
+interoperability or playback from every supported service. The earlier
+[Fire Stick recovery](#fcast-receiver-recovery-2026-10-18) remains separate
+hardware evidence for the post-release `0.2.2` build.
+
+### Release gate and local artifacts
+
+`make ci` passed: 3 build-logic tests, 819 app unit tests and 388 offline
+extractor cases, with no failed or skipped cases. Checkstyle, ktlint,
+dependency ordering, Android lint and debug/release assembly passed.
+Both APKs reported version `0.2.3`, code `1000203`, with their expected
+debug and release application IDs.
+
+The locally checked debug APK was signed with the existing debug certificate
+and had SHA-256
+`4d2f241ab579d61a7a9a94a76aeb841e40730b2db276aed727e8307955058d57`.
+The unsigned release APK had SHA-256
+`e1c6a09a2fbb3b4a9ee16b35f3df0e19e9ba27ff14ac4c730e1d7986e486962b`.
+These identify the local artifacts from this run, not signed production
+release assets or a reproducible-build guarantee.
+
+All five native scenarios above passed with that final debug APK. Both
+receiver idle and foreign-source replacement released the actual wake lock
+and closed the previous media listener.
+
+The disposable driver was removed from source and was absent from the
+retained debug and rebuilt instrumentation APKs. Its test package was
+uninstalled only from the isolated emulator. The emulator's original database,
+preferences and private files were restored, with all ten saved file hashes
+matching the backup. The main app was not uninstalled or data-cleared.
+The controlled origin, ADB reverse mapping, temporary files and owned emulator
+were stopped or removed. The phone was not modified during this review.
 

@@ -1,5 +1,6 @@
 package org.schabi.newpipe.player.cast;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -14,6 +15,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -151,6 +155,98 @@ public class CastMediaServerTest {
                     .replace("$Time$", "../2"), "GET", "").startsWith("HTTP/1.1 404"));
             assertThrows(IOException.class,
                     () -> server.register("https://cdn.example/$SubNumber$.m4s", ""));
+        }
+    }
+
+    @Test
+    public void preparedLiveLoadCanReplaceOldCapabilitiesWithoutRejectingNewMedia()
+            throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String oldest = server.register("https://cdn.example/segment-0.ts", "");
+            server.finishPreparation();
+            String newest = oldest;
+            for (int i = 1; i <= 8192; i++) {
+                newest = server.register("https://cdn.example/segment-" + i + ".ts", "");
+            }
+            assertTrue(request(oldest, "OPTIONS", "").startsWith("HTTP/1.1 404"));
+            assertTrue(request(newest, "OPTIONS", "").startsWith("HTTP/1.1 204"));
+        }
+    }
+
+    @Test(timeout = 40000)
+    public void progressingHeadersExpireWithoutInterruptingAnActiveStream() throws Exception {
+        final var originWorker = Executors.newSingleThreadExecutor();
+        final var dripper = Executors.newSingleThreadScheduledExecutor();
+        final List<Socket> slowClients = new ArrayList<>();
+        final CountDownLatch finishMedia = new CountDownLatch(1);
+        try (ServerSocket origin = new ServerSocket(0, 2, InetAddress.getLoopbackAddress());
+             CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            origin.setSoTimeout(5000);
+            final var originResponse = originWorker.submit(() -> {
+                try (Socket socket = origin.accept()) {
+                    socket.setSoTimeout(5000);
+                    final BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            socket.getInputStream(), StandardCharsets.US_ASCII));
+                    String line = reader.readLine();
+                    while (line != null && !line.isEmpty()) {
+                        line = reader.readLine();
+                    }
+                    socket.getOutputStream().write(("HTTP/1.1 200 OK\r\n"
+                            + "Content-Type: video/mp4\r\nContent-Length: 2\r\n"
+                            + "Connection: close\r\n\r\nA").getBytes(StandardCharsets.US_ASCII));
+                    socket.getOutputStream().flush();
+                    assertTrue(finishMedia.await(30, TimeUnit.SECONDS));
+                    socket.getOutputStream().write('B');
+                }
+                return null;
+            });
+            final URI media = URI.create(server.register("http://127.0.0.1:"
+                    + origin.getLocalPort() + "/video", "video/mp4"));
+            try (Socket receiver = new Socket(media.getHost(), media.getPort())) {
+                receiver.setSoTimeout(20000);
+                receiver.getOutputStream().write(("GET " + media.getRawPath()
+                        + " HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                        .getBytes(StandardCharsets.US_ASCII));
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(
+                        receiver.getInputStream(), StandardCharsets.US_ASCII));
+                String line = reader.readLine();
+                while (line != null && !line.isEmpty()) {
+                    line = reader.readLine();
+                }
+                assertEquals('A', reader.read());
+                for (int index = 0; index < 7; index++) {
+                    final Socket client = new Socket(media.getHost(), media.getPort());
+                    slowClients.add(client);
+                    client.setSoTimeout(20000);
+                    client.getOutputStream().write((index % 2 == 0 ? "GET "
+                            : "GET / HTTP/1.1\r\nX-Slow: ").getBytes(StandardCharsets.US_ASCII));
+                }
+                dripper.scheduleAtFixedRate(() -> {
+                    for (final Socket client : slowClients) {
+                        try {
+                            client.getOutputStream().write('x');
+                        } catch (final IOException ignored) {
+                            // Expired request connections must not stop the other slow clients.
+                        }
+                    }
+                }, 0, 100, TimeUnit.MILLISECONDS);
+                for (final Socket client : slowClients) {
+                    client.getInputStream().readAllBytes();
+                }
+                assertTrue(request(server.content("receiver media", "video/mp4"), "GET", "")
+                        .endsWith("\r\n\r\nreceiver media"));
+                finishMedia.countDown();
+                assertEquals('B', reader.read());
+                assertEquals(-1, reader.read());
+                originResponse.get(5, TimeUnit.SECONDS);
+            }
+        } finally {
+            finishMedia.countDown();
+            dripper.shutdownNow();
+            for (final Socket client : slowClients) {
+                client.close();
+            }
+            originWorker.shutdownNow();
         }
     }
 

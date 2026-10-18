@@ -23,6 +23,8 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class KickApi {
     public static final String FEATURED =
@@ -31,6 +33,15 @@ public final class KickApi {
             "Accept", List.of("application/json"),
             "Referer", List.of(KickUrl.BASE + "/"),
             "Origin", List.of(KickUrl.BASE));
+    private static final Pattern THUMBNAIL_HEIGHT = Pattern.compile(
+            "https://images\\.kick\\.com/video_thumbnails/[^/?#]+/[^/?#]+/"
+                    + "(160|360|480|720|1080)\\.webp(?:[?#].*)?");
+    private static final Pattern AVATAR_WIDTH = Pattern.compile(
+            "https://files\\.kick\\.com/images/user/[0-9]+/profile_image/conversion/"
+                    + "[^/?#]+-(medium|fullsize)\\.webp(?:[?#].*)?");
+    private static final Pattern VOD_PREVIEW = Pattern.compile(
+            "https://web\\.kick\\.com/api/v1/videos/[^/?#]+/thumbnails/[0-9]+"
+                    + "\\.jpeg(?:[?#].*)?");
 
     private KickApi() {
     }
@@ -60,10 +71,11 @@ public final class KickApi {
             throw new NotFoundException();
         }
         if (status == 410) {
-            throw new ContentNotAvailableException("This Kick content does not exist or expired");
+            throw new ContentNotAvailableException(
+                    "This Kick content is unavailable or has expired");
         }
         if (status < 200 || status >= 300) {
-            throw new IOException("Kick API returned HTTP " + status);
+            throw new IOException("Kick request returned HTTP " + status);
         }
         if (body == null || body.isBlank() || "null".equals(body.trim())) {
             throw new ContentNotAvailableException("Kick returned no content");
@@ -81,7 +93,7 @@ public final class KickApi {
 
     public static String manifest(final String url) throws IOException, ExtractionException {
         if (!KickUrl.isHttps(url)) {
-            throw new ParsingException("Invalid Kick HLS URL");
+            throw new ParsingException("Kick HLS URLs must use HTTPS");
         }
         final String playlist = body(url);
         if (!playlist.stripLeading().startsWith("#EXTM3U")) {
@@ -209,8 +221,31 @@ public final class KickApi {
     }
 
     public static List<Image> images(final String url) {
-        return KickUrl.isHttps(url) ? List.of(new Image(url, Image.HEIGHT_UNKNOWN,
-                Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN)) : List.of();
+        if (!KickUrl.isHttps(url)) {
+            return List.of();
+        }
+        int width = Image.WIDTH_UNKNOWN;
+        int height = Image.HEIGHT_UNKNOWN;
+        Image.ResolutionLevel quality = Image.ResolutionLevel.UNKNOWN;
+        if (url.startsWith("https://images.kick.com/video_thumbnails/")) {
+            final Matcher thumbnail = THUMBNAIL_HEIGHT.matcher(url);
+            if (thumbnail.matches()) {
+                // The filename encodes height; Kick's srcset width descriptors can be wrong.
+                height = Integer.parseInt(thumbnail.group(1));
+                quality = Image.ResolutionLevel.fromHeight(height);
+            }
+        } else if (url.startsWith("https://files.kick.com/images/user/")) {
+            final Matcher avatar = AVATAR_WIDTH.matcher(url);
+            if (avatar.matches()) {
+                // Conversion widths are fixed, but portrait avatars are not square.
+                width = "medium".equals(avatar.group(1)) ? 150 : 350;
+            }
+        } else if (url.startsWith("https://web.kick.com/api/v1/videos/")
+                && VOD_PREVIEW.matcher(url).matches()) {
+            // This endpoint serves HD previews without providing intrinsic dimensions.
+            quality = Image.ResolutionLevel.HIGH;
+        }
+        return List.of(new Image(url, height, width, quality));
     }
 
     public static String image(final JsonObject item, final String field) {

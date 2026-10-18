@@ -1,10 +1,10 @@
 # Library data
 
-Subscriptions, the feed, playlists, history and settings are kept on the
-device. Three jobs move that data in bulk: the feed refresh, the subscription
-import and export, and backup and restore. Local playlist edits also update
-the database. This page describes their behavior and failure boundaries;
-the code defines batch sizes, delays and file formats.
+PVCPipe stores subscriptions, feeds, playlists, history and settings on the
+device. Feed refreshes update the local library; subscription transfers and
+backup/restore move data to or from user-selected sources. This guide covers
+their behavior and failure boundaries. The implementation defines batch
+sizes, delays and file formats.
 
 ## Local playlists
 
@@ -55,6 +55,23 @@ service's feed extractor in place of loading the channel when the dedicated
 feed setting is on and the service has one
 (see [services.md](services.md#the-services)).
 
+## Subscriptions tab
+
+Subscribed channels are grouped by their stored service ID in ascending ID
+order. For supported services, this matches the service picker: YouTube,
+SoundCloud, BitChute, Rumble, Odysee, then Kick. Within each section, channels
+retain the database's case-insensitive alphabetical name order.
+
+Only services with subscriptions get a heading. Headings span the full width
+in both list and grid layouts; unsubscribing from a section's last channel
+removes its heading.
+
+These are presentation sections, not new database records or custom feed
+groups. Custom groups can still contain channels from multiple services.
+Subscriptions from retired services remain grouped by their original IDs,
+with `<unknown>` headings; different retired IDs remain separate even though
+their labels match. The empty list retains its import/export hint.
+
 ## Subscription import and export
 
 [`SubscriptionTransfer`](../app/src/main/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransfer.kt)
@@ -83,18 +100,17 @@ the screen closes.
 [`ImportExportManager`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt)
 reads and writes the archive.
 
-**Export.** The app checkpoints the database and writes a ZIP with three
-entries: `newpipe.db`, `preferences.json` and `newpipe.settings`, the older
-serialized form of the same preferences. Downloads are not in a backup. That
-covers the media files, the separate database of finished downloads and the
-state of unfinished ones.
+**Export.** PVCPipe checkpoints the local library database and writes a ZIP
+with three entries: `newpipe.db`, `preferences.json` and `newpipe.settings`
+(the legacy serialized form of the same preferences). It excludes downloaded
+media, the separate finished-downloads database and unfinished-download state.
 
 **Inspection.** Before a restore the app looks at the chosen file and reports
 whether it is a readable ZIP and which form of settings it holds. JSON
-settings are preferred when both forms are there. An inspection is advice.
-It does not validate the database, and the file can change before the
-restore reads it. If the settings it offered are no longer what the file
-holds, the restore stops and asks for a new inspection.
+settings are preferred when both forms are present. Inspection is advisory:
+it does not validate the database or snapshot the archive. If the settings
+format changes before restore preparation, the restore stops and requires a
+new inspection.
 
 **Imported settings are not trusted.** Before they replace the live ones,
 `ImportedPreferenceTypes.conformImport` checks their types. A preference the
@@ -124,11 +140,11 @@ this check:
    moves the pending database into place before any database connection is
    opened.
 
-A restore that completed has therefore staged the database and asked for a
-restart. It has not installed it in the running process. If the restart
-fails, the restore stays pending, and while one is pending the app refuses
-further restores and exports. Accepted work survives screen closure, not
-termination of the application process.
+A completed restore has staged the database and requested a restart; it has
+not replaced the database in the running process. If restart fails, the
+restore stays pending. While a restore is pending, further restores and
+exports are refused. Accepted work survives screen closure, not application
+process termination.
 
 Replacing the preferences and publishing the database are two steps, not one
 transaction. If the second fails, the app puts the old preferences back, and

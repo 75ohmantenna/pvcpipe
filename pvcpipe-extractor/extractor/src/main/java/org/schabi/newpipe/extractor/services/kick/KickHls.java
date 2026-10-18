@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Converts IVS master variants to downloadable media playlists, not another master. */
+/** Exposes IVS media-playlist URLs, rather than the master, as download sources. */
 public final class KickHls {
     private static final Pattern VARIANT = Pattern.compile(
             "#EXT-X-STREAM-INF:([^\\r\\n]*)\\r?\\n"
@@ -40,7 +40,7 @@ public final class KickHls {
                 throw new ParsingException("Invalid Kick HLS rendition URL", e);
             }
             if (!KickUrl.isHttps(media)) {
-                throw new ParsingException("Unsafe Kick HLS rendition URL");
+                throw new ParsingException("Kick HLS rendition URLs must use HTTPS");
             }
             final VideoStream stream = new VideoStream.Builder().setId("hls-" + streams.size())
                     .setContent(media, true).setDeliveryMethod(DeliveryMethod.HLS)

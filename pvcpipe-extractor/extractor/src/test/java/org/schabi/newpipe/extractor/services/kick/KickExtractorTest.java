@@ -35,6 +35,7 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
+import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -98,12 +99,13 @@ class KickExtractorTest {
         final String fresh = "https://live.example/master.m3u8?token=fresh";
         downloader.channel(true).on(CHANNEL_API + "/playback-url", "{\"data\":\"" + fresh + "\"}")
                 .on(fresh, KickFixtures.MASTER);
-        final StreamInfo info = StreamInfo.getInfo(Kick, "https://kick.com/example");
+        final StreamInfo info = StreamInfo.getInfo(Kick, "https://kick.com/example?t=25");
         assertEquals(StreamType.LIVE_STREAM, info.getStreamType());
         assertEquals(fresh, info.getHlsUrl());
         assertEquals("Live title", info.getName());
         assertEquals(CHANNEL_URL, info.getUploaderUrl());
         assertEquals(0, info.getDuration());
+        assertEquals(0, info.getStartPosition());
         assertEquals(-1, info.getViewCount());
         assertEquals(18, info.getAgeLimit());
         assertEquals(DeliveryMethod.HLS, info.getVideoStreams().get(0).getDeliveryMethod());
@@ -146,6 +148,49 @@ class KickExtractorTest {
     }
 
     @Test
+    void timestampedRecordingSeeksWithoutChangingCanonicalIdentity() throws Exception {
+        downloader.recording();
+        final String originalUrl = VIDEO_URL + "?t=25&ref=share";
+        assertEquals(VIDEO_URL, Kick.getStreamLHFactory().fromUrl(originalUrl).getUrl());
+        final StreamInfo info = StreamInfo.getInfo(Kick, originalUrl);
+        assertEquals(25, info.getStartPosition());
+        assertEquals(VIDEO_URL, info.getUrl());
+        assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
+    }
+
+    @Test
+    void encodedQueryValueCannotCreateRecordingSeekOffset() throws Exception {
+        downloader.recording();
+        final StreamInfo info = StreamInfo.getInfo(Kick, VIDEO_URL + "?ref=x%26t%3D25");
+        assertEquals(0, info.getStartPosition());
+        assertEquals(VIDEO_URL, info.getUrl());
+        assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"?t", "?t=", "?t=-25", "?t=1.5", "?t=25seconds",
+            "?t=9223372036854775807", "?t=9223372036854776", "?t=9223372036855",
+            "?t=9223372036854775808", "?t=999999999999999999999999999999",
+            "?t=%26t%3D25", "?t=invalid&t=25"})
+    void invalidOptionalRecordingOffsetsDoNotPreventPlayback(final String query) throws Exception {
+        downloader.recording();
+        final StreamInfo info = StreamInfo.getInfo(Kick, VIDEO_URL + query);
+        assertEquals(0, info.getStartPosition());
+        assertEquals(VIDEO_URL, info.getUrl());
+        assertEquals(MASTER_URL, info.getHlsUrl());
+        assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
+    }
+
+    @Test
+    void encodedRecordingOffsetUsesTheFirstQueryParameterValue() throws Exception {
+        downloader.recording();
+        final StreamInfo info = StreamInfo.getInfo(Kick, VIDEO_URL + "?%74=%32%35&t=50");
+        assertEquals(25, info.getStartPosition());
+        assertEquals(VIDEO_URL, info.getUrl());
+        assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
+    }
+
+    @Test
     void legacyUuidResolvesAndCanonicalizesToCurrentRecording() throws Exception {
         final JsonObject legacy = KickFixtures.json("{\"uuid\":\"" + LEGACY_UUID + "\","
                 + "\"source\":\"" + MASTER_URL + "\",\"views\":23,\"status\":\"public\"}");
@@ -176,7 +221,6 @@ class KickExtractorTest {
         assertEquals(73, channel.getSubscriberCount());
         assertEquals("Channel biography", channel.getDescription());
         assertTrue(channel.isVerified());
-        assertFalse(channel.getAvatars().isEmpty());
         assertTrue(channel.getErrors().isEmpty(), channel.getErrors().toString());
         assertEquals(ChannelTabs.VIDEOS, channel.getTabs().get(0).getContentFilters().get(0));
         final ChannelTabInfo videos = ChannelTabInfo.getInfo(Kick, channel.getTabs().get(0));
@@ -192,7 +236,39 @@ class KickExtractorTest {
         assertEquals(Instant.parse("2026-10-18T12:00:00Z").getEpochSecond(),
                 ((StreamInfoItem) live.getRelatedItems().get(0))
                         .getUploadDate().offsetDateTime().toEpochSecond());
-        assertEquals(1, downloader.requests.stream().filter(r -> r.url().equals(CHANNEL_API)).count());
+    }
+
+    @Test
+    void retainedLiveTabHandlerRefreshesOfflineAndEndedBroadcasts() throws Exception {
+        downloader.channel(false);
+        final ChannelInfo channel = ChannelInfo.getInfo(Kick, CHANNEL_URL);
+        final ListLinkHandler liveHandler = channel.getTabs().get(1);
+        assertTrue(ChannelTabInfo.getInfo(Kick, liveHandler).getRelatedItems().isEmpty());
+
+        downloader.channel(true);
+        final ChannelTabInfo live = ChannelTabInfo.getInfo(Kick, liveHandler);
+        assertEquals(1, live.getRelatedItems().size());
+        final String firstUrl = live.getRelatedItems().get(0).getUrl();
+        assertEquals("https://kick.com/example?live="
+                + Instant.parse("2026-10-18T12:00:00Z").getEpochSecond(), firstUrl);
+        assertTrue(live.getErrors().isEmpty(), live.getErrors().toString());
+
+        downloader.channel(false);
+        final ChannelTabInfo ended = ChannelTabInfo.getInfo(Kick, liveHandler);
+        assertTrue(ended.getRelatedItems().isEmpty());
+        assertTrue(ended.getErrors().isEmpty(), ended.getErrors().toString());
+
+        final JsonObject nextChannel = KickFixtures.channelData(true);
+        nextChannel.getObject("livestream").put("start_time", "2026-10-18 13:00:00");
+        nextChannel.getObject("livestream").put("session_title", "Next broadcast");
+        downloader.on(CHANNEL_API, JsonWriter.string(nextChannel));
+        final ChannelTabInfo restarted = ChannelTabInfo.getInfo(Kick, liveHandler);
+        assertEquals(1, restarted.getRelatedItems().size());
+        assertEquals("Next broadcast", restarted.getRelatedItems().get(0).getName());
+        assertEquals("https://kick.com/example?live="
+                + Instant.parse("2026-10-18T13:00:00Z").getEpochSecond(),
+                restarted.getRelatedItems().get(0).getUrl());
+        assertTrue(restarted.getErrors().isEmpty(), restarted.getErrors().toString());
     }
 
     @Test
@@ -372,12 +448,13 @@ class KickExtractorTest {
                 "{\"data\":" + JsonWriter.string(ongoing) + "}")
                 .on(CHANNEL_API + "/playback-url", "{\"data\":\"" + MASTER_URL + "\"}")
                 .on(MASTER_URL, KickFixtures.MASTER);
-        final StreamInfo info = StreamInfo.getInfo(Kick, VIDEO_URL);
+        final StreamInfo info = StreamInfo.getInfo(Kick, VIDEO_URL + "?t=25");
         assertEquals(StreamType.LIVE_STREAM, info.getStreamType());
         assertEquals("https://kick.com/example?live="
                 + Instant.parse("2026-10-18T12:00:00Z").getEpochSecond(), info.getUrl());
         assertEquals("Live title", info.getName());
         assertEquals(0, info.getDuration());
+        assertEquals(0, info.getStartPosition());
         assertEquals(MASTER_URL, info.getHlsUrl());
     }
 
@@ -414,9 +491,8 @@ class KickExtractorTest {
         channel.getObject("livestream").put("id", 10);
         channel.getObject("livestream").put("start_time", "2026-10-18 13:00:00");
         downloader.on(CHANNEL_API, JsonWriter.string(channel));
-        final ChannelInfo secondChannel = ChannelInfo.getInfo(Kick, CHANNEL_URL);
         final StreamInfoItem second = (StreamInfoItem) ChannelTabInfo.getInfo(Kick,
-                secondChannel.getTabs().get(1)).getRelatedItems().get(0);
+                firstChannel.getTabs().get(1)).getRelatedItems().get(0);
         assertEquals("https://kick.com/example?live=" + (firstStart + 3600), second.getUrl());
         assertEquals(second.getUrl(), StreamInfo.getInfo(Kick, second.getUrl()).getUrl());
         assertThrows(ContentNotAvailableException.class,

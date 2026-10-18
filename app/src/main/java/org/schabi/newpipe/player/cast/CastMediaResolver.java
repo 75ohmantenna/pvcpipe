@@ -26,7 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Blocking source preparation. One instance belongs to one receiver load, until playback ends. */
+/**
+ * Blocking preparation for one receiver load. Resources persist for replay and close on
+ * replacement, disconnect, error, or shutdown rather than natural playback completion.
+ */
 public final class CastMediaResolver implements Closeable {
     private final Context context;
     private CastMediaServer server;
@@ -58,6 +61,7 @@ public final class CastMediaResolver implements Closeable {
                 if (closed || Thread.currentThread().isInterrupted()) {
                     throw new IOException("Cast preparation was cancelled");
                 }
+                mediaServer.finishPreparation();
             }
             return media;
         } catch (final Exception error) {
@@ -66,8 +70,9 @@ public final class CastMediaResolver implements Closeable {
         }
     }
 
-    private CastMedia resolve(final StreamInfo info, @Nullable final MediaItemTag tag,
-                              final CastMediaServer mediaServer) throws Exception {
+    // Prepare sources without transferring lifetime ownership or publishing the receiver load.
+    CastMedia resolve(final StreamInfo info, @Nullable final MediaItemTag tag,
+                      final CastMediaServer mediaServer) throws Exception {
         if (StreamTypeUtil.isLiveStream(info.getStreamType())) {
             if (info.getDashMpdUrl() != null && !info.getDashMpdUrl().isBlank()) {
                 return remoteManifest(mediaServer, info.getDashMpdUrl(), CastManifest.DASH);

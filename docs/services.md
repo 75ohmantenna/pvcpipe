@@ -1,9 +1,9 @@
 # Services
 
-A service is a website the app can browse and play from. This page says what
-each one supports and where its code is. Dated service responses are recorded
-in [odysee-observations.md](odysee-observations.md) and
-[service-protocol-observations.md](service-protocol-observations.md).
+A service is a website PVCPipe can browse and play from. This guide describes
+implemented extraction capabilities and their limits. Dated responses and
+live checks are recorded separately in [odysee-observations.md](odysee-observations.md)
+and [service-protocol-observations.md](service-protocol-observations.md).
 
 ## How a service is put together
 
@@ -14,21 +14,21 @@ registers the services. Each one is a
 [`StreamingService`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/StreamingService.java)
 with two kinds of parts:
 
-- Link handler factories recognise an address, say whether it is a video, a
-  channel or a playlist, and reduce it to an id.
-- Extractors fetch a page and turn it into the models the app shows: stream,
-  channel, channel tab, playlist, search, suggestions, comments and kiosk. A
-  kiosk is a browse page such as Trending.
+- Link handler factories recognize supported addresses, identify streams,
+  channels or playlists, and extract their IDs.
+- Extractors fetch service data and populate the models shown by the app:
+  streams, channels, channel tabs, playlists, search results, suggestions,
+  comments and kiosks. A kiosk is a browse page such as Trending.
 
-A service leaves out the parts its website has no use for. The extractors
-make their requests through the downloader the app hands the library
+A service implements only the capabilities it supports. Extractors make
+requests through the downloader supplied by the app
 (`DownloaderImpl`). The player (`PlayerDataSource`) and the file downloader
 (`DownloadMission`) make their own requests for the media addresses the
 extractors return.
 
 ## The services
 
-| Service | Id | Media | Kiosks, default first | Playlists | Subscription import |
+| Service | ID | Media | Kiosks, default first | Playlists | Service subscription import |
 | --- | --- | --- | --- | --- | --- |
 | YouTube | 0 | audio, video, live | `live`, `trending_gaming`, `trending_music`, `trending_movies_and_shows`, `trending_podcasts_episodes` | yes | yes |
 | SoundCloud | 1 | audio | `New & hot` | yes | yes |
@@ -38,8 +38,8 @@ extractors return.
 | Kick | 8 | video, live | `Featured` | no | no |
 
 YouTube, SoundCloud, BitChute, Rumble and Odysee have comments. All six have
-search and search suggestions. The kiosk names in the table are the ids the
-code uses. `KioskTranslator` turns the ones it knows into display names.
+search and search suggestions. Rows follow service-picker order. Kiosk names
+in the table are code identifiers; `KioskTranslator` supplies localized display names.
 
 The main drawer contains local-library shortcuts, Settings and About, plus the
 service selector. It has no service-specific Live/Trending browse section.
@@ -54,11 +54,11 @@ loading each channel when the dedicated feed setting
 (`feed_use_dedicated_fetch_method_key`) is on. The other services have none,
 so a refresh loads the channel and its tab.
 
-The app has no sign-in for any service. It does not follow, vote or post.
-Subscriptions, saved playlists, history and queues are kept on the device
-(see [library-data.md](library-data.md)). The one identifier the app registers
-with a service is Odysee's anonymous visitor token, described under
-[Odysee](#odysee).
+PVCPipe has no service sign-in and cannot follow accounts, vote or post on a
+service. Local subscriptions do not change a service account. Subscriptions,
+saved playlists, history and queues stay on the device
+(see [library-data.md](library-data.md)). Optional Odysee count lookups register
+an anonymous visitor token; see [Odysee](#odysee).
 
 `DownloaderImpl` reports every HTTP 429 as a `ReCaptchaException`. The app
 can only do something about a captcha from YouTube: `ReCaptchaActivity` keeps
@@ -68,8 +68,8 @@ Google hosts, and for any other host the app says that the site is refusing
 requests from this network for now.
 
 "Hide paid content videos" in the PVCPipe settings sets a switch in the
-extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). With it on,
-their lists leave out videos that need a membership or a payment.
+extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). When enabled,
+their lists filter out content identified as requiring membership or payment.
 
 ## Search filters
 
@@ -248,11 +248,11 @@ does not show it under the channel it names.
 
 ### Paid, members-only and unlisted content
 
-A video that has to be bought, rented or needs a membership is marked by tags
-(`c:purchase`, `c:rental`, `c:members-only`) or an LBC fee, and `get` answers
-"authentication required" for it. A livestream can also be marked as
-protected in its livestream state. The app reports all of these as paid
-content. The kiosks leave such videos out. Search and channel lists show them
+Content requiring purchase, rental or membership is identified by tags
+(`c:purchase`, `c:rental`, `c:members-only`), an LBC fee or an authentication
+error from `get`. A livestream can also be marked protected in its live
+state. PVCPipe reports these as paid content. Kiosks omit them; search and
+channel lists show them
 unless "Hide paid content videos" is on.
 
 The publisher of an unlisted video shares it as a link that carries
@@ -325,11 +325,10 @@ as their referrer, so the app sends `Referer: https://odysee.com/` on every
 media request to them (`DownloaderImpl.getMediaReferer`): from the player,
 the downloader and the extractor downloader.
 
-A `HEAD` request for an uploaded file on `player.odycdn.com` does not answer
-for the file. With the referrer it redirects to the HLS master playlist when
-the file has been transcoded, which is how the extractor finds the
-renditions. The app therefore never asks for a file's size that way
-(`DownloaderImpl.isHeadUnusable`):
+The extractor uses `HEAD` on `player.odycdn.com` to discover HLS renditions:
+with the referrer, an uploaded file may redirect to a transcoded HLS master
+instead of describing the original file. The app therefore does not use
+`HEAD` to determine the uploaded file's size (`DownloaderImpl.isHeadUnusable`):
 
 - Where the downloader would use `HEAD`, it asks with `GET`. Where that
   request would have asked for everything from a position on, it asks for one
@@ -340,7 +339,7 @@ renditions. The app therefore never asks for a file's size that way
 - The playlists and segments of the HLS renditions answer `HEAD` like any
   file and are asked as before.
 
-A player outside the app gets the bare address and no referrer.
+An external player receives the media URL without PVCPipe's referrer header.
 [odysee-observations.md](odysee-observations.md) records what the hosts
 answered with and without it, and the HTTP 429 answers that kept uncached
 files from being checked.
@@ -348,10 +347,10 @@ files from being checked.
 ## Kick
 
 Kick supports public live broadcasts and retained VODs without a service
-account. Search returns up to 50 channels; suggestions return up to ten
-channel names. A channel exposes Videos and Livestreams tabs and can be
-subscribed to locally. Featured is a single live-discovery list. These lists
-do not invent continuation pages when the endpoint supplies none.
+account. Channel search requests up to 50 results; suggestions request up to
+ten names. Channels expose Videos and Livestreams tabs and support local
+subscriptions. Featured is a single live-discovery list. These extractors
+do not create continuation pages when the endpoint supplies none.
 
 [`KickApi`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/KickApi.java)
 uses the following public resources:
@@ -372,14 +371,19 @@ and `/{slug}/about` open the channel. VOD links use
 Some real legacy channel slugs begin with `@`; that character is preserved.
 Current VOD lookup falls back to the older UUID API only after HTTP 404,
 not after a private, expired, blocked or malformed response.
+VOD links can include a nonnegative `?t=<seconds>` start offset. Extraction
+reads it from the original URL before canonicalization. Invalid or oversized
+values and encoded parameter-boundary lookalikes default to zero. Live playback
+ignores recording offsets.
 
 Live feed items and extracted live streams use
 `/{slug}?live={start-time-in-UTC-seconds}` as a broadcast-specific identity.
 The extractor preserves this marker and rejects a marked link when the
 current broadcast has a different start time. This keeps successive
 broadcasts distinct in feed/history storage. Subscription URLs remain
-`/{slug}/videos`. Live start dates are retained for feed notification
-eligibility.
+`/{slug}/videos`. Reloading a channel's Livestreams tab fetches its current
+broadcast even when the tab handler is reused; the tab does not retain an old
+broadcast snapshot. Live start dates are retained for feed notification eligibility.
 
 Both live and VOD extraction expose combined audio/video HLS renditions,
 including URLs usable by the external-player chooser. The internal live
@@ -395,20 +399,35 @@ or unknown; legacy channel responses do not carry that visibility flag.
 Ordinary HTTP 403 errors are not treated as challenges without a challenge
 header or HTML markers.
 
-Clips, playlists, comments, live chat and remote following import are not
-implemented. PVCPipe has no live-chat surface. Playback does not depend on a
-Pusher or Centrifugo connection. See the
+Artwork metadata follows known CDN URL conventions:
+
+- Live thumbnail filenames provide height, not width.
+- Converted uploader avatars provide width: 150 pixels for `medium`, 350 for
+  `fullsize`. Height stays unknown because avatars need not be square.
+- Current VOD previews receive an estimated **High** quality label without
+  inventing exact dimensions.
+- Original and unrecognized image URLs keep unknown dimensions and quality.
+
+This metadata requires no extra image requests. In the Description tab, `?`
+means an unknown image dimension, not a failed image load.
+
+Channel banners use the shared channel header: they fill its width without
+stretching and are center-cropped to fit the height cap. This also applies to
+other services, not just Kick.
+
+Clips, playlists, comments, live chat, subtitles and importing a Kick account's
+followed channels are not implemented. PVCPipe has no live-chat surface.
+Playback does not depend on a Pusher or Centrifugo connection. See the
 [dated protocol checks](service-protocol-observations.md#kick-follow-up--2026-10-18)
 for the observed transport negotiation and verification limits.
 
 ## Removed services
 
-media.ccc.de, PeerTube and Bandcamp were removed from the extractor and the
-app. Their service ids, 2, 3 and 4, are retired. The database, backups and
-saved main-page tabs refer to services by id, so a new service takes the next
-unused id and never one of these. Because the ids are not contiguous, look a
-service up by id (`NewPipe.getService`, `Menu.findItem`) and never by its
-position in `ServiceList.all()`.
+media.ccc.de, PeerTube and Bandcamp were removed from the extractor and app.
+Their service IDs, 2, 3 and 4, remain retired: database rows, backups and saved
+main-page tabs use these persistent identifiers. Assign new services the next
+unused ID. IDs are not contiguous; use `NewPipe.getService(id)` or
+`Menu.findItem(id)`, never a position in `ServiceList.all()`.
 
 Settings migration 8 to 9 (`SettingMigrations`) drops main-page tabs that
 show a kiosk, channel or playlist of a removed service, deletes the PeerTube
@@ -430,13 +449,13 @@ does with them:
   and says how many it skipped. Without that, one such channel would fail the
   whole import.
 
-Use `ServiceHelper.hasService` for any new code that reads a stored service
-id.
+Use `ServiceHelper.hasService` when checking whether a stored service ID is
+currently supported.
 
 ## Adding or changing a service
 
-- A new service takes the next unused id in `ServiceList` and goes at the end
-  of its list.
+- Give a new service the next unused ID in `ServiceList` and append it to
+  the registration list.
 - The app side of a service is small: a theme in `styles_services.xml` and
   `colors_services.xml` named after the service, an icon in
   `PvcServiceHelper`, a link filter in `AndroidManifest.xml`, and names for

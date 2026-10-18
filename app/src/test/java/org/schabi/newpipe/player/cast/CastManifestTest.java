@@ -6,10 +6,19 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
 
 import java.io.IOException;
+import java.io.StringReader;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.xml.parsers.DocumentBuilderFactory;
 
 public class CastManifestTest {
     @Test
@@ -117,6 +126,77 @@ public class CastManifestTest {
     }
 
     @Test
+    public void implicitSegmentListRangesFetchTheProxiedRepresentationResource() throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String media = server.content("0123456789", "video/mp4");
+            final String rewritten = CastManifest.dash("<MPD><Period><AdaptationSet>"
+                    + "<Representation id=\"video\"><BaseURL>" + media + "</BaseURL>"
+                    + "<SegmentList><Initialization range=\"0-2\"/>"
+                    + "<SegmentURL mediaRange=\"3-5\"/></SegmentList>"
+                    + "</Representation></AdaptationSet></Period></MPD>",
+                    "https://cdn.example/manifest.mpd", server);
+            final String manifest = server.content(rewritten, CastManifest.DASH);
+
+            assertSegmentListRanges(manifest, "012", "345");
+        }
+    }
+
+    @Test
+    public void inheritedImplicitSegmentListUsesTheInheritedMediaResource() throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String media = server.content("abcdefghij", "video/mp4");
+            final URI mediaUri = URI.create(media);
+            final String rewritten = CastManifest.dash("<MPD><BaseURL>"
+                    + mediaUri.resolve("/") + "</BaseURL><Period><AdaptationSet><BaseURL>"
+                    + mediaUri.getRawPath().substring(1) + "</BaseURL>"
+                    + "<SegmentList timescale=\"1\" duration=\"1\">"
+                    + "<Initialization range=\"0-2\"/><SegmentURL mediaRange=\"3-5\"/>"
+                    + "</SegmentList><Representation id=\"video\"/>"
+                    + "</AdaptationSet></Period></MPD>",
+                    "https://cdn.example/manifest.mpd", server);
+            final String manifest = server.content(rewritten, CastManifest.DASH);
+
+            assertSegmentListRanges(manifest, "abc", "def");
+        }
+    }
+
+    @Test
+    public void explicitInitializationAndImplicitMediaKeepTheirSeparateResources()
+            throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String media = server.content("0123456789", "video/mp4");
+            final String initialization = server.content("abcdefghij", "video/mp4");
+            final String rewritten = CastManifest.dash("<MPD><Period><AdaptationSet>"
+                    + "<Representation id=\"video\"><BaseURL>" + media + "</BaseURL>"
+                    + "<SegmentList><Initialization sourceURL=\"" + initialization
+                    + "\" range=\"0-2\"/><SegmentURL mediaRange=\"3-5\"/></SegmentList>"
+                    + "</Representation></AdaptationSet></Period></MPD>",
+                    "https://cdn.example/manifest.mpd", server);
+            final String manifest = server.content(rewritten, CastManifest.DASH);
+
+            assertSegmentListRanges(manifest, "abc", "345");
+        }
+    }
+
+    @Test
+    public void implicitInitializationAndExplicitMediaKeepTheirSeparateResources()
+            throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String initialization = server.content("abcdefghij", "video/mp4");
+            final String media = server.content("0123456789", "video/mp4");
+            final String rewritten = CastManifest.dash("<MPD><Period><AdaptationSet>"
+                    + "<Representation id=\"video\"><BaseURL>" + initialization + "</BaseURL>"
+                    + "<SegmentList><Initialization range=\"0-2\"/>"
+                    + "<SegmentURL media=\"" + media + "\" mediaRange=\"3-5\"/></SegmentList>"
+                    + "</Representation></AdaptationSet></Period></MPD>",
+                    "https://cdn.example/manifest.mpd", server);
+            final String manifest = server.content(rewritten, CastManifest.DASH);
+
+            assertSegmentListRanges(manifest, "abc", "345");
+        }
+    }
+
+    @Test
     public void pairedDashRetainsBothAudioAndVideoIndexRanges() throws Exception {
         final String video = track("video/mp4", "v", "http://phone/video", "100-200");
         final String audio = track("audio/mp4", "a", "http://phone/audio", "50-99");
@@ -138,6 +218,48 @@ public class CastManifestTest {
                 + "<BaseURL>https://one.example/</BaseURL>"
                 + "<BaseURL>https://two.example/</BaseURL></MPD>",
                 "https://cdn.example/manifest.mpd", (url, mime) -> url));
+    }
+
+    private static void assertSegmentListRanges(final String manifest, final String initialization,
+                                                final String segment) throws Exception {
+        final String response = request(manifest, "");
+        assertTrue(response.startsWith("HTTP/1.1 200"));
+        final String text = response.substring(response.indexOf("\r\n\r\n") + 4);
+        final var document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new InputSource(new StringReader(text)));
+        final Element representation = (Element) document.getElementsByTagName("Representation")
+                .item(0);
+        final var bases = representation.getElementsByTagName("BaseURL");
+        final URI base = bases.getLength() == 0 ? URI.create(manifest)
+                : URI.create(manifest).resolve(bases.item(0).getTextContent());
+        final Element init = (Element) representation.getElementsByTagName("Initialization")
+                .item(0);
+        final Element media = (Element) representation.getElementsByTagName("SegmentURL").item(0);
+        assertDashRange(base, init.getAttribute("sourceURL"), init.getAttribute("range"),
+                initialization);
+        assertDashRange(base, media.getAttribute("media"), media.getAttribute("mediaRange"),
+                segment);
+    }
+
+    private static void assertDashRange(final URI base, final String reference, final String range,
+                                       final String expected) throws Exception {
+        final String url = reference.isEmpty() ? base.toString()
+                : base.resolve(reference).toString();
+        final String response = request(url, "Range: bytes=" + range + "\r\n");
+        assertTrue(response.startsWith("HTTP/1.1 206"));
+        assertTrue(response.contains("Content-Range: bytes " + range + "/10\r\n"));
+        assertEquals(expected, response.substring(response.indexOf("\r\n\r\n") + 4));
+    }
+
+    private static String request(final String url, final String headers) throws Exception {
+        final URI uri = URI.create(url);
+        try (Socket socket = new Socket(uri.getHost(), uri.getPort())) {
+            socket.setSoTimeout(5000);
+            socket.getOutputStream().write(("GET " + uri.getRawPath()
+                    + " HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n" + headers + "\r\n")
+                    .getBytes(StandardCharsets.US_ASCII));
+            return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private static String track(final String mime, final String id, final String url,

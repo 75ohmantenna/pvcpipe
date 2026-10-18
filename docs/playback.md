@@ -1,9 +1,9 @@
 # Playback
 
-The player's decisions are split into small classes with unit tests.
-`Player` reads the facts, asks the class that decides, and carries out the
-answer. This page says which class decides what. For the rules themselves,
-read the class and its test.
+PVCPipe separates playback decisions from Android effects. `Player` reads
+the current state, delegates decisions to focused classes, and applies the
+result. This guide identifies those boundaries; each class and its tests
+define the detailed rules.
 
 ## Choosing a source
 
@@ -29,10 +29,10 @@ queue, expiring loaded items and managing the timeline belong to
 ## FCast video casting
 
 Start a video, tap the cast button in the player's top row, and select an
-FCast receiver on the same local network. **Add by address** accepts a host
-or IP with a TCP port (46899 by default), or a pasted `fcast://r/` receiver
-link. **Get FCast Receiver** opens the receiver project. This is FCast
-casting, not Chromecast, AirPlay, or screen mirroring.
+FCast receiver on the same local network. **Add by address** accepts a
+hostname or IP address and TCP port (46899 by default), or a pasted
+`fcast://r/` receiver link. **Get FCast Receiver** opens the receiver project.
+FCast is not Chromecast, AirPlay or screen mirroring.
 
 The cast button opens the activity's
 [`FCastDialog`](../app/src/main/java/org/schabi/newpipe/player/cast/FCastDialog.java)
@@ -76,6 +76,12 @@ completion does not automatically replay the video.
   Moving to another queue occurrence invalidates the old source even when
   both entries have the same video URL.
 - Returning to the phone during a timeline drag clears the remote seek state.
+- An initial idle report does not cancel a pending load. Once playback is
+  established, an idle report that is not completion releases remote ownership.
+- When the receiver identifies a different sender's replacement source,
+  PVCPipe releases its cast connection without sending Stop to that source.
+  Without receiver source notifications, as on v2, foreign media cannot be
+  identified.
 
 ### Components and network lifetime
 
@@ -83,39 +89,60 @@ completion does not automatically replay the video.
 owns the handoff, asynchronous preparation, remote clock, and per-load
 resources for one player service.
 [`FCastSession`](../app/src/main/java/org/schabi/newpipe/player/cast/FCastSession.kt)
-adapts the official `org.fcast:sender-sdk:0.6.1`: native SDK calls run off the
+adapts the official `org.fcast:sender-sdk:0.6.1`. Native SDK calls run off the
 main thread, callbacks return to it, and connection generations discard stale
-events. It supports negotiated v2/v3 and secure v4 connections. v2 has no
-explicit end event, so completion is inferred conservatively from a playing
-to idle transition near a known duration; a remote Stop exactly there is
-indistinguishable from natural completion on that old protocol.
+events. The SDK supports negotiated v2/v3 and secure v4 connections.
+PVCPipe retains authoritative receiver state and duration across loads because
+the SDK can deduplicate unchanged values; advancing receiver progress can confirm
+a load without another Playing event. Matching acknowledgements teach a
+connection that it echoes the sender's sources; subsequent loads gate updates
+until their own acknowledgement. Without such echoes, readiness relies on
+playback evidence, including the observed SDK-v3 connection to Android Receiver
+2.1.5 and v4's intentionally unacknowledged own loads. While a load is pending,
+these peers cannot distinguish old-source progress from new-source progress.
+
+v2 has no explicit end event. PVCPipe reports completion once for a
+playing-to-idle transition near a known duration, or the Android receiver's
+playing-to-paused transition at the known end position. SDK-v3 connections
+without an observed own-source echo also permit this compatibility inference;
+v4 and source-echoing v3 connections require explicit completion. Without
+source/end notifications, a remote Stop near the end or a manual pause/seek
+exactly at the duration can be indistinguishable from natural completion.
 
 The sender SDK is MIT-licensed. Its attribution and the Java Native Access
 (JNA) attribution are available in the app's **About → Licenses** tab.
 
 [`FCastDiscovery`](../app/src/main/java/org/schabi/newpipe/player/cast/FCastDiscovery.kt)
 browses only `_fcast._tcp` with Android NSD while the picker is open. It keeps
-resolved addresses and TXT security records, and releases callbacks and the
-multicast lock when the picker closes. Android 17/API 37 requests local
-network permission only after the user opens casting. Denial leaves an
-explanation and an explicit permission action, without starting discovery.
+resolved addresses and TXT security records. A tracking-level loss withdraws
+the receiver from the picker but retains the callback so later updates can
+restore it. Browse-level loss or picker closure ends tracking; restarting
+discovery clears stale rows. Closing the picker releases callbacks and the
+multicast lock. Android 17/API 37 requests local network permission only
+after the user opens casting. Denial leaves an explanation and an explicit
+permission action, without starting discovery.
 
 [`CastMediaResolver`](../app/src/main/java/org/schabi/newpipe/player/cast/CastMediaResolver.java)
 uses the selected extracted streams, not the public webpage URL. It serves
 HLS/DASH manifests and media through
 [`CastMediaServer`](../app/src/main/java/org/schabi/newpipe/player/cast/CastMediaServer.java)
-on the connection's local address. This keeps phone-origin-bound media
-requests and required service headers on the phone. YouTube uses the
-existing extractor DASH creators and `YoutubeHttpDataSource`, including its
-POST-based transport. Separate supported audio and video are combined into
-one receiver manifest, not silently cast without audio.
+on the connection's local address. This keeps upstream requests and required
+service headers on the phone, including requests for IP-bound media.
+YouTube uses the existing extractor DASH creators and
+`YoutubeHttpDataSource`, including its POST-based transport. Supported
+separate audio and video tracks are combined in one receiver manifest;
+PVCPipe does not silently omit the selected audio.
 
-The HTTP server has tokenized allowlisted routes, bounded request workers,
-manifest sizes and route counts, byte-range/HEAD support, and no arbitrary
-receiver-selected upstream URL. Only GET, HEAD and OPTIONS are accepted;
-receiver-supplied cookies and authorization are not forwarded upstream.
+The HTTP server uses tokenized allowlisted routes, bounded request workers,
+manifest sizes and route counts, plus byte-range/HEAD support. Initial
+preparation fails if all required manifest and media routes exceed the
+resource budget; runtime routes use bounded least-recently-used eviction for
+long-running live streams. Request lines and headers have a 15-second absolute
+deadline measured from connection acceptance, independent of media-body
+streaming. Only GET, HEAD and OPTIONS are accepted. Receivers cannot select
+arbitrary upstream URLs, and their cookies and authorization are not forwarded.
 The server lives for the cast, with a foreground media notification and a CPU
-wake lock. Disconnect/error/shutdown cancels preparation and closes media
+wake lock. Disconnect, error or shutdown cancels preparation and closes media
 servers; SDK shutdown stays off the UI thread.
 
 ### Security and media limits
@@ -130,15 +157,19 @@ v4 control encryption does not encrypt the proxy's HTTP media traffic.
 
 Supported sources include muxed progressive video, HLS/DASH (including inline
 extractor manifests), paired HLS or single-period DASH tracks, and YouTube
-adaptive progressive/OTF/post-live streams with extractor index metadata.
-There is no transcoding/remuxing. Arbitrary split progressive tracks without
-index metadata, replacing embedded audio in a muxed stream, and unsupported
-DASH alternatives/templates fail explicitly. Receiver codec support still
-determines playback. Local subtitle, resize, pitch and silence-skipping
-controls are not receiver controls. Subtitle/resize controls are disabled
-while casting; the normal speed menu is enabled when the receiver advertises
-speed support. Media-session transport speed changes are not enabled by the
-connector's default action set; use the player's speed menu instead.
+adaptive progressive, OTF and post-live streams with extractor index metadata.
+Single-file DASH `SegmentList` ranges can use an implicit representation base
+URL; the proxy preserves that media resource rather than substituting the MPD.
+The proxy does not transcode or remux media. Arbitrary split progressive
+tracks without index metadata, replacement of embedded audio in a muxed
+stream, and unsupported DASH alternatives/templates fail explicitly.
+Receiver codec support still determines whether a source plays.
+
+Local subtitle, resize, pitch and silence-skipping controls do not control the
+receiver. Subtitle and resize controls are disabled while casting; the normal
+speed menu is available when the receiver advertises speed support. The
+media-session connector does not enable transport speed changes in its default
+action set; use the player's speed menu instead.
 
 The implementation follows the official
 [FCast protocol](https://docs.fcast.org/protocol/) and
@@ -151,13 +182,26 @@ The regular-control interaction follows Grayjay's
 [`CastButton`](https://github.com/futo-org/grayjay-android/blob/master/app/src/main/java/com/futo/platformplayer/views/casting/CastButton.kt)
 (connection-dialog entrypoint). PVCPipe reuses its existing player overlay
 rather than introducing a second cast player view.
-See the [regular-control smoke record](pvcpipe-device-smoke.md#fcast-regular-player-controls-2026-10-17)
-for this interaction cutover, and the earlier
+The [regular-control smoke record](pvcpipe-device-smoke.md#fcast-regular-player-controls-2026-10-17)
+covers the interaction cutover. Earlier
 [Pixel/receiver](pvcpipe-device-smoke.md#fcast-pixel-6a-and-amazon-receiver-2026-10-17)
 and [local emulator](pvcpipe-device-smoke.md#fcast-local-emulator-smoke-2026-10-17)
-records for transport/media checks and remaining hardware limits.
+records preserve their original transport/media results and limitations.
 The [0.2.0 release review](pvcpipe-device-smoke.md#pvcpipe-020-release-review-2026-10-18)
-records the later adversarial fixes and controlled app/protocol verification.
+records adversarial fixes and controlled app/protocol checks. A later
+[receiver recovery record](pvcpipe-device-smoke.md#fcast-receiver-recovery-2026-10-18)
+documents real TV picture and audio after a receiver reboot, without an FCast
+source change. None of these dated runs verifies every current source,
+receiver or protocol version.
+
+### Receiver connects but does not play
+
+If the receiver remains on its ready screen with no playback progress after
+a connection, disconnect in PVCPipe, restart the receiver device, then
+reconnect normally. This recovered the recorded Fire Stick session; it is a
+troubleshooting step, not a guaranteed fix. The receiver's internal failure
+cause was not established. A successful connection or HTTP media response
+alone does not prove that the receiver has decoded video or played audio.
 
 ## A request to play a queue
 
@@ -290,7 +334,9 @@ instrumentation tests (see [building.md](building.md)).
 | Area | Tests |
 | --- | --- |
 | Sources | [`PlaybackSourcesTest`](../app/src/test/java/org/schabi/newpipe/player/resolver/PlaybackSourcesTest.java), [`PlaybackSourcesSafetyTest`](../app/src/test/java/org/schabi/newpipe/player/resolver/PlaybackSourcesSafetyTest.java), on a device [`PlaybackSourcesIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/resolver/PlaybackSourcesIntegrationTest.kt) |
-| FCast | [`CastPlaybackTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastPlaybackTest.java), [`CastManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastManifestTest.java), [`CastMediaServerTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaServerTest.java), [`CastMediaTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaTest.java), [`FCastDeviceTest`](../app/src/test/java/org/schabi/newpipe/player/cast/FCastDeviceTest.kt), [`LegacyFCastCompletionTest`](../app/src/test/java/org/schabi/newpipe/player/cast/LegacyFCastCompletionTest.kt); on a device [`CastDashReceiverCompatibilityTest`](../app/src/androidTest/java/org/schabi/newpipe/player/cast/CastDashReceiverCompatibilityTest.java) |
+| FCast playback | [`CastPlaybackTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastPlaybackTest.java), [`LegacyFCastCompletionTest`](../app/src/test/java/org/schabi/newpipe/player/cast/LegacyFCastCompletionTest.kt), [`CastMediaTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaTest.java), [`FCastDeviceTest`](../app/src/test/java/org/schabi/newpipe/player/cast/FCastDeviceTest.kt) |
+| FCast media | [`CastManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastManifestTest.java), [`CastInlineManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastInlineManifestTest.java), [`CastMediaServerTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaServerTest.java); on a device [`CastDashReceiverCompatibilityTest`](../app/src/androidTest/java/org/schabi/newpipe/player/cast/CastDashReceiverCompatibilityTest.java) |
+| FCast discovery | [`FCastDiscoveryTest`](../app/src/test/java/org/schabi/newpipe/player/cast/FCastDiscoveryTest.java) |
 | Queue requests | [`QueuePlaybackChoiceTest`](../app/src/test/java/org/schabi/newpipe/player/QueuePlaybackChoiceTest.java), [`PlayerIntentTest`](../app/src/test/java/org/schabi/newpipe/player/PlayerIntentTest.java) |
 | Queue events | [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java) |
 | Audio | [`PlaybackAudioTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioTest.java), [`PlaybackAudioFocusProtocolTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioFocusProtocolTest.java), on a device [`PlaybackAudioIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/audio/PlaybackAudioIntegrationTest.kt) |

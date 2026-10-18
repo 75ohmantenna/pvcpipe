@@ -60,7 +60,7 @@ public final class KickStreamExtractor extends StreamExtractor {
             if (channel == null) {
                 channel = KickApi.channel(KickUrl.channelId(super.getUrl()));
             } else if (!channel.containsKey("livestream")) {
-                // Legacy video metadata embeds only a channel identity, not its live state.
+                // Legacy video metadata omits the channel's current livestream state.
                 channel = KickApi.channel(channel.getString("slug", ""));
             }
             stream = channel.getObject("livestream");
@@ -97,6 +97,11 @@ public final class KickStreamExtractor extends StreamExtractor {
         }
         return KickUrl.BASE + "/" + KickUrl.slug(channel.getString("slug"))
                 + "/videos/" + KickUrl.uuid(stream.getString("id", ""));
+    }
+
+    @Override
+    public long getTimeStamp() throws ParsingException {
+        return vod ? KickUrl.vodTime(getOriginalUrl()) : 0;
     }
 
     @Nonnull

@@ -38,7 +38,8 @@ public final class KickChannelTabExtractor extends ChannelTabExtractor {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
-        if (channel == null) {
+        // A retained Live-tab handler contains only a snapshot of the original channel load.
+        if (channel == null || getChannelTabType().getIdentifier() == ChannelTabs.ID_LIVESTREAMS) {
             channel = KickApi.channel(getId());
         }
     }
