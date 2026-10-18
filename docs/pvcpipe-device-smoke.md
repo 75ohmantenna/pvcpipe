@@ -354,3 +354,260 @@ was captured for each client, and the refusals stopped before one could be,
 so which clients were refused each time is not known. Nothing in these
 observations points at the app. [services.md](services.md#youtube) says when
 the app shows that message.
+
+## FCast local emulator smoke, 2026-10-17
+
+PVCPipe 0.1.0 debug with the new FCast integration, on a dedicated disposable
+API 26 x86_64 emulator. No physical device installation or instrumentation
+was performed. The API 37 emulator did not complete boot; this run does not
+establish Android 17 permission-prompt behavior.
+
+A throwaway instrumentation scenario launched the actual app/player, used
+a generated 120-second H.264/AAC video from a local HTTP origin, and connected
+the official sender SDK to a controlled FCast v3 TCP peer. The peer advertised
+itself through Android NSD, parsed real protocol frames, fetched byte ranges
+through PVCPipe's media proxy, and returned playback/volume updates.
+The temporary debug cleartext override and instrumentation source were removed
+afterward; neither is part of the shipped integration.
+
+Observed passing scenario:
+
+- Actual player cast button opened the themed picker; mDNS found the peer and
+  tapping its row connected.
+- Receiver fetched a 206 MP4 range through the LAN proxy. Local video/audio
+  had decoded before handoff, and local playback was paused while casting.
+- Pause/resume, seek to 42 seconds, speed 1.5x and volume 40% reached the peer.
+  The Android media session reflected remote playing/paused states.
+- Opening a second video replaced the cast source, and the receiver fetched
+  that source. The fixture was reseeded after the app's normal cache clears;
+  no service extractor response was being tested.
+- **Play on this device** resumed local playback and sent Stop to the peer.
+- Picker, connected controls and player entrypoint screenshots were inspected.
+
+This peer is not a real FCast receiver/decoder. The scenario proves local
+sender/control/proxy integration, not TV rendering or encrypted v4
+interoperability. Hardware checks left by this emulator run:
+
+1. Discover and connect to real Android/desktop receivers; test a pasted
+   receiver link and Android 17 permission denial/regrant.
+2. Cast real YouTube adaptive video with audio, HLS/live and other supported
+   service streams; check codec compatibility, seeking and selected quality/audio.
+3. Check queue/repeat, receiver-side controls, screen-off/background playback,
+   connection loss, Stop and Play on this device on physical hardware.
+
+## FCast Pixel 6a and Amazon receiver, 2026-10-17
+
+PVCPipe 0.1.0 debug on the Pixel 6a running API 37, installed over Wi-Fi ADB.
+The existing package and both APK signing certificates were checked before
+updating the app and test package with `adb install -r`. Neither package was
+uninstalled or cleared. Database and preference files remained in place,
+including the original app UID and older preference/security files.
+Normal playback added/updated watch history and cache data.
+
+The app discovered the real `FCast-Amazon-AFTKM` receiver on the local network.
+The source was YouTube's official Blender Big Buck Bunny film
+(`aqz-KE-bpKQ`), with selected quality 720p60 and separate adaptive audio/video.
+
+The first handoff failed with a receiver `NumberFormatException` for
+`cast-0`. The merged DASH manifest had used string AdaptationSet IDs, but
+those IDs must be integers. `CastManifest.mergeDash` now assigns distinct
+numeric IDs. `CastDashReceiverCompatibilityTest` exercises the real ExoPlayer
+DASH parser and checks that both playable track types and byte indexes
+survive merging. It passed directly on the Pixel: one targeted test, with
+only in-memory manifests, no database, preferences, files or network fixture.
+The inspected runner was the standard `AndroidJUnitRunner`; no Gradle
+connected-test task, orchestrator or clear-data option was used.
+
+After the correction, observed on the Pixel and its media session:
+
+- The Android 17 local-network prompt appeared only after opening casting.
+  Denial left an explanation and disabled address entry; the explicit retry
+  action requested permission again and allowing it started discovery.
+- The discovered receiver connected, reported playing, and sent advancing
+  progress for the YouTube DASH source.
+- Pause held the clock at 03:42. Seeking while paused moved it to 01:25.
+  Resume advanced progress, with media-session speed 1.5 and remote volume 40
+  after changing those controls. Speed and volume were restored to their
+  initial 1x and 100% values afterward.
+- Casting continued while the app was in the background. The remote
+  media-session clock advanced from about 02:16 to 02:49 during that interval.
+- **Play on this device** changed the session from remote to local playback
+  near the same position (about 04:31), and the expanded Pixel video surface
+  was visually checked playing again.
+- Manual reconnect using the receiver's IP and default port also reached
+  remote playing state, at about 07:38.
+- The sleep-key attempt recorded an 11.386-second sleep-to-wake interval;
+  casting remained active and the remote clock advanced from 488688 to
+  506692 ms across the overall attempt. The phone woke before the final
+  sleep-state check, so this is not a sustained screen-off/Doze test.
+- The dark-themed picker and remote controls were visually inspected.
+
+A system media-session Stop initially stopped only the paused local
+ExoPlayer while the receiver kept playing. The forwarding player's Stop
+override now stops/cancels casting before keeping the normal local Stop
+behavior. The corrected APK was installed and the parser regression passed
+again on the Pixel. With Blender's *Sintel* (`eRsGyueVLvQ`, 720p) reporting
+remote playing state, system Stop changed the session to local/non-playing
+and released the FCast CPU wake lock. Reconnecting after that Stop worked;
+the dialog's **Stop casting** also disconnected without starting the phone.
+The final run left casting stopped and receiver speed/volume restored.
+
+A later Big Buck Bunny reload returned HTTP 403 in the local
+`YoutubeHttpDataSource`, before casting. That source failure was not changed
+as part of the FCast fixes; the fresh Sintel source played and was used for
+the final Stop checks. The app UID's captured log contained no fatal exception.
+
+Final post-fix verification passed: the full app unit suite, Android debug
+lint, Checkstyle, ktlint, dependency ordering, and debug/minified release
+builds. The installed Pixel base APK's SHA-256 matched the final debug APK.
+
+The TV picture and speakers were not directly observable from this session;
+receiver playback feedback is not a visual/audible quality check. Secure v4,
+pasted receiver links, other codecs/services, HLS/live, queue/repeat and long
+screen-off/network-loss behavior still need separate receiver checks.
+
+## FCast regular-player controls, 2026-10-17
+
+The later regular-control/device-picker cutover was exercised on a new,
+disposable API 26 emulator. The Pixel's advertised Wi-Fi ADB endpoint did
+not accept a connection; its installation was not updated during this run.
+The earlier Pixel/TV results above therefore do not verify this newer UI.
+
+A throwaway instrumentation scenario launched the actual app/player and
+injected touchscreen events into its normal controls. Cached fixture metadata
+and a generated 120-second H.264/AAC video from a loopback HTTP origin made
+the source deterministic. Two controlled FCast v3 TCP peers advertised
+themselves through Android NSD, exchanged real frames with the official native
+sender SDK, fetched 206 MP4 ranges through the app's media proxy, and sent
+playback updates. This was not a mocked sender.
+
+The completed scenario passed twice, including:
+
+- The cast button opened the themed device list. Selecting Alpha connected
+  and automatically dismissed the picker, leaving the ordinary player overlay.
+- The regular play/pause button paused/resumed Alpha while the phone's
+  ExoPlayer stayed paused.
+- Left/right double-tap gestures sent rewind/fast-forward seeks using the
+  configured 10-second interval.
+- A held timeline drag stayed in seek state despite incoming receiver progress,
+  and release sought to approximately 42 seconds. Seeking to approximately
+  66 seconds while paused did not resume playback or leave a buffering spinner.
+- The regular speed menu changed receiver speed to 1.5x.
+- Opening the cast button while connected kept the device choices visible.
+  Switching Alpha to Beta while paused retained the position and pause intent;
+  switching back while playing retained the position and play intent.
+  Both old targets received Stop, and each new connection fetched its media.
+- **Disconnect** stopped Alpha, dismissed the picker, and left the phone paused.
+  The final wire log reported Alpha/Beta media loads 2/1 and Stops 2/1.
+- Settled device-picker, connected-picker and regular-control screenshots were
+  visually inspected. The dummy webpage's auxiliary-content error below the
+  player was outside this test; real service extraction was not exercised.
+
+`CastPlaybackTest` also covers frozen position/play intent during receiver
+changes and preservation of the player's active scrub state under receiver
+progress. These are permanent, isolated JVM regressions.
+
+Final verification passed: the full app unit suite, Android debug lint,
+Checkstyle, ktlint, dependency ordering, and debug, Android test and minified
+release APK builds.
+
+The temporary instrumentation source, debug cleartext override, HTTP origin,
+generated video and emulator were removed afterward. APK inspection confirmed
+that the final debug app has no temporary cleartext override and the Android
+test APK excludes the throwaway scenario while retaining the permanent parser
+regression. This run does not verify a
+real receiver's decoder, secure v4, Android 17 permission UI, or physical
+device behavior for this control cutover.
+
+## PVCPipe 0.2.0 release review, 2026-10-18
+
+The adversarial review covered FCast transport/manifests, playback ownership
+and controls, app/extractor service boundaries, download preparation, shared
+version handling, and documentation. It was not a live availability audit
+of every supported website or a real-receiver decoder test.
+
+The review corrected signed-URL percent corruption, query-only manifest
+resolution, inherited DASH segment-list truncation and empty upstream-error
+response framing. It also corrected pending receiver/source controls,
+paused buffering/quality intent, queue-occurrence ownership and returning
+to the phone during scrubbing. Download preparation now carries a format
+inferred by the dialog into the destination and recovery plan; BitChute
+recognizes HLS MIME parameters. Version-code calculation rejects values
+above Android's maximum instead of overflowing into an installable code.
+
+Three manifest regressions failed against the pre-fix compiled implementation:
+escaped signed URLs changed, query-only references lost the manifest filename,
+and only the last overriding DASH segment remained. The standalone version
+probe showed `429497.0.0` incorrectly mapping to `1002704` before the fix;
+out-of-range probes were rejected afterward. Permanent behavior regressions
+cover those boundaries and the playback/download transitions.
+
+### Actual app and protocol exercise
+
+A new disposable API 26 emulator ran the rebuilt app with the official native
+sender SDK and two controlled FCast v3 TCP peers advertised through NSD.
+The scenario used cached synthetic BitChute metadata and a generated local
+120-second H.264/AAC video, with two quality labels to exercise source
+replacement. It did not exercise live BitChute extraction or receiver decoding.
+The dummy webpage's auxiliary-content error below the player was outside the
+test. No Pixel installation or private data was changed.
+
+The completed scenario passed with these observations:
+
+- The themed picker discovered both targets, dismissed after handoff and
+  remained open when reopened for device choice.
+- Real touchscreen play/pause and left/right double-tap seeks controlled the
+  receiver while the local player stayed paused.
+- Thumb-origin, multi-move timeline drags remained stable under incoming
+  receiver progress. Release sought to approximately 42 seconds; seeking to
+  approximately 66 seconds while paused stayed paused without a spinner.
+- The normal speed menu set receiver speed to 1.5x. A paused quality change
+  reloaded at the retained position and remained paused after acknowledgement.
+- The receiver row was selected and play/pause, seek and speed controls were
+  invoked in one UI-thread turn, before connection callbacks could run.
+  The new receiver loaded paused at 73 seconds and 2x without a session error.
+- A real `MediaControllerCompat` controlled remote play, pause and seeking to
+  78 seconds. Transport speed is deliberately not enabled by the ExoPlayer
+  connector's default actions; the unused overrides were removed, not
+  presented as a supported feature. The normal player speed menu is supported.
+- Switching back while playing preserved position/intent and stopped the old
+  target. Disconnect stopped the final target and left the phone paused.
+- Actual HTTP requests traversed the app proxy for escaped signed paths,
+  query-only HLS variants and a ranged MP4 fetch. Both overriding DASH
+  segments and inherited initialization were fetched. A missing manifest
+  returned an empty 404 with `Content-Length: 0`.
+- Settled discovery-picker, connected-picker and paused-quality screenshots
+  were visually inspected.
+
+The final wire log reported:
+
+```text
+FCAST_MANIFEST_NETWORK_OK signedQueryAndPath=true inheritedSegments=2 empty404=true
+FCAST_REVIEW_SMOKE_OK alphaLoads=3 betaLoads=1 alphaSeeks=[30.231, 22.951, 41.983, 65.95] stops=2/1
+```
+
+Initial fixture attempts exposed an inaccurate synthetic drag trajectory,
+an unsupported transport-speed probe and a wait on peer state before the UI
+had received its acknowledgement. The final scenario dragged from the actual
+thumb, exercised advertised transport actions and awaited both sides; no
+production seek mapping or new transport-speed feature was introduced.
+
+The temporary instrumentation source and debug cleartext override were removed,
+and the HTTP origin, generated media, helper scripts and owned emulator were
+stopped/deleted. Real receiver decoding, secure v4, Android 17 permission UI,
+rotation during handoff and current live-site availability remain unverified
+by this run. Earlier dated hardware records do not verify this newer release.
+
+### Final clean artifacts
+
+After removing the throwaway scenario and override, `make ci` passed again:
+build-logic version tests, app unit tests, offline extractor tests,
+Checkstyle/ktlint/dependency ordering, Android lint and both APK builds.
+`assembleDebugAndroidTest` also passed. APK inspection confirmed version
+`0.2.0` / code `1000200` for debug and release, no temporary cleartext flag,
+and no throwaway smoke classes in the test APK; the permanent DASH parser
+regression remains. The release APK is unsigned.
+
+All 133 local Markdown file/heading references checked across the root,
+guides, records and fixture READMEs resolved. Historical observations were
+preserved rather than rewritten to claim current hardware coverage.

@@ -76,7 +76,7 @@ public class DownloadPreparationIntegrationTest {
         environment.protectedUri = Uri.fromFile(existing.toFile());
         environment.state = MissionState.Finished;
         selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.VIDEO,
-                video(), audio(DeliveryMethod.HLS), 100, 47, 5,
+                video(), MediaFormat.MPEG_4, audio(DeliveryMethod.HLS), 100, 47, 5,
                 info("original"), segments());
 
         preparation.save("original", DownloadPreparation.Destination.askDocument(), environment);
@@ -117,7 +117,7 @@ public class DownloadPreparationIntegrationTest {
         preparation.close();
 
         selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.AUDIO,
-                audio(DeliveryMethod.PROGRESSIVE_HTTP), null, 900, 0, 2,
+                audio(DeliveryMethod.PROGRESSIVE_HTTP), MediaFormat.M4A, null, 900, 0, 2,
                 info("different current selection"),
                 new SponsorBlockSegment[]{new SponsorBlockSegment(500, 900,
                         SponsorBlockCategory.INTRO)});
@@ -176,7 +176,7 @@ public class DownloadPreparationIntegrationTest {
         final DownloadPreparation.Location duplicate = serialized(saved);
         preparation.close();
         selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.AUDIO,
-                audio(DeliveryMethod.PROGRESSIVE_HTTP), null, 900, 0, 2,
+                audio(DeliveryMethod.PROGRESSIVE_HTTP), MediaFormat.M4A, null, 900, 0, 2,
                 info("changed"), new SponsorBlockSegment[0]);
         environment = new Environment();
         preparation = new DownloadPreparation(environment, () -> selected);
@@ -280,7 +280,8 @@ public class DownloadPreparationIntegrationTest {
 
     private static DownloadPreparation.Selection originalSelection() {
         return new DownloadPreparation.Selection(DownloadPreparation.Kind.VIDEO, video(),
-                audio(DeliveryMethod.PROGRESSIVE_HTTP), 100, 47, 5, info("original"), segments());
+                MediaFormat.MPEG_4, audio(DeliveryMethod.PROGRESSIVE_HTTP), 100, 47, 5,
+                info("original"), segments());
     }
 
     private static StreamInfo info(final String title) {

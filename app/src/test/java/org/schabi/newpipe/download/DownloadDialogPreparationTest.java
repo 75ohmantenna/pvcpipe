@@ -25,15 +25,19 @@ import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
 import android.view.MenuItem;
+import android.widget.RadioGroup;
+import android.widget.SeekBar;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AlertDialog;
+import androidx.collection.SparseArrayCompat;
 
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.DownloadDialogBinding;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.stream.AudioStream;
@@ -44,12 +48,15 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.util.SponsorBlockSegment;
+import org.schabi.newpipe.util.StreamItemAdapter;
+import org.schabi.newpipe.util.StreamItemAdapter.StreamInfoWrapper;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 
 /** Exercises the real dialog adapter without constructing an Android Fragment or launching UI. */
 public class DownloadDialogPreparationTest {
@@ -199,6 +206,56 @@ public class DownloadDialogPreparationTest {
         }
     }
 
+    @Test
+    public void selectedVideoCarriesTheInferredWrapperFormatIntoPreparation() throws Exception {
+        final VideoStream stream = new VideoStream.Builder().setId("unknown")
+                .setContent("https://example.com/video", true)
+                .setResolution("720p").setIsVideoOnly(false).build();
+        final StreamInfoWrapper<VideoStream> wrapper = new StreamInfoWrapper<>(
+                List.of(stream), null);
+        wrapper.setFormat(stream, MediaFormat.WEBM);
+        wrapper.setSize(stream, 1234);
+        @SuppressWarnings("unchecked")
+        final StreamItemAdapter<VideoStream, AudioStream> adapter = mock(StreamItemAdapter.class);
+        when(adapter.getItem(0)).thenReturn(stream);
+        when(adapter.getAllSecondary()).thenReturn(new SparseArrayCompat<>(0));
+        inject("videoStreamsAdapter", adapter);
+        inject("sponsorBlockSegments", new SponsorBlockSegment[0]);
+        dialog.wrappedVideoStreams = wrapper;
+        dialog.selectedVideoIndex = 0;
+        dialog.currentInfo = new StreamInfo(0, "https://example.com/watch",
+                "https://example.com/watch", StreamType.VIDEO_STREAM, "id", "recording", 0);
+        final DownloadDialogBinding binding = mock(DownloadDialogBinding.class);
+        final RadioGroup group = mock(RadioGroup.class);
+        when(group.getCheckedRadioButtonId()).thenReturn(R.id.video_button);
+        final SeekBar threads = mock(SeekBar.class);
+        when(threads.getProgress()).thenReturn(2);
+        final Field groupField = DownloadDialogBinding.class.getField("videoAudioGroup");
+        groupField.setAccessible(true);
+        groupField.set(binding, group);
+        final Field threadsField = DownloadDialogBinding.class.getField("threads");
+        threadsField.setAccessible(true);
+        threadsField.set(binding, threads);
+        inject("dialogBinding", binding);
+        final Method method = DownloadDialog.class.getDeclaredMethod("selectedDownload");
+        method.setAccessible(true);
+        final DownloadPreparation.Selection selection =
+                (DownloadPreparation.Selection) method.invoke(dialog);
+        final DownloadPreparationEnvironment environment = new DownloadPreparationEnvironment(
+                temporary.newFolder().toPath());
+        final DownloadPreparation preparation = new DownloadPreparation(environment,
+                () -> selection);
+
+        preparation.save("recording", DownloadPreparation.Destination.askDocument(), environment);
+
+        assertEquals(MediaFormat.WEBM, selection.primaryFormat);
+        assertEquals(1234, selection.primarySize);
+        assertEquals("recording.webm", environment.location.filename);
+        environment.location.complete(environment.fileUri);
+        assertEquals(MediaFormat.WEBM, environment.launches.get(0).recoveryInfo.get(0).getFormat());
+        assertNull(stream.getFormat());
+    }
+
     private DownloadPreparation.Presentation presentation() throws Exception {
         final Class<?> type = Class.forName(
                 DownloadDialog.class.getName() + "$DownloadPresentation");
@@ -265,7 +322,7 @@ public class DownloadDialogPreparationTest {
         final StreamInfo info = new StreamInfo(0, "https://example.com/watch",
                 "https://example.com/watch", StreamType.VIDEO_STREAM, "id", "recording", 0);
         final DownloadPreparation.Selection selection = new DownloadPreparation.Selection(kind,
-                stream, null, 100, 0, 3, info, new SponsorBlockSegment[0]);
+                stream, stream.getFormat(), null, 100, 0, 3, info, new SponsorBlockSegment[0]);
         final DownloadPreparationEnvironment environment = new DownloadPreparationEnvironment(
                 temporary.newFolder().toPath());
         final DownloadPreparation preparation = new DownloadPreparation(environment,

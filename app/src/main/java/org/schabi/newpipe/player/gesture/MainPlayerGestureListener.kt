@@ -75,9 +75,13 @@ class MainPlayerGestureListener(
         val bar: ProgressBar = binding.volumeProgressBar
         val playbackAudio: PlaybackAudio = player.playbackAudio
 
-        // If we just started sliding, change the progress bar to match the system volume
+        // If we just started sliding, match the current local or receiver volume.
         if (!binding.volumeRelativeLayout.isVisible) {
-            val volumePercent: Float = playbackAudio.systemVolume / playbackAudio.maxSystemVolume.toFloat()
+            val volumePercent = if (player.casting.isActive) {
+                player.casting.session.volume.toFloat()
+            } else {
+                playbackAudio.systemVolume / playbackAudio.maxSystemVolume.toFloat()
+            }
             bar.progress = (volumePercent * bar.max).toInt()
         }
 
@@ -87,7 +91,11 @@ class MainPlayerGestureListener(
         // Update volume
         val currentProgressPercent: Float = bar.progress / bar.max.toFloat()
         val currentVolume = (playbackAudio.maxSystemVolume * currentProgressPercent).toInt()
-        playbackAudio.systemVolume = currentVolume
+        if (player.casting.isActive) {
+            player.casting.session.setVolume(currentProgressPercent.toDouble())
+        } else {
+            playbackAudio.systemVolume = currentVolume
+        }
         if (DEBUG) {
             Log.d(TAG, "onScroll().volumeControl, currentVolume = $currentVolume")
         }
@@ -201,6 +209,14 @@ class MainPlayerGestureListener(
         isMoving = true
 
         // -- Brightness and Volume control --
+        if (player.casting.isActive) {
+            if (getDisplayHalfPortion(initialEvent) == DisplayPortion.RIGHT_HALF &&
+                player.casting.session.volumeSupported
+            ) {
+                onScrollVolume(distanceY)
+            }
+            return true
+        }
         if (pvcGestureHelper.isInternalScrollVolumeEvent(binding, player.context, initialEvent)) {
             pvcGestureHelper.onInternalScrollVolumeEvent(binding, playerUi, distanceY)
         } else if (getDisplayHalfPortion(initialEvent) == DisplayPortion.RIGHT_HALF) {

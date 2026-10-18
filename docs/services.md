@@ -40,6 +40,11 @@ All five have comments, search and search suggestions. The kiosk names in the
 table are the ids the code uses. `KioskTranslator` turns the ones it knows
 into display names.
 
+These are implemented extractor capabilities, not a promise that every
+website or every item is available on a particular network. For example,
+YouTube still registers the legacy `Trending` kiosk even though its service
+code notes that YouTube removed that interface in July 2025.
+
 YouTube also has a feed extractor. The feed refresh uses it in place of
 loading each channel when the dedicated feed setting
 (`feed_use_dedicated_fetch_method_key`) is on. The other services have none,
@@ -184,13 +189,13 @@ those shapes; they are evidence for the implementation, not an API contract.
 reads addresses on `odysee.com`, `www.odysee.com`, `lbry.tv` and
 `open.lbry.com`: videos, channels, embed and download links, and playlists.
 
-A video's id is its website path, such as `@channel:c/video:v`. The API wants
-the same thing as `lbry://@channel#c/video#v`. The part after the colon is
-the start of a 40-character claim id. It may be any length or missing, so one
-claim has several addresses. Lists use the address Odysee calls canonical. A
-channel that was opened by another address takes its canonical one once it is
-loaded, so that a subscription is the same whichever link it was made from. A
-video keeps the address it was opened with.
+A video's id is its website path, such as `@channel:c/video:a`. The API wants
+the same thing as `lbry://@channel#c/video#a`. The part after the colon is
+one to forty hexadecimal characters from the start of a claim id, or it may
+be missing, so one claim has several addresses. Lists use the address Odysee
+calls canonical. A channel that was opened by another address takes its
+canonical one once it is loaded, so that a subscription is the same whichever
+link it was made from. A video keeps the address it was opened with.
 
 ### What is listed and played
 
@@ -259,9 +264,10 @@ name, address or password.
   register a new visitor at every start. Like the rest of the preferences it
   is part of a settings export.
 - The token is sent in the body of a `POST`, never in an address.
-- A token that Odysee refuses is replaced once. A refusal is a 401 or 403
-  whose answer says the visitor could not be authenticated. A 403 from
-  something in front of Odysee leaves the token alone.
+- A token that Odysee refuses is replaced once. `OdyseeApi.callAccountApi`
+  identifies an authentication-error envelope, including in a 401 or 403
+  response. A 403 from something in front of Odysee that does not identify an
+  authentication error leaves the token alone.
 - If the new token is refused too, or registering fails, nothing more is
   registered for ten minutes, and for twice as long after each further
   failure, up to about ten hours. A registration that was abandoned because
@@ -284,12 +290,18 @@ name, address or password.
 
 ### A video page
 
-`OdyseeStreamExtractor.onFetchPage` needs the claim, the media address, the
-answer to a `HEAD` request for that address and, for a transcoded video, the
-playlist, one after another. Likes, the view count and the follower count are
-asked for at the same time as these, on threads of their own. None of them
-holds the page up for longer than its own request takes, and none of them
-fails the page.
+`OdyseeStreamExtractor.onFetchPage` resolves the claim and checks that it is
+playable and free. A file claim then needs the media address from `get`.
+For video files, `fetchTranscodedStreams` follows a `HEAD` request and reads
+an HLS master if one is found; failure of that optional lookup leaves the
+uploaded file available. Audio files do not need that rendition lookup.
+A livestream instead needs its current live state and media address.
+
+Likes, the view count and the follower count are requested concurrently
+after the claim (and, for a livestream, its live state) is available. The
+page waits for those tasks as well as media preparation, so a slow optional
+request can delay it. A failure in an optional task leaves its numbers
+unknown rather than failing the page.
 
 ### Media hosts
 

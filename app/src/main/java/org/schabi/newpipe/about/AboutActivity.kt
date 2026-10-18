@@ -29,8 +29,7 @@ class AboutActivity : AppCompatActivity() {
         setSupportActionBar(aboutBinding.aboutToolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        // Create the adapter that will return a fragment for each of the three
-        // primary sections of the activity.
+        // The About and Licenses tabs share this pager.
         val mAboutStateAdapter = AboutStateAdapter(this)
         // Set up the ViewPager with the sections adapter.
         aboutBinding.aboutViewPager2.adapter = mAboutStateAdapter
@@ -51,7 +50,7 @@ class AboutActivity : AppCompatActivity() {
     }
 
     /**
-     * A placeholder fragment containing a simple view.
+     * Displays the installed build's version, application ID, build type and project link.
      */
     class AboutFragment : Fragment() {
         override fun onCreateView(
@@ -126,12 +125,14 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("EventBus", "2012 - 2016", "Markus Junginger", "https://greenrobot.org/eventbus", StandardLicenses.APACHE2),
             SoftwareComponent("Error Prone Annotations", "2012 - 2026", "Google Inc.", "https://github.com/google/error-prone", StandardLicenses.APACHE2),
             SoftwareComponent("ExoPlayer", "2014 - 2020", "Google, Inc.", "https://github.com/google/ExoPlayer", StandardLicenses.APACHE2),
+            SoftwareComponent("FCast sender SDK", "2023", "FUTO", "https://github.com/futo-org/fcast", StandardLicenses.MIT),
             SoftwareComponent("GigaGet", "2014 - 2015", "Peter Cai", "https://github.com/PaperAirplane-Dev-Team/GigaGet", StandardLicenses.GPL3),
             SoftwareComponent("Google Auto", "2013 - 2026", "Google Inc.", "https://github.com/google/auto", StandardLicenses.APACHE2),
             SoftwareComponent("Guava", "2010 - 2026", "Google Inc.", "https://github.com/google/guava", StandardLicenses.APACHE2),
             SoftwareComponent("Groupie", "2016", "Lisa Wray", "https://github.com/lisawray/groupie", StandardLicenses.MIT),
             SoftwareComponent("HlsDownloader", "2025", "evermind-zz", "https://github.com/evermind-zz/HlsDownloader", StandardLicenses.GPL3),
             SoftwareComponent("J2ObjC Annotations", "2012 - 2026", "Google Inc.", "https://github.com/google/j2objc", StandardLicenses.APACHE2),
+            SoftwareComponent("Java Native Access", "", "JNA contributors", "https://github.com/java-native-access/jna", StandardLicenses.APACHE2),
             SoftwareComponent("JetBrains Compose Multiplatform", "2020 - 2026", "JetBrains and Compose Multiplatform contributors", "https://github.com/JetBrains/compose-multiplatform", StandardLicenses.APACHE2),
             SoftwareComponent("JetBrains Java Annotations", "2000 - 2026", "JetBrains", "https://github.com/JetBrains/java-annotations", StandardLicenses.APACHE2),
             SoftwareComponent("Jsoup", "2009 - 2020", "Jonathan Hedley", "https://github.com/jhy/jsoup", StandardLicenses.MIT),
@@ -152,7 +153,7 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("PrettyTime", "2012 - 2020", "Lincoln Baxter, III", "https://github.com/ocpsoft/prettytime", StandardLicenses.APACHE2),
             SoftwareComponent("ProcessPhoenix", "2015", "Jake Wharton", "https://github.com/JakeWharton/ProcessPhoenix", StandardLicenses.APACHE2),
             SoftwareComponent("Protocol Buffers", "2008", "Google Inc.", "https://github.com/protocolbuffers/protobuf", StandardLicenses.BSD3),
-            SoftwareComponent("PVCPipe Extractor", "2017 - 2026", "NewPipe and PVCPipe Extractor contributors", "https://github.com/75ohmantenna/pvcpipe-extractor", StandardLicenses.GPL3),
+            SoftwareComponent("PVCPipe Extractor", "2017 - 2026", "NewPipe and PVCPipe Extractor contributors", "https://github.com/75ohmantenna/pvcpipe/tree/master/pvcpipe-extractor", StandardLicenses.GPL3),
             SoftwareComponent("Reactive Streams", "2014 - 2026", "Reactive Streams contributors", "https://github.com/reactive-streams/reactive-streams-jvm", StandardLicenses.MIT0),
             SoftwareComponent("Rhino", "1997 - 2026", "Mozilla and Rhino contributors", "https://github.com/mozilla/rhino", StandardLicenses.MPL2),
             SoftwareComponent("RxAndroid", "2015", "The RxAndroid authors", "https://github.com/ReactiveX/RxAndroid", StandardLicenses.APACHE2),

@@ -63,6 +63,20 @@ class BitchuteStreamFormatTest {
         assertNull(stream.getFormat());
     }
 
+    @Test
+    void recognizesParameterizedHlsMimeTypesWithoutAPlaylistSuffix() throws Exception {
+        final String url = "https://cdn.example/manifest?token=one";
+        for (final String type : new String[]{
+                "application/vnd.apple.mpegurl; charset=utf-8",
+                " Application/X-MpegURL ; charset=UTF-8"}) {
+            final VideoStream stream = BitchuteStreamExtractor.buildVideoStream(media(type, url));
+
+            assertEquals(DeliveryMethod.HLS, stream.getDeliveryMethod(), type);
+            assertEquals(url, stream.getManifestUrl(), type);
+            assertNull(stream.getFormat(), type);
+        }
+    }
+
     private static ResultsStreamVideoMedia media(final String type, final String url) {
         return new ResultsStreamVideoMedia(JsonObject.builder()
                 .value("media_type", type)

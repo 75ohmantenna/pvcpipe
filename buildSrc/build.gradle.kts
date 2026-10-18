@@ -10,3 +10,7 @@ plugins {
 repositories {
     gradlePluginPortal()
 }
+
+dependencies {
+    testImplementation(kotlin("test-junit"))
+}

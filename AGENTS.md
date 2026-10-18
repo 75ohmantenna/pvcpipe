@@ -1,4 +1,51 @@
-@/home/user/.codex/RTK.md
+# Working in PVCPipe
+
+## Source of truth
+
+- Implementation and behavioral tests are authoritative. Update affected guides
+  and code comments when behavior changes; do not preserve a false claim to match
+  old documentation.
+- `pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/ServiceList.java`
+  defines supported services and their persistent IDs. Removed IDs remain retired.
+- `version.properties` is the shared app/extractor version source.
+  `buildSrc/src/main/kotlin/PvcVersion.kt` computes and validates the Android code.
+- Read `app/build.gradle.kts` for SDK levels, application IDs, packaging and signing,
+  and `settings.gradle.kts` for the bundled extractor's composite-build substitution.
+- `Makefile` defines the local release gate: run `make ci` before committing a
+  release. Instrumentation is separate and subject to the safety rules below.
+- `docs/README.md` separates current guides from dated observations. Historical
+  failures and hardware results stay historical; add dated follow-ups rather
+  than claiming older runs verify newer code.
+- The main player controls operate active FCast playback. The cast dialog selects,
+  switches or disconnects receivers; do not add a second playback-control panel.
+  Follow `docs/playback.md` and `app/src/main/java/org/schabi/newpipe/player/cast/`.
+- Verify significant behavior by running the changed path. Distinguish controlled
+  protocol peers and emulator results from real receiver/hardware evidence.
+
+## RTK shell commands
+
+Prefer dedicated file/search/edit tools when available. When using the shell,
+apply these RTK rewrites explicitly; there is no automatic Codex hook:
+
+| Command | Use |
+| --- | --- |
+| `git ...` | `rtk git ...` |
+| `ls -la ...` | `rtk ls -la ...` |
+| `cat file` | `rtk read file` |
+| `sudo cat file` | `sudo rtk read file` |
+| `grep ...` | `rtk grep ...` |
+| `find ...` | `rtk find ...` |
+| `wc -l ...` | `rtk wc -l ...` |
+| `docker ...` | `rtk docker ...` |
+| `kubectl ...` | `rtk kubectl ...` |
+| `gh ...` | `rtk gh ...` |
+| `npm run ...` | `rtk npm run ...` |
+| `pnpm ...` | `rtk pnpm ...` |
+
+Rewrite each part of a compound command. Never double-prefix an RTK command.
+Do not prefix interactive tools (`vim`, `nano`, `top`, `htop`, `ssh`) or commands
+without relevant output (`mkdir`, `chmod`, `rm`). RTK's own `gain`, `discover`
+and `proxy` commands need no rewrite.
 
 ## Remote submission restriction
 

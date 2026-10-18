@@ -61,6 +61,7 @@ import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
 import org.schabi.newpipe.player.broadcast.PlayerBroadcasts;
+import org.schabi.newpipe.player.cast.CastPlayback;
 import org.schabi.newpipe.player.error.PlaybackErrors;
 import org.schabi.newpipe.player.helper.CustomRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
@@ -221,6 +222,7 @@ public final class Player implements PlaybackListener, Listener {
     private final SharedPreferences prefs;
     @NonNull
     private final PlaybackHistory playbackHistory;
+    private final CastPlayback casting;
 
     private final SerialDisposable playbackDecision = new SerialDisposable();
 
@@ -249,6 +251,7 @@ public final class Player implements PlaybackListener, Listener {
         context = service;
         prefs = PreferenceManager.getDefaultSharedPreferences(context);
         playbackHistory = new PlaybackHistory(context);
+        casting = new CastPlayback(this);
 
         broadcasts = new PlayerBroadcasts(new BroadcastCommands());
         broadcastReceiver = new AndroidPlayerBroadcasts(context, broadcasts,
@@ -379,13 +382,12 @@ public final class Player implements PlaybackListener, Listener {
             case SEEK_IN_PLACE:
                 // seek to timestamp if stream is already playing
                 prepareIfIdle();
-                simpleExoPlayer.seekTo(playQueue.getIndex(),
-                        newQueue.getItem().getRecoveryPosition());
-                simpleExoPlayer.setPlayWhenReady(playWhenReady);
+                seekToCurrentItem(newQueue.getItem().getRecoveryPosition());
+                setPlaying(playWhenReady);
                 break;
             case KEEP_CURRENT_QUEUE:
                 prepareIfIdle();
-                simpleExoPlayer.setPlayWhenReady(playWhenReady);
+                setPlaying(playWhenReady);
                 break;
             case RESUME_FROM_HISTORY:
                 resumePlaybackFromHistory(newQueue, playWhenReady);
@@ -428,9 +430,8 @@ public final class Player implements PlaybackListener, Listener {
         if (oldPlayQueue != null
                 && playQueueItem.isSameItem(oldPlayQueue.getItem())) {
             prepareIfIdle();
-            simpleExoPlayer.seekTo(oldPlayQueue.getIndex(),
-                    seconds * 1000L);
-            simpleExoPlayer.setPlayWhenReady(playWhenReady);
+            seekToCurrentItem(seconds * 1000L);
+            setPlaying(playWhenReady);
 
         } else {
             final PlayQueue newPlayQueue;
@@ -535,6 +536,7 @@ public final class Player implements PlaybackListener, Listener {
                               final boolean playOnReady) {
         destroyPlayer();
         initPlayer(playOnReady);
+        casting.setPlayWhenReadyForSource(playOnReady);
         final boolean playbackSkipSilence = getPrefs().getBoolean(getContext().getString(
                 R.string.playback_skip_silence_key), getPlaybackSkipSilence());
         final PlaybackParameters savedParameters = retrievePlaybackParametersFromPrefs(this);
@@ -561,7 +563,7 @@ public final class Player implements PlaybackListener, Listener {
                 .setUsePlatformDiagnostics(false)
                 .build();
         simpleExoPlayer.addListener(this);
-        simpleExoPlayer.setPlayWhenReady(playOnReady);
+        simpleExoPlayer.setPlayWhenReady(playOnReady && !casting.isActive());
         simpleExoPlayer.setSeekParameters(PlayerHelper.getSeekParameters(context));
         simpleExoPlayer.setWakeMode(C.WAKE_MODE_NETWORK);
         simpleExoPlayer.setHandleAudioBecomingNoisy(true);
@@ -593,6 +595,7 @@ public final class Player implements PlaybackListener, Listener {
         if (DEBUG) {
             Log.d(TAG, "destroyPlayer() called");
         }
+        casting.onPlayerReset();
         UIs.call(PlayerUi::destroyPlayer);
 
         if (playbackAudio != null) {
@@ -622,6 +625,7 @@ public final class Player implements PlaybackListener, Listener {
         saveStreamProgressState();
         setRecovery();
         stopActivityBinding();
+        casting.close();
 
         destroyPlayer();
         broadcastReceiver.unregister();
@@ -639,8 +643,8 @@ public final class Player implements PlaybackListener, Listener {
         }
 
         final int queuePos = playQueue.getIndex();
-        final long windowPos = simpleExoPlayer.getCurrentPosition();
-        final long duration = simpleExoPlayer.getDuration();
+        final long windowPos = getCurrentPosition();
+        final long duration = getDuration();
 
         // No checks due to https://github.com/TeamNewPipe/NewPipe/pull/7195#issuecomment-962624380
         setRecovery(queuePos, MathUtils.clamp(windowPos, 0, duration));
@@ -699,7 +703,10 @@ public final class Player implements PlaybackListener, Listener {
     private final class BroadcastCommands implements PlayerBroadcasts.Commands {
         @Override
         public void pause() {
-            Player.this.pause();
+            // A headset unplugged from the phone must not pause the receiver's speakers.
+            if (!casting.isActive()) {
+                Player.this.pause();
+            }
         }
 
         @Override
@@ -771,6 +778,9 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public PlaybackParameters getPlaybackParameters() {
+        if (casting.isActive()) {
+            return casting.getParameters();
+        }
         if (exoPlayerIsNull()) {
             return PlaybackParameters.DEFAULT;
         }
@@ -779,7 +789,7 @@ public final class Player implements PlaybackListener, Listener {
 
     /**
      * Sets the playback parameters of the player, and also saves them to shared preferences.
-     * Speed and pitch are rounded up to 2 decimal places before being used or saved.
+     * Speed and pitch are rounded to the nearest 2 decimal places before being used or saved.
      *
      * @param speed       the playback speed, will be rounded to up to 2 decimal places
      * @param pitch       the playback pitch, will be rounded to up to 2 decimal places
@@ -794,6 +804,9 @@ public final class Player implements PlaybackListener, Listener {
         simpleExoPlayer.setPlaybackParameters(
                 new PlaybackParameters(roundedSpeed, roundedPitch));
         simpleExoPlayer.setSkipSilenceEnabled(skipSilence);
+        if (casting.isActive()) {
+            casting.setSpeed(roundedSpeed);
+        }
     }
     //endregion
 
@@ -834,12 +847,12 @@ public final class Player implements PlaybackListener, Listener {
             return;
         }
 
-        final int currentProgress = Math.max((int) simpleExoPlayer.getCurrentPosition(), 0);
+        final int currentProgress = (int) Math.min(Integer.MAX_VALUE, getCurrentPosition());
 
         onUpdateProgress(
                 currentProgress,
-                (int) simpleExoPlayer.getDuration(),
-                simpleExoPlayer.getBufferedPercentage());
+                (int) Math.min(Integer.MAX_VALUE, getDuration()),
+                casting.isActive() ? 100 : simpleExoPlayer.getBufferedPercentage());
 
         if (isPrepared) {
             sponsorBlock.skip(this, currentProgress, isRewind);
@@ -884,6 +897,9 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     private void updatePlaybackState(final boolean playWhenReady, final int playbackState) {
+        if (casting.isActive()) {
+            return; // Local ExoPlayer stays paused while the receiver owns playback.
+        }
         if (DEBUG) {
             Log.d(TAG, "ExoPlayer - updatePlaybackState() called with: "
                     + "playWhenReady = [" + playWhenReady + "], "
@@ -923,6 +939,9 @@ public final class Player implements PlaybackListener, Listener {
 
     @Override // exoplayer listener
     public void onIsLoadingChanged(final boolean isLoading) {
+        if (casting.isActive()) {
+            return;
+        }
         if (!isLoading && currentState == STATE_PAUSED && isProgressLoopRunning()) {
             stopProgressLoop();
         } else if (isLoading && !isProgressLoopRunning()) {
@@ -1146,12 +1165,19 @@ public final class Player implements PlaybackListener, Listener {
     //region Mute / Unmute
 
     public void toggleMute() {
+        if (casting.isActive()) {
+            casting.toggleMute();
+            return;
+        }
         playbackAudio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE);
         UIs.call(playerUi -> playerUi.onMuteUnmuteChanged(isMuted()));
         notifyPlaybackUpdateToListeners();
     }
 
     public boolean isMuted() {
+        if (casting.isActive()) {
+            return casting.getSession().getVolume() == 0;
+        }
         return !exoPlayerIsNull() && playbackAudio.isMuted();
     }
     //endregion
@@ -1218,6 +1244,7 @@ public final class Player implements PlaybackListener, Listener {
                     listeners.onAudioTrackUpdate();
                 }
             });
+            casting.onSourceChanged();
         });
     }
 
@@ -1371,8 +1398,8 @@ public final class Player implements PlaybackListener, Listener {
             return false;
         }
 
-        final long currentPositionMillis = simpleExoPlayer.getCurrentPosition();
-        final long currentDurationMillis = simpleExoPlayer.getDuration();
+        final long currentPositionMillis = getCurrentPosition();
+        final long currentDurationMillis = getDuration();
         return currentDurationMillis - currentPositionMillis < timeToEndMillis;
     }
 
@@ -1416,6 +1443,8 @@ public final class Player implements PlaybackListener, Listener {
                 || currentItem.getServiceId() != item.getServiceId()
                 || !currentItem.getUrl().equals(item.getUrl());
 
+        casting.onQueueItemChanged(item);
+
         currentItem = item;
 
         if (playQueueIndex != playQueue.getIndex()) {
@@ -1454,8 +1483,12 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public void seekTo(final long positionMillis) {
+        if (casting.isActive()) {
+            casting.seek(positionMillis);
+            return;
+        }
         if (DEBUG) {
-            Log.d(TAG, "seekBy() called with: position = [" + positionMillis + "]");
+            Log.d(TAG, "seekTo() called with: position = [" + positionMillis + "]");
         }
         if (!exoPlayerIsNull()) {
             // prevent invalid positions when fast-forwarding/-rewinding
@@ -1468,10 +1501,14 @@ public final class Player implements PlaybackListener, Listener {
         if (DEBUG) {
             Log.d(TAG, "seekBy() called with: offsetMillis = [" + offsetMillis + "]");
         }
-        seekTo(simpleExoPlayer.getCurrentPosition() + offsetMillis);
+        seekTo(getCurrentPosition() + offsetMillis);
     }
 
     public void seekToDefault() {
+        if (casting.isActive()) {
+            casting.seek(0);
+            return;
+        }
         if (!exoPlayerIsNull()) {
             simpleExoPlayer.seekToDefaultPosition();
         }
@@ -1486,6 +1523,10 @@ public final class Player implements PlaybackListener, Listener {
     //region Player actions (play, pause, previous, fast-forward, ...)
 
     public void play() {
+        if (casting.isActive()) {
+            casting.play();
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "play() called");
         }
@@ -1508,6 +1549,10 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public void pause() {
+        if (casting.isActive()) {
+            casting.pause();
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "pause() called");
         }
@@ -1545,7 +1590,7 @@ public final class Player implements PlaybackListener, Listener {
         /* If current playback has run for PLAY_PREV_ACTIVATION_LIMIT_MILLIS milliseconds,
          * restart current track. Also restart the track if the current track
          * is the first in a queue.*/
-        if (simpleExoPlayer.getCurrentPosition() > PLAY_PREV_ACTIVATION_LIMIT_MILLIS
+        if (getCurrentPosition() > PLAY_PREV_ACTIVATION_LIMIT_MILLIS
                 || playQueue.getIndex() == 0) {
             seekToDefault();
             playQueue.offsetIndex(0);
@@ -1571,7 +1616,7 @@ public final class Player implements PlaybackListener, Listener {
 
     public void fastForward() {
         if (DEBUG) {
-            Log.d(TAG, "fastRewind() called");
+            Log.d(TAG, "fastForward() called");
         }
         seekBy(retrieveSeekDurationFromPreferences(this));
         triggerProgressUpdate();
@@ -1597,8 +1642,9 @@ public final class Player implements PlaybackListener, Listener {
         return new PlaybackHistory.Snapshot(getCurrentStreamInfo().orElse(null), playQueue,
                 exoPlayerIsNull() || currentMetadata == null
                         ? -1 : simpleExoPlayer.getCurrentMediaItemIndex(),
-                exoPlayerIsNull() ? 0 : simpleExoPlayer.getContentPosition(),
-                exoPlayerIsNull() ? 0 : simpleExoPlayer.getCurrentPosition());
+                casting.isActive() ? casting.getPosition()
+                        : exoPlayerIsNull() ? 0 : simpleExoPlayer.getContentPosition(),
+                getCurrentPosition());
     }
 
     private void registerStreamViewed() {
@@ -1648,7 +1694,7 @@ public final class Player implements PlaybackListener, Listener {
 
     @NonNull
     public String getVideoUrlAtCurrentTime() {
-        final long timeSeconds = simpleExoPlayer.getCurrentPosition() / 1000;
+        final long timeSeconds = getCurrentPosition() / 1000;
         String videoUrl = getVideoUrl();
         if (!isLive() && timeSeconds >= 0 && currentMetadata != null
                 && currentMetadata.getServiceId() == YouTube.getServiceId()) {
@@ -1841,11 +1887,14 @@ public final class Player implements PlaybackListener, Listener {
     private void notifyPlaybackUpdateToListeners() {
         if (!exoPlayerIsNull() && playQueue != null) {
             listeners.onPlaybackUpdate(currentState, getRepeatMode(), playQueue.isShuffled(),
-                    simpleExoPlayer.getPlaybackParameters());
+                    getPlaybackParameters());
         }
     }
 
     public void useVideoAndSubtitles(final boolean videoAndSubtitlesEnabled) {
+        if (casting.isActive()) {
+            return; // Moving the app to the background must not replace the cast video source.
+        }
         if (playQueue == null) {
             return;
         }
@@ -1901,19 +1950,113 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public boolean isStopped() {
+        if (casting.isActive()) {
+            return false;
+        }
         return exoPlayerIsNull() || simpleExoPlayer.getPlaybackState() == ExoPlayer.STATE_IDLE;
     }
 
     public boolean isPlaying() {
-        return !exoPlayerIsNull() && simpleExoPlayer.isPlaying();
+        return casting.isActive() ? currentState == STATE_PLAYING
+                : !exoPlayerIsNull() && simpleExoPlayer.isPlaying();
     }
 
     public boolean getPlayWhenReady() {
-        return !exoPlayerIsNull() && simpleExoPlayer.getPlayWhenReady();
+        return casting.isActive() ? casting.getPlayWhenReady()
+                : !exoPlayerIsNull() && simpleExoPlayer.getPlayWhenReady();
     }
 
     public boolean isLoading() {
-        return !exoPlayerIsNull() && simpleExoPlayer.isLoading();
+        return casting.isActive() ? casting.isPreparing()
+                : !exoPlayerIsNull() && simpleExoPlayer.isLoading();
+    }
+
+    private void setPlaying(final boolean playing) {
+        if (casting.isActive()) {
+            if (playing) {
+                casting.play();
+            } else {
+                casting.pause();
+            }
+        } else {
+            simpleExoPlayer.setPlayWhenReady(playing);
+        }
+    }
+
+    private void seekToCurrentItem(final long position) {
+        if (casting.isActive()) {
+            casting.seek(position);
+        } else {
+            // Timestamp intents may arrive before the timeline is prepared: retain ExoPlayer's
+            // pending indexed seek instead of clamping against an unknown/old duration.
+            simpleExoPlayer.seekTo(playQueue.getIndex(), position);
+        }
+    }
+
+    public CastPlayback getCasting() {
+        return casting;
+    }
+
+    public long getCurrentPosition() {
+        return casting.isActive() ? casting.getPosition()
+                : exoPlayerIsNull() ? 0 : simpleExoPlayer.getCurrentPosition();
+    }
+
+    public long getDuration() {
+        return casting.isActive() ? casting.getDuration()
+                : exoPlayerIsNull() ? 0 : simpleExoPlayer.getDuration();
+    }
+
+    public void pauseLocalForCasting() {
+        playbackAudio.onPlaybackEvent(PlaybackAudio.Event.PAUSE_REQUESTED);
+        simpleExoPlayer.pause();
+    }
+
+    public void restoreLocalAfterCasting(final long position, final boolean playHere) {
+        if (exoPlayerIsNull()) {
+            return;
+        }
+        simpleExoPlayer.seekTo(position);
+        if (currentState == STATE_PAUSED_SEEK) {
+            changeState(STATE_PAUSED);
+        }
+        updatePlaybackState(false, simpleExoPlayer.getPlaybackState());
+        if (playHere) {
+            play();
+        }
+        triggerProgressUpdate();
+    }
+
+    public void onCastingStateChanged(final int state) {
+        isPrepared = true;
+        if (currentState != state && currentState != STATE_PAUSED_SEEK) {
+            changeState(state);
+        }
+    }
+
+    public void onCastingChanged() {
+        UIs.call(PlayerUi::onCastingChanged);
+        UIs.call(playerUi -> playerUi.onMuteUnmuteChanged(isMuted()));
+        notifyPlaybackUpdateToListeners();
+    }
+
+    public void onCastingEnded() {
+        saveStreamProgressStateCompleted();
+        if (getRepeatMode() == REPEAT_MODE_ONE
+                || getRepeatMode() == REPEAT_MODE_ALL && playQueue != null
+                && playQueue.size() == 1) {
+            casting.play();
+        } else if (playQueue != null && getRepeatMode() == REPEAT_MODE_ALL
+                && playQueue.getIndex() == playQueue.size() - 1) {
+            casting.setPlayWhenReadyForSource(true);
+            casting.onPlayerReset();
+            playQueue.setIndex(0);
+        } else {
+            if (playQueue != null && playQueue.getIndex() < playQueue.size() - 1) {
+                casting.setPlayWhenReadyForSource(true);
+            }
+            changeState(STATE_COMPLETED);
+        }
     }
 
     private boolean isLive() {

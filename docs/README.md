@@ -4,6 +4,11 @@ The code and its tests say what the app does. These pages say where to look
 and why things are the way they are. If a page and the code disagree, the
 page is wrong.
 
+PVCPipe is in development. The guides describe implemented behavior and
+limits, not a claim that all supported sites, receivers or devices have
+passed live testing. The dated records distinguish observed results from
+paths that have not been exercised.
+
 ## Guides
 
 A guide describes the code as it is now and names the classes to read.
@@ -12,7 +17,7 @@ A guide describes the code as it is now and names the classes to read.
 | --- | --- |
 | [building.md](building.md) | Requirements, layout, `make ci`, the test suites |
 | [services.md](services.md) | The five services, their search filters, removed services, adding a service |
-| [playback.md](playback.md) | The player: sources, queue, audio focus, history, errors, the detail screen, proof tokens |
+| [playback.md](playback.md) | The player: sources, FCast casting, queue, audio focus, history, errors, the detail screen, proof tokens |
 | [library-data.md](library-data.md) | Local playlists, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Downloads: preparation, checkpoints, sharing a finished file |
 | [../GLOSSARY.md](../GLOSSARY.md) | The terms the code and these pages use |

@@ -6,6 +6,7 @@ import static org.schabi.newpipe.player.notification.NotificationConstants.ACTIO
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.media.AudioManager;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.util.Log;
@@ -14,7 +15,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media.session.MediaButtonReceiver;
 
+import androidx.media.VolumeProviderCompat;
 import com.google.android.exoplayer2.ForwardingPlayer;
+import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player.RepeatMode;
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
 
@@ -47,6 +50,7 @@ public class MediaSessionPlayerUi extends PlayerUi
 
     // used to check whether any notification action changed, before sending costly updates
     private List<NotificationActionData> prevNotificationActions = List.of();
+    @Nullable private VolumeProviderCompat castVolume;
 
 
     public MediaSessionPlayerUi(@NonNull final Player player,
@@ -129,9 +133,8 @@ public class MediaSessionPlayerUi extends PlayerUi
 
 
     private ForwardingPlayer getForwardingPlayer() {
-        // ForwardingPlayer means that all media session actions called on this player are
-        // forwarded directly to the connected exoplayer, except for the overridden methods. So
-        // override play and pause since our player adds more functionality to them over exoplayer.
+        // ForwardingPlayer defaults to local ExoPlayer; route owned commands and receiver state
+        // through Player instead.
         return new ForwardingPlayer(player.getExoPlayer()) {
             @Override
             public void play() {
@@ -143,6 +146,90 @@ public class MediaSessionPlayerUi extends PlayerUi
             @Override
             public void pause() {
                 player.pause();
+            }
+
+            @Override
+            public void stop() {
+                if (player.getCasting().isActive()
+                        || player.getCasting().getSession().getConnectionState() != 0) {
+                    player.getCasting().stop(false);
+                }
+                super.stop();
+            }
+
+            @Override
+            public void setPlayWhenReady(final boolean ready) {
+                if (ready) {
+                    player.play();
+                } else {
+                    player.pause();
+                }
+            }
+
+            @Override
+            public boolean getPlayWhenReady() {
+                return player.getPlayWhenReady();
+            }
+
+            @Override
+            public boolean isPlaying() {
+                return player.isPlaying();
+            }
+
+            @Override
+            public int getPlaybackState() {
+                if (!player.getCasting().isActive()) {
+                    return super.getPlaybackState();
+                }
+                return player.getCurrentState() == Player.STATE_BUFFERING ? STATE_BUFFERING
+                        : player.getCurrentState() == Player.STATE_COMPLETED ? STATE_ENDED
+                        : STATE_READY;
+            }
+
+            @Override
+            public long getCurrentPosition() {
+                return player.getCurrentPosition();
+            }
+
+            @Override
+            public long getContentPosition() {
+                return player.getCasting().isActive() ? player.getCurrentPosition()
+                        : super.getContentPosition();
+            }
+
+            @Override
+            public long getDuration() {
+                return player.getDuration();
+            }
+
+            @Override
+            public PlaybackParameters getPlaybackParameters() {
+                return player.getPlaybackParameters();
+            }
+
+            @Override
+            public void seekTo(final long positionMs) {
+                player.seekTo(positionMs);
+            }
+
+            @Override
+            public void seekTo(final int mediaItemIndex, final long positionMs) {
+                if (player.getCasting().isActive()
+                        && mediaItemIndex == player.getExoPlayer().getCurrentMediaItemIndex()) {
+                    player.seekTo(positionMs);
+                } else {
+                    super.seekTo(mediaItemIndex, positionMs);
+                }
+            }
+
+            @Override
+            public void seekBack() {
+                player.fastRewind();
+            }
+
+            @Override
+            public void seekForward() {
+                player.fastForward();
             }
         };
     }
@@ -188,6 +275,7 @@ public class MediaSessionPlayerUi extends PlayerUi
             // mediaSession will be inactive after destroyPlayer is called
             return;
         }
+        sessionConnector.invalidateMediaSessionPlaybackState();
 
         // These two preferences retain the original fourth and fifth slot keys.
         final List<NotificationActionData> newNotificationActions =
@@ -208,6 +296,44 @@ public class MediaSessionPlayerUi extends PlayerUi
                             .map(data -> new SessionConnectorActionProvider(data, context))
                             .toArray(SessionConnectorActionProvider[]::new));
         }
+    }
+
+    @Override
+    public void onUpdateProgress(final int currentProgress, final int duration,
+                                 final int bufferPercent) {
+        if (player.getCasting().isActive()) {
+            sessionConnector.invalidateMediaSessionPlaybackState();
+        }
+    }
+
+    @Override
+    public void onCastingChanged() {
+        if (player.getCasting().isActive()
+                && player.getCasting().getSession().getVolumeSupported()) {
+            final int volume = (int) Math.round(player.getCasting().getSession().getVolume() * 100);
+            if (castVolume == null) {
+                castVolume = new VolumeProviderCompat(VolumeProviderCompat.VOLUME_CONTROL_ABSOLUTE,
+                        100, volume) {
+                    @Override
+                    public void onSetVolumeTo(final int value) {
+                        player.getCasting().getSession().setVolume(value / 100.0);
+                    }
+
+                    @Override
+                    public void onAdjustVolume(final int direction) {
+                        player.getCasting().getSession().setVolume(Math.max(0, Math.min(1,
+                                player.getCasting().getSession().getVolume() + direction * 0.05)));
+                    }
+                };
+                mediaSession.setPlaybackToRemote(castVolume);
+            } else {
+                castVolume.setCurrentVolume(volume);
+            }
+        } else if (castVolume != null) {
+            castVolume = null;
+            mediaSession.setPlaybackToLocal(AudioManager.STREAM_MUSIC);
+        }
+        sessionConnector.invalidateMediaSessionPlaybackState();
     }
 
     @Override

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp">
+
+    <androidx.appcompat.widget.AppCompatEditText
+        android:id="@+id/receiverAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/fcast_address"
+        android:inputType="textUri"
+        android:maxLines="1"
+        android:selectAllOnFocus="true" />
+
+    <androidx.appcompat.widget.AppCompatEditText
+        android:id="@+id/receiverPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/fcast_port"
+        android:inputType="number"
+        android:maxLength="5"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:text="46899" />
+
+    <org.schabi.newpipe.views.NewPipeTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/fcast_manual_security" />
+</LinearLayout>

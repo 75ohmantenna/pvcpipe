@@ -55,6 +55,8 @@ final class DownloadPreparation {
     static final class Selection {
         final Kind kind;
         final Stream primary;
+        // Header probes enrich the wrapper, not the immutable extractor stream.
+        final MediaFormat primaryFormat;
         final AudioStream secondary;
         final long primarySize;
         final long secondarySize;
@@ -63,11 +65,12 @@ final class DownloadPreparation {
         final SponsorBlockSegment[] segments;
 
         @SuppressWarnings("checkstyle:ParameterNumber")
-        Selection(final Kind kind, final Stream primary, final AudioStream secondary,
-                  final long primarySize, final long secondarySize, final int threads,
-                  final StreamInfo info, final SponsorBlockSegment[] segments) {
+        Selection(final Kind kind, final Stream primary, final MediaFormat primaryFormat,
+                  final AudioStream secondary, final long primarySize, final long secondarySize,
+                  final int threads, final StreamInfo info, final SponsorBlockSegment[] segments) {
             this.kind = kind;
             this.primary = primary;
+            this.primaryFormat = primaryFormat;
             this.secondary = secondary;
             this.primarySize = primarySize;
             this.secondarySize = secondarySize;
@@ -516,7 +519,7 @@ final class DownloadPreparation {
                 throw new IllegalArgumentException(
                         "The selected stream has a different media kind");
             }
-            final MediaFormat format = primary.getFormat();
+            final MediaFormat format = selected.primaryFormat;
             if (format == null || !primary.isUrl() || primary.getContent() == null
                     || primary.getContent().isBlank()
                     || (primary.getDeliveryMethod() != PROGRESSIVE_HTTP
@@ -561,12 +564,14 @@ final class DownloadPreparation {
             }
             psArgs = kind == Kind.SUBTITLE && format == MediaFormat.TTML
                     ? new String[]{format.getSuffix(), "false"} : null;
+            final MissionRecoveryInfo primaryRecovery = new MissionRecoveryInfo(primary);
+            primaryRecovery.setFormat(format);
             if (selected.secondary == null) {
                 urls = new String[]{primary.getContent()};
-                recovery = List.of(new MissionRecoveryInfo(primary));
+                recovery = List.of(primaryRecovery);
             } else {
                 urls = new String[]{primary.getContent(), selected.secondary.getContent()};
-                recovery = List.of(new MissionRecoveryInfo(primary),
+                recovery = List.of(primaryRecovery,
                         new MissionRecoveryInfo(selected.secondary));
             }
         }

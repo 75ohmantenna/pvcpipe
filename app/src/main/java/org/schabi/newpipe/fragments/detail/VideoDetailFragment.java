@@ -378,7 +378,8 @@ public final class VideoDetailFragment
 
         // Stop the service when user leaves the app with double back press
         // if video player is selected. Otherwise unbind
-        if (activity.isFinishing() && isPlayerAvailable() && player.videoPlayerSelected()) {
+        if (activity.isFinishing() && isPlayerAvailable() && player.videoPlayerSelected()
+                && !player.getCasting().isActive()) {
             playerHolder.stopService();
         } else {
             playerHolder.setListener(null);
@@ -715,7 +716,7 @@ public final class VideoDetailFragment
 
         // If we are in fullscreen mode just exit from it via first back press
         if (isFullscreen()) {
-            if (!DeviceUtils.isTablet(activity)) {
+            if (!DeviceUtils.isTablet(activity) && !player.getCasting().isActive()) {
                 player.pause();
             }
             restoreDefaultOrientation();
@@ -1051,6 +1052,10 @@ public final class VideoDetailFragment
         }
 
         removeVideoPlayerView();
+        if (player.getCasting().isActive()) {
+            root.ifPresent(view -> view.setVisibility(View.GONE));
+            return;
+        }
         if (isAutoplayEnabled()) {
             playerService.stopForImmediateReusing();
             root.ifPresent(view -> view.setVisibility(View.GONE));

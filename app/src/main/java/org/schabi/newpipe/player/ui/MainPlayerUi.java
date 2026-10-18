@@ -57,6 +57,7 @@ import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
+import org.schabi.newpipe.player.cast.FCastDialog;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.gesture.BasePlayerGestureListener;
 import org.schabi.newpipe.player.gesture.MainPlayerGestureListener;
@@ -167,6 +168,9 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         }));
         binding.queueButton.setOnClickListener(v -> openItemsList(true));
         binding.segmentsButton.setOnClickListener(v -> openItemsList(false));
+        binding.castButton.setOnClickListener(v ->
+                getParentActivity().ifPresent(activity ->
+                        FCastDialog.show(activity.getSupportFragmentManager())));
 
         binding.addToPlaylistButton.setOnClickListener(v ->
                 getParentActivity().map(FragmentActivity::getSupportFragmentManager)
@@ -201,6 +205,7 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         binding.queueButton.setOnClickListener(null);
         binding.segmentsButton.setOnClickListener(null);
         binding.addToPlaylistButton.setOnClickListener(null);
+        binding.castButton.setOnClickListener(null);
 
         context.getContentResolver().unregisterContentObserver(settingsContentObserver);
 
@@ -288,6 +293,7 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         binding.share.setVisibility(View.VISIBLE);
         binding.openInBrowser.setVisibility(View.VISIBLE);
         binding.switchMute.setVisibility(View.VISIBLE);
+        binding.castButton.setVisibility(View.VISIBLE);
         binding.playerCloseButton.setVisibility(isFullscreen ? View.GONE : View.VISIBLE);
         // Top controls have a large minHeight which is allows to drag the player
         // down in fullscreen mode (just larger area to make easy to locate by finger)
@@ -372,6 +378,9 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
      * next lines of code will enable audio-only playback only if needed
      */
     private void onFragmentStopped() {
+        if (player.getCasting().isActive()) {
+            return; // Casting continues independently of local minimize/background preferences.
+        }
         if (player.isPlaying() || player.isLoading()) {
             switch (getMinimizeOnExitAction(context)) {
                 case MINIMIZE_ON_EXIT_MODE_BACKGROUND:
@@ -589,7 +598,7 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         if (areSegmentsVisible) {
             if (segmentAdapter.setItems(info)) {
                 final int adapterPosition = getNearestStreamSegmentPosition(
-                        player.getExoPlayer().getCurrentPosition());
+                        player.getCurrentPosition());
                 segmentAdapter.selectSegmentAt(adapterPosition);
                 binding.itemsList.scrollToPosition(adapterPosition);
             } else {
@@ -634,10 +643,10 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
             if (playQueue != null) {
                 binding.itemsList.scrollToPosition(playQueue.getIndex());
             }
-            updateQueueTime((int) player.getExoPlayer().getCurrentPosition());
+            updateQueueTime((int) player.getCurrentPosition());
         } else {
             final int adapterPosition = getNearestStreamSegmentPosition(
-                    player.getExoPlayer().getCurrentPosition());
+                    player.getCurrentPosition());
             segmentAdapter.selectSegmentAt(adapterPosition);
             binding.itemsList.scrollToPosition(adapterPosition);
         }
@@ -857,6 +866,11 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
 
     @Override
     protected void onPlaybackSpeedClicked() {
+        if (player.getCasting().isActive()) {
+            playbackSpeedPopupMenu.show();
+            isSomePopupMenuVisible = true;
+            return;
+        }
         getParentActivity().ifPresent(activity ->
                 PlaybackParameterDialog.newInstance(player.getPlaybackSpeed(),
                                 player.getPlaybackPitch(), player.getPlaybackSkipSilence(),

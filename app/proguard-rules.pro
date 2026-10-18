@@ -25,6 +25,8 @@
 # See https://github.com/jhy/jsoup/issues/2459 - may be resolved in future, then this may be removed
 -dontwarn com.google.re2j.**
 
+# FCast sender-sdk bundles the JNA and UniFFI keep rules in its AAR consumer rules.
+
 ## See https://github.com/TeamNewPipe/NewPipe/pull/1441
 -keepclassmembers class * implements java.io.Serializable {
     static final long serialVersionUID;

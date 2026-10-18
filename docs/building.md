@@ -15,7 +15,7 @@
 | --- | --- |
 | `app/` | The Android app. Room schemas are in `app/schemas/`. |
 | `pvcpipe-extractor/` | The `extractor` and `timeago-generator` Gradle projects; `timeago-parser/` supplies additional Java sources to `extractor`. |
-| `buildSrc/` | The `checkDependenciesOrder` task. |
+| `buildSrc/` | Shared version parsing/code validation, its regressions, and `checkDependenciesOrder`. |
 | `checkstyle/` | The Checkstyle rules for the app. The extractor has its own in `pvcpipe-extractor/checkstyle/`. |
 | `docs/` | The guides and records listed in [README.md](README.md). |
 
@@ -35,6 +35,7 @@ make ci                        # every check below, then both APKs
 
 | Task | What it does |
 | --- | --- |
+| `:buildSrc:test` | version-code monotonicity and Android upper-bound regressions |
 | `:app:runCheckstyle` | Checkstyle over every Java file under `app/src/` |
 | `:app:runKtlint` | ktlint over the app's Kotlin, with the rules in `.editorconfig` |
 | `:app:checkDependenciesOrder` | fails if a section of `gradle/libs.versions.toml` is not in alphabetical order |
@@ -69,15 +70,38 @@ fork came from.
 
 - The version is `major.minor.patch`, with minor and patch below 100.
 - The app's version code is computed from it (`PvcVersion` in `buildSrc/`):
-  1,000,000 + major x 10,000 + minor x 100 + patch. So 0.1.0 is 1000100 and
-  1.0.0 is 1010000. The base is above 581013, the last code of the old
+  1,000,000 + major x 10,000 + minor x 100 + patch. So 0.2.0 is 1000200 and
+  1.0.0 is 1010000. Codes above Android's maximum of 2,100,000,000 are rejected.
+  The base is above 581013, the last code of the old
   numbering, because Android refuses to install a lower code over a higher
   one.
 - The bundled extractor has the same version. Its build reads the same file.
-- To release a new version, change the one line in `version.properties`.
+- Change the version only in `version.properties`, not in either build script.
+
+### Release procedure
+
+1. Choose a new version and an unused `v<version>` Git tag. PVCPipe remains
+   in development; a version tag is not a claim that every site or receiver
+   has been tested.
+2. Run `make ci` and exercise the changed behavior. Record which paths used
+   controlled peers/emulators and which used real devices. Use the device
+   safety procedure below; do not erase an installation to verify a release.
+3. Commit the reviewed changes and create an annotated `v<version>` tag on
+   that commit. `version.properties`, app metadata and extractor version
+   must agree.
+4. Check the submission destination, then push the commit and tag to
+   `github.com/75ohmantenna/pvcpipe` only. Keep the local pre-push guard.
+   Do not publish to upstream repositories or force-update an existing tag.
+
+The APK built by `assembleRelease` remains unsigned. Creating a Git tag does
+not sign it or upload an installable release asset; release signing requires
+a separate, securely managed key. Never label a debug-key APK as a signed
+production release.
 
 ## Tests
 
+- **Build-logic tests.** `./gradlew :buildSrc:test` checks version component
+  rollovers and rejects codes outside Android's supported range.
 - **App unit tests.** `./gradlew :app:testDebugUnitTest`, with
   `--tests '<pattern>'` for a subset. They run on the JVM.
 - **Offline extractor tests.** `forkCiTest` runs the JUnit tests tagged
@@ -119,7 +143,7 @@ Fragments, activities and dialogs save their state by hand in Android
 `Bundle`s. The app once used an annotation processor for this. The keys it
 generated are still read, so state saved by an older build survives an
 update. `DownloadDialogSavedStateTest` and `SearchFragmentSavedStateTest`
-pin those keys.
+exercise restoration through those older keys.
 
 `org.schabi.newpipe.util.StateSaver` is something else. It keeps large list
 state out of the `Bundle`, in memory across a configuration change and on

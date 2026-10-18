@@ -154,6 +154,10 @@ public abstract class PlayerUi {
     public void onMuteUnmuteChanged(final boolean isMuted) {
     }
 
+    /** Called when a cast connection, its volume, or playback ownership changes. */
+    public void onCastingChanged() {
+    }
+
     /**
      * @see com.google.android.exoplayer2.Player.Listener#onTracksChanged(Tracks)
      * @param currentTracks the available tracks information

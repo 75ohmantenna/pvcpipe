@@ -13,14 +13,14 @@ object ImportedPreferenceTypes {
     /**
      * Checks a whole import.
      *
-     * A key the app reads as a number is held to that type. Every other key is held to the type
-     * of the app's live value, which for the keys the settings screens define is the type of
-     * their default. A value of another type is converted if that does not change it, and is
-     * otherwise replaced by the live value, or dropped so that the default applies.
+     * A key the app reads as a number is held to that type. Other keys with a live value
+     * are held to its type. A mismatched value is converted if that does not change it,
+     * and is otherwise replaced by the live value, or dropped so that the default applies.
+     * Keys without a numeric type or live value are left unchanged; this does not validate
+     * every possible imported preference.
      *
-     * One kind of key is left alone: a key whose type was changed by a settings migration, in a
-     * file from before that migration. The migration runs at the next start and needs the old
-     * value in its old type.
+     * Keys awaiting a settings migration are also left alone. The migration runs at the
+     * next start and needs the old value in its old type.
      *
      * @param imported the decoded settings, changed in place
      * @param numericTypes the type of every key the app reads as a number

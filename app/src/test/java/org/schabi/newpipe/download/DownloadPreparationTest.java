@@ -24,6 +24,7 @@ import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.util.SponsorBlockCategory;
 import org.schabi.newpipe.util.SponsorBlockSegment;
+import org.schabi.newpipe.util.StreamItemAdapter.StreamInfoWrapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -112,6 +113,51 @@ public class DownloadPreparationTest {
         assertEquals(Postprocessing.ALGORITHM_PVC_HLS_REMUXER, launch.psName);
         assertEquals('v', launch.kind);
         assertEquals(1, launch.urls.length);
+    }
+
+    @Test
+    public void inferredAudioFormatSurvivesPickerSerializationWithoutMutatingStream()
+            throws Exception {
+        final AudioStream stream = new AudioStream.Builder().setId("unknown")
+                .setContent("https://example.com/audio", true).setAverageBitrate(128).build();
+        final StreamInfoWrapper<AudioStream> wrapper = new StreamInfoWrapper<>(
+                List.of(stream), null);
+        wrapper.setFormat(stream, MediaFormat.M4A);
+        selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.AUDIO, stream,
+                wrapper.getFormat(0), null, 100, 0, 5, info, segments);
+
+        preparation.save("recording", DownloadPreparation.Destination.askDocument(), environment);
+        assertNotNull(environment.location);
+        assertEquals("recording.m4a", environment.location.filename);
+        assertEquals("audio/mp4", environment.location.mime);
+        final DownloadPreparation.Location state = serialized(environment.location.state());
+        wrapper.setFormat(stream, MediaFormat.WEBMA_OPUS);
+        preparation.close();
+        preparation = new DownloadPreparation(environment, () -> selected);
+        preparation.resume(state, environment.fileUri, environment);
+
+        final DownloadPreparation.Launch launch = environment.launches.get(0);
+        assertEquals(Postprocessing.ALGORITHM_M4A_NO_DASH, launch.psName);
+        assertEquals(MediaFormat.M4A, launch.recoveryInfo.get(0).getFormat());
+        assertEquals(128, launch.recoveryInfo.get(0).getDesiredBitrate());
+        assertNull(stream.getFormat());
+    }
+
+    @Test
+    public void inferredVideoFormatControlsOutputAndRecovery() {
+        final VideoStream stream = new VideoStream.Builder().setId("unknown")
+                .setContent("https://example.com/video", true)
+                .setIsVideoOnly(false).setResolution("720p").build();
+        selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.VIDEO, stream,
+                MediaFormat.WEBM, null, 100, 0, 5, info, segments);
+
+        final DownloadPreparation.Launch launch = submitDocument();
+
+        assertEquals("recording.webm", environment.location.filename);
+        assertEquals("video/webm", environment.location.mime);
+        assertNull(launch.psName);
+        assertEquals(MediaFormat.WEBM, launch.recoveryInfo.get(0).getFormat());
+        assertNull(stream.getFormat());
     }
 
     @Test
@@ -690,8 +736,8 @@ public class DownloadPreparationTest {
     private void select(final DownloadPreparation.Kind kind, final Stream primary,
                         final AudioStream secondary, final long primarySize,
                         final long secondarySize) {
-        selected = new DownloadPreparation.Selection(kind, primary, secondary, primarySize,
-                secondarySize, 5, info, segments);
+        selected = new DownloadPreparation.Selection(kind, primary, primary.getFormat(), secondary,
+                primarySize, secondarySize, 5, info, segments);
     }
 
     private static AudioStream audio(final MediaFormat format) {

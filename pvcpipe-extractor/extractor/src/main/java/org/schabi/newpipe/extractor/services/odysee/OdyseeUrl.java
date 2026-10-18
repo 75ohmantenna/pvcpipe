@@ -19,9 +19,9 @@ import javax.annotation.Nullable;
 
 /**
  * Translates between the three ways Odysee names a claim: the website address
- * ({@code https://odysee.com/@channel:c/video:v}), the LBRY URI the API wants
- * ({@code lbry://@channel#c/video#v}) and the id the extractor keeps, which is the website path
- * without its leading slash ({@code @channel:c/video:v}).
+ * ({@code https://odysee.com/@channel:c/video:a}), the LBRY URI the API wants
+ * ({@code lbry://@channel#c/video#a}) and the id the extractor keeps, which is the website path
+ * without its leading slash ({@code @channel:c/video:a}).
  */
 public final class OdyseeUrl {
 
@@ -162,7 +162,7 @@ public final class OdyseeUrl {
     }
 
     /**
-     * @param id a channel or stream id, such as {@code @channel:c/video:v}
+     * @param id a channel or stream id, such as {@code @channel:c/video:a}
      * @return the website address for it
      */
     @Nonnull
@@ -175,7 +175,7 @@ public final class OdyseeUrl {
     }
 
     /**
-     * @param id a channel or stream id, such as {@code @channel:c/video:v}
+     * @param id a channel or stream id, such as {@code @channel:c/video:a}
      * @return the LBRY URI the API resolves
      */
     @Nonnull
@@ -184,7 +184,7 @@ public final class OdyseeUrl {
     }
 
     /**
-     * @param lbryUri a URI the API returned, such as {@code lbry://@channel#c/video#v}
+     * @param lbryUri a URI the API returned, such as {@code lbry://@channel#c/video#a}
      * @return the website address for it
      */
     @Nonnull

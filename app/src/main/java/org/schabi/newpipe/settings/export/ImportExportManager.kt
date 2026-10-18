@@ -65,7 +65,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
             val name = BackupFileLocator.FILE_NAME_DB
             ZipHelper.addFileToZip(outZip, name, fileLocator.db)
 
-            // add the legacy vulnerable serialized preferences (will be removed in the future)
+            // Include the legacy format for older importers; current restores prefer JSON.
             ZipHelper.addFileToZip(
                 outZip,
                 BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
@@ -181,7 +181,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
     }
 
     @Deprecated(
-        "Serializing preferences with Java's ObjectOutputStream is vulnerable to injections",
+        "Legacy Java-serialized preferences require restricted deserialization; prefer JSON",
         replaceWith = ReplaceWith("exportHasJsonPrefs")
     )
     fun exportHasSerializedPrefs(zipFile: StoredFileHelper): Boolean {
@@ -196,7 +196,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
      * Remove all shared preferences from the app and load the preferences supplied to the manager.
      */
     @Deprecated(
-        "Serializing preferences with Java's ObjectOutputStream is vulnerable to injections",
+        "Legacy Java-serialized preferences require restricted deserialization; prefer JSON",
         replaceWith = ReplaceWith("loadJsonPrefs")
     )
     @Throws(IOException::class, ClassNotFoundException::class)

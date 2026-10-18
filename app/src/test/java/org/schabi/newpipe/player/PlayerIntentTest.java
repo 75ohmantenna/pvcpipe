@@ -28,6 +28,7 @@ import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
+import org.schabi.newpipe.player.cast.CastPlayback;
 import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
@@ -86,6 +87,7 @@ public class PlayerIntentTest {
         setField("playerType", PlayerType.MAIN);
         setField("UIs", uis);
         setField("simpleExoPlayer", exoPlayer);
+        setField("casting", mock(CastPlayback.class));
         setField("playbackSources", playbackSources);
         setField("playbackHistory", history);
         setField("context", mock(Context.class));

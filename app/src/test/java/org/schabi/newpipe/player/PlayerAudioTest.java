@@ -1,11 +1,14 @@
 package org.schabi.newpipe.player;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -17,6 +20,7 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.broadcast.AndroidPlayerBroadcasts;
+import org.schabi.newpipe.player.cast.CastPlayback;
 import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
@@ -33,6 +37,7 @@ public class PlayerAudioTest {
     public void replayRequestsAudioBeforeChangingQueueAndPlaying() throws Exception {
         try (var log = mockStatic(Log.class)) {
             final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            set(player, "casting", mock(CastPlayback.class));
             final ExoPlayer exo = mock(ExoPlayer.class);
             final PlaybackAudio audio = mock(PlaybackAudio.class);
             final PlayQueue queue = mock(PlayQueue.class);
@@ -56,6 +61,7 @@ public class PlayerAudioTest {
     public void pauseAbandonsAudioBeforePausingThePlayer() throws Exception {
         try (var log = mockStatic(Log.class)) {
             final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            set(player, "casting", mock(CastPlayback.class));
             final ExoPlayer exo = mock(ExoPlayer.class);
             final PlaybackAudio audio = mock(PlaybackAudio.class);
             set(player, "simpleExoPlayer", exo);
@@ -74,6 +80,7 @@ public class PlayerAudioTest {
     public void refusedMuteReportsTheActualAudioStateToUi() throws Exception {
         try (var log = mockStatic(Log.class)) {
             final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            set(player, "casting", mock(CastPlayback.class));
             final PlaybackAudio audio = mock(PlaybackAudio.class);
             final PlayerUi ui = mock(PlayerUi.class);
             set(player, "simpleExoPlayer", mock(ExoPlayer.class));
@@ -91,6 +98,7 @@ public class PlayerAudioTest {
     public void destructionDisposesAudioBeforeReleasingThePlayer() throws Exception {
         try (var log = mockStatic(Log.class)) {
             final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            set(player, "casting", mock(CastPlayback.class));
             final ExoPlayer exo = mock(ExoPlayer.class);
             final PlaybackAudio audio = mock(PlaybackAudio.class);
             doReturn(false).when(player).isProgressLoopRunning();
@@ -112,6 +120,48 @@ public class PlayerAudioTest {
             final InOrder order = inOrder(audio, exo);
             order.verify(audio).dispose();
             order.verify(exo).release();
+        }
+    }
+
+    @Test
+    public void castPlaybackControlsNeverAcquirePhoneAudioFocus() throws Exception {
+        final Player player = mock(Player.class, CALLS_REAL_METHODS);
+        final CastPlayback cast = mock(CastPlayback.class);
+        when(cast.isActive()).thenReturn(true);
+        final ExoPlayer exo = mock(ExoPlayer.class);
+        final PlaybackAudio audio = mock(PlaybackAudio.class);
+        set(player, "casting", cast);
+        set(player, "simpleExoPlayer", exo);
+        set(player, "playbackAudio", audio);
+
+        player.play();
+        player.pause();
+        player.seekTo(42000);
+
+        verify(cast).play();
+        verify(cast).pause();
+        verify(cast).seek(42000);
+        verifyNoInteractions(audio, exo);
+    }
+
+    @Test
+    public void returningToPhoneDuringScrubbingRestoresAnOrdinaryPausedState() throws Exception {
+        try (var log = mockStatic(Log.class)) {
+            final Player player = mock(Player.class, CALLS_REAL_METHODS);
+            final ExoPlayer exo = mock(ExoPlayer.class);
+            when(exo.getPlaybackState()).thenReturn(ExoPlayer.STATE_READY);
+            set(player, "casting", mock(CastPlayback.class));
+            set(player, "simpleExoPlayer", exo);
+            set(player, "currentState", Player.STATE_PAUSED_SEEK);
+            set(player, "isPrepared", true);
+            set(player, "UIs", mock(PlayerUiList.class));
+            set(player, "progressUpdateDisposable", new SerialDisposable());
+            doNothing().when(player).triggerProgressUpdate();
+
+            player.restoreLocalAfterCasting(42000, false);
+
+            assertEquals(Player.STATE_PAUSED, player.getCurrentState());
+            verify(exo).seekTo(42000);
         }
     }
 

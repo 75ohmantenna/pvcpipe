@@ -5,14 +5,14 @@ import java.nio.file.Path
 import kotlin.io.path.div
 
 /**
- * Locates specific files of NewPipe based on the home directory of the app.
+ * Locates the app's database and the preference entries used by its backup format.
  */
 class BackupFileLocator(context: Context) {
     companion object {
         const val FILE_NAME_DB = "newpipe.db"
 
         @Deprecated(
-            "Serializing preferences with Java's ObjectOutputStream is vulnerable to injections",
+            "Legacy Java-serialized preferences require restricted deserialization; prefer JSON",
             replaceWith = ReplaceWith("FILE_NAME_JSON_PREFS")
         )
         const val FILE_NAME_SERIALIZED_PREFS = "newpipe.settings"

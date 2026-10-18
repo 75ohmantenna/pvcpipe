@@ -325,8 +325,12 @@ public class BitchuteStreamExtractor extends StreamExtractor {
 
     private static boolean isHlsMedia(final ResultsStreamVideoMedia media) {
         final String path = getMediaPath(media.getMediaUrl());
-        return "application/x-mpegURL".equalsIgnoreCase(media.getMediaType())
-                || "application/vnd.apple.mpegurl".equalsIgnoreCase(media.getMediaType())
+        final String mediaType = media.getMediaType();
+        final int parametersStart = mediaType == null ? -1 : mediaType.indexOf(';');
+        final String bareMediaType = mediaType == null ? "" : (parametersStart < 0
+                ? mediaType : mediaType.substring(0, parametersStart)).trim();
+        return "application/x-mpegURL".equalsIgnoreCase(bareMediaType)
+                || "application/vnd.apple.mpegurl".equalsIgnoreCase(bareMediaType)
                 || path.toLowerCase(Locale.ROOT).endsWith(".m3u8");
     }
 

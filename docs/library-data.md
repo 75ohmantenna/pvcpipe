@@ -97,11 +97,14 @@ restore reads it. If the settings it offered are no longer what the file
 holds, the restore stops and asks for a new inspection.
 
 **Imported settings are not trusted.** Before they replace the live ones,
-`ImportedPreferenceTypes` checks their types. A preference the app reads as
-a number must hold that kind of number, or one that converts to it without
-changing its value. Every other preference must have the type of the app's
-live value. A value that fails is replaced by the live value, or dropped so
-that the default applies. Two tables in `BackupRestore` feed this check:
+`ImportedPreferenceTypes.conformImport` checks their types. A preference the
+app declares as numeric must hold that kind of number, or one that converts
+to it without changing its value. Other keys with a live value must match
+that value's type. A value that fails is replaced by the live value, or
+dropped so that the default applies. A key with neither a numeric declaration
+nor a live value is left unchanged: this is type normalization, not complete
+validation of every imported setting. Two tables in `BackupRestore` feed
+this check:
 
 - The numeric preferences. Add a key there when adding a `getInt`,
   `getLong` or `getFloat` read.
@@ -124,7 +127,8 @@ that the default applies. Two tables in `BackupRestore` feed this check:
 A restore that completed has therefore staged the database and asked for a
 restart. It has not installed it in the running process. If the restart
 fails, the restore stays pending, and while one is pending the app refuses
-further restores and exports.
+further restores and exports. Accepted work survives screen closure, not
+termination of the application process.
 
 Replacing the preferences and publishing the database are two steps, not one
 transaction. If the second fails, the app puts the old preferences back, and

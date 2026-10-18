@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fcast_title">Cast with FCast</string>
+    <string name="fcast_help">Open FCast Receiver on your TV or computer and connect both devices to the same local network.</string>
+    <string name="fcast_searching">Looking for FCast receivers…</string>
+    <string name="fcast_add_address">Add by address</string>
+    <string name="fcast_address">IP address, hostname, or fcast:// receiver link</string>
+    <string name="fcast_port">TCP port</string>
+    <string name="fcast_address_error">Enter a hostname or IP address and a port from 1 to 65535.</string>
+    <string name="fcast_connect">Connect</string>
+    <string name="fcast_connecting">Connecting to %1$s…</string>
+    <string name="fcast_preparing">Preparing video for %1$s…</string>
+    <string name="fcast_connected">Casting to %1$s</string>
+    <string name="fcast_play_here">Play on this device</string>
+    <string name="fcast_disconnect">Disconnect</string>
+    <string name="fcast_cancel_connection">Cancel connection</string>
+    <string name="fcast_get_receiver">Get FCast Receiver</string>
+    <string name="fcast_local_network">Allow local network access to find and connect to FCast receivers.</string>
+    <string name="fcast_allow_network">Allow local network access</string>
+    <string name="fcast_source_error">This stream could not be prepared for casting. Local playback is still available.</string>
+    <string name="fcast_no_route">Could not find a local network route to the receiver.</string>
+    <string name="fcast_manual_security">Use a trusted local network. Automatic discovery also carries the receiver’s security information; a plain address does not.</string>
+    <string name="fcast_controls_hint">Use the player controls to play, pause, rewind, and fast-forward.</string>
+</resources>

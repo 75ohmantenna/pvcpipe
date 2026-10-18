@@ -246,7 +246,7 @@ public final class PlayerService extends MediaBrowserServiceCompat {
     @Override
     public void onTaskRemoved(final Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        if (player != null && !player.videoPlayerSelected()) {
+        if (player != null && (!player.videoPlayerSelected() || player.getCasting().isActive())) {
             return;
         }
         // Release video playback and its foreground notification, but let Android stop the

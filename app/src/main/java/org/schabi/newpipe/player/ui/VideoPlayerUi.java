@@ -361,15 +361,14 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
                         if (portion == DisplayPortion.LEFT) {
                             // Check if it's possible to rewind
                             // Small puffer to eliminate infinite rewind seeking
-                            if (player.getExoPlayer().getCurrentPosition() < 500L) {
+                            if (player.getCurrentPosition() < 500L) {
                                 return FastSeekDirection.NONE;
                             }
                             return FastSeekDirection.BACKWARD;
                         } else if (portion == DisplayPortion.RIGHT) {
                             // Check if it's possible to fast-forward
                             if (player.getCurrentState() == STATE_COMPLETED
-                                    || player.getExoPlayer().getCurrentPosition()
-                                    >= player.getExoPlayer().getDuration()) {
+                                    || player.getCurrentPosition() >= player.getDuration()) {
                                 return FastSeekDirection.NONE;
                             }
                             return FastSeekDirection.FORWARD;
@@ -403,6 +402,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         setupElementsVisibility();
         setupElementsSize(context.getResources());
         binding.getRoot().setVisibility(View.VISIBLE);
+        onCastingChanged();
         binding.playPauseButton.requestFocus();
     }
 
@@ -440,6 +440,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
     protected void setupElementsVisibility() {
         setMuteButton(player.isMuted());
+        binding.castButton.setVisibility(View.GONE);
         animateRotation(binding.moreOptionsButton, DEFAULT_CONTROLS_DURATION, 0);
 
         final boolean isSponsorBlockEnabled =
@@ -547,7 +548,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         if (duration != binding.playbackSeekBar.getMax()) {
             setVideoDurationToControls(duration);
         }
-        if (player.getCurrentState() != STATE_PAUSED) {
+        if (player.getCurrentState() != STATE_PAUSED || player.getCasting().isActive()) {
             updatePlayBackElementsCurrentDuration(currentProgress);
         }
         if (player.isLoading() || bufferPercent > 90) {
@@ -675,18 +676,22 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         }
 
         player.seekTo(seekBar.getProgress());
-        if (player.getExoPlayer().getDuration() == seekBar.getProgress()) {
-            player.getExoPlayer().play();
+        if (player.getDuration() == seekBar.getProgress()) {
+            player.play();
         }
 
         binding.playbackCurrentTime.setText(getTimeString(seekBar.getProgress()));
         animate(binding.currentDisplaySeek, false, 200, AnimationType.SCALE_AND_ALPHA);
         animate(binding.currentSeekbarPreviewThumbnail, false, 200, AnimationType.SCALE_AND_ALPHA);
 
-        if (player.getCurrentState() == STATE_PAUSED_SEEK) {
+        if (player.getCasting().isActive()) {
+            player.changeState(player.getCasting().isPreparing() ? STATE_BUFFERING
+                    : player.getPlayWhenReady() ? STATE_PLAYING : STATE_PAUSED);
+        } else if (player.getCurrentState() == STATE_PAUSED_SEEK) {
             player.changeState(STATE_BUFFERING);
         }
-        if (!player.isProgressLoopRunning()) {
+        if (!player.isProgressLoopRunning()
+                && (!player.getCasting().isActive() || player.getPlayWhenReady())) {
             player.startProgressLoop();
         }
 
@@ -820,7 +825,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     @Override
     public void onPrepared() {
         super.onPrepared();
-        setVideoDurationToControls((int) player.getExoPlayer().getDuration());
+        setVideoDurationToControls((int) player.getDuration());
         binding.playbackSpeed.setText(formatSpeed(player.getPlaybackSpeed()));
         markSegments(player.getCurrentItem(), binding.playbackSeekBar, context, player.getPrefs());
     }
@@ -861,7 +866,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
         animatePlayPauseButton(PlayButtonAction.PAUSE);
 
-        binding.getRoot().setKeepScreenOn(true);
+        binding.getRoot().setKeepScreenOn(!player.getCasting().isActive());
     }
 
     @Override
@@ -869,7 +874,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         super.onBuffering();
         binding.loadingPanel.setBackgroundColor(Color.TRANSPARENT);
         binding.loadingPanel.setVisibility(View.VISIBLE);
-        binding.getRoot().setKeepScreenOn(true);
+        binding.getRoot().setKeepScreenOn(!player.getCasting().isActive());
     }
 
     @Override
@@ -1003,6 +1008,37 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         setMuteButton(isMuted);
     }
 
+    @Override
+    public void onCastingChanged() {
+        final boolean active = player.getCasting().isActive();
+        final boolean becameActive = active && binding.castStatus.getVisibility() != View.VISIBLE;
+        binding.castButton.setAlpha(player.getCasting().getSession().getConnectionState() == 1
+                ? 0.5f : 1.0f);
+        binding.castButton.setImageResource(active
+                ? R.drawable.ic_cast_connected : R.drawable.ic_cast);
+        binding.castButton.setContentDescription(active
+                ? context.getString(R.string.fcast_connected,
+                        player.getCasting().getSession().getDeviceName())
+                : context.getString(R.string.fcast_title));
+        binding.castStatus.setVisibility(active ? View.VISIBLE : View.GONE);
+        binding.castStatus.setText(context.getString(R.string.fcast_connected,
+                player.getCasting().getSession().getDeviceName()));
+        binding.surfaceForeground.setVisibility(active ? View.VISIBLE : View.GONE);
+        binding.resizeTextView.setEnabled(!active);
+        binding.captionTextView.setEnabled(!active);
+        binding.playbackSpeed.setEnabled(!active
+                || player.getCasting().getSession().getSpeedSupported());
+        binding.switchMute.setEnabled(!active
+                || player.getCasting().getSession().getVolumeSupported());
+        if (active) {
+            binding.subtitleView.setCues(List.of());
+            binding.getRoot().setKeepScreenOn(false);
+            if (becameActive) {
+                showControlsThenHide();
+            }
+        }
+    }
+
     private void setMuteButton(final boolean isMuted) {
         binding.switchMute.setImageDrawable(AppCompatResources.getDrawable(context, isMuted
                 ? R.drawable.ic_volume_off : R.drawable.ic_volume_up));
@@ -1030,6 +1066,9 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     @Override
     public void onRenderedFirstFrame() {
         super.onRenderedFirstFrame();
+        if (player.getCasting().isActive()) {
+            return;
+        }
         //TODO check if this causes black screen when switching to fullscreen
         animate(binding.surfaceForeground, false, DEFAULT_CONTROLS_DURATION);
     }
@@ -1437,6 +1476,9 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
     @Override
     public void onCues(@NonNull final List<Cue> cues) {
+        if (player.getCasting().isActive()) {
+            return;
+        }
         super.onCues(cues);
         binding.subtitleView.setCues(cues);
     }

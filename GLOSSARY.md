@@ -17,7 +17,7 @@ application settings.
 
 **Accepted restore**:
 A restore request accepted by the application for completion even if the
-settings screen closes.
+settings screen closes, while the application process remains running.
 
 **Pending database restore**:
 A replacement database prepared for activation when the application next starts.
@@ -110,5 +110,20 @@ A view or progress update accepted for ordered database storage even if the
 player closes, while the application process remains running.
 
 **Playback audio**:
-The internal volume, mute state, and audio-focus behavior of playback. Android
-music-stream volume is a separate device-level control.
+The internal volume, mute state, and audio-focus behavior of local playback.
+Android music-stream volume is a separate device-level control; an active
+cast uses the receiver's volume controls instead.
+
+**FCast receiver**:
+A device running FCast receiver software, controlled over the local network.
+This is not a Chromecast or AirPlay target.
+
+**Cast session**:
+The app-owned receiver connection and playback handoff. The regular player
+controls operate the receiver while casting; closing the device picker does
+not disconnect it.
+
+**Cast media proxy**:
+The phone's per-load HTTP server that serves extracted media and rewritten
+manifests to the receiver through opaque, allowlisted routes. FCast v4
+encrypts control traffic, not this HTTP media path.

@@ -13,6 +13,7 @@ object PvcVersion {
     // Android refuses to install a lower code over a higher one, so the codes of PVCPipe's own
     // numbering start above it.
     private const val BASE = 1_000_000
+    private const val MAX_CODE = 2_100_000_000
     private val FORMAT = Regex("""(\d+)\.(\d{1,2})\.(\d{1,2})""")
 
     /**
@@ -27,8 +28,9 @@ object PvcVersion {
     }
 
     /**
-     * Every version has one code, and a higher version has a higher code:
+     * Every accepted version has one code, and a higher version has a higher code:
      * 0.1.0 is 1000100, 0.1.1 is 1000101, 0.2.0 is 1000200 and 1.0.0 is 1010000.
+     * Codes above Android's maximum of 2,100,000,000 are rejected before narrowing to Int.
      *
      * @param name a version name of the form major.minor.patch
      * @return the Android version code for it
@@ -36,6 +38,10 @@ object PvcVersion {
     fun code(name: String): Int {
         val (major, minor, patch) = FORMAT.matchEntire(name)?.destructured
             ?: error("The version must be major.minor.patch with minor and patch below 100: '$name'")
-        return BASE + major.toInt() * 10_000 + minor.toInt() * 100 + patch.toInt()
+        val code = BASE.toLong() + major.toInt() * 10_000L + minor.toInt() * 100 + patch.toInt()
+        require(code <= MAX_CODE) {
+            "Version exceeds Android's maximum version code: '$name'"
+        }
+        return code.toInt()
     }
 }

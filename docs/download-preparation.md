@@ -15,6 +15,13 @@ range and validator checks on a resumed download, and the processing after a
 download are all in that code. This page covers what the code promises about
 state on disk.
 
+`DownloadPreparation.Selection` captures the selected streams, sizes and
+primary media format before destination preparation. The format comes from
+the dialog's `StreamInfoWrapper`, including a format inferred by its HTTP
+header probe when the immutable extractor stream has none. Filename, MIME
+type, postprocessing and recovery use that captured format; later dialog
+selection changes do not alter the pending plan.
+
 ## What "submitted" means
 
 A download is submitted once `DownloadManagerService.startMission` has
@@ -56,10 +63,11 @@ including BitChute live streams.
   address with the addresses of the segments. It fetches playlists and
   encryption keys as bytes, because a key is binary.
 - Each conversion works in a directory of its own under `ffmpeg_temp` and
-  removes it when it ends, also after a failure. Several HLS downloads can
-  be converted at the same time. A conversion that starts while no other is
-  running first removes whatever is left in `ffmpeg_temp`: files of a build
-  that had one shared directory, or of a process that was killed half way.
+  attempts to remove it when it ends, also after a failure. Several HLS
+  downloads can be converted at the same time. A conversion that starts while
+  no other is running first attempts to remove leftovers in `ffmpeg_temp`:
+  files of a build that had one shared directory, or of a process that was
+  killed half way. Cleanup is best effort (`PvcFromHlsRemuxer.deleteQuietly`).
 - A segment that the server refuses fails the mission with the HTTP error,
   and the mission keeps its segments. `DownloadMissionRecover` is not used
   for HLS: it can only find a whole progressive file again. A retry asks for
@@ -79,9 +87,10 @@ grants read access to that one file.
   in place of the path. It never exposes the folder the file is in.
 - The file stays where it is, on internal or removable storage. No copy is
   made.
-- The token and the path are stored in a private preferences file, so the
-  other app can still open the file after the chooser or PVCPipe's process
-  is gone.
+- The token-to-path mapping is stored in private preferences and survives
+  PVCPipe process death. The recipient still needs Android's read URI grant;
+  saving the mapping does not make that grant permanent or extend its
+  Android-managed lifetime.
 - If the path no longer points to a regular file, the address does not open.
 - A download saved through the Storage Access Framework is shared by its
   original document address and does not go through this provider.

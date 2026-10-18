@@ -248,6 +248,9 @@ dependencies {
     implementation(libs.google.exoplayer.mediasession)
     implementation(libs.google.exoplayer.ui)
 
+    // FCast protocol, including authenticated v4 receivers and legacy v2/v3 receivers
+    implementation(libs.fcast.sender.sdk)
+
     // Manager for complex RecyclerView layouts
     implementation(libs.lisawray.groupie.core)
     implementation(libs.lisawray.groupie.viewbinding)

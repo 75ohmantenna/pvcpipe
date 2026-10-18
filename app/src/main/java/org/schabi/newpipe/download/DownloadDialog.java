@@ -806,16 +806,19 @@ public class DownloadDialog extends DialogFragment
         final int selected = dialogBinding.videoAudioGroup.getCheckedRadioButtonId();
         final DownloadPreparation.Kind kind;
         final Stream stream;
+        final MediaFormat format;
         AudioStream secondaryStream = null;
         final long size;
         long secondarySize = 0;
         if (selected == R.id.audio_button) {
             kind = DownloadPreparation.Kind.AUDIO;
             stream = audioStreamsAdapter.getItem(selectedAudioIndex);
+            format = getWrappedAudioStreams().getFormat(selectedAudioIndex);
             size = getWrappedAudioStreams().getSizeInBytes(selectedAudioIndex);
         } else if (selected == R.id.video_button) {
             kind = DownloadPreparation.Kind.VIDEO;
             stream = videoStreamsAdapter.getItem(selectedVideoIndex);
+            format = wrappedVideoStreams.getFormat(selectedVideoIndex);
             size = wrappedVideoStreams.getSizeInBytes(selectedVideoIndex);
             final SecondaryStreamHelper<AudioStream> secondary = videoStreamsAdapter
                     .getAllSecondary().get(wrappedVideoStreams.getStreamsList().indexOf(stream));
@@ -826,12 +829,14 @@ public class DownloadDialog extends DialogFragment
         } else if (selected == R.id.subtitle_button) {
             kind = DownloadPreparation.Kind.SUBTITLE;
             stream = subtitleStreamsAdapter.getItem(selectedSubtitleIndex);
+            format = wrappedSubtitleStreams.getFormat(selectedSubtitleIndex);
             size = wrappedSubtitleStreams.getSizeInBytes(selectedSubtitleIndex);
         } else {
             return null;
         }
-        return new DownloadPreparation.Selection(kind, stream, secondaryStream, size, secondarySize,
-                dialogBinding.threads.getProgress() + 1, currentInfo, sponsorBlockSegments.clone());
+        return new DownloadPreparation.Selection(kind, stream, format, secondaryStream, size,
+                secondarySize, dialogBinding.threads.getProgress() + 1, currentInfo,
+                sponsorBlockSegments.clone());
     }
 
     private final class DownloadPresentation implements DownloadPreparation.Presentation {
