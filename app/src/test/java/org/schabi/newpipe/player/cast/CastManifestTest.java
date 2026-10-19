@@ -210,6 +210,25 @@ public class CastManifestTest {
     }
 
     @Test
+    public void deeplyNestedXmlIsRejectedBeforeRecursiveTransforms() {
+        final String xml = "<MPD>" + "<Extension>".repeat(10000)
+                + "</Extension>".repeat(10000) + "</MPD>";
+        assertThrows(IOException.class, () -> CastManifest.dash(xml,
+                "https://cdn.example/manifest.mpd", (url, mime) -> url));
+        assertThrows(IOException.class, () -> CastManifest.mergeDash(xml, xml));
+    }
+
+    @Test
+    public void wideShallowXmlDoesNotConsumeTheNestingBudget() throws Exception {
+        final String xml = "<MPD><Period>" + "<Extension/>".repeat(1000) + "</Period></MPD>";
+        final String rewritten = CastManifest.dash(xml, "https://cdn.example/manifest.mpd",
+                (url, mime) -> url);
+        assertEquals(1000, DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new InputSource(new StringReader(rewritten)))
+                .getElementsByTagName("Extension").getLength());
+    }
+
+    @Test
     public void externalXmlAndAmbiguousBaseAlternativesAreRejected() {
         assertThrows(IOException.class, () -> CastManifest.dash("<!DOCTYPE MPD ["
                 + "<!ENTITY x SYSTEM 'file:///etc/passwd'>]><MPD>&x;</MPD>",

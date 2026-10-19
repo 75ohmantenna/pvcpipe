@@ -26,6 +26,7 @@ import javax.xml.transform.stream.StreamResult;
 final class CastManifest {
     static final String DASH = "application/dash+xml";
     static final String HLS = "application/vnd.apple.mpegurl";
+    private static final int MAX_XML_DEPTH = 64;
     private static final Pattern HLS_URI = Pattern.compile("URI=\"([^\"]+)\"");
     private static final String[] URL_ATTRIBUTES =
             {"media", "initialization", "sourceURL", "index"};
@@ -272,6 +273,28 @@ final class CastManifest {
         final Document document = builder.parse(new InputSource(new StringReader(xml)));
         if (!"MPD".equals(name(document.getDocumentElement()))) {
             throw new IOException("Not a DASH manifest");
+        }
+        // Check iteratively before cloning, transforming or serializing untrusted DOM trees.
+        final Node root = document.getDocumentElement();
+        Node node = root;
+        int depth = 1;
+        while (true) {
+            if (depth > MAX_XML_DEPTH) {
+                throw new IOException("DASH manifest is nested too deeply");
+            }
+            if (node.getFirstChild() != null) {
+                node = node.getFirstChild();
+                depth++;
+            } else {
+                while (node != root && node.getNextSibling() == null) {
+                    node = node.getParentNode();
+                    depth--;
+                }
+                if (node == root) {
+                    break;
+                }
+                node = node.getNextSibling();
+            }
         }
         return document;
     }

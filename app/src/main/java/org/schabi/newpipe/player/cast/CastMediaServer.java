@@ -24,6 +24,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -63,6 +64,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
     private final Set<Closeable> sources = ConcurrentHashMap.newKeySet();
     private final Map<String, Resource> routes = new LinkedHashMap<>(32, 0.75f, true);
     private final Map<String, String> keys = new HashMap<>();
+    private final Set<String> retainedManifests = new HashSet<>();
     private final OkHttpClient client = DownloaderImpl.getInstance().getClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build();
     private final String prefix = "/" + UUID.randomUUID() + "/";
@@ -115,36 +117,53 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
         if (resource.url.length() > 8192) {
             throw new IOException("Media URL is too long");
         }
+        final Matcher matcher = TEMPLATE.matcher(resource.url);
+        final StringBuilder suffix = new StringBuilder();
+        while (matcher.find()) {
+            suffix.append('/').append(matcher.group());
+        }
+        // Validate before mutating the bounded route table, including its LRU ordering.
+        if (TEMPLATE.matcher(resource.url).replaceAll("").contains("$")) {
+            throw new IOException("Unsupported DASH URL template");
+        }
         final String key = resource.url + "\n" + resource.mimeType;
         String path = resource.content == null ? keys.get(key) : null;
         if (path == null) {
-            if (preparing && routes.size() >= MAX_ROUTES) {
-                throw new IOException("Cast preparation references too many media resources");
+            if (routes.size() >= MAX_ROUTES) {
+                if (preparing) {
+                    throw new IOException("Cast preparation references too many media resources");
+                }
+                final var candidates = routes.entrySet().iterator();
+                boolean evicted = false;
+                while (candidates.hasNext()) {
+                    final var candidate = candidates.next();
+                    if (!retainedManifests.contains(candidate.getKey())) {
+                        final Resource removed = candidate.getValue();
+                        candidates.remove();
+                        keys.remove(removed.url + "\n" + removed.mimeType);
+                        evicted = true;
+                        break;
+                    }
+                }
+                if (!evicted) {
+                    throw new IOException("Cast source has too many retained manifests");
+                }
             }
             path = prefix + UUID.randomUUID();
             routes.put(path, resource);
             if (resource.content == null) {
                 keys.put(key, path);
             }
-            if (routes.size() > MAX_ROUTES) {
-                final String oldest = routes.keySet().iterator().next();
-                final Resource removed = routes.remove(oldest);
-                keys.remove(removed.url + "\n" + removed.mimeType);
+            // The receiver can revisit these original entry points after hours of live segments.
+            if (preparing && (resource.content != null || CastManifest.HLS.equals(resource.mimeType)
+                    || CastManifest.DASH.equals(resource.mimeType))) {
+                retainedManifests.add(path);
             }
         } else {
             final Resource existing = routes.get(path);
             if (resource.length > 0) {
                 existing.length = resource.length;
             }
-        }
-        final Matcher matcher = TEMPLATE.matcher(resource.url);
-        final StringBuilder suffix = new StringBuilder();
-        while (matcher.find()) {
-            suffix.append('/').append(matcher.group());
-        }
-        // Unsupported substitutions must not turn into a client-controlled arbitrary URL.
-        if (TEMPLATE.matcher(resource.url).replaceAll("").contains("$")) {
-            throw new IOException("Unsupported DASH URL template");
         }
         return origin + path + suffix;
     }
@@ -557,6 +576,7 @@ final class CastMediaServer implements Closeable, CastManifest.Urls {
             closed = true;
             routes.clear();
             keys.clear();
+            retainedManifests.clear();
         }
         closeQuietly(server);
         workers.shutdownNow();

@@ -43,8 +43,10 @@ import okhttp3.CookieJar;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class DownloaderImplTest {
     @Test
@@ -102,6 +104,21 @@ public class DownloaderImplTest {
         // the livestream host has no files to ask the size of
         assertFalse(DownloaderImpl.isHeadUnusable(
                 "https://cloud.odysee.live/content/id/master.m3u8"));
+    }
+
+    @Test
+    public void fallbackSizeProbeKeepsBitChuteMediaIdentity() throws Exception {
+        final OkHttpClient client = new OkHttpClient.Builder().addInterceptor(chain -> {
+            final Request request = chain.request();
+            assertTrue(request.header("User-Agent").contains("Firefox/128.0"));
+            assertEquals("bytes=0-0", request.header("Range"));
+            assertEquals("identity", request.header("Accept-Encoding"));
+            return new Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
+                    .code(206).message("Partial Content").header("Content-Range", "bytes 0-0/42")
+                    .body(ResponseBody.create(new byte[]{0}, null)).build();
+        }).build();
+        assertEquals(42, PvcDownloaderImplUtils.getContentLengthViaGet(
+                "https://seed125.bitchute.com/video.mp4", client));
     }
 
     @Test

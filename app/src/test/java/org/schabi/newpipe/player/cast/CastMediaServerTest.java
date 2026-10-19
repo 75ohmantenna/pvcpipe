@@ -173,6 +173,52 @@ public class CastMediaServerTest {
         }
     }
 
+    @Test
+    public void liveSegmentChurnRetainsPreparedManifests() throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String inline = server.content("#EXTM3U\n", CastManifest.HLS);
+            final String playlist = server.register("https://cdn.example/live.m3u8",
+                    CastManifest.HLS);
+            final String oldest = server.register("https://cdn.example/segment-0.ts", "");
+            server.finishPreparation();
+            String newest = oldest;
+            for (int i = 1; i <= 8192; i++) {
+                newest = server.register("https://cdn.example/segment-" + i + ".ts", "");
+            }
+            assertTrue(request(inline, "GET", "").endsWith("\r\n\r\n#EXTM3U\n"));
+            assertTrue(request(playlist, "OPTIONS", "").startsWith("HTTP/1.1 204"));
+            assertTrue(request(oldest, "OPTIONS", "").startsWith("HTTP/1.1 404"));
+            assertTrue(request(newest, "OPTIONS", "").startsWith("HTTP/1.1 204"));
+        }
+    }
+
+    @Test
+    public void retainedManifestsCannotOverflowTheRouteBound() throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            final String first = server.register("https://cdn.example/0.m3u8", CastManifest.HLS);
+            for (int i = 1; i < 8192; i++) {
+                server.register("https://cdn.example/" + i + ".m3u8", CastManifest.HLS);
+            }
+            server.finishPreparation();
+            assertThrows(IOException.class,
+                    () -> server.register("https://cdn.example/segment.ts", ""));
+            assertEquals(first, server.register("https://cdn.example/0.m3u8", CastManifest.HLS));
+            assertTrue(request(first, "OPTIONS", "").startsWith("HTTP/1.1 204"));
+        }
+    }
+
+    @Test
+    public void rejectedTemplatesDoNotConsumePreparationCapacity() throws Exception {
+        try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {
+            for (int i = 0; i < 8192; i++) {
+                final String url = "https://cdn.example/" + i + "/$Unsupported$.m4s";
+                assertThrows(IOException.class, () -> server.register(url, ""));
+            }
+            final String content = server.content("still available", "video/mp4");
+            assertTrue(request(content, "GET", "").endsWith("\r\n\r\nstill available"));
+        }
+    }
+
     @Test(timeout = 40000)
     public void progressingHeadersExpireWithoutInterruptingAnActiveStream() throws Exception {
         final var originWorker = Executors.newSingleThreadExecutor();
