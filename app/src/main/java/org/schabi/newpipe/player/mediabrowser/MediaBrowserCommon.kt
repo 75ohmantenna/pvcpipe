@@ -26,12 +26,13 @@ internal fun infoItemTypeToString(type: InfoType): String {
     }
 }
 
-internal fun infoItemTypeFromString(type: String): InfoType {
+/** @return the type, or `null` for a value that [infoItemTypeToString] never produces */
+internal fun infoItemTypeFromString(type: String): InfoType? {
     return when (type) {
         ID_STREAM -> InfoType.STREAM
         ID_PLAYLIST -> InfoType.PLAYLIST
         ID_CHANNEL -> InfoType.CHANNEL
-        else -> error("Unexpected value: $type")
+        else -> null
     }
 }
 

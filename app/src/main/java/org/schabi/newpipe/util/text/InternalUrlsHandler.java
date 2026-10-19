@@ -44,7 +44,7 @@ public final class InternalUrlsHandler {
         if (matcher.group(2) == null) {
             seconds = -1;
         } else {
-            seconds = Integer.parseInt(matcher.group(2));
+            seconds = parseTimestampSeconds(matcher.group(2));
         }
 
         final StreamingService service;
@@ -65,6 +65,25 @@ public final class InternalUrlsHandler {
             NavigationHelper.openRouterActivity(context, matchedUrl);
             return true;
         }
+    }
+
+    /**
+     * Description links are written by uploaders, so the digits can have any length.
+     *
+     * @param digits the ASCII decimal digits of a {@code t} parameter
+     * @return the seconds, clamped to the range that {@link TimestampChangeData} can carry
+     */
+    static int parseTimestampSeconds(@NonNull final String digits) {
+        int start = 0;
+        while (start < digits.length() - 1 && digits.charAt(start) == '0') {
+            start++;
+        }
+        final String significant = digits.substring(start);
+        // Integer.MAX_VALUE has ten digits, so every longer value is above it.
+        if (significant.length() > 10) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.min(Long.parseLong(significant), Integer.MAX_VALUE);
     }
 
     /**

@@ -58,6 +58,34 @@ unfinished downloads are not migrated.
 The media file, the checkpoint and the finished-downloads database are three
 separate things on disk. No transaction spans them.
 
+## File names
+
+A download name is one path component. Titles come from uploaders and the
+filename settings can come from an import, so the name is checked in three
+places:
+
+- `FilenameUtils.createFilename` checks the stored settings each time it reads
+  them. A custom charset that is not a valid pattern falls back to the default
+  charset; a valid one is kept. A replacement containing `/`, `\` or NUL falls
+  back to `_`. Path separators are replaced even when a custom pattern keeps
+  them. The settings screen refuses such a replacement too.
+- `DownloadPreparation.save` fails with `FILE_CREATION` before any picker or
+  file change when the name is not a plain file name.
+- `StoredDirectoryHelper` and the path-based `StoredFileHelper` constructor
+  refuse empty names, `.`, `..` and names containing a separator or NUL. The
+  constructor checks before `Files.deleteIfExists`, so a refused name changes
+  nothing outside the folder. Recovery (`DownloadManager.tryRecover`) creates
+  files through the same check. Names that only contain dots, such as
+  `..video.mp4`, are allowed.
+
+## Removing entries
+
+"Delete" removes an entry and its file. "Delete entry" keeps the file and is
+offered only for finished downloads. An unfinished mission keeps its threads
+and its checkpoint, so forgetting only its entry would bring it back when it
+finished or at the next start. `DownloadManager.deleteMission` refuses that
+case as well as the menu hiding it.
+
 ## HLS downloads
 
 An HLS media playlist is downloaded segment by segment, then remuxed with
@@ -109,6 +137,8 @@ grants read access to that one file.
 `make ci` runs the unit tests: `DownloadPreparationTest`,
 `DownloadMissionLifecycleTest`, `DownloadManagerCheckpointTest` and
 `UtilityAtomicCheckpointTest` cover preparation, checkpoints and recovery.
+`DownloadManagerDeleteEntryTest` covers removing entries, and
+`FilenameUtilsTest` and `StoredFileNameContainmentTest` cover file names.
 
 `DownloadPreparationIntegrationTest` and `MissionFileSharingTest` are
 instrumentation tests and need a device. Before running any instrumentation

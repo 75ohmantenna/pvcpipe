@@ -315,7 +315,7 @@ public class DownloadManager {
             if (mission.storage == null) {
                 // noting to do here
                 mission.errCode = DownloadMission.ERROR_FILE_CREATION;
-                if (mission.errObject != null) {
+                if (mission.errObject == null) {
                     mission.errObject = new IOException("DownloadMission.storage == NULL");
                 }
                 return;
@@ -362,8 +362,23 @@ public class DownloadManager {
         }
     }
 
+    /**
+     * An unfinished download keeps its threads and checkpoint, which would bring a forgotten
+     * entry back on completion or at the next start. Only a finished entry can be forgotten.
+     *
+     * @param mission the entry to forget
+     * @return whether the entry can be removed while its file stays
+     */
+    public static boolean canDeleteEntryOnly(@Nullable final Mission mission) {
+        return mission instanceof FinishedMission;
+    }
+
     public void deleteMission(final Mission mission, final boolean alsoDeleteFile) {
         synchronized (this) {
+            if (!alsoDeleteFile && !canDeleteEntryOnly(mission)) {
+                Log.w(TAG, "Not forgetting the entry of an unfinished download");
+                return;
+            }
             if (mission instanceof DownloadMission) {
                 mMissionsPending.remove(mission);
             } else if (mission instanceof FinishedMission) {

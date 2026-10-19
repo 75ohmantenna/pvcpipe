@@ -119,22 +119,16 @@ public class Deleter {
             return;
         }
 
-        while (items.size() > 0) {
-            final Pair<Mission, Boolean> missionAndAlsoDeleteFile = items.remove(0);
-            final Mission mission = missionAndAlsoDeleteFile.getFirst();
-            final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
-            if (mission.deleted) {
-                continue;
-            }
+        final Pair<Mission, Boolean> missionAndAlsoDeleteFile = items.remove(0);
+        final Mission mission = missionAndAlsoDeleteFile.getFirst();
+        final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
 
-            mIterator.unHide(mission);
-            mDownloadManager.deleteMission(mission, alsoDeleteFile);
+        mIterator.unHide(mission);
+        mDownloadManager.deleteMission(mission, alsoDeleteFile);
 
-            if (mission instanceof FinishedMission) {
-                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                        mission.storage.getUri()));
-            }
-            break;
+        if (mission instanceof FinishedMission) {
+            mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                    mission.storage.getUri()));
         }
 
         if (items.size() < 1) {

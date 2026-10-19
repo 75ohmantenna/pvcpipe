@@ -54,11 +54,6 @@ public abstract class Mission implements Serializable {
         return true;
     }
 
-    /**
-     * Marks the mission as deleted, independently of whether its output file was removed.
-     */
-    public transient boolean deleted = false;
-
     @NonNull
     @Override
     public String toString() {

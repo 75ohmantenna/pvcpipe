@@ -788,6 +788,9 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             checkMasterButtonsVisibility();
             return true;
         } else if (id == R.id.delete_entry) { // just delete the entry
+            if (!DownloadManager.canDeleteEntryOnly(h.item.mission)) {
+                return true;
+            }
             mDeleter.append(h.item.mission, false);
             applyChanges();
             checkMasterButtonsVisibility();
@@ -1007,6 +1010,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         MenuItem queue;
         MenuItem showError;
         MenuItem delete;
+        MenuItem deleteEntry;
         MenuItem source;
         MenuItem checksum;
 
@@ -1043,6 +1047,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             queue = menu.findItem(R.id.queue);
             showError = menu.findItem(R.id.error_message_view);
             delete = menu.findItem(R.id.delete);
+            deleteEntry = menu.findItem(R.id.delete_entry);
             source = menu.findItem(R.id.source);
             checksum = menu.findItem(R.id.checksum);
 
@@ -1070,6 +1075,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             queue.setVisible(false);
             showError.setVisible(false);
             delete.setVisible(false);
+            deleteEntry.setVisible(false);
             source.setVisible(false);
             checksum.setVisible(false);
 
@@ -1110,6 +1116,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             } else {
                 open.setVisible(true);
                 delete.setVisible(true);
+                deleteEntry.setVisible(DownloadManager.canDeleteEntryOnly(item.mission));
                 checksum.setVisible(true);
             }
 
