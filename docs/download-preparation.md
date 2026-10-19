@@ -24,6 +24,11 @@ header probe when the immutable extractor stream has none. Filename, MIME
 type, postprocessing and recovery use that captured format; later dialog
 selection changes do not alter the pending plan.
 
+Size probes use the same service-specific user agent as media downloads,
+including BitChute's seed-host workaround. When HEAD is unavailable, a GET
+probe requests only the first byte and closes the response after reading its
+size headers.
+
 ## What "submitted" means
 
 A download is submitted after `DownloadManagerService.startMission` accepts

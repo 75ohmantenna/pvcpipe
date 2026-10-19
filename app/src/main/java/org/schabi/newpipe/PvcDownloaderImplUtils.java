@@ -32,8 +32,6 @@ import okhttp3.Interceptor;
 import okhttp3.JavaNetCookieJar;
 import okhttp3.OkHttpClient;
 
-import static org.schabi.newpipe.DownloaderImpl.USER_AGENT;
-
 /** PVCPipe networking helpers for downloader configuration and custom-endpoint checks. */
 public final class PvcDownloaderImplUtils {
     public static final Config CONFIG = new Config();
@@ -52,8 +50,14 @@ public final class PvcDownloaderImplUtils {
      * @throws IOException if the server refuses or does not tell the size
      */
     public static long getContentLengthViaGet(final String url) throws IOException {
+        return getContentLengthViaGet(url, DownloaderImpl.getInstance().getClient());
+    }
+
+    @VisibleForTesting
+    static long getContentLengthViaGet(final String url, final OkHttpClient client)
+            throws IOException {
         final okhttp3.Request.Builder request = new okhttp3.Request.Builder().url(url)
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", DownloaderImpl.getMediaUserAgent(url))
                 .header("Accept", "*/*")
                 .header("Accept-Encoding", "identity")
                 .header("Range", "bytes=0-0");
@@ -61,8 +65,7 @@ public final class PvcDownloaderImplUtils {
         if (referer != null) {
             request.header("Referer", referer);
         }
-        try (okhttp3.Response response = DownloaderImpl.getInstance().getClient()
-                .newCall(request.build()).execute()) {
+        try (okhttp3.Response response = client.newCall(request.build()).execute()) {
             return contentLength(response.code(), response.header("Content-Range"),
                     response.header("Content-Length"), url);
         }
