@@ -137,10 +137,14 @@ The HTTP server uses tokenized allowlisted routes, bounded request workers,
 manifest sizes and route counts, plus byte-range/HEAD support. Initial
 preparation fails if all required manifest and media routes exceed the
 resource budget; runtime routes use bounded least-recently-used eviction for
-long-running live streams. Request lines and headers have a 15-second absolute
-deadline measured from connection acceptance, independent of media-body
-streaming. Only GET, HEAD and OPTIONS are accepted. Receivers cannot select
-arbitrary upstream URLs, and their cookies and authorization are not forwarded.
+long-running live streams. Manifests published during preparation retain their
+routes for refresh and replay while old segment routes can expire. Invalid
+DASH templates consume no route capacity. DASH XML nesting is limited to 64
+nodes before recursive transformations run. Request lines and headers have a
+15-second absolute deadline measured from connection acceptance, independent
+of media-body streaming. Only GET, HEAD and OPTIONS are accepted. Receivers
+cannot select arbitrary upstream URLs, and their cookies and authorization
+are not forwarded.
 The server lives for the cast, with a foreground media notification and a CPU
 wake lock. Disconnect, error or shutdown cancels preparation and closes media
 servers; SDK shutdown stays off the UI thread.

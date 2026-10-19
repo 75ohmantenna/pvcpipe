@@ -402,8 +402,10 @@ public final class CastPlayback implements FCastSession.Listener {
         if (durationMs > 0) {
             duration = durationMs;
         }
-        if (playbackSpeed > 0 && Double.isFinite(playbackSpeed)) {
-            speed = (float) playbackSpeed;
+        // A finite protocol double can underflow to zero or overflow when narrowed for ExoPlayer.
+        final float nextSpeed = (float) playbackSpeed;
+        if (nextSpeed > 0 && Float.isFinite(nextSpeed)) {
+            speed = nextSpeed;
             if (parameters.speed != speed) {
                 parameters = new PlaybackParameters(speed);
                 player.onPlaybackParametersChanged(parameters);

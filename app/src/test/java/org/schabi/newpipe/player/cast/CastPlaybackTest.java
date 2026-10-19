@@ -130,6 +130,20 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void receiverSpeedsMustRemainPositiveAndFiniteAfterFloatConversion() {
+        playback.onPlaybackChanged(1, 10000, 120000, 1.5);
+        for (final double value : new double[]{Double.MIN_VALUE, Double.MAX_VALUE,
+                Double.NaN, Double.POSITIVE_INFINITY, 0, -1}) {
+            playback.onPlaybackChanged(1, 10000, 120000, value);
+            assertEquals(1.5f, playback.getSpeed(), 0f);
+            assertEquals(1.5f, playback.getParameters().speed, 0f);
+        }
+        playback.onPlaybackChanged(1, 10000, 120000, 2);
+        now.addAndGet(1000);
+        assertEquals(12000, playback.getPosition());
+    }
+
+    @Test
     public void seekingInsideCompletedMediaMakesTheSelectedPositionResumable() {
         playback.onPlaybackChanged(1, 120000, 120000, 1);
         playback.onEnded();
