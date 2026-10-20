@@ -39,13 +39,17 @@ class MediaBrowserPlaybackPreparerTest {
     private val errors = mutableListOf<Int>()
     private val started = mutableListOf<Int>()
     private lateinit var statics: List<MockedStatic<*>>
-    private var previousMain: RxFunction<Callable<Scheduler>, Scheduler>? = null
+    private var previousDatabase: AppDatabase? = null
+    private var previousInitMain: RxFunction<Callable<Scheduler>, Scheduler>? = null
+    private var previousMain: RxFunction<Scheduler, Scheduler>? = null
+    private var previousIo: RxFunction<in Scheduler, out Scheduler>? = null
 
     @Before
     fun setUp() {
         `when`(context.getText(anyInt())).thenReturn("error")
         `when`(database.playlistStreamDAO()).thenReturn(playlistStreams)
-        setDatabase(database)
+        previousDatabase = databaseField().get(null) as AppDatabase?
+        databaseField().set(null, database)
         val contexts = mockStatic(ContextCompat::class.java)
         contexts.`when`<Context> { ContextCompat.getContextForLanguage(context) }
             .thenReturn(context)
@@ -57,7 +61,9 @@ class MediaBrowserPlaybackPreparerTest {
             null
         }
         statics = listOf(contexts, navigation, mockStatic(Uri::class.java), mockStatic(Log::class.java))
-        previousMain = RxAndroidPlugins.getInitMainThreadSchedulerHandler()
+        previousInitMain = RxAndroidPlugins.getInitMainThreadSchedulerHandler()
+        previousMain = RxAndroidPlugins.getOnMainThreadSchedulerHandler()
+        previousIo = RxJavaPlugins.getIoSchedulerHandler()
         RxAndroidPlugins.setInitMainThreadSchedulerHandler { Schedulers.trampoline() }
         RxAndroidPlugins.setMainThreadSchedulerHandler { Schedulers.trampoline() }
         RxJavaPlugins.setIoSchedulerHandler { Schedulers.trampoline() }
@@ -65,19 +71,16 @@ class MediaBrowserPlaybackPreparerTest {
 
     @After
     fun tearDown() {
-        setDatabase(null)
+        databaseField().set(null, previousDatabase)
         statics.forEach { it.close() }
-        RxAndroidPlugins.setInitMainThreadSchedulerHandler(previousMain)
-        RxAndroidPlugins.setMainThreadSchedulerHandler(null)
-        RxJavaPlugins.setIoSchedulerHandler(null)
+        RxAndroidPlugins.setInitMainThreadSchedulerHandler(previousInitMain)
+        RxAndroidPlugins.setMainThreadSchedulerHandler(previousMain)
+        RxJavaPlugins.setIoSchedulerHandler(previousIo)
     }
 
     // The singleton opens a Room database, which needs a device; hand it the mock instead.
-    private fun setDatabase(value: AppDatabase?) {
-        val field = NewPipeDatabase::class.java.getDeclaredField("databaseInstance")
-        field.isAccessible = true
-        field.set(null, value)
-    }
+    private fun databaseField() = NewPipeDatabase::class.java.getDeclaredField("databaseInstance")
+        .apply { isAccessible = true }
 
     private fun prepare(mediaId: String, path: List<String>, url: String? = null) {
         val uri = mock(Uri::class.java)
