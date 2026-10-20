@@ -271,6 +271,11 @@ final class DownloadPreparation {
             return;
         }
         final String filename = baseName + "." + ready.suffix;
+        if (!StoredFileHelper.isPlainFileName(filename)) {
+            fail(presentation, FailureReason.FILE_CREATION,
+                    new IOException("Not a plain file name: " + filename));
+            return;
+        }
         final StoredDirectoryHelper folder = destination.folder;
         if (!destination.askDocument && (folder == null || folder.isDirect()
                 || folder.isInvalidSafStorage())) {

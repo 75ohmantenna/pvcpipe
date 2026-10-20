@@ -77,6 +77,11 @@ public class StoredDirectoryHelper {
     }
 
     public StoredFileHelper createUniqueFile(final String name, final String mime) {
+        // Checked first: the numbered and timestamped fallbacks below would hide the refusal.
+        if (!StoredFileHelper.isPlainFileName(name)) {
+            Log.w(TAG, "Refusing to create a file outside its folder: " + name);
+            return null;
+        }
         final List<String> matches = new ArrayList<>();
         final String[] filename = splitFilename(name);
         final String lcFileName = filename[0].toLowerCase(Locale.ROOT);
@@ -140,6 +145,10 @@ public class StoredDirectoryHelper {
     private StoredFileHelper createFile(final String filename, final String mime,
                                         final boolean safe) {
         final StoredFileHelper storage;
+        if (!StoredFileHelper.isPlainFileName(filename)) {
+            Log.w(TAG, "Refusing to create a file outside its folder: " + filename);
+            return null;
+        }
 
         try {
             if (docTree == null) {
@@ -265,6 +274,9 @@ public class StoredDirectoryHelper {
     }
 
     public Uri findFile(final String filename) {
+        if (!StoredFileHelper.isPlainFileName(filename)) {
+            return null;
+        }
         if (docTree == null) {
             final Path res = ioTree.resolve(filename);
             return Files.exists(res) ? Uri.fromFile(res.toFile()) : null;

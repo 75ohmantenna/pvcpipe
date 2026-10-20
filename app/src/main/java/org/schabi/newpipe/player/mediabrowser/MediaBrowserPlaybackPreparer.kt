@@ -75,7 +75,9 @@ class MediaBrowserPlaybackPreparer(
         }
 
         disposable?.dispose()
-        disposable = extractPlayQueueFromMediaId(mediaId)
+        // Deferred, so that a malformed ID from any controller reaches the error handler below
+        // instead of throwing on the main thread.
+        disposable = Single.defer { extractPlayQueueFromMediaId(mediaId) }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe(
@@ -125,126 +127,82 @@ class MediaBrowserPlaybackPreparer(
     //endregion
 
     //region Building play queues from playlists and history
-    private fun extractLocalPlayQueue(playlistId: Long, index: Int): Single<PlayQueue> {
+    private fun extractLocalPlayQueue(
+        mediaId: String,
+        playlistId: Long,
+        index: Int
+    ): Single<PlayQueue> {
         return LocalPlaylistManager(database).getPlaylistStreams(playlistId).firstOrError()
-            .map { items -> SinglePlayQueue(items.map { it.toStreamInfoItem() }, index) }
+            .map { items ->
+                checkIndex(mediaId, index, items.size)
+                SinglePlayQueue(items.map { it.toStreamInfoItem() }, index)
+            }
     }
 
-    private fun extractRemotePlayQueue(playlistId: Long, index: Int): Single<PlayQueue> {
+    private fun extractRemotePlayQueue(
+        mediaId: String,
+        playlistId: Long,
+        index: Int
+    ): Single<PlayQueue> {
         return RemotePlaylistManager(database).getPlaylist(playlistId).firstOrError()
             .flatMap { ExtractorHelper.getPlaylistInfo(it.serviceId, it.url, false) }
             // ignore info.errors, i.e. ignore errors about specific items, since there would
             // be no way to show the error properly in Android Auto anyway
-            .map { info -> PlaylistPlayQueue(info, index) }
+            .map { info ->
+                checkIndex(mediaId, index, info.relatedItems.size)
+                PlaylistPlayQueue(info, index)
+            }
     }
 
     private fun extractPlayQueueFromMediaId(mediaId: String): Single<PlayQueue> {
-        try {
-            val mediaIdUri = mediaId.toUri()
-            val path = ArrayList(mediaIdUri.pathSegments)
-            if (path.isEmpty()) {
-                throw parseError(mediaId)
-            }
+        val mediaIdUri = mediaId.toUri()
+        val request = MediaIdRequest.parse(
+            mediaIdUri.pathSegments,
+            mediaIdUri.getQueryParameter(ID_URL)
+        ) ?: throw parseError(mediaId)
 
-            return when (path.removeAt(0)) {
-                ID_BOOKMARKS -> extractPlayQueueFromPlaylistMediaId(
-                    mediaId,
-                    path,
-                    mediaIdUri.getQueryParameter(ID_URL)
-                )
+        return when (request) {
+            is MediaIdRequest.LocalPlaylist ->
+                extractLocalPlayQueue(mediaId, request.playlistId, request.index)
 
-                ID_HISTORY -> extractPlayQueueFromHistoryMediaId(mediaId, path)
+            is MediaIdRequest.RemotePlaylist ->
+                extractRemotePlayQueue(mediaId, request.playlistId, request.index)
 
-                ID_INFO_ITEM -> extractPlayQueueFromInfoItemMediaId(
-                    mediaId,
-                    path,
-                    mediaIdUri.getQueryParameter(ID_URL) ?: throw parseError(mediaId)
-                )
-
-                else -> throw parseError(mediaId)
-            }
-        } catch (e: ContentNotAvailableException) {
-            return Single.error(e)
-        }
-    }
-
-    @Throws(ContentNotAvailableException::class)
-    private fun extractPlayQueueFromPlaylistMediaId(
-        mediaId: String,
-        path: MutableList<String>,
-        url: String?
-    ): Single<PlayQueue> {
-        if (path.isEmpty()) {
-            throw parseError(mediaId)
-        }
-
-        when (val playlistType = path.removeAt(0)) {
-            ID_LOCAL, ID_REMOTE -> {
-                if (path.size != 2) {
-                    throw parseError(mediaId)
-                }
-                val playlistId = path[0].toLong()
-                val index = path[1].toInt()
-                return if (playlistType == ID_LOCAL) {
-                    extractLocalPlayQueue(playlistId, index)
-                } else {
-                    extractRemotePlayQueue(playlistId, index)
-                }
-            }
-
-            ID_URL -> {
-                if (path.size != 1 || url == null) {
-                    throw parseError(mediaId)
-                }
-
-                val serviceId = path[0].toInt()
-                return ExtractorHelper.getPlaylistInfo(serviceId, url, false)
+            is MediaIdRequest.PlaylistUrl ->
+                ExtractorHelper.getPlaylistInfo(request.serviceId, request.url, false)
                     .map { PlaylistPlayQueue(it) }
-            }
 
-            else -> throw parseError(mediaId)
+            is MediaIdRequest.History -> extractPlayQueueFromHistory(mediaId, request.streamId)
+
+            is MediaIdRequest.Item -> extractPlayQueueFromInfoItem(mediaId, request)
         }
     }
 
-    @Throws(ContentNotAvailableException::class)
-    private fun extractPlayQueueFromHistoryMediaId(
-        mediaId: String,
-        path: List<String>
-    ): Single<PlayQueue> {
-        if (path.size != 1) {
-            throw parseError(mediaId)
-        }
-
-        val streamId = path[0].toLong()
+    private fun extractPlayQueueFromHistory(mediaId: String, streamId: Long): Single<PlayQueue> {
         return database.streamHistoryDAO().history
             .firstOrError()
             .map { items ->
                 val infoItems = items
                     .filter { it.streamId == streamId }
                     .map { it.toStreamInfoItem() }
+                checkIndex(mediaId, 0, infoItems.size)
                 SinglePlayQueue(infoItems, 0)
             }
     }
 
-    @Throws(ContentNotAvailableException::class)
-    private fun extractPlayQueueFromInfoItemMediaId(
+    private fun extractPlayQueueFromInfoItem(
         mediaId: String,
-        path: List<String>,
-        url: String
+        request: MediaIdRequest.Item
     ): Single<PlayQueue> {
-        if (path.size != 2) {
-            throw parseError(mediaId)
-        }
-
-        val serviceId = path[1].toInt()
-        return when (infoItemTypeFromString(path[0])) {
-            InfoType.STREAM -> ExtractorHelper.getStreamInfo(serviceId, url, false)
+        val serviceId = request.serviceId
+        return when (request.type) {
+            InfoType.STREAM -> ExtractorHelper.getStreamInfo(serviceId, request.url, false)
                 .map { SinglePlayQueue(it) }
 
-            InfoType.PLAYLIST -> ExtractorHelper.getPlaylistInfo(serviceId, url, false)
+            InfoType.PLAYLIST -> ExtractorHelper.getPlaylistInfo(serviceId, request.url, false)
                 .map { PlaylistPlayQueue(it) }
 
-            InfoType.CHANNEL -> ExtractorHelper.getChannelInfo(serviceId, url, false)
+            InfoType.CHANNEL -> ExtractorHelper.getChannelInfo(serviceId, request.url, false)
                 .map { info ->
                     val playableTab = info.tabs
                         .firstOrNull { ChannelTabHelper.isStreamsTab(it) }
@@ -253,6 +211,13 @@ class MediaBrowserPlaybackPreparer(
                 }
 
             else -> throw parseError(mediaId)
+        }
+    }
+
+    /** The item list may have changed since the media browser listed it. */
+    private fun checkIndex(mediaId: String, index: Int, size: Int) {
+        if (index !in 0 until size) {
+            throw parseError(mediaId)
         }
     }
     //endregion

@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
@@ -19,6 +20,7 @@ import androidx.preference.Preference;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.streams.io.NoFileManagerSafeGuard;
 import org.schabi.newpipe.streams.io.StoredDirectoryHelper;
+import org.schabi.newpipe.util.FilenameUtils;
 import java.io.IOException;
 
 public class DownloadSettingsFragment extends BasePreferenceFragment {
@@ -57,6 +59,21 @@ public class DownloadSettingsFragment extends BasePreferenceFragment {
             updatePathPickers(!(boolean) value);
             return true;
         });
+
+        final Preference replacement =
+                findPreference(getString(R.string.settings_file_replacement_character_key));
+        if (replacement != null) {
+            replacement.setOnPreferenceChangeListener((preference, value) -> {
+                // FilenameUtils also checks the stored value, which an import can write.
+                final boolean valid = FilenameUtils.isValidReplacement(String.valueOf(value));
+                if (!valid) {
+                    Toast.makeText(requireContext(),
+                            R.string.settings_file_replacement_character_invalid,
+                            Toast.LENGTH_SHORT).show();
+                }
+                return valid;
+            });
+        }
     }
 
     @Override

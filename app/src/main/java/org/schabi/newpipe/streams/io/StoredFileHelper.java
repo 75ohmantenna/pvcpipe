@@ -96,9 +96,29 @@ public class StoredFileHelper implements Serializable {
         this.srcType = this.docFile.getType();
     }
 
+    /**
+     * Download names come from titles and settings. A name must be one path component, so that
+     * creating it cannot replace or reveal a file outside the folder it is created in.
+     *
+     * @param filename the name to check
+     * @return whether the name is a single ordinary file name
+     */
+    public static boolean isPlainFileName(@Nullable final String filename) {
+        return filename != null && !filename.isEmpty()
+                && !".".equals(filename) && !"..".equals(filename)
+                && filename.indexOf('/') < 0 && filename.indexOf('\\') < 0
+                && filename.indexOf('\0') < 0;
+    }
+
     StoredFileHelper(final Path location, final String filename, final String mime)
             throws IOException {
+        if (!isPlainFileName(filename)) {
+            throw new IOException("Not a plain file name: " + filename);
+        }
         ioPath = location.resolve(filename);
+        if (!location.equals(ioPath.getParent())) {
+            throw new IOException("File name leaves its folder: " + filename);
+        }
 
         Files.deleteIfExists(ioPath);
         Files.createFile(ioPath);
