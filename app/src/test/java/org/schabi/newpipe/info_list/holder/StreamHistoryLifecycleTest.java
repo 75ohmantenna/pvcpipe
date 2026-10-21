@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.schabi.newpipe.database.stream.model.StreamStateEntity;
+import org.schabi.newpipe.extractor.stream.ContentAvailability;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -27,6 +28,24 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subjects.SingleSubject;
 
 public class StreamHistoryLifecycleTest {
+    @Test
+    public void paidRowsDoNotLoadWatchedProgressOnStateUpdates() throws Exception {
+        final StreamMiniInfoItemHolder holder =
+                mock(StreamMiniInfoItemHolder.class, CALLS_REAL_METHODS);
+        final AnimatedProgressBar progress = mock(AnimatedProgressBar.class);
+        final HistoryRecordManager history = mock(HistoryRecordManager.class);
+        field(holder, "stateSubscription", new SerialDisposable());
+        field(holder, "itemProgressView", progress);
+        for (final var availability : new ContentAvailability[]{
+                ContentAvailability.MEMBERSHIP, ContentAvailability.PAID}) {
+            final StreamInfoItem item = item();
+            when(item.getContentAvailability()).thenReturn(availability);
+            field(holder, "boundItem", item);
+            holder.updateState(item, history);
+            verify(history, never()).loadStreamState(item);
+        }
+    }
+
     @Test
     public void historyLookupReturnsBeforeResultAndCannotUpdateARecycledHolder() throws Exception {
         final var immediate = Schedulers.trampoline();
