@@ -491,16 +491,17 @@ public class YoutubeStreamInfoItemExtractor extends PvcYoutubeStreamInfoItemHelp
     @Nonnull
     @Override
     public ContentAvailability getContentAvailability() throws ParsingException {
-        if (isPremiere()) {
-            return ContentAvailability.UPCOMING;
-        }
-
+        // Payment restrictions also apply before a scheduled premiere starts.
         if (isMembersOnly()) {
             return ContentAvailability.MEMBERSHIP;
         }
 
         if (isPremium()) {
             return ContentAvailability.PAID;
+        }
+
+        if (isPremiere()) {
+            return ContentAvailability.UPCOMING;
         }
 
         return ContentAvailability.AVAILABLE;

@@ -71,6 +71,13 @@ requests from this network for now.
 extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). When enabled,
 their lists filter out content identified as requiring membership or payment.
 
+Online video lists, grids, cards and compact related-video rows show a purple **PAID**
+thumbnail badge when the extractor reports membership or payment restrictions.
+The badge replaces the duration or live label, following PipePipe's presentation,
+and hides watched progress. It does not grant access to restricted videos.
+Unknown availability gets no paid badge. Local history, saved playlists and feed
+rows do not persist availability, so this badge applies to online results only.
+
 ## Search filters
 
 A service declares its search filters in a class that extends

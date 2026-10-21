@@ -8,6 +8,7 @@ import android.widget.TextView;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.database.stream.model.StreamStateEntity;
 import org.schabi.newpipe.extractor.InfoItem;
+import org.schabi.newpipe.extractor.stream.ContentAvailability;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.info_list.InfoItemBuilder;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -60,23 +61,8 @@ public class StreamMiniInfoItemHolder extends InfoItemHolder {
         itemVideoTitleView.setText(item.getName());
         itemUploaderView.setText(item.getUploaderName());
 
-        if (item.getDuration() > 0) {
-            itemDurationView.setText(Localization.getDurationString(item.getDuration()));
-            itemDurationView.setBackgroundColor(itemBuilder.getContext()
-                    .getColor(R.color.duration_background_color));
-            itemDurationView.setVisibility(View.VISIBLE);
-
-            loadState(item, historyRecordManager, false);
-        } else if (StreamTypeUtil.isLiveStream(item.getStreamType())) {
-            itemDurationView.setText(R.string.duration_live);
-            itemDurationView.setBackgroundColor(itemBuilder.getContext()
-                    .getColor(R.color.live_duration_background_color));
-            itemDurationView.setVisibility(View.VISIBLE);
-            itemProgressView.setVisibility(View.GONE);
-        } else {
-            itemDurationView.setVisibility(View.GONE);
-            itemProgressView.setVisibility(View.GONE);
-        }
+        updateDuration(item);
+        loadState(item, historyRecordManager, false);
 
         // Default thumbnail is shown on error, while loading and if the url is empty
         CoilHelper.INSTANCE.loadThumbnail(itemThumbnailView, item.getThumbnails());
@@ -103,6 +89,32 @@ public class StreamMiniInfoItemHolder extends InfoItemHolder {
         }
     }
 
+    void updateDuration(final StreamInfoItem item) {
+        if (isPaidContent(item)) {
+            itemDurationView.setText(R.string.paid_video);
+            itemDurationView.setBackgroundColor(itemBuilder.getContext()
+                    .getColor(R.color.paid_video_background_color));
+            itemDurationView.setVisibility(View.VISIBLE);
+        } else if (item.getDuration() > 0) {
+            itemDurationView.setText(Localization.getDurationString(item.getDuration()));
+            itemDurationView.setBackgroundColor(itemBuilder.getContext()
+                    .getColor(R.color.duration_background_color));
+            itemDurationView.setVisibility(View.VISIBLE);
+        } else if (StreamTypeUtil.isLiveStream(item.getStreamType())) {
+            itemDurationView.setText(R.string.duration_live);
+            itemDurationView.setBackgroundColor(itemBuilder.getContext()
+                    .getColor(R.color.live_duration_background_color));
+            itemDurationView.setVisibility(View.VISIBLE);
+        } else {
+            itemDurationView.setVisibility(View.GONE);
+        }
+    }
+
+    private static boolean isPaidContent(final StreamInfoItem item) {
+        return item.getContentAvailability() == ContentAvailability.MEMBERSHIP
+                || item.getContentAvailability() == ContentAvailability.PAID;
+    }
+
     @Override
     public void updateState(final InfoItem infoItem,
                             final HistoryRecordManager historyRecordManager) {
@@ -114,7 +126,9 @@ public class StreamMiniInfoItemHolder extends InfoItemHolder {
     private void loadState(final StreamInfoItem item, final HistoryRecordManager manager,
                            final boolean animate) {
         stateSubscription.set(null);
-        if (!DependentPreferenceHelper.getPositionsInListsEnabled(itemProgressView.getContext())
+        if (isPaidContent(item)
+                || !DependentPreferenceHelper.getPositionsInListsEnabled(
+                        itemProgressView.getContext())
                 || item.getDuration() <= 0 || StreamTypeUtil.isLiveStream(item.getStreamType())) {
             itemProgressView.setVisibility(View.GONE);
             return;
