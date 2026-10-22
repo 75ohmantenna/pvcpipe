@@ -196,3 +196,65 @@ production implementation, not new device runs during PR completion. No addition
 device, live-service, size or performance claims are made. Independent external PR
 review and exact reviewed head are recorded on the PR rather than in tracked review
 artifacts.
+
+## Follow-up: streaming download checksums — 2026-10-22
+
+PR #132 remains the completed initial pass; retained dependencies are not unfinished
+migrations. The next batch targets a specific problematic utility call, not removal
+of a still-useful library.
+
+| Serious candidate | Actual use and previous retention | New evidence / decision |
+| --- | --- | --- |
+| Download checksum: ExoPlayer `Util.toByteArray` + Okio `ByteString` | `Utility.checksum` serves the MD5/SHA-1 actions in `MissionAdapter`; both dependencies remain needed elsewhere. The first pass did not assess this full-file hashing path separately. | The entire download was buffered and copied before hashing. A 512 MiB file causes `OutOfMemoryError` in the actual old Android checksum path. Replace this local use with streaming Java `MessageDigest`. |
+| Other Okio Base64 uses | Search-filter decoding is deliberately permissive; proof-token decoding also handles YouTube's alternate alphabet/padding. | No new evidence justifies tightening accepted inputs. Another encoder-only substitution would not remove Okio or fix a demonstrated problem. Retain. |
+| Guava HTTP helpers | `YoutubeHttpDataSource` uses case-insensitive, null-filtering map views and ExoPlayer-facing predicates. Guava also remains transitive. | Reimplementing collection semantics adds code without a demonstrated defect or dependency elimination. Retain. |
+| ProcessPhoenix | Backup restore/history reset trigger a fresh process; App deliberately skips initialization in the rebirth process. | No simpler equivalent lifecycle/process strategy established. Retain rather than replace restart coordination with custom infrastructure. |
+| PrettyTime | UI-locale unrounded upload dates, disabled decades, parsed-year adjustment and textual fallback remain unchanged. | No newly agreed output contract or API26/27 ICU evidence resolves the earlier blockers. No replacement proposed; retain locale resources and R8 rules. |
+
+### Implementation and compatibility
+
+`Utility.checksum` now feeds one **8 KiB** buffer into a per-call `MessageDigest`,
+then formats only the digest bytes as lowercase, zero-padded hex using the existing
+`SponsorBlock.sha256` formatting convention. `SharpInputStream` and its
+try-with-resources ownership remain. Read errors still propagate, including after
+partial input; the download action's Rx scheduler and notification flow are unchanged.
+No cancellation or UI error-handling redesign is included.
+
+[Android's MessageDigest contract](https://developer.android.com/reference/java/security/MessageDigest)
+provides **MD5 and SHA-1 from API1**. This is a Java standard-library API available
+natively on every supported Android version, not AndroidX or a desugared/newer-OS
+API. There is no locale, rounding, date, time-zone or text-encoding dependency:
+the file's raw bytes are hashed. Existing MD5/SHA-1 actions and their security
+limitations remain; these legacy checksums are not upgraded into authentication.
+
+The only production caller supplies `R.id.md5` or `R.id.sha1`. Unsupported IDs now
+throw `IllegalArgumentException` before opening a file instead of falling through
+to a full-file hex dump. This intentional internal-contract tightening does not
+change either menu action. No dependency declaration, resource or shrinker rule is
+removed: Okio and ExoPlayer remain required by networking, Wire and playback.
+
+Regression tests cover empty input, known digests/leading zeroes, binary input
+across many short reads and a final partial buffer, read-error propagation/closure,
+and the explicit unsupported-ID contract. minSdk26 and toolchain versions stay fixed.
+
+### Validation evidence
+
+- Latest-master baseline `692dfa42d`: all five `make ci` stages passed; no baseline
+  build/test/lint failures were observed (cached/up-to-date work was reused).
+- Before editing, an isolated Android `app_process` run loaded the built debug APK
+  and called the actual `Utility.checksum` through a `StoredFileHelper` file URI.
+  A sparse **512 MiB** zero-filled file failed with `OutOfMemoryError` at
+  `Util.toByteArray` → `Utility.checksum:204`, with a **256 MiB** heap growth limit.
+- With the updated debug APK, the same smoke on the **API37 Pixel 6a** returned
+  MD5 `aa559b4e3523a6c931f08f4df52d58f2` and SHA-1
+  `5b088492c9f4778f409b7ae61477dec124c99033`, matching independently computed
+  Python hashlib fixtures. The process reported file size **536870912** and
+  maximum heap **268435456**. This proves the changed path can hash a file larger
+  than its heap; it is not an APK-size, throughput or measured peak-memory claim.
+- All **5** focused `UtilityChecksumTest` cases pass; Checkstyle and debug assembly
+  pass. Mockito reports its existing dynamic-agent/future-JDK warning.
+- Release dependency insight confirms Okio **3.17.0** remains required through
+  OkHttp, Coil and Wire. No library removal or shrinker cleanup is claimed.
+- No installation, instrumentation, app-data reset, live-service or SAF-provider
+  device run was performed. API26/27 hardware remains unexercised; compatibility
+  is grounded in the native API contract and unchanged file-stream abstraction.
