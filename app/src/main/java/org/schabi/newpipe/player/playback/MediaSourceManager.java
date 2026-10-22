@@ -132,6 +132,10 @@ public class MediaSourceManager {
 
     private final Handler removeMediaSourceHandler = new Handler(Looper.getMainLooper());
 
+    // Manager entry points and playlist completions run on the application (main) thread.
+    // Unlike an Rx subscription, ExoPlayer's retained completion actions outlive cancellation.
+    private boolean disposed;
+
     public MediaSourceManager(@NonNull final Context context,
                               @NonNull final PlaybackListener listener,
                               @NonNull final PlayQueue playQueue) {
@@ -189,6 +193,13 @@ public class MediaSourceManager {
      * Dispose the manager and releases all message buses and loaders.
      */
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+        // Retire ownership before cancellation can trigger any further callbacks.
+        disposed = true;
+        removeMediaSourceHandler.removeCallbacksAndMessages(null);
+
         if (DEBUG) {
             Log.d(TAG, "close() called.");
         }
@@ -229,6 +240,9 @@ public class MediaSourceManager {
     }
 
     private void onPlayQueueChanged(final PlayQueueEvent event) {
+        if (disposed) {
+            return;
+        }
         if (playQueue.isEmpty() && playQueue.isComplete()) {
             playbackListener.onPlaybackShutdown();
             return;
@@ -357,7 +371,7 @@ public class MediaSourceManager {
         }
 
         final PlayQueueItem currentItem = playQueue.getItem();
-        if (isBlocked.get() || currentItem == null) {
+        if (disposed || isBlocked.get() || currentItem == null) {
             return;
         }
 
@@ -365,6 +379,9 @@ public class MediaSourceManager {
     }
 
     private synchronized void maybeSynchronizePlayer() {
+        if (disposed) {
+            return;
+        }
         if (isPlayQueueReady() && isPlaybackReady()) {
             final boolean isBlockReleased = maybeUnblock();
             maybeSync(isBlockReleased);
@@ -379,7 +396,9 @@ public class MediaSourceManager {
         return Observable.interval(progressUpdateIntervalMillis,
                                    TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
                 .filter(ignored ->
-                        playbackListener.isApproachingPlaybackEdge(playbackNearEndGapMillis));
+                        !disposed
+                                && playbackListener.isApproachingPlaybackEdge(
+                                        playbackNearEndGapMillis));
     }
 
     private Disposable getDebouncedLoader() {
@@ -395,6 +414,9 @@ public class MediaSourceManager {
     }
 
     private void loadImmediate() {
+        if (disposed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "MediaSource - loadImmediate() called");
         }
@@ -413,6 +435,9 @@ public class MediaSourceManager {
     }
 
     private void maybeLoadItem(@NonNull final PlayQueueItem item) {
+        if (disposed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "maybeLoadItem() called.");
         }
@@ -475,6 +500,9 @@ public class MediaSourceManager {
 
     private void onMediaSourceReceived(@NonNull final PlayQueueItem item,
                                        @NonNull final ManagedMediaSource mediaSource) {
+        if (disposed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "MediaSource - Loaded=[" + item.getTitle()
                     + "] with url=[" + item.getUrl() + "]");
@@ -528,6 +556,9 @@ public class MediaSourceManager {
      * is up-to-date.
      */
     private void maybeRenewCurrentIndex() {
+        if (disposed) {
+            return;
+        }
         final int currentIndex = playQueue.getIndex();
         final PlayQueueItem currentItem = playQueue.getItem();
         final ManagedMediaSource currentSource = playlist.get(currentIndex);
