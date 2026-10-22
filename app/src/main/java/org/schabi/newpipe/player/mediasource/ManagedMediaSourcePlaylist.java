@@ -56,23 +56,15 @@ public class ManagedMediaSourcePlaylist {
     //////////////////////////////////////////////////////////////////////////*/
 
     /**
-     * Expands the {@link ConcatenatingMediaSource} by appending it with a
-     * {@link PlaceholderMediaSource}.
+     * Inserts placeholder slots for a recorded queue insertion.
      *
-     * @see #append(ManagedMediaSource)
+     * @param index insertion position in the event-consistent playlist
+     * @param count number of slots to insert
      */
-    public synchronized void expand() {
-        append(PlaceholderMediaSource.COPY);
-    }
-
-    /**
-     * Appends a {@link ManagedMediaSource} to the end of {@link ConcatenatingMediaSource}.
-     *
-     * @see ConcatenatingMediaSource#addMediaSource
-     * @param source {@link ManagedMediaSource} to append
-     */
-    public synchronized void append(@NonNull final ManagedMediaSource source) {
-        internalSource.addMediaSource(source);
+    public synchronized void expand(final int index, final int count) {
+        for (int offset = 0; offset < count; offset++) {
+            internalSource.addMediaSource(index + offset, PlaceholderMediaSource.COPY);
+        }
     }
 
     /**
@@ -83,7 +75,7 @@ public class ManagedMediaSourcePlaylist {
      * @param index of {@link ManagedMediaSource} to be removed
      */
     public synchronized void remove(final int index) {
-        if (index < 0 || index > internalSource.getSize()) {
+        if (index < 0 || index >= internalSource.getSize()) {
             return;
         }
 

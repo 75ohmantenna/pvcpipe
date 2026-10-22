@@ -18,6 +18,8 @@ import org.schabi.newpipe.player.mediasource.LoadedMediaSource;
 import org.schabi.newpipe.player.mediasource.ManagedMediaSource;
 import org.schabi.newpipe.player.mediasource.ManagedMediaSourcePlaylist;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
+import org.schabi.newpipe.player.playqueue.PlayQueueEvent.AppendEvent;
+import org.schabi.newpipe.player.playqueue.PlayQueueEvent.InitEvent;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.PlayQueueEvent.MoveEvent;
 import org.schabi.newpipe.player.playqueue.PlayQueueEvent;
@@ -235,10 +237,16 @@ public class MediaSourceManager {
         // Event specific action
         switch (event.type()) {
             case INIT:
+                maybeBlock();
+                final InitEvent initEvent = (InitEvent) event;
+                playlist.expand(0, initEvent.getSize());
+                break;
             case ERROR:
                 maybeBlock();
+                break;
             case APPEND:
-                populateSources();
+                final AppendEvent appendEvent = (AppendEvent) event;
+                playlist.expand(appendEvent.getStartIndex(), appendEvent.getAmount());
                 break;
             case SELECT:
                 maybeRenewCurrentIndex();
@@ -558,16 +566,11 @@ public class MediaSourceManager {
         if (DEBUG) {
             Log.d(TAG, "resetSources() called.");
         }
+        // Reset resolved sources, not the structural baseline. Pending deltas must still
+        // apply exactly once, even when the live queue already includes their effects.
+        final int size = playlist.size();
         playlist = new ManagedMediaSourcePlaylist();
-    }
-
-    private void populateSources() {
-        if (DEBUG) {
-            Log.d(TAG, "populateSources() called.");
-        }
-        while (playlist.size() < playQueue.size()) {
-            playlist.expand();
-        }
+        playlist.expand(0, size);
     }
 
     /*//////////////////////////////////////////////////////////////////////////
