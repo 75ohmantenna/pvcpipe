@@ -92,14 +92,33 @@ resources for one player service.
 adapts the official `org.fcast:sender-sdk:0.6.1`. Native SDK calls run off the
 main thread, callbacks return to it, and connection generations discard stale
 events. The SDK supports negotiated v2/v3 and secure v4 connections.
-PVCPipe retains authoritative receiver state and duration across loads because
-the SDK can deduplicate unchanged values; advancing receiver progress can confirm
+PVCPipe retains playback state and duration across loads because the SDK can
+deduplicate unchanged receiver values; advancing receiver progress can confirm
 a load without another Playing event. Matching acknowledgements teach a
 connection that it echoes the sender's sources; subsequent loads gate updates
 until their own acknowledgement. Without such echoes, readiness relies on
 playback evidence, including the observed SDK-v3 connection to Android Receiver
 2.1.5 and v4's intentionally unacknowledged own loads. While a load is pending,
 these peers cannot distinguish old-source progress from new-source progress.
+
+SDK 0.6.1's v3 `Initial`/`PlayUpdate` source callbacks synthesize Playing without
+updating its cached receiver playback state
+([release transport source](https://gitlab.futo.org/videostreaming/fcast/-/blob/android-sender-sdk-v0.6.1/sdk/sender/fcast-sender-sdk/src/fcast.rs#L1633-1800)).
+If that cache already says Paused, the next receiver Paused snapshot is suppressed.
+For a paused startup, the session therefore enforces Pause and exposes Paused
+immediately; it does not adopt synthetic Playing as playback intent or wait for a
+corrective callback. This freezes the application clock and retains paused intent
+for another replacement or receiver switch. Explicit Resume cancels startup pause
+enforcement; explicit Pause during preparation re-arms it. Enforcement is one-shot,
+so later receiver Playing/Paused transitions remain authoritative. v2 has no such
+synthetic source callback, and v4 does not use this state-deduplication path.
+
+The paused-startup regressions in `CastPlaybackTest` exercise the actual session
+policy and playback controller with controlled preparation scheduling and clock
+time. Android effects, media resolution and SDK/receiver transport are mocked;
+v2/v4 cases exercise startup receiver observations, not v3 synthetic callbacks.
+These JVM checks and tagged SDK-source evidence do not establish real receiver
+picture, audio or transport timing.
 
 v2 has no explicit end event. PVCPipe reports completion once for a
 playing-to-idle transition near a known duration, or the Android receiver's
