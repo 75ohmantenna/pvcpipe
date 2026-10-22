@@ -4,10 +4,28 @@
 
 - Android SDK platform 37. PVCPipe compiles against and targets API 37; its
   minimum is API 26 (Android 8.0).
-- JDK 17 for the app, JDK 11 for the extractor and JDK 21 for Checkstyle in
-  both builds. Install all three so Gradle can resolve the declared toolchains.
-- The Gradle wrapper downloads Gradle 9.6.1. Initial builds also need access
-  to the dependency repositories declared in the Gradle settings files.
+- JDK 21 for app and extractor compilation, and JDK 25 for Gradle and
+  Checkstyle. Install both so Gradle can resolve the declared toolchains.
+  The daemon JVM criteria in both builds select Java 25 even when the shell's
+  `JAVA_HOME` points to another version. No automatic JDK download is configured.
+- Both Gradle wrappers download Gradle 9.8.2 and verify its SHA-256 checksum.
+  A globally installed Gradle does not change the wrapper version. Initial builds
+  also need access to the dependency repositories declared in the settings files.
+
+The current build uses AGP 9.4.1, Kotlin 2.4.21 and KSP 2.3.12. Kotlin's
+[published fully supported matrix](https://kotlinlang.org/docs/gradle-configure-project.html)
+for 2.4.21 ends at Gradle 9.7.0 and AGP 9.3.1, while permitting newer versions
+with qualifications. This repository exercises its newer combination through
+`make ci`; that is project-specific evidence, not certification by every vendor.
+
+Java 21 language and bytecode targets do not make the complete desktop JDK API
+available on Android. Android SDK APIs and core-library desugaring still determine
+which library calls can run on a device.
+
+The 2026-10-22 toolchain cutover passed `make ci` on Linux x64: build-logic,
+app and offline extractor tests, static checks, Android lint, and both APK
+variants. That run did not include instrumentation or receiver/hardware
+validation.
 
 ## Layout
 
@@ -31,7 +49,16 @@ publishing step. This repository declares no publication workflow.
 make ci                        # every check below, then both APKs
 ```
 
-`make ci` runs two Gradle invocations and stops at the first failure:
+`make ci` runs five serial Gradle invocations and stops at the first failure:
+static/build-logic checks, JVM tests, Android lint, the debug APK, then the release
+APK. Each invocation uses `--no-daemon` so compiler and lint memory is released
+between stages.
+
+The app build defaults to one Gradle worker, no parallel project execution,
+in-process Kotlin compilation, a 2 GiB daemon heap and a 1 GiB metaspace limit.
+Standalone extractor builds use one worker, a 1 GiB heap and 768 MiB of metaspace.
+On a small laptop, run only one build at a time and use `--no-daemon` for individual
+commands too. These limits do not include the OS, IDE or forked test/check workers.
 
 | Task | What it does |
 | --- | --- |
@@ -41,6 +68,7 @@ make ci                        # every check below, then both APKs
 | `:app:checkDependenciesOrder` | fails if a section of `gradle/libs.versions.toml` is not in alphabetical order |
 | `:app:lintDebug` | Android lint |
 | `:app:testDebugUnitTest` | the app's unit tests |
+| `:pvcpipe-extractor:extractor:checkstyleMain` | the extractor's main-source Checkstyle |
 | `:pvcpipe-extractor:extractor:forkCiTest` | the extractor's Checkstyle and its tests tagged `offline` |
 | `:app:assembleDebug`, `:app:assembleRelease` | both APKs |
 
@@ -55,8 +83,9 @@ APKs are written under `app/build/outputs/apk/`:
 - **Debug:** application ID `org.seventyfiveohmantenna.pvcpipe.debug`, app name
   **PVCPipe Debug**. Android tooling signs it with the local debug key.
 - **Release:** default application ID `org.seventyfiveohmantenna.pvcpipe`,
-  app name **PVCPipe**. Code and resources are shrunk; without a signing
-  configuration, the output is `app-release-unsigned.apk`.
+  app name **PVCPipe**. Code and resources are shrunk. With local release signing
+  configured, the output is `app-release.apk`; otherwise it is
+  `app-release-unsigned.apk`.
 
 The source namespace remains `org.schabi.newpipe`; it is not an installation
 ID. Debug and default release builds can coexist. The optional
@@ -70,6 +99,54 @@ an identity or signature mismatch; follow the device-safety procedure below.
 
 `make ci` is the repository's local gate. Run it before pushing; it does not
 include instrumentation tests or live-network extractor tests.
+
+## Release signing
+
+Release signing is optional and never falls back to the Android debug key.
+The build reads `~/.config/pvcpipe/signing.properties`, or the file selected by
+`PVCPIPE_SIGNING_PROPERTIES`. The properties must contain `storeFile` (an absolute
+path to a PKCS12 keystore), `storePassword`, `keyAlias` and `keyPassword`.
+An absent default file leaves releases unsigned; an invalid explicit path or
+incomplete properties file fails the build instead of silently skipping signing.
+
+Keep the keystore and credentials outside the checkout, in directories accessible
+only to their owner (`0700`), with files readable only by that owner (`0600`).
+Do not commit them, copy them into build artifacts, publish Gradle caches, or put
+passwords on command lines. Run `./gradlew --no-daemon :app:assembleRelease` to
+build with the configured key, and verify the APK certificate before distributing
+it. Signing an APK does not publish it or make a Git tag a release.
+
+This laptop's dedicated key is `~/.local/share/pvcpipe-signing/release.p12`,
+alias `pvcpipe-release`. Its public certificate is `release-cert.pem` in that
+directory. The encrypted backup bundle is
+`~/.local/share/pvcpipe-signing/backups/pvcpipe-release-signing-2026-10-22.tar.gpg`;
+it contains the keystore, signing properties, public certificate and recovery
+instructions. Its separate decryption passphrase is in the private file
+`~/.config/pvcpipe/signing-backup-passphrase.txt`.
+
+Copy the encrypted bundle to offline storage and save the decryption passphrase
+separately in a password manager. Both are needed for recovery; copies on this
+laptop alone do not protect against losing the laptop. A recovery round-trip was
+verified locally when the bundle was created. After restoring elsewhere, update
+`storeFile` to the restored absolute path and preserve the alias and passwords.
+Do not generate a new signing identity for existing installations: updates must
+retain their original signing key.
+
+Use a separate application ID such as `-DpackageSuffix=.smoke` for disposable
+release-mode testing. This keeps smoke-test data separate from both the debug
+and production apps. Verify the package ID as well as the certificate before
+installing; never uninstall a populated app to bypass a signing mismatch.
+
+The 2026-10-22 signed, minified smoke build was exercised on a Pixel 6a running
+Android 17/API 37. It initially exposed a release-only startup failure: R8 kept
+PrettyTime's locale bundle classes but removed their public no-argument
+constructors, which `ResourceBundle` invokes reflectively. The targeted rule in
+`app/proguard-rules.pro` retains those constructors. After that fix, cold startup,
+live search, video playback, pause/seek/resume, background audio and playlist
+persistence across a cold process restart passed in the separate smoke package.
+The populated debug app was not replaced or cleared. Repeat a release-mode cold
+start after shrinker/dependency changes; assembling an APK and running JVM tests
+alone did not catch this failure.
 
 ## Versions
 
@@ -104,10 +181,9 @@ fork came from.
    `github.com/75ohmantenna/pvcpipe` only. Keep the local pre-push guard.
    Do not publish to upstream repositories or force-update an existing tag.
 
-The APK built by `assembleRelease` remains unsigned. Creating a Git tag does
-not sign it or upload an installable release asset; release signing requires
-a separate, securely managed key. Never label a debug-key APK as a signed
-production release.
+`assembleRelease` signs with the external release configuration when it is
+available, and otherwise produces an unsigned APK. Creating a Git tag does not
+sign or publish an APK. Never label a debug-key APK as a production-signed release.
 
 ## Tests
 
@@ -139,8 +215,11 @@ records a media host becoming unavailable during repeated test requests.
 ## Conventions the checks enforce
 
 - Java follows `checkstyle/checkstyle.xml`, with exceptions in
-  `checkstyle/suppressions.xml`. Checkstyle does not ask for Javadoc, but a
-  method's Javadoc has to carry a tag for every parameter.
+  `checkstyle/suppressions.xml`. Checkstyle does not ask for Javadoc, but existing
+  Javadoc needs a summary sentence ending with a period, and a method's Javadoc
+  has to carry a tag for every parameter. Both builds use `SummaryJavadoc`;
+  Checkstyle removed the old `JavadocStyle` check. License-only and author-only
+  metadata belongs in ordinary block comments, not Javadoc.
 - The extractor's Checkstyle rejects `toLowerCase()` and `toUpperCase()`
   without a `Locale`. With the language of the device set to Turkish they
   turn `i` into `İ` and `I` into `ı`, and host names stop matching.
