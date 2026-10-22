@@ -26,7 +26,7 @@ identified separately. Remaining external libraries are not platform APIs.
 | --- | --- | --- | --- |
 | Rhino `rhino-engine`, JSR-223 bridge | None | No `javax.script`, engine discovery or reflection callers. `utils/JavaScript` uses Rhino Context/Function directly. Keep Rhino core and its reflective/runtime rules. | Remove as unused; remove engine catalog alias and engine/JSR-223 shrinker rules |
 | JSR-305 in `timeago-generator` | None | Generator imports only JDK/NanoJSON APIs; extractor and incorporated timeago parser still use annotations. | Remove unused generator declaration only |
-| AndroidX LocalBroadcastManager direct declaration | Existing Gradle dependency constraint | No app/variant/test/resource callers. ExoPlayer UI → legacy-support-core-utils still needs it; retain the 1.1.0 pin. No exclusion. | Remove direct runtime ownership; retain transitively |
+| AndroidX LocalBroadcastManager direct declaration | Existing Gradle dependency constraint | No app/variant/test/resource callers. Material → dynamicanimation → legacy-support-core-utils still needs it; retain the 1.1.0 pin. No exclusion. | Remove direct runtime ownership; retain transitively |
 | Okio ByteString used just to encode search-filter bytes | Java `Base64.getEncoder().encodeToString` | Native Android API 26, also Java SE 8+. Same padded basic alphabet, no wrapping, followed by existing URL encoding. No locale, timezone or threading state. | Replace encoding; retain permissive Okio decoding and generated Wire runtime |
 | Guava Stopwatch for thumbnail debug diagnostics | Java `System.nanoTime()` subtraction | Monotonic elapsed time, not wall clock; no mutable timer object. Timing stays gated by `Log.isLoggable`. Logs now use integer milliseconds instead of Guava's adaptive units. No thumbnail/cancellation changes. | Replace two local timer uses; retain Guava elsewhere |
 | PrettyTime relative upload dates | Android DateUtils or ICU RelativeDateTimeFormatter | Both available at minSdk, but not behavior-equivalent; see below. | Retain |
@@ -165,3 +165,34 @@ No instrumentation, installation, uninstall or app-data reset was performed.
 Temporary smoke sources/launchers and device copies were removed. API26/27 runtime
 coverage remains unexercised; Base64 availability there is established by the
 official API contract, not a claimed device run. No size/performance delta measured.
+
+### Completion follow-up — 2026-10-22
+
+The PR workflow began on master `2195e4eb9` with the five cutovers above already
+implemented but uncommitted. Source/declarations, variant/resource/reflection
+references, generated Wire use and shrinker rules were rechecked; those changes
+were included rather than reimplemented. No further production migration was
+justified. PrettyTime, ProcessPhoenix and the other retained candidates still have
+the stated blockers. `jdeps` confirms retained Rhino core itself references
+`jdk.dynalink`, so its warning/keep rules were not removed with the unused engine.
+
+Fresh dependency insight corrected one audit claim: LocalBroadcastManager is
+required through **Material → dynamicanimation → legacy-support-core-utils**, not
+ExoPlayer UI. Its version remains 1.1.0 by constraint. Separate debug/release
+insights find no `rhino-engine`; generator runtime resolution contains NanoJSON
+only, and generator classes compile.
+
+Added a durable golden search-filter token assertion for Base64 padding and URL
+escaping, and tagged the existing codec matrix `offline` so `make ci` executes it.
+Added an offline regression exercising direct Rhino compilation and an actual
+parameterized string transformation. Focused tests pass; the former disabled
+exploratory codec case remains disabled. Both the received-work baseline and the
+strengthened implementation pass all five `make ci` stages, including lint and
+release/R8 assembly; no baseline failures were observed. Cached/up-to-date tasks
+are not represented as fresh compilation or new hardware evidence.
+
+Earlier JVM/device smoke observations above remain dated evidence of the unchanged
+production implementation, not new device runs during PR completion. No additional
+device, live-service, size or performance claims are made. Independent external PR
+review and exact reviewed head are recorded on the PR rather than in tracked review
+artifacts.

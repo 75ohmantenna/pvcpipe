@@ -5,6 +5,7 @@ package org.schabi.newpipe.extractor.services.youtube.search.filter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.services.youtube.search.filter.protobuf.DateFilter;
 import org.schabi.newpipe.extractor.services.youtube.search.filter.protobuf.Features;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("offline")
 class YoutubeProtoBufferSearchParameterAccessorTest {
 
     final DateFilter[] dateFilters = {
@@ -71,6 +73,12 @@ class YoutubeProtoBufferSearchParameterAccessorTest {
     @AfterEach
     void tearDown() {
         spBuilder = null;
+    }
+
+    @Test
+    void videoFilterUsesPaddedBase64AndUrlEscaping() throws IOException {
+        // YouTube's sp protocol uses basic Base64, including padding, then URL escaping.
+        assertEquals("EgIQAQ%3D%3D", spBuilder.setTypeFilter(TypeFilter.video).build().getSp());
     }
 
     @Test
