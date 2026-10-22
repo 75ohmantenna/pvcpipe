@@ -19,3 +19,9 @@ app/release/
 bin/
 .vscode/
 *.code-workspace
+
+# Android release signing material must stay outside version control.
+*.jks
+*.keystore
+*.p12
+signing.properties
