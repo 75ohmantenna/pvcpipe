@@ -72,9 +72,12 @@ public abstract class PlayQueue implements Serializable {
     public void init() {
         eventBroadcast = PublishSubject.create();
 
-        broadcastReceiver = eventBroadcast.toFlowable(BackpressureStrategy.BUFFER)
+        // Each subscriber starts at the queue it actually observes. Earlier mutations are
+        // already in that snapshot; later mutations arrive as ordered deltas behind INIT.
+        final PublishSubject<PlayQueueEvent> events = eventBroadcast;
+        broadcastReceiver = Flowable.defer(() -> events.toFlowable(BackpressureStrategy.BUFFER)
                 .observeOn(AndroidSchedulers.mainThread())
-                .startWithItem(new InitEvent());
+                .startWithItem(new InitEvent(size())));
     }
 
     /**

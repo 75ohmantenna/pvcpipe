@@ -10,7 +10,8 @@ import java.io.Serializable
 sealed interface PlayQueueEvent : Serializable {
     fun type(): Type
 
-    class InitEvent : PlayQueueEvent {
+    // Captured per subscription, before asynchronous observers can see later mutations.
+    class InitEvent(val size: Int) : PlayQueueEvent {
         override fun type() = Type.INIT
     }
 

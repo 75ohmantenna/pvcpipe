@@ -225,11 +225,15 @@ for each change.
 [`MediaSourceManager`](../app/src/main/java/org/schabi/newpipe/player/playback/MediaSourceManager.java)
 and
 [`PlayQueueAdapter`](../app/src/main/java/org/schabi/newpipe/player/playqueue/PlayQueueAdapter.java)
-receive the events asynchronously. Two rules follow from that:
+receive the events asynchronously. Three rules follow from that:
 
-- An append event carries the index at which the items went in. An observer
-  must not work it out from the size of the queue, which may have changed by
-  the time the event arrives.
+- Each subscription captures its initial queue size before asynchronous delivery.
+  Mutations before subscription are already in that baseline; later events apply
+  their recorded deltas exactly once. Resetting resolved sources preserves the
+  size reached by processed events, not the later live queue size.
+- An append event carries its insertion index and count. The source timeline
+  inserts exactly those placeholder slots; observers must not infer the delta
+  from the live queue size, which may already include later removals or appends.
 - Replacing a tail the app queued automatically with items the user picked
   sends the removal before the append. The timeline and the shuffle backup
   have to lose that tail as well.
@@ -342,7 +346,7 @@ instrumentation tests (see [building.md](building.md)).
 | FCast media | [`CastManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastManifestTest.java), [`CastInlineManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastInlineManifestTest.java), [`CastMediaServerTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaServerTest.java); on a device [`CastDashReceiverCompatibilityTest`](../app/src/androidTest/java/org/schabi/newpipe/player/cast/CastDashReceiverCompatibilityTest.java) |
 | FCast discovery | [`FCastDiscoveryTest`](../app/src/test/java/org/schabi/newpipe/player/cast/FCastDiscoveryTest.java) |
 | Queue requests | [`QueuePlaybackChoiceTest`](../app/src/test/java/org/schabi/newpipe/player/QueuePlaybackChoiceTest.java), [`PlayerIntentTest`](../app/src/test/java/org/schabi/newpipe/player/PlayerIntentTest.java) |
-| Queue events | [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java) |
+| Queue events and timeline | [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java), [`MediaSourceManagerTest`](../app/src/test/java/org/schabi/newpipe/player/playback/MediaSourceManagerTest.java) |
 | Audio | [`PlaybackAudioTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioTest.java), [`PlaybackAudioFocusProtocolTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioFocusProtocolTest.java), on a device [`PlaybackAudioIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/audio/PlaybackAudioIntegrationTest.kt) |
 | History | [`PlaybackHistoryTest`](../app/src/test/java/org/schabi/newpipe/player/history/PlaybackHistoryTest.java), [`PlaybackHistoryPlayerLifecycleTest`](../app/src/test/java/org/schabi/newpipe/player/history/PlaybackHistoryPlayerLifecycleTest.java), on a device [`PlaybackHistoryIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/history/PlaybackHistoryIntegrationTest.kt) |
 | Broadcasts | [`PlayerBroadcastsTest`](../app/src/test/java/org/schabi/newpipe/player/broadcast/PlayerBroadcastsTest.java), on a device [`AndroidPlayerBroadcastsTest`](../app/src/androidTest/java/org/schabi/newpipe/player/broadcast/AndroidPlayerBroadcastsTest.kt) |
