@@ -258,3 +258,10 @@ and the explicit unsupported-ID contract. minSdk26 and toolchain versions stay f
 - No installation, instrumentation, app-data reset, live-service or SAF-provider
   device run was performed. API26/27 hardware remains unexercised; compatibility
   is grounded in the native API contract and unchanged file-stream abstraction.
+- Full implementation `make ci` passed all five stages: buildSrc/style/order checks,
+  app JVM and extractor offline tests, lintDebug, debug assembly, and release
+  R8/assembly. Release minification executed for the changed implementation.
+  Existing JVM agent/class-sharing warnings do not represent failed tests.
+- The smoke's temporary device APKs/runner/files were removed. There was no
+  modification of an installed app or its private data. Exact reviewed head and
+  external review disposition are recorded on the PR, outside tracked artifacts.
