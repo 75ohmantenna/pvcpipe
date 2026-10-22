@@ -176,14 +176,17 @@ public class MediaSourceManagerTest {
         final PlayQueueItem fourth = item("same-url");
         final PlayQueueItem fifth = item("same-url");
         start(first, second);
+        final ManagedMediaSource secondSource = playlist().get(1);
         queue.append(List.of(third, fourth));
-        queue.move(3, 1);
+        queue.move(1, 3);
         queue.remove(0);
         queue.remove(1);
         queue.append(List.of(fifth));
         drain();
 
-        assertTailAndOrder(fourth, third, fifth);
+        // A misplaced source must not be hidden by selecting/reloading the final tail.
+        assertSame(secondSource, playlist().get(1));
+        assertTailAndOrder(third, second, fifth);
     }
 
     @Test
