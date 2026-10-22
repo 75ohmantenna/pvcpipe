@@ -597,6 +597,9 @@ public final class Player implements PlaybackListener, Listener {
         if (DEBUG) {
             Log.d(TAG, "destroyPlayer() called");
         }
+        if (playQueueManager != null) {
+            playQueueManager.dispose();
+        }
         casting.onPlayerReset();
         UIs.call(PlayerUi::destroyPlayer);
 
@@ -613,9 +616,6 @@ public final class Player implements PlaybackListener, Listener {
         }
         if (playQueue != null) {
             playQueue.dispose();
-        }
-        if (playQueueManager != null) {
-            playQueueManager.dispose();
         }
     }
 

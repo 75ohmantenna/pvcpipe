@@ -241,6 +241,37 @@ receive the events asynchronously. Three rules follow from that:
 When you change how the queue is modified, keep the queue, the media-source
 timeline and the list on screen in step.
 
+### Playlist completion lifetime
+
+`MediaSourceManager` is owned by the application's main thread. Replacing a
+queue manager or destroying the player permanently retires it before cancelling
+its subscriptions or stopping/releasing ExoPlayer. Disposal is idempotent.
+Retired managers reject playlist synchronization and reload completions before
+calling the shared playback listener, loading sources or mutating playback.
+Blocking, initialization and source resets do not retire the current manager;
+the processed queue/timeline accounting above still applies.
+
+Rx cancellation does not cancel ExoPlayer's separately retained completion
+actions. In the resolved ExoPlayer **2.19.1**,
+[`ConcatenatingMediaSource.releaseSourceInternal()`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L525-L539)
+dispatches outstanding actions, and
+[`HandlerAndRunnable.dispatch()`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L1043-L1055)
+posts them to the supplied handler. Mutations
+[`without a playback handler`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L601-L619)
+(including after release) can also post completions. Removing queued handler
+callbacks is cleanup only: the permanent ownership check also rejects actions
+already dequeued or posted during/after cleanup and release.
+
+`MediaSourceManagerTest` controls Rx and Android delivery independently. It runs
+real queue, manager and ExoPlayer playlist methods for stale synchronization,
+reload, release-time dispatch, post-release mutation, same-URL replacement,
+repeated disposal and valid current-manager work. Android handlers/loopers,
+the playback listener and child media sources are mocked; prepared-source
+completion registration and release are invoked directly rather than running
+a decoder/playback thread. These are JVM/framework-source checks, not device or
+receiver playback evidence. Accepted history writes retain their independent
+lifetime described below.
+
 ## Volume, mute and audio focus
 
 [`PlaybackAudio`](../app/src/main/java/org/schabi/newpipe/player/audio/PlaybackAudio.java)

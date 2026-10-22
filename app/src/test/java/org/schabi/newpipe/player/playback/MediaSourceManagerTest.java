@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -27,6 +28,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 
 import org.junit.After;
@@ -48,6 +50,8 @@ import org.schabi.newpipe.util.SponsorBlock;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +60,8 @@ import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
@@ -76,6 +82,8 @@ public class MediaSourceManagerTest {
     private MockedConstruction<Handler> handlers;
     private PlayQueue queue;
     private MediaSourceManager manager;
+    private final List<Runnable> completions = new ArrayList<>();
+    private boolean holdCompletions;
 
     @Before
     public void setUp() {
@@ -104,7 +112,12 @@ public class MediaSourceManagerTest {
         // not executed inline. Both queue observeOn hops also use this controlled scheduler.
         handlers = mockConstruction(Handler.class, (handler, context) ->
                 when(handler.post(any(Runnable.class))).thenAnswer(call -> {
-                    mainThread.scheduleDirect(call.getArgument(0));
+                    final Runnable action = call.getArgument(0);
+                    if (holdCompletions) {
+                        completions.add(action);
+                    } else {
+                        mainThread.scheduleDirect(action);
+                    }
                     return true;
                 }));
         doAnswer(call -> {
@@ -332,6 +345,192 @@ public class MediaSourceManagerTest {
         sources.remove(0);
         sources.remove(0);
         assertEquals(0, sources.size());
+    }
+
+    @Test
+    public void queuedSynchronizationCannotTouchDestroyedPlayback() throws Exception {
+        start(item("old"));
+        queueSynchronization();
+        manager.dispose();
+        clearInvocations(listener);
+        runCompletions();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void oldSynchronizationCannotAssignOccurrenceInReplacementQueue() throws Exception {
+        start(item("same-url"));
+        queueSynchronization();
+        final Runnable oldCompletion = completions.remove(0);
+        holdCompletions = false;
+        manager.dispose();
+        queue.dispose();
+        final PlayQueueItem replacement = item("same-url");
+        start(replacement);
+        clearInvocations(listener);
+        completions.add(oldCompletion);
+        runCompletions();
+        verifyNoInteractions(listener);
+        queue.setIndex(0);
+        drain();
+        verify(listener).onPlaybackSynchronize(same(replacement), anyBoolean());
+    }
+
+    @Test
+    public void queuedReloadCannotLoadAfterDisposal() throws Exception {
+        start(item("old"));
+        queueReload();
+        manager.dispose();
+        clearInvocations(queue.getItem(), listener);
+        runCompletions();
+        verify(queue.getItem(), org.mockito.Mockito.never()).getStream();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void synchronizationPostedByReleaseAfterCleanupIsRejected() throws Exception {
+        start(item("old"));
+        queueSynchronization();
+        final ConcatenatingMediaSource source = retainCompletionUntilRelease();
+        manager.dispose();
+        clearInvocations(listener);
+        release(source);
+        runCompletions();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void reloadPostedAfterCleanupIsRejected() throws Exception {
+        start(item("old"));
+        queueReload();
+        final ConcatenatingMediaSource source = retainCompletionUntilRelease();
+        manager.dispose();
+        release(source);
+        clearInvocations(queue.getItem(), listener);
+        runCompletions();
+        verify(queue.getItem(), org.mockito.Mockito.never()).getStream();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void releaseDuringDisposalCannotSynchronizePlayback() throws Exception {
+        start(item("old"));
+        queueSynchronization();
+        final ConcatenatingMediaSource source = retainCompletionUntilRelease();
+        final Field loaders = MediaSourceManager.class.getDeclaredField("loaderReactor");
+        loaders.setAccessible(true);
+        // Model a resource whose cancellation releases a source and drains its callback.
+        ((CompositeDisposable) loaders.get(manager)).add(Disposable.fromAction(() -> {
+            release(source);
+            runCompletions();
+        }));
+        clearInvocations(listener);
+        manager.dispose();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void mutationAfterSourceReleaseCannotReviveRetiredManager() throws Exception {
+        start(item("old"));
+        queueReload();
+        final Runnable completion = completions.remove(0);
+        final ConcatenatingMediaSource source = playlist().getParentMediaSource();
+        manager.dispose();
+        release(source);
+        source.addMediaSource(source.getMediaSource(0), completionHandler(), completion);
+        assertEquals(1, completions.size());
+        clearInvocations(queue.getItem(), listener);
+        runCompletions();
+        verify(queue.getItem(), org.mockito.Mockito.never()).getStream();
+        verifyNoInteractions(listener);
+    }
+
+    @Test
+    public void repeatedDisposalDoesNotAffectCurrentManager() throws Exception {
+        start(item("old"));
+        final MediaSourceManager retired = manager;
+        retired.dispose();
+        subscribeManager();
+        drain();
+        queueSynchronization();
+        retired.dispose();
+        clearInvocations(listener);
+        runCompletions();
+        verify(listener).onPlaybackSynchronize(same(queue.getItem()), anyBoolean());
+    }
+
+    @Test
+    public void currentSynchronizationAndReloadStillComplete() throws Exception {
+        start(item("current"));
+        queueSynchronization();
+        clearInvocations(listener);
+        runCompletions();
+        verify(listener).onPlaybackSynchronize(same(queue.getItem()), anyBoolean());
+        queueReload();
+        clearInvocations(queue.getItem(), listener);
+        runCompletions();
+        verify(queue.getItem()).getStream();
+        assertTrue(playlist().get(0) instanceof LoadedMediaSource);
+        verify(listener).onPlaybackSynchronize(same(queue.getItem()), anyBoolean());
+    }
+
+    private void queueSynchronization() throws Exception {
+        final ManagedMediaSource source = playlist().get(0);
+        playlist().invalidate(0, null, null);
+        holdCompletions = true;
+        final Method received = MediaSourceManager.class.getDeclaredMethod(
+                "onMediaSourceReceived", PlayQueueItem.class, ManagedMediaSource.class);
+        received.setAccessible(true);
+        received.invoke(manager, queue.getItem(), source);
+        assertEquals(1, completions.size());
+    }
+
+    private void queueReload() throws Exception {
+        final PlayQueueItem current = queue.getItem();
+        final StreamInfo info = current.getStream().blockingGet();
+        final MediaSource child = mock(MediaSource.class);
+        final MediaItem mediaItem = new MediaItem.Builder()
+                .setUri(info.getUrl()).setTag(StreamInfoTag.of(info)).build();
+        when(child.getMediaItem()).thenReturn(mediaItem);
+        playlist().update(0, new LoadedMediaSource(child, StreamInfoTag.of(info), current, 0));
+        holdCompletions = true;
+        final Method renew = MediaSourceManager.class.getDeclaredMethod("maybeRenewCurrentIndex");
+        renew.setAccessible(true);
+        renew.invoke(manager);
+        assertEquals(1, completions.size());
+    }
+
+    private Handler completionHandler() throws Exception {
+        final Field field = MediaSourceManager.class.getDeclaredField("removeMediaSourceHandler");
+        field.setAccessible(true);
+        return (Handler) field.get(manager);
+    }
+
+    private void runCompletions() {
+        final List<Runnable> pending = new ArrayList<>(completions);
+        completions.clear();
+        holdCompletions = false;
+        pending.forEach(Runnable::run);
+        mainThread.triggerActions();
+    }
+
+    private ConcatenatingMediaSource retainCompletionUntilRelease() throws Exception {
+        final Runnable completion = completions.remove(0);
+        final ConcatenatingMediaSource source = playlist().getParentMediaSource();
+        // Register as a prepared source would; Android playback-thread message delivery is
+        // outside this JVM fixture. Registration, release and Handler dispatch are real ExoPlayer.
+        final Method register = ConcatenatingMediaSource.class.getDeclaredMethod(
+                "createOnCompletionAction", Handler.class, Runnable.class);
+        register.setAccessible(true);
+        register.invoke(source, completionHandler(), completion);
+        return source;
+    }
+
+    private static void release(final ConcatenatingMediaSource source) throws Exception {
+        final Method release = ConcatenatingMediaSource.class
+                .getDeclaredMethod("releaseSourceInternal");
+        release.setAccessible(true);
+        release.invoke(source);
     }
 
     private void createQueue(final PlayQueueItem first, final PlayQueueItem... rest) {
