@@ -8,8 +8,6 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.util.Util;
-
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.streams.io.SharpInputStream;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
@@ -22,9 +20,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.HttpURLConnection;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
-
-import okio.ByteString;
 
 @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
 public class Utility {
@@ -199,16 +197,37 @@ public class Utility {
 
     public static String checksum(final StoredFileHelper source, final int algorithmId)
             throws IOException {
-        ByteString byteString;
-        try (var inputStream = new SharpInputStream(source.getStream())) {
-            byteString = ByteString.of(Util.toByteArray(inputStream));
-        }
+        final String algorithm;
         if (algorithmId == R.id.md5) {
-            byteString = byteString.md5();
+            algorithm = "MD5";
         } else if (algorithmId == R.id.sha1) {
-            byteString = byteString.sha1();
+            algorithm = "SHA-1";
+        } else {
+            throw new IllegalArgumentException("Unsupported checksum algorithm: " + algorithmId);
         }
-        return byteString.hex();
+
+        final MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance(algorithm);
+        } catch (final NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(algorithm + " is unavailable", impossible);
+        }
+
+        // Downloads can exceed the heap size. Only retain one read buffer, not the whole file.
+        try (var inputStream = new SharpInputStream(source.getStream())) {
+            final byte[] buffer = new byte[8192];
+            int count;
+            while ((count = inputStream.read(buffer)) != -1) {
+                digest.update(buffer, 0, count);
+            }
+        }
+        final byte[] hash = digest.digest();
+        final StringBuilder hex = new StringBuilder(hash.length * 2);
+        for (final byte item : hash) {
+            hex.append(Character.forDigit((item >>> 4) & 0xf, 16));
+            hex.append(Character.forDigit(item & 0xf, 16));
+        }
+        return hex.toString();
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
