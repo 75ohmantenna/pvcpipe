@@ -45,6 +45,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Unwraps a repost to obtain its original claim.
+     *
      * @param claim a claim, which may be a repost
      * @return the claim that was reposted, or the claim itself
      */
@@ -81,6 +83,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Checks whether the claim contains playable media.
+     *
      * @return whether the claim is something a media player can play
      */
     public static boolean isPlayable(@Nonnull final JsonObject claim) {
@@ -101,6 +105,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Returns the publisher's title or falls back to the claim name.
+     *
      * @return the title the publisher gave the claim, or its name in the address if it has none
      */
     @Nonnull
@@ -110,6 +116,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Returns the claim's website address.
+     *
      * @return the website address of the claim
      */
     @Nonnull
@@ -165,6 +173,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Returns the media duration in seconds.
+     *
      * @return the length in seconds, or -1 if the claim does not say
      */
     public static long duration(@Nonnull final JsonObject claim) {
@@ -174,6 +184,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Returns the release date, falling back to the claim's creation date.
+     *
      * @return when the publisher says the content was released, or when the claim was made
      */
     @Nullable
@@ -227,6 +239,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Returns topic tags without website settings.
+     *
      * @return the topic tags of the claim, without the website's own setting tags
      */
     @Nonnull
@@ -242,6 +256,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Determines the claim's availability to anonymous visitors.
+     *
      * @return whether an anonymous visitor may play the claim
      */
     @Nonnull
@@ -316,6 +332,8 @@ public final class OdyseeClaim {
     }
 
     /**
+     * Collects claim objects from a search result array.
+     *
      * @param claims objects from a claim search
      * @return those of them that are claims
      */

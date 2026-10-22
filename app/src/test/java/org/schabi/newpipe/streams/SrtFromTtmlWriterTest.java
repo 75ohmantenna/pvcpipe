@@ -178,10 +178,10 @@ public class SrtFromTtmlWriterTest {
             + "</p>";
 
     /**
-     * Parses TTML into a Jsoup Document and selects the first <p> element.
+     * Parses TTML into a Jsoup Document and selects the first {@code <p>} element.
      *
-     * @param ttmlContent TTML content (e.g., <p>...</p>)
-     * @return the first <p> element
+     * @param ttmlContent TTML content (e.g., {@code <p>...</p>})
+     * @return the first {@code <p>} element
      * @throws Exception if parsing fails
      */
     private Element parseTtmlParagraph(final String ttmlContent) throws Exception {

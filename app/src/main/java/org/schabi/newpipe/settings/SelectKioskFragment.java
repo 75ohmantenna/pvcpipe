@@ -25,7 +25,7 @@ import org.schabi.newpipe.util.ThemeHelper;
 import java.util.List;
 import java.util.Vector;
 
-/**
+/*
  * Created by Christian Schabesberger on 09.10.17.
  * SelectKioskFragment.java is part of NewPipe.
  * <p>

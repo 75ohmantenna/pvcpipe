@@ -61,6 +61,8 @@ final class DetailOrientation {
     }
 
     /**
+     * Determines whether expanding the detail screen should enter fullscreen playback.
+     *
      * @param landscape  whether the device is in landscape orientation
      * @param playing    whether a player exists and is playing
      * @param fullscreen whether the main player is in fullscreen

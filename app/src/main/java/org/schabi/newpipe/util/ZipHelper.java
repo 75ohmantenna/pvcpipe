@@ -16,7 +16,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-/**
+/*
  * Created by Christian Schabesberger on 28.01.18.
  * Copyright 2018 Christian Schabesberger <chris.schabesberger@mailbox.org>
  * ZipHelper.java is part of NewPipe
@@ -143,6 +143,8 @@ public final class ZipHelper {
     }
 
     /**
+     * Checks whether the ZIP archive contains an entry with the given filename.
+     *
      * @param zipFile   the zip file
      * @param fileInZip the filename to check
      * @return whether the provided filename is in the zip; only the first level is checked

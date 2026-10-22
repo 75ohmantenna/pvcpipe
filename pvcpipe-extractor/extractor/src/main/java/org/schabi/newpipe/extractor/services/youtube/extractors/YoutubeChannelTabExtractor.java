@@ -597,7 +597,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
     }
 
     /**
-     * Enum representing the verified state of a channel
+     * Enum representing the verified state of a channel.
      */
     private enum VerifiedStatus {
         VERIFIED,

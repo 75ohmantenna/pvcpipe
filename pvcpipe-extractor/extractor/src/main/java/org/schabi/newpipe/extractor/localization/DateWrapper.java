@@ -44,6 +44,8 @@ public class DateWrapper implements Serializable {
     }
 
     /**
+     * Get the wrapped instant.
+     *
      * @return the wrapped {@link Instant}
      */
     @Nonnull
@@ -52,6 +54,8 @@ public class DateWrapper implements Serializable {
     }
 
     /**
+     * Get the wrapped instant as an offset date-time in UTC.
+     *
      * @return the wrapped {@link Instant} as an {@link OffsetDateTime} set to UTC.
      */
     @Nonnull
@@ -60,6 +64,8 @@ public class DateWrapper implements Serializable {
     }
 
     /**
+     * Get the wrapped instant as a local date-time in the current time zone.
+     *
      * @return the wrapped {@link Instant} as a {@link LocalDateTime} in the current time zone.
      */
     @Nonnull
@@ -68,6 +74,8 @@ public class DateWrapper implements Serializable {
     }
 
     /**
+     * Get the wrapped instant as a local date-time in the given time zone.
+     *
      * @return the wrapped {@link Instant} as a {@link LocalDateTime} in the given time zone.
      */
     @Nonnull
@@ -76,6 +84,8 @@ public class DateWrapper implements Serializable {
     }
 
     /**
+     * Check whether the date is an approximation.
+     *
      * @return if the date is considered is precise or just an approximation (e.g. service only
      * returns an approximation like 2 weeks ago instead of a precise date).
      */

@@ -291,6 +291,8 @@ public class StoredDirectoryHelper {
     }
 
     /**
+     * Checks whether access to the SAF storage has been lost.
+     *
      * @return {@code false} if the storage is direct, or the SAF storage is valid; {@code true} if
      * SAF access to this SAF storage is denied (e.g. the user clicked on {@code Android settings ->
      * Apps & notifications -> NewPipe -> Storage & cache -> Clear access});

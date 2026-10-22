@@ -16,6 +16,8 @@ public class OdyseeChannelInfoItemExtractor implements ChannelInfoItemExtractor 
     private final long subscriberCount;
 
     /**
+     * Creates a channel item extractor with its follower count.
+     *
      * @param claim           a channel claim
      * @param subscriberCount how many followers it has, or -1 if that is not known
      */

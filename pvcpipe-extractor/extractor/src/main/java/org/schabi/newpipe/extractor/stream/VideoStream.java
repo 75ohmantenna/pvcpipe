@@ -29,11 +29,17 @@ import javax.annotation.Nullable;
 public final class VideoStream extends Stream {
     public static final String RESOLUTION_UNKNOWN = "";
 
-    /** @deprecated Use {@link #getResolution()} instead. */
+    /**
+     * The video resolution.
+     * @deprecated Use {@link #getResolution()} instead.
+     */
     @Deprecated
     public final String resolution;
 
-    /** @deprecated Use {@link #isVideoOnly()} instead. */
+    /**
+     * Whether this stream contains only video.
+     * @deprecated Use {@link #isVideoOnly()} instead.
+     */
     @Deprecated
     public final boolean isVideoOnly;
 

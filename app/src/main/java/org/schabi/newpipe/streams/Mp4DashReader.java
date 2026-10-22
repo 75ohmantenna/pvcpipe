@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.NoSuchElementException;
 
-/**
+/*
  * @author kapodamy
  */
 public class Mp4DashReader {

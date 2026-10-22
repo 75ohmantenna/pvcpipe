@@ -4,6 +4,7 @@
  */
 
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,23 +17,28 @@ plugins {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
-kotlin {
-    compilerOptions {
-        // TODO: Drop annotation default target when it is stable
-        freeCompilerArgs.addAll(
-            "-Xannotation-default-target=param-property"
-        )
-    }
-}
 
 val pvcpipeVersion = PvcVersion.name(
     providers.fileContents(rootProject.layout.projectDirectory.file("version.properties"))
         .asText.get()
 )
+
+val releaseSigningOverride = providers.environmentVariable("PVCPIPE_SIGNING_PROPERTIES")
+val releaseSigningFile = layout.projectDirectory.file(
+    releaseSigningOverride.orElse(
+        providers.systemProperty("user.home").map { "$it/.config/pvcpipe/signing.properties" }
+    ).get()
+)
+require(!releaseSigningOverride.isPresent || releaseSigningFile.asFile.isFile) {
+    "PVCPIPE_SIGNING_PROPERTIES must point to an existing signing properties file"
+}
+val releaseSigningProperties = providers.fileContents(releaseSigningFile).asText.orNull?.let {
+    Properties().apply { load(it.reader()) }
+}
 
 configure<ApplicationExtension> {
     compileSdk {
@@ -56,6 +62,21 @@ configure<ApplicationExtension> {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val releaseSigningConfig = releaseSigningProperties?.let { properties ->
+        signingConfigs.create("release") {
+            fun requiredProperty(name: String): String =
+                requireNotNull(properties.getProperty(name)?.takeIf { it.isNotBlank() }) {
+                    "Missing $name in release signing properties"
+                }
+
+            storeFile = file(requiredProperty("storeFile"))
+            storeType = "PKCS12"
+            storePassword = requiredProperty("storePassword")
+            keyAlias = requiredProperty("keyAlias")
+            keyPassword = requiredProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         debug {
             isDebuggable = true
@@ -65,6 +86,7 @@ configure<ApplicationExtension> {
         }
 
         release {
+            releaseSigningConfig?.let { signingConfig = it }
             System.getProperty("packageSuffix")?.let { suffix ->
                 applicationIdSuffix = suffix
                 resValue("string", "app_name", "PVCPipe $suffix")
@@ -135,7 +157,7 @@ val ktlint = configurations.create("ktlint")
 // https://checkstyle.org/#JRE_and_JDK
 tasks.withType<Checkstyle>().configureEach {
     javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 

@@ -223,6 +223,8 @@ public final class Localization {
     }
 
     /**
+     * Formats the like count, using a dash when the count is unknown.
+     *
      * @param context the Android context
      * @param likeCount the like count, possibly negative if unknown
      * @return if {@code likeCount} is smaller than {@code 0}, the string {@code "-"}, otherwise
@@ -361,6 +363,8 @@ public final class Localization {
     }
 
     /**
+     * Formats a parsed relative time or falls back to the service's original text.
+     *
      * @param context the Android context; if {@code null} then even if in debug mode and the
      *                setting is enabled, {@code textual} will not be shown next to {@code parsed}
      * @param parsed  the textual date or time ago parsed by NewPipeExtractor, or {@code null} if

@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /**
- * Avoid using regex !!!
+ * Avoid using regex.
  */
 public final class Parser {
 
@@ -61,7 +61,7 @@ public final class Parser {
 
     /**
      * Matches group 1 of the given pattern against the input
-     * and returns the matched group
+     * and returns the matched group.
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
@@ -76,7 +76,7 @@ public final class Parser {
 
     /**
      * Matches group 1 of the given pattern against the input
-     * and returns the matched group
+     * and returns the matched group.
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
@@ -91,7 +91,7 @@ public final class Parser {
 
     /**
      * Matches the specified group of the given pattern against the input,
-     * and returns the matched group
+     * and returns the matched group.
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
@@ -107,7 +107,7 @@ public final class Parser {
 
     /**
      * Matches the specified group of the given pattern against the input,
-     * and returns the matched group
+     * and returns the matched group.
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
@@ -125,7 +125,7 @@ public final class Parser {
 
     /**
      * Matches multiple patterns against the input string and
-     * returns the first successful matcher
+     * returns the first successful matcher.
      *
      * @param patterns The array of regex patterns to match.
      * @param input    The input string to match against.
@@ -139,7 +139,7 @@ public final class Parser {
 
     /**
      * Matches multiple patterns against the input string and
-     * returns the first successful matcher
+     * returns the first successful matcher.
      *
      * @param patterns The array of regex patterns to match.
      * @param input    The input string to match against.

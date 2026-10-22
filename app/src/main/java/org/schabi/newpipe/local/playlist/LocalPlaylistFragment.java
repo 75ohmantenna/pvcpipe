@@ -390,7 +390,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     }
 
     /**
-     * Shares the playlist in one of 3 ways, depending on the value of {@code shareMode}:
+     * Shares the playlist in one of 3 ways, depending on the value of {@code shareMode}.
      * <ul>
      *     <li>{@code JUST_URLS}: shares the URLs only.</li>
      *     <li>{@code WITH_TITLES}: each entry in the list is accompanied by its title.</li>

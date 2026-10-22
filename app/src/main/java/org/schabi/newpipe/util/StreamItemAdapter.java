@@ -208,6 +208,8 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
     }
 
     /**
+     * Checks whether any video-only stream lacks an associated secondary stream.
+     *
      * @return if there are any video-only streams with no secondary stream associated with them.
      * @see #hasAnyVideoOnlyStreamWithNoSecondaryStream
      */
@@ -353,6 +355,8 @@ public class StreamItemAdapter<T extends Stream, U extends Stream> extends BaseA
         }
 
         /**
+         * Reads the stream length from the response's Content-Length header.
+         *
          * @param response the answer to a request for a stream
          * @return the length it states, or -1 if it states none that can be read
          */

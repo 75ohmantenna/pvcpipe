@@ -28,6 +28,8 @@ public class OdyseeCommentsInfoItemExtractor implements CommentsInfoItemExtracto
     private final JsonObject author;
 
     /**
+     * Creates a comment extractor with its available reaction and author data.
+     *
      * @param comment   a comment as the comment service returns it
      * @param streamUrl the address of the video the comment is on
      * @param reactions the reaction counts of the comment, if they could be loaded

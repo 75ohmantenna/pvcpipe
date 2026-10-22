@@ -364,6 +364,8 @@ public class DownloadMission extends Mission {
     }
 
     /**
+     * Establishes the HTTP connection and checks its response status and encoding.
+     *
      * @param threadId id of the calling thread
      * @param conn     Opens and establish the communication
      * @throws IOException if an error occurred connecting to the server.

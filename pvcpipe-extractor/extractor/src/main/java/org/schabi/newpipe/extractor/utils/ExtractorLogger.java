@@ -1,7 +1,7 @@
 package org.schabi.newpipe.extractor.utils;
 
 /**
- * Logging class for outputting logs from the extractor to the desired output<br><br>
+ * Logging class for outputting logs from the extractor to the desired output.<br><br>
  * Intended to be used in the same manner as Android's {@code Log}:<br>
  * {@code ExtractorLogger.d("Hello my name Jeff")}<br>
  * <br>
@@ -16,7 +16,7 @@ public final class ExtractorLogger {
     private static volatile Logger logger = EMPTY_LOGGER;
 
     /**
-     * Set the Logger that you want the extractor logs to be logged to
+     * Set the Logger that you want the extractor logs to be logged to.
      * <br>
      * Provide an implementation of the {@code Logger} interface for each method and whenever the
      * extractor code calls {@code ExtractorLogger.d/w/e}
@@ -64,7 +64,7 @@ public final class ExtractorLogger {
     }
 
     /***
-     * Internal method for logging with formatting
+     * Internal method for logging with formatting.
      */
     @SuppressWarnings("checkstyle:NeedBraces")
     private static void logFormat(final Level level,
@@ -138,7 +138,7 @@ public final class ExtractorLogger {
 
     /**
      * Simple string format method for easier logging in the form of
-     * {@code ExtractorLogger.d("Hello my name {Name} {}", name, surname)}<br><br>
+     * {@code ExtractorLogger.d("Hello my name {Name} {}", name, surname)}.<br><br>
      * Braces can be escaped by double braces:
      * <code>{{ -> {</code> and
      * <code>}} -> }</code>

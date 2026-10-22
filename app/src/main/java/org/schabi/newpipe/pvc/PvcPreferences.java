@@ -15,6 +15,8 @@ public final class PvcPreferences {
     }
 
     /**
+     * Reads whether comment replies should appear within the comments page.
+     *
      * @param context any context
      * @return whether comment replies are shown inside the comments page instead of on a screen
      * of their own

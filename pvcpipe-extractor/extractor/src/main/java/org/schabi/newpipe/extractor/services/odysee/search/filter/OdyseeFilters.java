@@ -41,6 +41,8 @@ public final class OdyseeFilters extends BaseSearchFilters {
     private static final String QUERY_CHANNELS = "claimType=channel";
 
     /**
+     * Builds search parameters for the selected content type.
+     *
      * @param contentFilter the content filter of a search, of which the first one counts
      * @return the search parameters that select that kind of result
      */
@@ -74,6 +76,8 @@ public final class OdyseeFilters extends BaseSearchFilters {
     }
 
     /**
+     * Builds applicable sorting parameters for the selected content type.
+     *
      * @param contentFilter the content filter of a search, of which the first one counts
      * @param sortFilter    the sort filters of that search
      * @return the search parameters for the sort filters, each with a leading ampersand

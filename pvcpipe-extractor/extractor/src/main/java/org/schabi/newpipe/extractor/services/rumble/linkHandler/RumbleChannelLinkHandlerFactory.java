@@ -20,7 +20,7 @@ public class RumbleChannelLinkHandlerFactory extends ListLinkHandlerFactory {
     }
 
     /**
-     * Returns URL to channel from an ID
+     * Returns URL to channel from an ID.
      *
      * @param id             Channel ID including e.g. 'c/id' or 'user/id'
      * @param contentFilters

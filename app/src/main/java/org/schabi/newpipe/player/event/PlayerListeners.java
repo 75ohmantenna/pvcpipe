@@ -28,6 +28,8 @@ public final class PlayerListeners {
     }
 
     /**
+     * Removes the fragment listener only if it is still the registered listener.
+     *
      * @param listener the listener to forget; another listener that has replaced it stays
      */
     public void removeFragmentListener(@Nullable final PlayerServiceEventListener listener) {
@@ -41,6 +43,8 @@ public final class PlayerListeners {
     }
 
     /**
+     * Removes the activity listener only if it is still the registered listener.
+     *
      * @param listener the listener to forget; another listener that has replaced it stays
      */
     public void removeActivityListener(@Nullable final PlayerEventListener listener) {

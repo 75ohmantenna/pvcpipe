@@ -62,7 +62,7 @@ public abstract class StreamingService {
         private final Set<MediaCapability> mediaCapabilities;
 
         /**
-         * Creates a new instance of a ServiceInfo
+         * Creates a new instance of a ServiceInfo.
          * @param name the name of the service
          * @param mediaCapabilities the type of media this service can handle
          */
@@ -315,7 +315,7 @@ public abstract class StreamingService {
     //////////////////////////////////////////////////////////////////////////*/
 
     /**
-     * Figures out where the link is pointing to (a channel, a video, a playlist, etc.)
+     * Figures out where the link is pointing to (a channel, a video, a playlist, etc.).
      * @param url the url on which it should be decided of which link type it is
      * @return the link type of url
      */

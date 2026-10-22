@@ -226,6 +226,8 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     }
 
     /**
+     * Returns zero because timestamp extraction is not supported.
+     *
      * @return 0 means no timestamp is found.
      */
     @Override

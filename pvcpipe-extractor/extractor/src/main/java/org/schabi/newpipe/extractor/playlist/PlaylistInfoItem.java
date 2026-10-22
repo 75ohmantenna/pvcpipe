@@ -11,7 +11,7 @@ public class PlaylistInfoItem extends InfoItem {
     private String uploaderUrl;
     private boolean uploaderVerified;
     /**
-     * How many streams this playlist have
+     * How many streams this playlist have.
      */
     private long streamCount = 0;
     private Description description;

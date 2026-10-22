@@ -65,6 +65,8 @@ public final class PlayerUiList {
     }
 
     /**
+     * Finds the first player UI assignable to the requested type.
+     *
      * @param playerUiType the class of the player UI to return; the {@link
      *                     Class#isInstance(Object)} method will be used, so even subclasses could
      *                     be returned

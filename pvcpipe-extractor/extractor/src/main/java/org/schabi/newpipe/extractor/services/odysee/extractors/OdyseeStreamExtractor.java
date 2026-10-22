@@ -221,6 +221,8 @@ public class OdyseeStreamExtractor extends StreamExtractor {
     }
 
     /**
+     * Parses the renditions listed in an HLS master playlist.
+     *
      * @param playlistUrl the address of an HLS master playlist
      * @param playlist    its content
      * @return one stream for each rendition the playlist lists
@@ -295,6 +297,8 @@ public class OdyseeStreamExtractor extends StreamExtractor {
     }
 
     /**
+     * Estimates the uploaded file's average bitrate from its size and duration.
+     *
      * @return the average bitrate of the uploaded file in bits per second, or 0 if the claim
      * does not give its size and length
      */

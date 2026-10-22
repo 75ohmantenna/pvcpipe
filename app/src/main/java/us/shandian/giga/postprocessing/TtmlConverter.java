@@ -7,7 +7,7 @@ import org.schabi.newpipe.streams.io.SharpStream;
 
 import java.io.IOException;
 
-/**
+/*
  * @author kapodamy
  */
 class TtmlConverter extends Postprocessing {

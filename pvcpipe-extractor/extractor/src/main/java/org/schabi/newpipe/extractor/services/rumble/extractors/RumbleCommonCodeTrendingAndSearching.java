@@ -9,7 +9,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItemExtractor;
 import java.util.List;
 
 /**
- * common code shared between {@link RumbleSearchExtractor} and {@link RumbleTrendingExtractor}
+ * Common code shared between {@link RumbleSearchExtractor} and {@link RumbleTrendingExtractor}.
  */
 public class RumbleCommonCodeTrendingAndSearching {
 

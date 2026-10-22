@@ -26,6 +26,8 @@ import static org.junit.Assert.assertTrue;
 public class ErrorInfoTest {
 
     /**
+     * Reads the error message resource ID using reflection.
+     *
      * @param errorInfo the error info to access
      * @return the private field errorInfo.message.stringRes using reflection
      */

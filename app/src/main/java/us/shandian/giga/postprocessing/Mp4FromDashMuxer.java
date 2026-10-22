@@ -5,7 +5,7 @@ import org.schabi.newpipe.streams.io.SharpStream;
 
 import java.io.IOException;
 
-/**
+/*
  * @author kapodamy
  */
 class Mp4FromDashMuxer extends Postprocessing {

@@ -93,6 +93,8 @@ public final class StateSaver {
     }
 
     /**
+     * Restores the saved state referenced by the bundle from memory or disk.
+     *
      * @param outState
      * @param writeRead
      * @return the saved state
@@ -175,6 +177,8 @@ public final class StateSaver {
     }
 
     /**
+     * Saves the state and stores its reference in the output bundle.
+     *
      * @param isChangingConfig
      * @param savedState
      * @param outState

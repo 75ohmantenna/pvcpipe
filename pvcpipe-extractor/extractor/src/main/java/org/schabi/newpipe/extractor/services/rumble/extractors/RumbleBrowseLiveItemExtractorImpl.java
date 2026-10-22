@@ -9,6 +9,8 @@ import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import static org.schabi.newpipe.extractor.ServiceList.Rumble;
 
 /**
+ * Extracts stream items from Rumble's live browsing page.
+ *
  * 20240123 - Live is working - https://rumble.com/browse/live
  */
 public class RumbleBrowseLiveItemExtractorImpl extends RumbleItemsExtractorImpl {

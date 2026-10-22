@@ -382,6 +382,8 @@ public final class PlayerService extends MediaBrowserServiceCompat {
     }
 
     /**
+     * Gets the active player, if the service currently has one.
+     *
      * @return the current active player instance. May be null, since the player service can outlive
      * the player e.g. to respond to Android Auto media browser queries.
      */

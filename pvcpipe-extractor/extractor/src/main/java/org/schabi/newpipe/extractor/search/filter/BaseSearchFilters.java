@@ -40,7 +40,7 @@ public abstract class BaseSearchFilters {
     }
 
     /**
-     * Set the selected content filter
+     * Set the selected content filter.
      *
      * @param selectedContentFilter the name of the content filter
      */

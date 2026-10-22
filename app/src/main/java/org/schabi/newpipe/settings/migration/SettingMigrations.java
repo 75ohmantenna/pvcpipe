@@ -266,6 +266,8 @@ public final class SettingMigrations {
     };
 
     /**
+     * Filters YouTube's retired combined Trending feed out of the main page tabs.
+     *
      * @param tabs the main page tabs to filter
      * @return tabs other than YouTube's retired combined Trending feed, in their original order
      */
@@ -301,6 +303,8 @@ public final class SettingMigrations {
     }
 
     /**
+     * Filters tabs belonging to removed services out of the main page tabs.
+     *
      * @param tabs the main page tabs to filter
      * @return the tabs that do not show a kiosk, channel or playlist of a removed service
      */
@@ -311,6 +315,8 @@ public final class SettingMigrations {
     }
 
     /**
+     * Gets the service ID for a remote content tab.
+     *
      * @param tab a main page tab
      * @return the id of the service whose content the tab shows, or -1 if it shows local content
      *         or follows the selected service
@@ -406,6 +412,8 @@ public final class SettingMigrations {
         }
 
         /**
+         * Determines whether this migration applies to the current settings version.
+         *
          * @param currentVersion current settings version
          * @return Returns whether this migration should be run.
          * A migration is necessary if the old version of this migration is lower than or equal to

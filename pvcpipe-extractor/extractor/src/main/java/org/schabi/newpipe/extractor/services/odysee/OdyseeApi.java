@@ -123,6 +123,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Searches claims with the supplied pagination parameters.
+     *
      * @param params the claim search parameters
      * @return the claims on the requested page
      */
@@ -168,6 +170,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Requests the media address for a stream.
+     *
      * @param lbryUri   the stream to play
      * @param signature the signature and timestamp of the link the stream was opened with, as
      *                  {@link OdyseeUrl#signatureOf} returns them, or {@code null}
@@ -222,6 +226,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Searches Odysee for matching claim ids and names.
+     *
      * @param query the search query string, starting with {@code s=}
      * @return the hits, each with a {@code claimId} and a {@code name}
      */
@@ -237,6 +243,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Fetches related claims, falling back to search if necessary.
+     *
      * @param query the encoded search parameters, including the current claim id
      * @return recommendations, falling back to search when the recommender is unavailable
      */
@@ -261,6 +269,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Fetches the claim's reaction counts.
+     *
      * @param claimId the claim to ask about
      * @return its {@code like} and {@code dislike} counts
      */
@@ -414,6 +424,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Fetches a channel's livestream state.
+     *
      * @param channelClaimId the channel that may be broadcasting
      * @return the livestream state of the channel
      */
@@ -425,6 +437,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Fetches the livestream states of all broadcasting channels.
+     *
      * @return the livestream state of every channel that has one
      */
     @Nonnull
@@ -439,6 +453,8 @@ public final class OdyseeApi {
     }
 
     /**
+     * Fetches the definition of a homepage category.
+     *
      * @param categoryKey a key of the website's homepage, such as {@code PRIMARY_CONTENT}
      * @return the definition of that homepage row, or an empty object if it is gone
      */

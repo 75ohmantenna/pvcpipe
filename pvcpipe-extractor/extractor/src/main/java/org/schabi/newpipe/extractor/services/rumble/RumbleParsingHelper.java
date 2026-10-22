@@ -85,6 +85,8 @@ public final class RumbleParsingHelper {
     }
 
     /**
+     * Calls an extractor and optionally wraps failures in a parsing exception.
+     *
      * @param shouldThrowOnError if true a ParsingException is thrown on error
      * @param msg                in case of Exception the error message that is passed
      * @param callable           the function that extract the desired string
@@ -131,6 +133,8 @@ public final class RumbleParsingHelper {
     }
 
     /**
+     * Extracts a thumbnail URL using the supplied identifier lookup.
+     *
      * @return {@code null} when Rumble renders a letter avatar instead of an image
      */
     public static String extractThumbnail(final Document document,

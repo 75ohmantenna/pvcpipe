@@ -112,6 +112,8 @@ public class OdyseeKioskExtractor extends KioskExtractor<StreamInfoItem> {
     }
 
     /**
+     * Lists live claim viewer counts in descending order.
+     *
      * @return the claims that are on air with their number of viewers, the most watched first
      */
     private Map<String, Long> liveViewers() throws IOException, ExtractionException {

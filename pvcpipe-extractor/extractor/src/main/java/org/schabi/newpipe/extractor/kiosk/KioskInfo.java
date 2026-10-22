@@ -55,7 +55,7 @@ public final class KioskInfo extends ListInfo<StreamInfoItem> {
     }
 
     /**
-     * Get KioskInfo from KioskExtractor
+     * Get KioskInfo from KioskExtractor.
      *
      * @param extractor an extractor where fetchPage() was already got called on.
      */

@@ -538,7 +538,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Implement the following diagram behavior for the up button:
+     * Implement the following diagram behavior for the up button.
      * <pre>
      *              +---------------+
      *              |  Main Screen  +----+

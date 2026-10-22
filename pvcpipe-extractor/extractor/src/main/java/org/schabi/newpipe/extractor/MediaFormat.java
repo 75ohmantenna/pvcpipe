@@ -30,7 +30,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Static data about various media formats support by NewPipe, eg mime type, extension
+ * Static data about various media formats support by NewPipe, eg mime type, extension.
  */
 
 @SuppressWarnings("MethodParamPad") // we want the media format table below to be aligned
@@ -51,7 +51,7 @@ public enum MediaFormat {
     WEBMA_OPUS(0x200, "WebM Opus", "webm", "audio/webm"),
     AIFF      (0x600, "AIFF",      "aiff", "audio/aiff"),
     /**
-     * Same as {@link MediaFormat#AIFF}, just with the shorter suffix/file extension
+     * Same as {@link MediaFormat#AIFF}, just with the shorter suffix/file extension.
      */
     AIF       (0x600, "AIFF",      "aif",  "audio/aiff"),
     WAV       (0x700, "WAV",       "wav",  "audio/wav"),
@@ -93,7 +93,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Return the friendly name of the media format with the supplied id
+     * Return the friendly name of the media format with the supplied id.
      *
      * @param id the id of the media format. Currently an arbitrary, NewPipe-specific number.
      * @return the friendly name of the MediaFormat associated with this ids,
@@ -105,7 +105,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Return the file extension of the media format with the supplied id
+     * Return the file extension of the media format with the supplied id.
      *
      * @param id the id of the media format. Currently an arbitrary, NewPipe-specific number.
      * @return the file extension of the MediaFormat associated with this ids,
@@ -117,7 +117,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Return the MIME type of the media format with the supplied id
+     * Return the MIME type of the media format with the supplied id.
      *
      * @param id the id of the media format. Currently an arbitrary, NewPipe-specific number.
      * @return the MIME type of the {@link MediaFormat} associated with this id,
@@ -181,7 +181,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Get the name of the format
+     * Get the name of the format.
      *
      * @return the name of the format
      */
@@ -191,7 +191,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Get the filename extension
+     * Get the filename extension.
      *
      * @return the filename extension
      */
@@ -201,7 +201,7 @@ public enum MediaFormat {
     }
 
     /**
-     * Get the mime type
+     * Get the mime type.
      *
      * @return the mime type
      */

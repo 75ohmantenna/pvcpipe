@@ -82,6 +82,8 @@ public class PvcHostFragment extends Fragment {
     }
 
     /**
+     * Finds the nearest host among the fragment's ancestors.
+     *
      * @param fragment a fragment that may be shown inside a host
      * @return the nearest host above the fragment, or {@code null} if it is not inside one
      */

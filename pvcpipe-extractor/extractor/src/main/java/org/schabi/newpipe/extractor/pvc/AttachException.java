@@ -54,7 +54,7 @@ public class AttachException extends ParsingException {
     }
 
     /**
-     * Add useful data as key=value
+     * Add useful data as key=value.
      *
      * @param key   to describe the value
      * @param value that might help the developer

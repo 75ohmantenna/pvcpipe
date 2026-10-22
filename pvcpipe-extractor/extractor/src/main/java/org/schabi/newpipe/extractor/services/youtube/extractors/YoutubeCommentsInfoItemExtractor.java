@@ -96,6 +96,8 @@ public class YoutubeCommentsInfoItemExtractor implements CommentsInfoItemExtract
     }
 
     /**
+     * Extracts the comment's like count from accessibility data or its localized label.
+     *
      * @implNote The method tries first to get the exact like count by using the accessibility data
      * returned. But if the parsing of this accessibility data fails, the method parses internally
      * a localized string.

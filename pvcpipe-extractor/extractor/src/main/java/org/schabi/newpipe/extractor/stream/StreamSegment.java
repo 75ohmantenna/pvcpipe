@@ -6,17 +6,17 @@ import java.io.Serializable;
 
 public class StreamSegment implements Serializable {
     /**
-     * Title of this segment
+     * Title of this segment.
      */
     private String title;
 
     /**
-     * The channel or creator linked to this segment
+     * The channel or creator linked to this segment.
      */
     private String channelName;
 
     /**
-     * Timestamp of the starting point in seconds
+     * Timestamp of the starting point in seconds.
      */
     private int startTimeSeconds;
 

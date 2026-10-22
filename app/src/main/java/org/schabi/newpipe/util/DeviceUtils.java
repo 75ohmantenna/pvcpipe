@@ -287,6 +287,8 @@ public final class DeviceUtils {
     }
 
     /**
+     * Checks whether the device provides a usable WebView CookieManager.
+     *
      * @return whether the device has support for WebView, see
      * <a href="https://stackoverflow.com/a/69626735">https://stackoverflow.com/a/69626735</a>
      */

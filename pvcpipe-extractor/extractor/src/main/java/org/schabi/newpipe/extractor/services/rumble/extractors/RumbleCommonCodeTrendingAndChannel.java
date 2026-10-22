@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * shared code for {@link RumbleTrendingExtractor} and {@link RumbleChannelExtractor}
+ * Shared code for {@link RumbleTrendingExtractor} and {@link RumbleChannelExtractor}.
  */
 public class RumbleCommonCodeTrendingAndChannel {
     private final int serviceId;

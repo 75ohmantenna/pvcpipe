@@ -72,6 +72,8 @@ public final class PvcDownloaderImplUtils {
     }
 
     /**
+     * Determines the whole file size from a first-byte request's response headers.
+     *
      * @param status        the status of the answer to a request for the first byte
      * @param contentRange  its Content-Range header
      * @param contentLength its Content-Length header

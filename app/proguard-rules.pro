@@ -25,6 +25,12 @@
 # See https://github.com/jhy/jsoup/issues/2459 - may be resolved in future, then this may be removed
 -dontwarn com.google.re2j.**
 
+# ResourceBundle constructs PrettyTime locale bundles reflectively.
+# PrettyTime's consumer rules keep the classes, but R8 also needs their constructors.
+-keep class org.ocpsoft.prettytime.i18n.** extends java.util.ResourceBundle {
+    public <init>();
+}
+
 # FCast sender-sdk bundles the JNA and UniFFI keep rules in its AAR consumer rules.
 
 ## See https://github.com/TeamNewPipe/NewPipe/pull/1441

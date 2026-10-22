@@ -8,7 +8,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     alias(libs.plugins.google.protobuf)
-    id("com.squareup.wire") version "5.5.0"
+    id("com.squareup.wire") version "5.5.1"
     checkstyle
 }
 
@@ -55,7 +55,7 @@ tasks.register<Test>("forkCiTest") {
 // https://checkstyle.org/#JRE_and_JDK
 tasks.withType<Checkstyle>().configureEach {
     javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 

@@ -559,6 +559,8 @@ public class SearchFilterLogic {
         void setVisible(boolean visible);
 
         /**
+         * Gets the identifier of the filter item represented by this UI element.
+         *
          * @return get the id of the corresponding {@link FilterItem}
          */
         int getItemId();
@@ -692,6 +694,8 @@ public class SearchFilterLogic {
         }
 
         /**
+         * Updates the selected filters when an item belongs to an exclusive group.
+         *
          * @param filterId       the id of a {@link FilterItem}
          * @param selectedFilter the list of filter Ids that could contain the given id
          * @return true if exclusive group

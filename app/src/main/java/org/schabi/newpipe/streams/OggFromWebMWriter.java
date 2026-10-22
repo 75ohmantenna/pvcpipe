@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
-/**
+/*
  * @author kapodamy
  */
 public class OggFromWebMWriter implements Closeable {
