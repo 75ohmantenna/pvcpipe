@@ -39,6 +39,8 @@ import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 public class YoutubeChannelInfoItemExtractor implements ChannelInfoItemExtractor {
     private final JsonObject channelInfoItem;
     /**
+     * Indicates whether the item uses the channel-handle layout.
+     *
      * New layout:
      * "subscriberCountText": Channel handle
      * "videoCountText": Subscriber count

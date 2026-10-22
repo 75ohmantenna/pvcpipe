@@ -17,6 +17,8 @@ public final class PagerScrollPolicy {
     private int originalHeight = UNSET;
 
     /**
+     * Determines whether the content scrolls independently beneath a fixed player.
+     *
      * @param landscape             whether the device is in landscape orientation
      * @param scrollOnlyBelowPlayer the user's "scroll only below player" setting
      * @return whether the view scrolls by itself under a fixed player, instead of scrolling

@@ -28,24 +28,24 @@ public final class PlaylistInfo extends ListInfo<StreamInfoItem> {
      */
     public enum PlaylistType {
         /**
-         * A normal playlist (not a mix)
+         * A normal playlist (not a mix).
          */
         NORMAL,
 
         /**
-         * A mix made only of streams related to a particular stream, for example YouTube mixes
+         * A mix made only of streams related to a particular stream, for example YouTube mixes.
          */
         MIX_STREAM,
 
         /**
          * A mix made only of music streams related to a particular stream, for example YouTube
-         * music mixes
+         * music mixes.
          */
         MIX_MUSIC,
 
         /**
          * A mix made only of streams from (or related to) the same channel, for example YouTube
-         * channel mixes
+         * channel mixes.
          *
          * @deprecated There is currently no service that implements this.
          * YouTube removed all playlists with this type around 2024-06
@@ -55,7 +55,7 @@ public final class PlaylistInfo extends ListInfo<StreamInfoItem> {
 
         /**
          * A mix made only of streams related to a particular (musical) genre, for example YouTube
-         * genre mixes
+         * genre mixes.
          */
         MIX_GENRE,
     }
@@ -85,7 +85,7 @@ public final class PlaylistInfo extends ListInfo<StreamInfoItem> {
     }
 
     /**
-     * Get PlaylistInfo from PlaylistExtractor
+     * Get PlaylistInfo from PlaylistExtractor.
      *
      * @param extractor an extractor where fetchPage() was already got called on.
      */

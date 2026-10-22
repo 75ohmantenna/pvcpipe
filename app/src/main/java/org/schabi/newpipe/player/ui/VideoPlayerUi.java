@@ -1491,6 +1491,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     }
 
     /**
+     * Configures the subtitle view with the supplied caption scale.
      *
      * @param captionScale Value returned by {@link PlayerHelper#getCaptionScale}.
      */

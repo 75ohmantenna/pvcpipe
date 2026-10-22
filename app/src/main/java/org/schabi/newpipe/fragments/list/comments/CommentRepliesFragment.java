@@ -191,6 +191,8 @@ public final class CommentRepliesFragment
     }
 
     /**
+     * Gets the comment whose replies this fragment displays.
+     *
      * @return the comment to which the replies are shown
      */
     public CommentsInfoItem getCommentsInfoItem() {

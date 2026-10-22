@@ -13,7 +13,7 @@ import org.mozilla.javascript.ScriptRuntime;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 
 /**
- * Based on Mozilla Rhino's (v1.7.14) org.mozilla.javascript.TokenStream
+ * Based on Mozilla Rhino's (v1.7.14) org.mozilla.javascript.TokenStream.
  * <p/>
  * Changes:
  * <ul>

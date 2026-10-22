@@ -92,6 +92,8 @@ public final class CommentsInfo extends ListInfo<CommentsInfoItem> {
     }
 
     /**
+     * Check whether comments are disabled.
+     *
      * @return {@code true} if the comments are disabled otherwise {@code false} (default)
      * @see CommentsExtractor#isCommentsDisabled()
      */
@@ -100,6 +102,8 @@ public final class CommentsInfo extends ListInfo<CommentsInfoItem> {
     }
 
     /**
+     * Set whether comments are disabled.
+     *
      * @param commentsDisabled {@code true} if the comments are disabled otherwise {@code false}
      */
     public void setCommentsDisabled(final boolean commentsDisabled) {

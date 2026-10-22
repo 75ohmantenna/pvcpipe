@@ -112,6 +112,8 @@ public final class YoutubeProgressiveDashManifestCreator {
     }
 
     /**
+     * Returns the generated progressive stream manifest cache.
+     *
      * @return the cache of DASH manifests generated for progressive streams
      */
     @Nonnull

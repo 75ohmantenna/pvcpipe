@@ -110,7 +110,7 @@ public final class AudioStream extends Stream {
 
         /**
          * Set the content or the URL of the {@link AudioStream}, depending on whether isUrl is
-         * true
+         * true.
          * <p>
          * It must not be null, and should be non empty.
          * </p>
@@ -127,7 +127,7 @@ public final class AudioStream extends Stream {
         }
 
         /**
-         * Set the {@link MediaFormat} used by the {@link AudioStream}, which can be null
+         * Set the {@link MediaFormat} used by the {@link AudioStream}, which can be null.
          *
          * <p>
          * It should be one of the audio {@link MediaFormat}s ({@link MediaFormat#M4A M4A},

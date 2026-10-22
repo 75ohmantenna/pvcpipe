@@ -40,6 +40,8 @@ public class FilterItem implements Serializable {
     }
 
     /**
+     * Get the identifier of this filter item.
+     *
      * @return {@link #identifier}
      */
     public int getIdentifier() {
@@ -47,6 +49,8 @@ public class FilterItem implements Serializable {
     }
 
     /**
+     * Get the translatable name identifier of this filter item.
+     *
      * @return {@link #nameId}
      */
     public LibraryStringIds getNameId() {

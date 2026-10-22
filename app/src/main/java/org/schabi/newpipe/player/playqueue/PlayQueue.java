@@ -111,6 +111,8 @@ public abstract class PlayQueue implements Serializable {
     //////////////////////////////////////////////////////////////////////////*/
 
     /**
+     * Gets the index of the item selected for playback.
+     *
      * @return the current index that should be played
      */
     public int getIndex() {
@@ -161,6 +163,8 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
+     * Gets the item selected for playback, if the queue is not empty.
+     *
      * @return the current item that should be played, or null if the queue is empty
      */
     @Nullable
@@ -169,6 +173,8 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
+     * Gets the item at the specified queue index, if it exists.
+     *
      * @param index the index of the item to return
      * @return the item at the given index, or null if the index is out of bounds
      */
@@ -192,6 +198,8 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
+     * Gets the number of items currently in the play queue.
+     *
      * @return the current size of play queue.
      */
     public int size() {
@@ -217,6 +225,8 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
+     * Gets an immutable view of the play queue's items.
+     *
      * @return an immutable view of the play queue
      */
     @NonNull
@@ -335,7 +345,7 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
-     * Report an exception for the item at the current index in order and skip to the next one
+     * Report an exception for the item at the current index in order and skip to the next one.
      * <p>
      * This is done as a separate event as the underlying manager may have
      * different implementation regarding exceptions.
@@ -445,7 +455,7 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
-     * Shuffles the current play queue
+     * Shuffles the current play queue.
      * <p>
      * This method first backs up the existing play queue and item being played. Then a newly
      * shuffled play queue will be generated along with currently playing item placed at the

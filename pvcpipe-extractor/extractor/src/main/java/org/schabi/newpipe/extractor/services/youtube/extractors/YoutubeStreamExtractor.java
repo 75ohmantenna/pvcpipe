@@ -1289,7 +1289,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
 
     /**
      * Get the stream builder helper which will be used to build {@link AudioStream}s in
-     * {@link #getItags(String, ItagItem.ItagType, java.util.function.Function, String)}
+     * {@link #getItags(String, ItagItem.ItagType, java.util.function.Function, String)}.
      *
      * <p>
      * The {@code StreamBuilderHelper} will set the following attributes in the
@@ -1342,7 +1342,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
 
     /**
      * Get the stream builder helper which will be used to build {@link VideoStream}s in
-     * {@link #getItags(String, ItagItem.ItagType, java.util.function.Function, String)}
+     * {@link #getItags(String, ItagItem.ItagType, java.util.function.Function, String)}.
      *
      * <p>
      * The {@code StreamBuilderHelper} will set the following attributes in the

@@ -22,7 +22,7 @@ import java.util.List;
 import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.disposables.Disposable;
 
-/**
+/*
  * Created by Christian Schabesberger on 01.08.16.
  * <p>
  * Copyright (C) Christian Schabesberger 2016 <chris.schabesberger@mailbox.org>

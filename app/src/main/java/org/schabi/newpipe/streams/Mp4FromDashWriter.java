@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
-/**
+/*
  * @author kapodamy
  */
 public class Mp4FromDashWriter {

@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.schabi.newpipe.R;
 
-/**
+/*
  * Created by Christian Schabesberger on 01.08.16.
  * <p>
  * Copyright (C) Christian Schabesberger 2016 <chris.schabesberger@mailbox.org>

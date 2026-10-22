@@ -47,6 +47,8 @@ public final class ExtractorHelper {
     }
 
     /**
+     * Get related items, recording extraction errors in the stream info.
+     *
      * @deprecated Use {@link #getRelatedItemsOrLogError(StreamInfo, StreamExtractor)}
      */
     @Deprecated

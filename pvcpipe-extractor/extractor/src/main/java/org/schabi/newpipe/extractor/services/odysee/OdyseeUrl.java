@@ -162,6 +162,8 @@ public final class OdyseeUrl {
     }
 
     /**
+     * Converts a channel or stream id to its website address.
+     *
      * @param id a channel or stream id, such as {@code @channel:c/video:a}
      * @return the website address for it
      */
@@ -175,6 +177,8 @@ public final class OdyseeUrl {
     }
 
     /**
+     * Converts a channel or stream id to a resolvable LBRY URI.
+     *
      * @param id a channel or stream id, such as {@code @channel:c/video:a}
      * @return the LBRY URI the API resolves
      */
@@ -184,6 +188,8 @@ public final class OdyseeUrl {
     }
 
     /**
+     * Converts an LBRY URI to its website address.
+     *
      * @param lbryUri a URI the API returned, such as {@code lbry://@channel#c/video#a}
      * @return the website address for it
      */
@@ -195,6 +201,8 @@ public final class OdyseeUrl {
     }
 
     /**
+     * Checks whether text is a complete claim id.
+     *
      * @param value any text
      * @return whether it is a complete claim id
      */

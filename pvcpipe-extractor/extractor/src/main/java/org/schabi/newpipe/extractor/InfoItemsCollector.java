@@ -39,7 +39,7 @@ public abstract class InfoItemsCollector<I extends InfoItem, E extends InfoItemE
     private final Comparator<I> comparator;
 
     /**
-     * Create a new collector with no comparator / sorting function
+     * Create a new collector with no comparator / sorting function.
      * @param serviceId the service id
      */
     public InfoItemsCollector(final int serviceId) {
@@ -47,7 +47,7 @@ public abstract class InfoItemsCollector<I extends InfoItem, E extends InfoItemE
     }
 
     /**
-     * Create a new collector
+     * Create a new collector.
      * @param serviceId the service id
      */
     public InfoItemsCollector(final int serviceId, @Nullable final Comparator<I> comparator) {
@@ -75,7 +75,7 @@ public abstract class InfoItemsCollector<I extends InfoItem, E extends InfoItemE
     }
 
     /**
-     * Add an error
+     * Add an error.
      * @param error the error
      */
     protected void addError(final Exception error) {
@@ -83,7 +83,7 @@ public abstract class InfoItemsCollector<I extends InfoItem, E extends InfoItemE
     }
 
     /**
-     * Add an item
+     * Add an item.
      * @param item the item
      */
     protected void addItem(final I item) {
@@ -91,7 +91,7 @@ public abstract class InfoItemsCollector<I extends InfoItem, E extends InfoItemE
     }
 
     /**
-     * Get the service id
+     * Get the service id.
      * @return the service id
      */
     public int getServiceId() {

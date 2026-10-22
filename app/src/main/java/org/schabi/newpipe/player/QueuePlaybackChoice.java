@@ -32,6 +32,8 @@ enum QueuePlaybackChoice {
     START;
 
     /**
+     * Chooses how to play the incoming queue based on the current playback state.
+     *
      * @param hasPlayer       whether an ExoPlayer instance exists
      * @param current         the queue the player has now, if any
      * @param incoming        the queue it is asked to play

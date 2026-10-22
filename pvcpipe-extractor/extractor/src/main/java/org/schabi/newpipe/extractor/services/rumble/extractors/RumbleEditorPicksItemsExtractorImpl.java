@@ -7,6 +7,8 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 
 /**
+ * Extracts items from Rumble's editor picks page.
+ *
  * 20240123 - editor-picks is working - https://rumble.com/editor-picks
  */
 public class RumbleEditorPicksItemsExtractorImpl extends RumbleBrowseLiveItemExtractorImpl {

@@ -61,6 +61,8 @@ public final class PlaybackErrors {
         SHUT_DOWN;
 
         /**
+         * Indicates whether this recovery handles the error without a user notification.
+         *
          * @return whether the player handles the error by itself, so that the user does not
          * need an error notification
          */
@@ -73,6 +75,8 @@ public final class PlaybackErrors {
     }
 
     /**
+     * Chooses a recovery strategy for the reported playback error.
+     *
      * @param errorCode the {@link PlaybackException#errorCode} of the reported error
      * @return what the player does about it
      */

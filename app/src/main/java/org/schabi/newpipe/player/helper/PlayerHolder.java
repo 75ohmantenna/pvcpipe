@@ -158,6 +158,8 @@ public final class PlayerHolder {
         private boolean playAfterConnect = false;
 
         /**
+         * Sets whether playback should start after the next service connection.
+         *
          * @param playAfterConnection Sets the value of `playAfterConnect` to pass to the {@link
          * PlayerServiceExtendedEventListener#onPlayerConnected(Player, boolean)} the next time it
          * is called. The value of `playAfterConnect` will be reset to false after that.

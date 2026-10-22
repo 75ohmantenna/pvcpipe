@@ -220,8 +220,6 @@ public class SrtFromTtmlWriter {
         return normalizeForSrt(actualCharacters);
     }
 
-    // CHECKSTYLE:OFF checkstyle:JavadocStyle
-    // checkstyle does not understand that span tags are inside a code block
     /**
      * <p>Recursive method to extract text from all nodes.</p>
      * <p>
@@ -260,7 +258,6 @@ public class SrtFromTtmlWriter {
             extractText(child, text);
         }
     }
-    // CHECKSTYLE:ON
 
     public void build(final SharpStream ttml) throws IOException {
         /*

@@ -294,6 +294,8 @@ public class RouterActivity extends AppCompatActivity {
     }
 
     /**
+     * Presents the routing error and finishes the router activity when applicable.
+     *
      * @param context the context. It will be {@code finish()}ed at the end of the handling if it is
      *                an instance of {@link RouterActivity}.
      * @param errorInfo the error information

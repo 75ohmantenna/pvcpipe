@@ -29,7 +29,7 @@ import org.schabi.newpipe.util.Localization;
 
 import io.reactivex.rxjava3.core.Single;
 
-/**
+/*
  * Created by Christian Schabesberger on 23.09.17.
  * <p>
  * Copyright (C) Christian Schabesberger 2017 <chris.schabesberger@mailbox.org>

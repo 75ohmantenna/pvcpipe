@@ -89,6 +89,8 @@ final class OdyseeItems {
     }
 
     /**
+     * Parses a list page's numeric id.
+     *
      * @param page a page that an Odysee list handed out, whose id is a number
      * @param what the kind of list, for the error message
      * @return that number
@@ -138,6 +140,8 @@ final class OdyseeItems {
     }
 
     /**
+     * Builds a claim search for playable files on the requested page.
+     *
      * @param page the page to ask for, starting at 1
      * @return the parameters of a claim search for videos and audio that have a file
      */
@@ -153,6 +157,8 @@ final class OdyseeItems {
     }
 
     /**
+     * Checks whether the result count and search limit allow another page.
+     *
      * @param page      the page that was just read, starting at 1
      * @param itemCount how many claims it held
      * @return whether the claim search has a further page

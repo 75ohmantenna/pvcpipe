@@ -84,6 +84,8 @@ public final class PlayerBroadcasts {
     }
 
     /**
+     * Gets the broadcast actions handled by the player.
+     *
      * @return the actions to register the receiver for
      */
     @NonNull
@@ -92,6 +94,8 @@ public final class PlayerBroadcasts {
     }
 
     /**
+     * Reports the screen state recorded from screen broadcasts.
+     *
      * @return whether the device screen is on, going by the last screen broadcast
      */
     public boolean isScreenOn() {

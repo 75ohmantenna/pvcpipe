@@ -89,12 +89,12 @@ public abstract class ListExtractor<R extends InfoItem> extends Extractor {
         }
 
         /**
-         * The current list of items of this page
+         * The current list of items of this page.
          */
         private final List<T> itemsList;
 
         /**
-         * Url pointing to the next page relative to this one
+         * Url pointing to the next page relative to this one.
          *
          * @see ListExtractor#getPage(Page)
          * @see Page
@@ -103,7 +103,7 @@ public abstract class ListExtractor<R extends InfoItem> extends Extractor {
         private final Page nextPage;
 
         /**
-         * Errors that happened during the extraction
+         * Errors that happened during the extraction.
          */
         private final List<Throwable> errors;
 
@@ -129,6 +129,8 @@ public abstract class ListExtractor<R extends InfoItem> extends Extractor {
         }
 
         /**
+         * Get the next page when available.
+         *
          * @return the next page if available, or null otherwise
          */
         @Nullable

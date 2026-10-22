@@ -34,7 +34,7 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
     }
 
     /**
-     * The unmodified like count given by the service
+     * The unmodified like count given by the service.
      * <br>
      * It may be language dependent
      */
@@ -43,7 +43,7 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
     }
 
     /**
-     * The text of the comment
+     * The text of the comment.
      */
     @Nonnull
     default Description getCommentText() throws ParsingException {
@@ -51,7 +51,7 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
     }
 
     /**
-     * The upload date given by the service, unmodified
+     * The upload date given by the service, unmodified.
      *
      * @see StreamExtractor#getTextualUploadDate()
      */
@@ -60,7 +60,7 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
     }
 
     /**
-     * The upload date wrapped with DateWrapper class
+     * The upload date wrapped with DateWrapper class.
      *
      * @see StreamExtractor#getUploadDate()
      */
@@ -87,21 +87,21 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
     }
 
     /**
-     * Whether the comment has been hearted by the uploader
+     * Whether the comment has been hearted by the uploader.
      */
     default boolean isHeartedByUploader() throws ParsingException {
         return false;
     }
 
     /**
-     * Whether the comment is pinned
+     * Whether the comment is pinned.
      */
     default boolean isPinned() throws ParsingException {
         return false;
     }
 
     /**
-     * Whether the uploader is verified by the service
+     * Whether the uploader is verified by the service.
      */
     default boolean isUploaderVerified() throws ParsingException {
         return false;

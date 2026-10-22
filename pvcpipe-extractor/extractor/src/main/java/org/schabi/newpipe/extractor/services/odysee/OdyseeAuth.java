@@ -31,12 +31,16 @@ public final class OdyseeAuth {
     /** Keeps the token between runs of the program. Its methods must not block for long. */
     public interface TokenStore {
         /**
+         * Loads the saved visitor token.
+         *
          * @return the token that was saved, or {@code null} if there is none
          */
         @Nullable
         String load();
 
         /**
+         * Saves or forgets the visitor token.
+         *
          * @param token the token to keep, or {@code null} to forget the one that was kept
          */
         void save(@Nullable String token);
@@ -71,6 +75,8 @@ public final class OdyseeAuth {
     }
 
     /**
+     * Replaces the store used to keep the visitor token.
+     *
      * @param tokenStore where to keep the token between runs, or {@code null} to keep it
      *                   only until the program ends
      */

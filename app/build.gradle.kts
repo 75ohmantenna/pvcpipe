@@ -16,18 +16,10 @@ plugins {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
-kotlin {
-    compilerOptions {
-        // TODO: Drop annotation default target when it is stable
-        freeCompilerArgs.addAll(
-            "-Xannotation-default-target=param-property"
-        )
-    }
-}
 
 val pvcpipeVersion = PvcVersion.name(
     providers.fileContents(rootProject.layout.projectDirectory.file("version.properties"))
@@ -135,7 +127,7 @@ val ktlint = configurations.create("ktlint")
 // https://checkstyle.org/#JRE_and_JDK
 tasks.withType<Checkstyle>().configureEach {
     javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 

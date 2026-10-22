@@ -80,6 +80,8 @@ public abstract class HeaderFooterListAdapter<T>
     }
 
     /**
+     * Creates a header view using the current header supplier.
+     *
      * @return a header view from the current supplier; call only while {@link #hasHeader()}
      */
     protected View createHeaderView() {
@@ -87,6 +89,8 @@ public abstract class HeaderFooterListAdapter<T>
     }
 
     /**
+     * Reports whether the footer has been requested.
+     *
      * @return whether {@link #showFooter(boolean)} was last called with {@code true}
      */
     protected boolean isFooterRequested() {
@@ -94,6 +98,8 @@ public abstract class HeaderFooterListAdapter<T>
     }
 
     /**
+     * Reports whether the adapter includes a footer row.
+     *
      * @return whether a footer row currently follows the items
      */
     protected boolean isFooterShown() {
@@ -105,6 +111,8 @@ public abstract class HeaderFooterListAdapter<T>
     }
 
     /**
+     * Converts an adapter position to an item index, accounting for the header.
+     *
      * @param adapterPosition a position in this adapter
      * @return the index in {@link #getItemsList()} that the position refers to
      */
@@ -113,6 +121,8 @@ public abstract class HeaderFooterListAdapter<T>
     }
 
     /**
+     * Gets the holder view type for an item.
+     *
      * @param item an item of this adapter
      * @return the view type of the holder that shows the item
      */

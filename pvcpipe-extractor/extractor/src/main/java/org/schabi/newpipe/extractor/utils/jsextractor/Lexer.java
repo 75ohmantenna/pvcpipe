@@ -104,7 +104,7 @@ public class Lexer {
     }
 
     /**
-     * Parsed token, containing the token and its position in the input string
+     * Parsed token, containing the token and its position in the input string.
      */
     public static class ParsedToken {
         public final Token token;
@@ -124,7 +124,7 @@ public class Lexer {
     private final Stack<Paren> parenStack;
 
     /**
-     * Create a new JavaScript lexer with the given source code
+     * Create a new JavaScript lexer with the given source code.
      *
      * @param js JavaScript code
      */
@@ -136,7 +136,7 @@ public class Lexer {
     }
 
     /**
-     * Continue parsing and return the next token
+     * Continue parsing and return the next token.
      * @return next token
      * @throws ParsingException
      */
@@ -154,7 +154,7 @@ public class Lexer {
     }
 
     /**
-     * Check if the parser is balanced (equal amount of open and closed parentheses and braces)
+     * Check if the parser is balanced (equal amount of open and closed parentheses and braces).
      * @return true if balanced
      */
     public boolean isBalanced() {
@@ -163,7 +163,7 @@ public class Lexer {
 
     /**
      * Evaluate the token for possible regex start and handle updating the
-     * `self.last_three`, `self.paren_stack` and `self.brace_stack`
+     * `self.last_three`, `self.paren_stack` and `self.brace_stack`.
      */
     void keepBooks(final ParsedToken parsedToken) throws ParsingException {
         if (parsedToken.token.isPunct) {
@@ -188,7 +188,7 @@ public class Lexer {
     }
 
     /**
-     * Handle the book keeping when we find an `(`
+     * Handle the book keeping when we find an `(`.
      */
     void handleOpenParenBooks() {
         boolean funcExpr = false;
@@ -207,7 +207,7 @@ public class Lexer {
     }
 
     /**
-     * Handle the book keeping when we find an `{`
+     * Handle the book keeping when we find an `{`.
      */
     void handleOpenBraceBooks() {
         boolean isBlock = true;
@@ -241,7 +241,7 @@ public class Lexer {
     }
 
     /**
-     * Handle the book keeping when we find an `)`
+     * Handle the book keeping when we find an `)`.
      */
     void handleCloseParenBooks(final int start) throws ParsingException {
         if (parenStack.isEmpty()) {
@@ -251,7 +251,7 @@ public class Lexer {
     }
 
     /**
-     * Handle the book keeping when we find an `}`
+     * Handle the book keeping when we find an `}`.
      */
     void handleCloseBraceBooks(final int start) throws ParsingException {
         if (braceStack.isEmpty()) {
@@ -265,7 +265,7 @@ public class Lexer {
     }
 
     /**
-     * Detect if the `/` is the beginning of a regex or is division
+     * Detect if the `/` is the beginning of a regex or is division.
      * <a href="https://github.com/sweet-js/sweet-core/wiki/design">see this for more details</a>
      *
      * @return isRegexStart

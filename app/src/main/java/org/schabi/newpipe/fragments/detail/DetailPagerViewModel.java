@@ -45,6 +45,8 @@ public final class DetailPagerViewModel extends AndroidViewModel {
     }
 
     /**
+     * Gets the detail pager view model shared by the fragment's activity.
+     *
      * @param fragment a fragment attached to the activity that shows the detail screen
      * @return the view model shared by that activity's fragments
      */

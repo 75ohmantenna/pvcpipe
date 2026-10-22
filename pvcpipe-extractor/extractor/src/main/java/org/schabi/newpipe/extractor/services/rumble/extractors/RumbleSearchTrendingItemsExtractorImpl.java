@@ -9,6 +9,8 @@ import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import static org.schabi.newpipe.extractor.ServiceList.Rumble;
 
 /**
+ * Extracts video listing items from Rumble search and trending pages.
+ *
  * 20240123 -- 'Trending today' is working --
  * "https://rumble.com/videos?sort=views&amp;date=today"
  * 20240123 -- 'Latest' is working -- "https://rumble.com/videos?date=this-week"

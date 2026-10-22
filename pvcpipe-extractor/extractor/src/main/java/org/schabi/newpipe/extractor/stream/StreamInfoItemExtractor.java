@@ -32,7 +32,7 @@ import java.util.List;
 public interface StreamInfoItemExtractor extends InfoItemExtractor {
 
     /**
-     * Get the stream type
+     * Get the stream type.
      *
      * @return the stream type
      * @throws ParsingException if there is an error in the extraction
@@ -48,7 +48,7 @@ public interface StreamInfoItemExtractor extends InfoItemExtractor {
     boolean isAd() throws ParsingException;
 
     /**
-     * Get the stream duration in seconds
+     * Get the stream duration in seconds.
      *
      * @return the stream duration in seconds or -1 if no duration is available
      * @throws ParsingException if there is an error in the extraction
@@ -56,7 +56,7 @@ public interface StreamInfoItemExtractor extends InfoItemExtractor {
     long getDuration() throws ParsingException;
 
     /**
-     * Parses the number of views (or of current viewers in case of live streams)
+     * Parses the number of views (or of current viewers in case of live streams).
      *
      * @return the number of views (or of current viewers in case of live streams) or -1 if not
      * available
@@ -65,7 +65,7 @@ public interface StreamInfoItemExtractor extends InfoItemExtractor {
     long getViewCount() throws ParsingException;
 
     /**
-     * Get the uploader name
+     * Get the uploader name.
      *
      * @return the uploader name
      * @throws ParsingException if there is an error in the extraction

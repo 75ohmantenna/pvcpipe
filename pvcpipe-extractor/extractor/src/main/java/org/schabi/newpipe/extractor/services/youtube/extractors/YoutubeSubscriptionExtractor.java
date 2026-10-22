@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
 import static org.schabi.newpipe.extractor.subscription.SubscriptionExtractor.ContentSource.INPUT_STREAM;
 
 /**
- * Extract subscriptions from a Google takeout export
+ * Extract subscriptions from a Google takeout export.
  */
 public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
     private static final String BASE_CHANNEL_URL = "https://www.youtube.com/channel/";

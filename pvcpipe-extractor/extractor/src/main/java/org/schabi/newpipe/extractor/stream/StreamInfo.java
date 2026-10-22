@@ -416,7 +416,7 @@ public class StreamInfo extends Info {
     private List<Frameset> previewFrames = List.of();
 
     /**
-     * Get the stream type
+     * Get the stream type.
      *
      * @return the stream type
      */
@@ -429,7 +429,7 @@ public class StreamInfo extends Info {
     }
 
     /**
-     * Get the thumbnail url
+     * Get the thumbnail url.
      *
      * @return the thumbnail url as a string
      */
@@ -459,7 +459,7 @@ public class StreamInfo extends Info {
     }
 
     /**
-     * Get the duration in seconds
+     * Get the duration in seconds.
      *
      * @return the duration in seconds
      */
@@ -632,6 +632,8 @@ public class StreamInfo extends Info {
     }
 
     /**
+     * Get the related items.
+     *
      * @deprecated Use {@link #getRelatedItems()}
      */
     @Deprecated
@@ -644,6 +646,8 @@ public class StreamInfo extends Info {
     }
 
     /**
+     * Set the related items.
+     *
      * @deprecated Use {@link #setRelatedItems(List)}
      */
     @Deprecated

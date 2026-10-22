@@ -293,7 +293,7 @@ public final class ThemeHelper {
     }
 
     /**
-     * Get the device theme
+     * Get the device theme.
      * <p>
      * It will return true if the device 's theme is dark, false otherwise.
      * <p>

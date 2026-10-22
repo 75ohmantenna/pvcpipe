@@ -10,6 +10,8 @@ public final class PagerContentSizer {
     private final PagerScrollPolicy policy = new PagerScrollPolicy();
 
     /**
+     * Applies the pager content height while remembering the view's original height.
+     *
      * @param view   the scrolling view
      * @param height the height the pager content should have
      */
@@ -18,6 +20,8 @@ public final class PagerContentSizer {
     }
 
     /**
+     * Updates nested scrolling and restores the original height when needed.
+     *
      * @param view                  the scrolling view
      * @param landscape             whether the device is in landscape orientation
      * @param scrollOnlyBelowPlayer the user's "scroll only below player" setting

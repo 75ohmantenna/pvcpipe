@@ -22,6 +22,8 @@ import static org.schabi.newpipe.extractor.services.youtube.ItagItem.ItagType.VI
 public class ItagItem implements Serializable {
 
     /**
+     * Lists the known YouTube stream formats.
+     *
      * List can be found here:
      * https://github.com/ytdl-org/youtube-dl/blob/e988fa4/youtube_dl/extractor/youtube.py#L1195
      */
@@ -228,6 +230,8 @@ public class ItagItem implements Serializable {
 
     // Audio fields
     /**
+     * The average audio bitrate.
+     *
      * @deprecated Use {@link #getAverageBitrate()} instead.
      */
     @Deprecated
@@ -237,12 +241,16 @@ public class ItagItem implements Serializable {
 
     // Video fields
     /**
+     * The video resolution label.
+     *
      * @deprecated Use {@link #getResolutionString()} instead.
      */
     @Deprecated
     public String resolutionString;
 
     /**
+     * The video frame rate.
+     *
      * @deprecated Use {@link #getFps()} and {@link #setFps(int)} instead.
      */
     @Deprecated

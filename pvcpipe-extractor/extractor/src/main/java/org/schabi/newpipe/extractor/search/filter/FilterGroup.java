@@ -21,6 +21,8 @@ import javax.annotation.Nullable;
 public final class FilterGroup {
 
     /**
+     * The identifier of this filter group.
+     *
      * {@link #getIdentifier()}
      */
     private final int identifier;
@@ -81,6 +83,8 @@ public final class FilterGroup {
     }
 
     /**
+     * Get the identifier of this filter group.
+     *
      * {@link FilterItem#getIdentifier()}
      */
     public int getIdentifier() {
@@ -88,6 +92,8 @@ public final class FilterGroup {
     }
 
     /**
+     * Get the translatable name identifier of this filter group.
+     *
      * {@link #groupNameId}
      */
     public LibraryStringIds getNameId() {
@@ -95,6 +101,8 @@ public final class FilterGroup {
     }
 
     /**
+     * Get the identifier of the default selected filter.
+     *
      * {@link #defaultSelectedFilterId}
      */
     public int getDefaultSelectedFilterId() {
@@ -102,6 +110,8 @@ public final class FilterGroup {
     }
 
     /**
+     * Get the items in this filter group.
+     *
      * {@link #filterItems}
      * @return
      */
@@ -110,6 +120,8 @@ public final class FilterGroup {
     }
 
     /**
+     * Check whether only one item can be selected at a time.
+     *
      * {@link #onlyOneCheckable}
      */
     public boolean isOnlyOneCheckable() {

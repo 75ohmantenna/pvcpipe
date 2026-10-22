@@ -29,6 +29,8 @@ public final class AndroidPlayerBroadcasts {
     private boolean registered = false;
 
     /**
+     * Creates a receiver that dispatches player commands before notifying the observer.
+     *
      * @param context    the context to register the receiver with
      * @param broadcasts runs the player command of each received action
      * @param observer   gets every broadcast after its command has run, for the player UIs

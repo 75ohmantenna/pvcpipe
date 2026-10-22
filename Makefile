@@ -1,7 +1,10 @@
 .PHONY: ci
 
 ci:
-	./gradlew --no-continue :buildSrc:test :app:runCheckstyle :app:runKtlint :app:checkDependenciesOrder \
-		:app:lintDebug :app:testDebugUnitTest \
+	./gradlew --no-daemon --no-continue :buildSrc:test :app:runCheckstyle :app:runKtlint \
+		:app:checkDependenciesOrder :pvcpipe-extractor:extractor:checkstyleMain
+	./gradlew --no-daemon --no-continue :app:testDebugUnitTest \
 		:pvcpipe-extractor:extractor:forkCiTest
-	./gradlew --no-continue :app:assembleDebug :app:assembleRelease
+	./gradlew --no-daemon --no-continue :app:lintDebug
+	./gradlew --no-daemon --no-continue :app:assembleDebug
+	./gradlew --no-daemon --no-continue :app:assembleRelease

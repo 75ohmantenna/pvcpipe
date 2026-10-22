@@ -34,7 +34,7 @@ import okio.ByteString;
 public final class YoutubeProtoBufferSearchParameterAccessor {
 
     /**
-     * the base64 urlencoded sp string
+     * The base64 urlencoded sp string.
      */
     private String searchParameter = "";
 
@@ -105,7 +105,7 @@ public final class YoutubeProtoBufferSearchParameterAccessor {
     }
 
     /**
-     * Decode a sp parameter back to a {@link SearchRequest} object
+     * Decode a sp parameter back to a {@link SearchRequest} object.
      *
      * @param urlEncodedBase64EncodedSearchParameter the parameter says it all
      * @return {@link SearchRequest} with decoded search parameter
@@ -177,7 +177,7 @@ public final class YoutubeProtoBufferSearchParameterAccessor {
     }
 
     /**
-     * Build a {@link YoutubeProtoBufferSearchParameterAccessor} Object
+     * Build a {@link YoutubeProtoBufferSearchParameterAccessor} Object.
      */
     public static class Builder {
         private final ArrayList<Features> featureList = new ArrayList<>();

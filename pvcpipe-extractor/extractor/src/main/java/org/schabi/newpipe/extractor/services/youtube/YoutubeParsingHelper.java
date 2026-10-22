@@ -238,7 +238,7 @@ public final class YoutubeParsingHelper {
     }
 
     /**
-     * Parses the duration string of the video expecting ":" or "." as separators
+     * Parses the duration string of the video expecting ":" or "." as separators.
      *
      * @return the duration in seconds
      * @throws ParsingException when more than 3 separators are found
@@ -302,8 +302,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
-     * Checks if the given playlist id is a YouTube Mix (auto-generated playlist)
-     * Ids from a YouTube Mix start with "RD"
+     * Checks if the given playlist id is a YouTube Mix (auto-generated playlist).
+     * Ids from a YouTube Mix start with "RD".
      *
      * @param playlistId the playlist id
      * @return Whether given id belongs to a YouTube Mix
@@ -313,8 +313,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
-     * Checks if the given playlist id is a YouTube My Mix (auto-generated playlist)
-     * Ids from a YouTube My Mix start with "RDMM"
+     * Checks if the given playlist id is a YouTube My Mix (auto-generated playlist).
+     * Ids from a YouTube My Mix start with "RDMM".
      *
      * @param playlistId the playlist id
      * @return Whether given id belongs to a YouTube My Mix
@@ -324,8 +324,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
-     * Checks if the given playlist id is a YouTube Music Mix (auto-generated playlist)
-     * Ids from a YouTube Music Mix start with "RDAMVM" or "RDCLAK"
+     * Checks if the given playlist id is a YouTube Music Mix (auto-generated playlist).
+     * Ids from a YouTube Music Mix start with "RDAMVM" or "RDCLAK".
      *
      * @param playlistId the playlist id
      * @return Whether given id belongs to a YouTube Music Mix
@@ -335,8 +335,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
-     * Checks if the given playlist id is a YouTube Genre Mix (auto-generated playlist)
-     * Ids from a YouTube Genre Mix start with "RDGMEM"
+     * Checks if the given playlist id is a YouTube Genre Mix (auto-generated playlist).
+     * Ids from a YouTube Genre Mix start with "RDGMEM".
      *
      * @return Whether given id belongs to a YouTube Genre Mix
      */
@@ -345,6 +345,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
+     * Extracts the video id on which a mix playlist is based.
+     *
      * @param playlistId the playlist id to parse
      * @return the {@link PlaylistInfo.PlaylistType} extracted from the playlistId (mix playlist
      *         types included)
@@ -386,6 +388,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
+     * Determines the playlist type from its id.
+     *
      * @param playlistId the playlist id to parse
      * @return the {@link PlaylistInfo.PlaylistType} extracted from the playlistId (mix playlist
      *         types included)
@@ -412,6 +416,8 @@ public final class YoutubeParsingHelper {
     }
 
     /**
+     * Determines the playlist type from a URL's list parameter.
+     *
      * @param playlistUrl the playlist url to parse
      * @return the {@link PlaylistInfo.PlaylistType} extracted from the playlistUrl's list param
      *         (mix playlist types included)
@@ -1171,7 +1177,7 @@ public final class YoutubeParsingHelper {
 
     /**
      * Returns a {@link Map} containing the required YouTube headers, including the
-     * <code>CONSENT</code> cookie to prevent redirects to <code>consent.youtube.com</code>
+     * <code>CONSENT</code> cookie to prevent redirects to <code>consent.youtube.com</code>.
      */
     public static Map<String, List<String>> getYouTubeHeaders()
             throws ExtractionException, IOException {

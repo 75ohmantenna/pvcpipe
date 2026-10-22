@@ -20,6 +20,8 @@ public class OdyseeStreamInfoItemExtractor implements StreamInfoItemExtractor {
     private final long viewCount;
 
     /**
+     * Creates a stream item extractor with its view or live viewer count.
+     *
      * @param claim     a claim that a player can play
      * @param viewCount how often it was viewed, or for a livestream how many are watching;
      *                  -1 if that is not known

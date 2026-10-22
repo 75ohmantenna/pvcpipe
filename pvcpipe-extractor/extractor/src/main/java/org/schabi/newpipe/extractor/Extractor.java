@@ -42,6 +42,8 @@ public abstract class Extractor {
     }
 
     /**
+     * Get the link handler for this extractor.
+     *
      * @return The {@link LinkHandler} of the current extractor object (e.g. a ChannelExtractor
      *         should return a channel url handler).
      */
@@ -93,7 +95,7 @@ public abstract class Extractor {
     }
 
     /**
-     * Get the name
+     * Get the name.
      *
      * @return the name
      * @throws ParsingException if the name cannot be extracted

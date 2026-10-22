@@ -377,6 +377,8 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
+     * Get related items as a stream info items collector when available.
+     *
      * @return The result of {@link #getRelatedItems()} if it is a
      * {@link StreamInfoItemsCollector}, <code>null</code> otherwise
      * @deprecated Use {@link #getRelatedItems()}. May be removed in a future version.
@@ -393,7 +395,7 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * Should return a list of Frameset object that contains preview of stream frames
+     * Should return a list of Frameset object that contains preview of stream frames.
      *
      * @return list of preview frames or empty list if frames preview is not supported or not found
      *         for specified stream

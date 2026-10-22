@@ -53,7 +53,7 @@ public abstract class SearchQueryHandlerFactory extends ListLinkHandlerFactory {
     }
 
     /**
-     * It's not mandatory for NewPipe to handle the Url
+     * It's not mandatory for NewPipe to handle the Url.
      */
     @Override
     public boolean onAcceptUrl(final String url) {
@@ -61,6 +61,8 @@ public abstract class SearchQueryHandlerFactory extends ListLinkHandlerFactory {
     }
 
     /**
+     * Get the available content filters.
+     *
      * {@link BaseSearchFilters#getContentFilters()}
      */
     public FilterContainer getAvailableContentFilter() {
@@ -68,6 +70,8 @@ public abstract class SearchQueryHandlerFactory extends ListLinkHandlerFactory {
     }
 
     /**
+     * Get the sort filters available for a content filter.
+     *
      * {@link BaseSearchFilters#getContentFilterSortFilterVariant(int)}
      */
     public FilterContainer getContentFilterSortFilterVariant(final int contentFilterId) {
@@ -75,6 +79,8 @@ public abstract class SearchQueryHandlerFactory extends ListLinkHandlerFactory {
     }
 
     /**
+     * Get a filter item by its identifier.
+     *
      * {@link BaseSearchFilters#getFilterItem(int)}
      */
     public FilterItem getFilterItem(final int filterId) {
