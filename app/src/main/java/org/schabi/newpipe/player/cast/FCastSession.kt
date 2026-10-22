@@ -204,12 +204,12 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     }
 
     fun pause() = onMain {
-        playback.clearPauseOnLoad()
+        playback.setPlayWhenReady(false)
         command { it.pausePlayback() }
     }
 
     fun resume() = onMain {
-        playback.clearPauseOnLoad()
+        playback.setPlayWhenReady(true)
         command { it.resumePlayback() }
     }
 
@@ -426,7 +426,9 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
 
 /**
  * Main-thread playback policy, independent of the SDK connection and Android event loop.
- * Receiver state and duration are connection-wide: SDK 0.6.1 deduplicates unchanged v2/v3 values.
+ * Playback state and duration survive loads: SDK 0.6.1 deduplicates unchanged v2/v3 values.
+ * SDK observations are not all authoritative: v3 source echoes synthesize Playing without
+ * updating the SDK's receiver-state cache. Startup pause enforcement normalizes that observation.
  * Source echoes are learned from matching acknowledgements, not SDK feature/version guesses:
  * some working receivers never echo their own loads, including observed SDK-v3 connections.
  * Until an own-load echo is observed, readiness must use playback evidence; the protocol
@@ -531,8 +533,10 @@ internal class FCastPlaybackState(
         if (expectedSource != null && !pendingLoad) relinquish()
     }
 
-    fun clearPauseOnLoad() {
-        pauseOnLoad = false
+    fun setPlayWhenReady(ready: Boolean) {
+        // Explicit Resume cancels startup enforcement; a later Pause must re-arm it while
+        // preparation is pending, including after a Buffering observation.
+        pauseOnLoad = !ready && (pendingLoad || pauseOnLoad || receiverState == PlaybackState.BUFFERING)
     }
 
     fun seek(positionMs: Long) {
@@ -586,7 +590,13 @@ internal class FCastPlaybackState(
     private fun applyPauseOnLoad() {
         if (pauseOnLoad && (receiverState == PlaybackState.PLAYING || receiverState == PlaybackState.PAUSED)) {
             pauseOnLoad = false
-            if (receiverState == PlaybackState.PLAYING) pause()
+            if (receiverState == PlaybackState.PLAYING) {
+                // The SDK can suppress the next unchanged receiver Paused snapshot. Expose
+                // our enforced startup policy now, rather than adopting synthetic Playing
+                // as intent and advancing the application clock until a callback that may never come.
+                receiverState = PlaybackState.PAUSED
+                pause()
+            }
         }
     }
 
