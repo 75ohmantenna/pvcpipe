@@ -232,8 +232,6 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.lifecycle.livedata)
     implementation(libs.androidx.lifecycle.viewmodel)
-    // Not referenced by app code: pins the version Material pulls in transitively
-    implementation(libs.androidx.localbroadcastmanager)
     implementation(libs.androidx.media)
     implementation(libs.androidx.preference)
     implementation(libs.androidx.recyclerview)
@@ -330,6 +328,8 @@ dependencies {
     implementation(libs.evermind.challengefloatsaway)
 
     constraints {
+        // No app API use; retain the pin for legacy-support-core-utils' transitive dependency.
+        implementation(libs.androidx.localbroadcastmanager)
         // Transitive libraries the app uses. coil-compose used to raise them to these versions;
         // the pins keep them there now that it is gone.
         implementation(libs.androidx.collection)

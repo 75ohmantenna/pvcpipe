@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Objects;
 
 import javax.annotation.Nonnull;
@@ -94,8 +95,7 @@ public final class YoutubeProtoBufferSearchParameterAccessor {
         final SearchRequest searchRequest = searchRequestBuilder.build();
 
         final byte[] protoBufEncoded = searchRequest.encode();
-        final ByteString bs = new ByteString(protoBufEncoded);
-        final String protoBufEncodedBase64 = bs.base64();
+        final String protoBufEncodedBase64 = Base64.getEncoder().encodeToString(protoBufEncoded);
         final String urlEncodedBase64EncodedSearchParameter
                 = Utils.encodeUrlUtf8(protoBufEncodedBase64);
 

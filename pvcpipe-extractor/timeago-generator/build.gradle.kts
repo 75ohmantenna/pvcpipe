@@ -5,5 +5,4 @@
 
 dependencies {
     implementation(libs.newpipe.nanojson)
-    implementation(libs.google.jsr305)
 }

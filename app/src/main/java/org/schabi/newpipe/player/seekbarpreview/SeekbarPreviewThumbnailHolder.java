@@ -11,8 +11,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.SparseArrayCompat;
 
-import com.google.common.base.Stopwatch;
-
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.extractor.stream.Frameset;
 import org.schabi.newpipe.util.image.CoilHelper;
@@ -125,7 +123,8 @@ public class SeekbarPreviewThumbnailHolder {
 
     private void generateDataFrom(final Frameset frameset, final UUID updateRequestIdentifier) {
         Log.d(TAG, "Starting generation of seekbarPreviewData");
-        final Stopwatch sw = Log.isLoggable(TAG, Log.DEBUG) ? Stopwatch.createStarted() : null;
+        final boolean logTiming = Log.isLoggable(TAG, Log.DEBUG);
+        final long startNanos = logTiming ? System.nanoTime() : 0;
 
         int currentPosMs = 0;
         int pos = 1;
@@ -170,8 +169,9 @@ public class SeekbarPreviewThumbnailHolder {
             }
         }
 
-        if (sw != null) {
-            Log.d(TAG, "Generation of seekbarPreviewData took " + sw.stop());
+        if (logTiming) {
+            Log.d(TAG, "Generation of seekbarPreviewData took "
+                    + (System.nanoTime() - startNanos) / 1_000_000 + " ms");
         }
     }
 
@@ -221,7 +221,8 @@ public class SeekbarPreviewThumbnailHolder {
             return null;
         }
 
-        final Stopwatch sw = Log.isLoggable(TAG, Log.DEBUG) ? Stopwatch.createStarted() : null;
+        final boolean logTiming = Log.isLoggable(TAG, Log.DEBUG);
+        final long startNanos = logTiming ? System.nanoTime() : 0;
         try {
             Log.d(TAG, "Downloading bitmap for seekbarPreview from '" + url + "'");
 
@@ -229,9 +230,9 @@ public class SeekbarPreviewThumbnailHolder {
             // Ensure that you are not running on the main thread, otherwise this will hang
             final var bitmap = CoilHelper.INSTANCE.loadBitmapBlocking(App.getInstance(), url);
 
-            if (sw != null) {
+            if (logTiming) {
                 Log.d(TAG, "Download of bitmap for seekbarPreview from '" + url + "' took "
-                        + sw.stop());
+                        + (System.nanoTime() - startNanos) / 1_000_000 + " ms");
             }
 
             return bitmap;

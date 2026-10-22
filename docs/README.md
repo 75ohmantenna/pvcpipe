@@ -17,6 +17,7 @@ A guide describes the code as it is now and names the classes to read.
 | --- | --- |
 | [building.md](building.md) | SDK and JDK requirements, build tasks, application IDs, signing, versioning and safe testing |
 | [services.md](services.md) | Service IDs, extraction capabilities, search filters, Kick metadata, retired services and integration requirements |
+| [dependency-audit.md](dependency-audit.md) | Dependency roles, standard-library replacements, compatibility decisions and verification, October 2026 |
 | [playback.md](playback.md) | Source selection, FCast setup and limits, queue control, audio focus, history, errors and YouTube proof tokens |
 | [library-data.md](library-data.md) | Local playlists, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Download selection and submission, checkpoints, HLS processing and finished-file sharing |
