@@ -43,6 +43,7 @@ public final class CastPlayback implements FCastSession.Listener {
     private boolean ended;
     private boolean reloadOnConnection;
     private boolean pendingSeek;
+    private boolean clockValid;
     private int generation;
     private long position;
     private long duration;
@@ -75,6 +76,15 @@ public final class CastPlayback implements FCastSession.Listener {
 
     public boolean getPlayWhenReady() {
         return playWhenReady;
+    }
+
+    /**
+     * A receiver-observed/carried checkpoint or explicit seek, never a reset/load request.
+     * @param item the selected queue occurrence
+     * @return whether this occurrence owns a usable checkpoint
+     */
+    public boolean ownsClock(@Nullable final PlayQueueItem item) {
+        return active && item != null && loadedItem == item && clockValid;
     }
 
     public long getPosition() {
@@ -196,7 +206,7 @@ public final class CastPlayback implements FCastSession.Listener {
         }
         final boolean continuing = active && loadedTag != null
                 && loadedTag.getStreamUrl().equals(tag.getStreamUrl());
-        final long start = continuing || (active && pendingSeek)
+        final long start = continuing || (active && (pendingSeek || clockValid))
                 ? getPosition() : player.getExoPlayer().getCurrentPosition();
         final boolean shouldPlay = active ? playWhenReady : player.getPlayWhenReady();
         if (continuing && !force && canControlReceiver()) {
@@ -280,6 +290,7 @@ public final class CastPlayback implements FCastSession.Listener {
         loadedItem = null;
         ended = false;
         pendingSeek = false;
+        clockValid = false;
         if (active) {
             if (!closed && session.getConnectionState() == 2) {
                 session.pause();
@@ -391,6 +402,8 @@ public final class CastPlayback implements FCastSession.Listener {
 
     public void seek(final long target) {
         pendingSeek = active && preparing;
+        // Explicit sender intent is resumable even before the receiver accepts its load.
+        clockValid = active && loadedItem != null;
         position = duration > 0 ? Math.min(duration, Math.max(0, target)) : Math.max(0, target);
         if (duration <= 0 || position < duration) {
             ended = false;
@@ -437,7 +450,8 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private void returnToDevice(final boolean playHere) {
         final boolean wasActive = active;
-        final long resumePosition = getPosition();
+        final long resumePosition = ownsClock(player.getCurrentItem())
+                && player.isCurrentSourceSynchronized() ? getPosition() : -1;
         if (wasActive) {
             player.saveStreamProgressState();
         }
@@ -447,6 +461,7 @@ public final class CastPlayback implements FCastSession.Listener {
         loadedTag = null;
         receiverTag = null;
         loadedItem = null;
+        clockValid = false;
         if (resolver != null) {
             resolver.close();
             resolver = null;
@@ -469,7 +484,11 @@ public final class CastPlayback implements FCastSession.Listener {
         if (!active || !canControlReceiver() || ended) {
             return;
         }
-        position = positionMs >= 0 ? positionMs : getPosition();
+        final boolean observed = session.hasObservedPosition();
+        // State/duration/speed emissions can still carry the load's requested position.
+        // Do not replace an established checkpoint or explicit seek with that placeholder.
+        position = positionMs >= 0 && (observed || !clockValid) ? positionMs : getPosition();
+        clockValid |= observed && positionMs >= 0;
         if (durationMs > 0) {
             duration = durationMs;
         }

@@ -95,6 +95,8 @@ public abstract class CastPlaybackTestFixture {
         clock.when(SystemClock::elapsedRealtime).thenAnswer(invocation -> now.get());
         sessions = mockConstruction(FCastSession.class, (session, arguments) -> {
             when(session.getConnectionState()).thenReturn(2);
+            // Direct controller callbacks in this fixture represent receiver clock samples.
+            when(session.hasObservedPosition()).thenReturn(true);
             when(session.getLocalAddress()).thenReturn(
                     InetAddress.getByAddress(new byte[]{(byte) 192, 0, 2, 1}));
         });
