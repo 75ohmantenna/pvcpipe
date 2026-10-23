@@ -463,3 +463,76 @@ assembly. Instrumentation assembly also passed, and the final targeted API 26
 run repeated all nine retained checks successfully after probe removal. Gradle
 reused unchanged outputs where reported. The second review covered the complete
 corrected production/test diff; later edits only clarify review disposition and evidence.
+
+## Reporting correctness — follow-up 2026-10-23
+
+This follows the 2026-10-23 read-only reporting/privacy assessment's three
+report-content correctness findings. Its separate recipient/destination,
+privacy-notice, capture-default and attachment-consent decisions remain open;
+email-only routing and unconfirmed toolkit/ACRA concerns are not corrected here.
+
+Started from post-PR-#148 master (`f8612efbe`). A detached disposable worktree
+kept production sources unchanged; only synthetic regression fixtures were
+added. On a newly created disposable API 26 emulator, nine instrumentation
+checks ran with four expected failures: pagination cookie-only data appeared
+in the diagnostic request, both capture-enabled and capture-disabled delayed
+reports used opening time instead of construction time, and Markdown emitted
+Service twice. No API 37 environment or user installation was used.
+
+The correction removes the cookie-map interpolation, not the page or cookies
+supplied to extraction. Query, URL and page IDs remain diagnostic inputs.
+`ErrorInfo.request` flows unchanged to the screen and both builders; ErrorInfo
+has no custom object serialization that expands a Page/cookie map. The inherited
+debug snackbar log prints the ErrorInfo object identity; the early log helper
+prints exception text and attached exception data, not request/page fields.
+This source trace is not a general log-sanitization guarantee.
+
+The report activity now retains the returned positive ErrorInfo construction
+timestamp regardless of capture preference, falling back to activity-opening
+time for missing/nonpositive timestamps. The timestamp comes from the
+wall-clock/capture-trigger point in public ErrorInfo constructors. ACRA's sender
+constructs a new ErrorInfo from a stored stack trace and does not carry through
+`USER_CRASH_DATE`: its timestamp remains sender-time construction, not original
+crash time. Markdown's second Service line is removed; other report content,
+exception bounds and JSON structure are unchanged.
+
+See [error-reporting.md](error-reporting.md) for the current contract and
+remaining sensitive-input exposure. Destination addresses, repository issue
+settings, capture defaults, privacy-policy publication and attachment consent
+are intentionally unchanged. Unconfirmed toolkit/ACRA concerns are not bundled.
+
+### Controlled regression and surface evidence
+
+A clarified baseline assertion identified the cookie-only marker in **request,
+Markdown and JSON**, but not ErrorInfo's object identity string. The corrected
+build passed all nine retained instrumentation checks and a subsequently removed
+synthetic surface smoke (10 total) on the disposable API 26 emulator. The screen
+was opened and visually inspected with synthetic diagnostics and exception text;
+the displayed timestamp was present. No sharing action was accepted or report
+sent; report-builder/ACRA tests intercepted activity intents.
+
+The pagination regression calls real `SearchFragment.handleNextItems` with a
+synthetic Page and error, captures its real ErrorInfo, and invokes the real
+activity and Markdown/JSON builders. Capture enabled/disabled both retain query,
+URL and page IDs, exclude the cookie-only marker from request/object string,
+both reports and app-process logcat, and preserve the original Page cookie map.
+Its unattached fragment substitutes footer/snackbar delivery; inherited
+snackbar UI/debug logging is source-inspected, not runtime-covered by that
+fixture. A focused JVM regression runs the real app helper and SearchInfo
+dispatch with a controlled extractor peer, which receives the identical Page
+and cookie map. This is extraction-boundary evidence, not live network/service
+or receiver/hardware proof.
+
+Report regressions cover delayed opening with capture enabled/disabled;
+nonpositive timestamp fallback; actual ACRA sender-time construction with a
+synthetic historical crash date; exactly one Markdown Service; all JSON fields,
+user comments, single/multiple exceptions and constructor truncation bounds.
+External activity starts are intercepted and fixtures are disposable; restoring
+preferences is not a guarantee that these tests are safe on a user installation.
+The complete serial gate, fresh official Claude review, independent adjudication
+and exact-head merge disposition are recorded on the PR rather than inferred
+from these focused checks.
+
+After removal of the temporary surface smoke, Checkstyle, ktlint, the focused
+JVM extraction-boundary regression and instrumentation assembly passed. The
+final packaged retained suite then passed again on API 26: **9 tests**.
