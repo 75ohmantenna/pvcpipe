@@ -648,7 +648,9 @@ public final class Player implements PlaybackListener, Listener {
         // Selection can advance before ExoPlayer switches sources. Only the loaded source's
         // occurrence owns its clock; URLs, indices and currentItem can already match another item.
         final boolean ownsPosition = MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
-                .flatMap(tag -> tag.getMaybeExtras(LoadedMediaSource.class))
+                .flatMap(tag -> tag.getMaybeExtras(Object.class))
+                .filter(LoadedMediaSource.class::isInstance)
+                .map(LoadedMediaSource.class::cast)
                 .map(source -> source.getStream() == playQueue.getItem())
                 .orElse(false);
         if (!ownsPosition) {

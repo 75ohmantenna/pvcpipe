@@ -316,21 +316,36 @@ media-item tag carries a `LoadedMediaSource` whose `getStream()` is the selected
 `PlayQueueItem` instance. URL equality, matching numerical indices and
 `currentItem` are not ownership evidence. Missing or mismatched source ownership
 leaves the selected occurrence's existing recovery (including unset) unchanged.
-Aligned capture retains the existing clock and clamping behavior.
+`LoadedMediaSource` carries that tag through both initial and published child
+timeline windows, preserving child media configuration, timing and period UIDs.
+This is necessary because ExoPlayer reads prepared media items from the timeline,
+not the wrapper's `getMediaItem()`. Extras are inspected without an unchecked
+loaded-source cast: placeholder and failed-source clocks cannot authorize capture.
+Aligned capture retains the existing local/active-receiver clock and clamping.
 
 `PlayerRecoveryTest` holds queue selection delivery on a `TestScheduler`, calls
 the actual selection, quality/audio, recovery and synchronization methods, and
 checks stored recovery plus the eventual seek/default-position command and
 recovery consumption. It covers same-URL distinct occurrences, existing/unset
 recovery, equal-index stale sources, missing tags and valid aligned capture with
-watch history disabled. All 11 checks pass after the correction; eight fail on
-the unchanged baseline. The standalone quality/audio scenario now retains and
-seeks B's intended 12 seconds.
+watch history disabled. The first 11-check harness exposed eight failures on the
+unchanged baseline, but its wrapper-only media items did not establish prepared
+timeline ownership. Fresh review caught the missing timeline propagation and an
+unsafe extras cast; both were reproduced before correction.
+
+The strengthened 18 checks use real initial/published `SinglePeriodTimeline`
+windows and caller dispatch, including direct aligned capture without a prior
+history write, placeholder/failed extras, and active-receiver clock boundaries.
+All pass. A repeated standalone quality/audio scenario using prepared windows
+observes 45-second storage/seek on unchanged master and the intended 12 seconds
+after the correction.
 
 These are controlled JVM checks, not device playback evidence. ExoPlayer decoding,
 Android effects, resolution and manager reload are mocked; the delayed readiness
-callback stands in for the manager. Queue objects, loaded-source tags, Player
-methods and disabled-history policy are real. The separate history progress path
+callback stands in for the manager. Child source preparation is controlled rather
+than running a decoder thread; source publication, timeline windows, queue objects,
+Player methods and disabled-history policy are real. Cast transport is mocked.
+The separate history progress path
 still uses its existing index guard; this correction does not claim to replace
 that guard with occurrence ownership or resolve other navigation defects.
 
