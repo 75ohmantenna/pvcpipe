@@ -46,7 +46,8 @@ public class PvcHlsPreProcessor {
             for (final HlsParser.Segment segment : segments) {
                 segmentsUrls.add(segment.getUri().toString());
                 // Retain the original rendition metadata for each segment. HLS missions bypass
-                // progressive-URL recovery in DownloadMission.doRecover; these are not segment URLs.
+                // progressive-URL recovery in DownloadMission.doRecover;
+                // these are not segment URLs.
                 missionRecoveryInfos.add(mission.recoveryInfo[0]);
             }
         }

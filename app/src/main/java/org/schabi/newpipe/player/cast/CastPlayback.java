@@ -265,7 +265,8 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     /**
-     * During an active cast, quality reloads keep the item; another occurrence invalidates ownership.
+     * During an active cast, quality reloads keep the item;
+     * another occurrence invalidates ownership.
      *
      * @param item the selected queue occurrence, not merely its video URL
      */

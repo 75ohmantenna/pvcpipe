@@ -96,7 +96,7 @@ public class PvcFromHlsRemuxer extends Postprocessing {
     }
 
     /**
-     * Runs one conversion in a directory of its own and attempts to remove the directory afterwards,
+     * Runs one conversion in a directory of its own and attempts to remove it afterwards,
      * also when conversion fails. Cleanup is best effort and does not replace a conversion failure.
      * <p>
      * When no other conversion is running, whatever is in the parent directory was left by a
