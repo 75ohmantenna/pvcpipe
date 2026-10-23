@@ -73,8 +73,9 @@ completion does not automatically replay the video.
   Local headset disconnection and minimize-on-exit preferences do not pause
   an active receiver.
 - Rebuilding a source for the same queue item retains its remote clock.
-  Moving to another queue occurrence invalidates the old source even when
-  both entries have the same video URL.
+  During an active cast, synchronization to another queue occurrence invalidates
+  the old source even when both entries have the same video URL. Initial
+  preparation has an unresolved occurrence-invalidation gap described below.
 - Returning to the phone during a timeline drag clears the remote seek state.
 - An initial idle report does not cancel a pending load. Once playback is
   established, an idle report that is not completion releases remote ownership.
@@ -166,7 +167,7 @@ resource budget; runtime routes use bounded least-recently-used eviction for
 long-running live streams. Manifests published during preparation retain their
 routes for refresh and replay while old segment routes can expire. Invalid
 DASH templates consume no route capacity. DASH XML nesting is limited to 64
-nodes before recursive transformations run. Request lines and headers have a
+levels before recursive transformations run. Request lines and headers have a
 15-second absolute deadline measured from connection acceptance, independent
 of media-body streaming. Only GET, HEAD and OPTIONS are accepted. Receivers
 cannot select arbitrary upstream URLs, and their cookies and authorization
@@ -239,15 +240,18 @@ alone does not prove that the receiver has decoded video or played audio.
 decides what the player does with a queue it is asked to play. It checks, in
 this order, whether to seek in place, keep the loaded queue, or look up a
 resume position first. If none applies, the queue starts from scratch.
-`Player.handleQueuePlayback` cancels any pending decision before it asks, and
-carries out the answer.
+`Player.handleQueuePlayback` cancels any pending timestamp/resume decision after
+it retrieves a valid cached queue, then carries out the answer. Timestamp
+requests also replace that pending decision; enqueueing into an existing queue
+does not. Cancellation prevents the old lookup from applying playback changes,
+not history writes already accepted by `PlaybackHistory`.
 
 ## Changing the queue
 
 [`PlayQueue`](../app/src/main/java/org/schabi/newpipe/player/playqueue/PlayQueue.java)
-changes the queue and broadcasts a
+changes the queue and publishes mutation events as
 [`PlayQueueEvent`](../app/src/main/java/org/schabi/newpipe/player/playqueue/PlayQueueEvent.kt)
-for each change.
+values.
 [`MediaSourceManager`](../app/src/main/java/org/schabi/newpipe/player/playback/MediaSourceManager.java)
 and
 [`PlayQueueAdapter`](../app/src/main/java/org/schabi/newpipe/player/playqueue/PlayQueueAdapter.java)
@@ -298,6 +302,33 @@ a decoder/playback thread. These are JVM/framework-source checks, not device or
 receiver playback evidence. Accepted history writes retain their independent
 lifetime described below.
 
+### Unresolved navigation defects
+
+Findings **4–5** from the 2026-10-22 playback concurrency audit (baseline
+`29018edf312868bbd2634bc5c00b1e73bc69b3f1`) remain unresolved in the current
+implementation. They are defects, not supported playback contracts:
+
+- **4 — Recovery during pending navigation.** Quality/audio changes call
+  `Player.setRecovery()`, which pairs the selected queue index with the current
+  playback clock without checking that both represent the same occurrence.
+  Selecting B while the engine still represents A, then changing quality/audio,
+  can copy A's position into B. `PlaybackHistory`'s progress-index guard does not
+  protect this separate recovery path.
+- **5 — Initial cast preparation after a failed selection.**
+  `CastPlayback.onQueueItemChanged()` invalidates another occurrence only when
+  casting is already active. During initial preparation for A, selecting a
+  failed B can leave A's preparation alive: B's metadata has no `StreamInfo`,
+  so `loadCurrent()` returns before cancelling it. The completion checks the
+  preparation generation and connection, but not the captured queue occurrence,
+  and can hand the skipped A to the receiver.
+
+The original audit demonstrated these application-state failures with controlled
+JVM scenarios. Current source inspection still shows the missing ownership
+checks; the committed active-cast invalidation regression does not cover initial
+preparation followed by a failed selection. Neither the original audit nor this
+documentation review establishes the full failed-source/receiver sequence on a
+device.
+
 ## Volume, mute and audio focus
 
 [`PlaybackAudio`](../app/src/main/java/org/schabi/newpipe/player/audio/PlaybackAudio.java)
@@ -327,9 +358,11 @@ connects it to the preferences and to the Room-backed
   Disposal is not cancellation, but database failures can still lose a write.
 - A stream with no history, a finished one, or a failed lookup has no resume
   position.
-- The queue's own recovery position is the content position and is kept with
-  the watch history switched off. The progress written to the database is the
-  playback position and is written only with it switched on.
+- Progress recording updates the queue's recovery position from the content
+  position even with watch history off, but only when the queue and engine media
+  indices agree. Database progress uses the playback position and requires watch
+  history to be on. Other recovery callers, including `Player.setRecovery()`,
+  are separate from this guard; see the unresolved navigation defect above.
 
 ## Broadcasts
 

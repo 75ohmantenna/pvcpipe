@@ -34,6 +34,25 @@ extractor features. See [docs/playback.md](../docs/playback.md) for FCast
 controls and media limits. Offline fixtures establish parser behavior, not
 current website availability; live observations remain dated records.
 
+## Maintained and generated sources
+
+The service implementation and offline regression tests are maintained in this
+fork. Existing NewPipe Extractor copyright and license headers identify inherited
+code; they are not statements of the app's current service support.
+
+Do not hand-edit generated relative-date patterns in `timeago-parser/`; their
+source data and generator entry points are described in
+[`timeago-parser/raw/README.md`](timeago-parser/raw/README.md).
+BitChute response models under
+`extractor/src/main/java/com/github/pvcpipe/json2java4nanojson/` carry
+json2java4nanoJson generation notices. The extractor build also generates Java
+from Protocol Buffers and Wire definitions. Preserve those generation and
+provenance notices when updating the corresponding sources.
+
+The commands above are maintained build examples, not evidence of current
+service availability. Service tests using fake downloaders exercise only their
+supplied responses.
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).

@@ -2,9 +2,10 @@
 
 ## Source of truth
 
-- Implementation and behavioral tests are authoritative. Update affected guides
-  and code comments when behavior changes; do not preserve a false claim to match
-  old documentation.
+- Establish behavior from implementation, relevant callers, configuration and
+  behavioral tests. Inspect test doubles and assertions before generalizing their
+  evidence. Correct stale guides and comments, but report possible code defects
+  rather than documenting them as intentional contracts.
 - `pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/ServiceList.java`
   defines supported services and their persistent IDs. Removed IDs remain retired.
 - `version.properties` is the shared app/extractor version source.
@@ -21,6 +22,9 @@
   Follow `docs/playback.md` and `app/src/main/java/org/schabi/newpipe/player/cast/`.
 - Verify significant behavior by running the changed path. Distinguish controlled
   protocol peers and emulator results from real receiver/hardware evidence.
+- Playback audit findings 4–5 remain unresolved unless new evidence establishes
+  otherwise; see `docs/playback.md` under "Unresolved navigation defects".
+  Keep dated audit observations separate from current guarantees.
 
 ## RTK shell commands
 

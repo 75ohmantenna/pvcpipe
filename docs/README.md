@@ -1,8 +1,10 @@
 # Documentation
 
-The implementation and tests define PVCPipe's behavior. These pages explain
-that behavior, its limits and the code behind it. If a guide disagrees with
-the implementation, the guide needs correcting.
+Establish behavior from implementation, relevant callers, configuration and
+behavioral tests, not from these pages. Test doubles and narrow assertions
+limit what a passing test establishes. A discrepancy can be a stale guide,
+a known limitation or a code defect; do not turn a defect into a promised
+contract merely because it is implemented.
 
 PVCPipe is in development. The guides describe implemented behavior and
 limits, not a claim that all supported sites, receivers or devices have
@@ -17,7 +19,6 @@ A guide describes the code as it is now and names the classes to read.
 | --- | --- |
 | [building.md](building.md) | SDK and JDK requirements, build tasks, application IDs, signing, versioning and safe testing |
 | [services.md](services.md) | Service IDs, extraction capabilities, search filters, Kick metadata, retired services and integration requirements |
-| [dependency-audit.md](dependency-audit.md) | Dependency roles, standard-library replacements, compatibility decisions and verification, October 2026 |
 | [playback.md](playback.md) | Source selection, FCast setup and limits, queue control, audio focus, history, errors and YouTube proof tokens |
 | [library-data.md](library-data.md) | Local playlists, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Download selection and submission, checkpoints, HLS processing and finished-file sharing |
@@ -36,5 +37,7 @@ guides and implementation for current behavior.
 | [odysee-observations.md](odysee-observations.md) | What Odysee's servers answered while its service was written, October 2026 |
 | [local-playlist-mutations.md](local-playlist-mutations.md) | The uninstalling instrumentation run and the procedure for testing an existing installation |
 | [service-protocol-observations.md](service-protocol-observations.md) | Protocol observations, implementation provenance and controlled extraction follow-ups, October 2026 |
+| [dependency-audit.md](dependency-audit.md) | Dependency roles, compatibility decisions, toolchain and checksum verification, October 2026 |
+| [documentation-alignment.md](documentation-alignment.md) | Documentation/comment audit coverage, unresolved discrepancies and proposed UI-text follow-ups, 2026-10-23 |
 
 `AGENTS.md` at the top of the repository holds the rules for coding agents.

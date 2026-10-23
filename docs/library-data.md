@@ -18,7 +18,8 @@ with automatic-thumbnail updates in the same transaction.
   edits cannot change those pending operations.
 - These mutations use a shared serial write scheduler and cache their result,
   so multiple observers do not repeat the write. Playlist creation instead
-  uses a deferred, uncached I/O operation and reads its input on subscription.
+  checks for an empty input immediately; for a nonempty input it returns a
+  deferred, uncached I/O operation that reads the live list on subscription.
 - Duplicate removal keeps the first occurrence. Watched-item removal uses
   both history and saved progress; finished-only removal also checks the
   saved completion state. A pending draft is applied in the same transaction
@@ -44,8 +45,9 @@ stores the results in batches and then trims old entries from the feed.
   the whole run.
 - The first observer of `result` starts the run. Later observers get the same
   outcome replayed. An observer that detaches does not stop the work.
-- `cancel` stops new channel loads from starting. Loads already under way
-  finish, and what was collected is still stored.
+- `cancel` cooperatively stops admitting channel loads at the pipeline's
+  cancellation checks. Loads already under way finish, and collected results
+  are still stored.
 - All of this runs inside the app's process. If Android kills the process,
   the refresh is gone.
 
@@ -80,15 +82,20 @@ in the background and show its progress in a notification.
 
 - An import reads its source: a channel address, a file exported from a
   service, or an earlier export of this app. It counts and skips channels
-  from unsupported services. It loads every remaining channel before storing
-  any, then stores them in order, in batches.
-- A batch that fails does not undo the batches stored before it.
+  from unsupported services. For every remaining entry it loads the channel
+  and its first tab before storing any, then stores the results in source
+  order, in batches.
+- Each batch is a database transaction. A batch that fails rolls back that
+  batch, not the batches stored before it. Import updates existing
+  subscriptions as well as inserting new ones; a successful count is the
+  number of supported source entries processed, not necessarily new rows.
 - An export takes a snapshot of the subscriptions and writes it to the
   document the user chose.
 - A source that cannot be opened, a channel that cannot be loaded and a write
   that fails all come back as `Outcome.Failure`. None of them is reported as
   an import or export of nothing. A cancelled coroutine stays cancelled and
-  is not turned into a failure.
+  is not turned into a failure. An empty source, or one containing only
+  unsupported services, can succeed with a count of zero.
 
 ## Backup and restore
 
@@ -108,9 +115,10 @@ media, the separate finished-downloads database and unfinished-download state.
 **Inspection.** Before a restore the app looks at the chosen file and reports
 whether it is a readable ZIP and which form of settings it holds. JSON
 settings are preferred when both forms are present. Inspection is advisory:
-it does not validate the database or snapshot the archive. If the settings
-format changes before restore preparation, the restore stops and requires a
-new inspection.
+it does not validate the database or snapshot the archive. When settings
+are included in the restore, a change in the preferred settings format
+before preparation stops the restore and requires a new inspection.
+Database-only restores do not recheck the settings format.
 
 **Imported settings are not trusted.** Before they replace the live ones,
 `ImportedPreferenceTypes.conformImport` checks their types. A preference the
@@ -168,3 +176,8 @@ Instrumentation tests against Room on a device, not in `make ci`:
 and
 [`BackupRestoreIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreIntegrationTest.java).
 [building.md](building.md) says where it is safe to run them.
+
+These tests exercise controlled workflow failures and local persistence.
+The feed and subscription Room tests supply extraction results rather than
+contacting services; they do not establish live extractor/network behavior
+or survival after Android kills the process.
