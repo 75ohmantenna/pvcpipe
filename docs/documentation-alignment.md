@@ -43,7 +43,10 @@ Kotlin, resources, external sites or historical test artifacts.
   A later 2026-10-23 correction revalidated and fixed finding **4** with isolated
   baseline/fixed controlled JVM recovery-and-seek evidence; see
   [the correction and its boundaries](playback.md#recovery-during-pending-navigation--corrected-2026-10-23).
-  Finding **5** remains [a separate unresolved defect](playback.md#unresolved-navigation-defects).
+  A subsequent 2026-10-23 correction revalidated and fixed finding **5**, including
+  failed metadata delivery and late initial-cast completion on same-URL distinct
+  occurrences; see [the correction and mocked boundaries](playback.md#initial-cast-preparation-ownership--corrected-2026-10-23).
+  The separate equal-index history-write race remains outside both corrections.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to

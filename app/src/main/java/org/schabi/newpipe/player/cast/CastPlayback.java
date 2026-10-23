@@ -34,6 +34,7 @@ public final class CastPlayback implements FCastSession.Listener {
     @Nullable private CastMediaResolver preparingResolver;
     @Nullable private CastMediaResolver previousResolver;
     @Nullable private MediaItemTag loadedTag;
+    @Nullable private MediaItemTag receiverTag;
     @Nullable private PlayQueueItem loadedItem;
     private boolean active;
     private boolean preparing;
@@ -133,6 +134,7 @@ public final class CastPlayback implements FCastSession.Listener {
         error = null;
         final long currentPosition = getPosition();
         cancelPreparation();
+        receiverTag = null;
         reloadOnConnection = true;
         if (active) {
             position = currentPosition;
@@ -166,9 +168,22 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     private void loadCurrent(final boolean force) {
+        if (closed) {
+            return;
+        }
+        final PlayQueueItem item = player.getCurrentItem();
+        // Queue-manager reloads temporarily clear currentItem without changing occurrence.
+        if (item == null) {
+            return;
+        }
         final StreamInfo info = player.getCurrentStreamInfo().orElse(null);
         final MediaItemTag tag = player.getCurrentMetadata();
-        if (info == null || tag == null || tag == loadedTag && !force || closed) {
+        if (info == null || tag == null) {
+            cancelSourcePreparation();
+            return;
+        }
+        if (tag == loadedTag && !force
+                && (preparingResolver != null || receiverTag != null)) {
             return;
         }
         if (session.getLocalAddress() == null) {
@@ -185,7 +200,7 @@ public final class CastPlayback implements FCastSession.Listener {
         }
         cancelPreparation();
         loadedTag = tag;
-        loadedItem = player.getCurrentItem();
+        loadedItem = item;
         preparing = true;
         playWhenReady = shouldPlay;
         if (active) {
@@ -206,8 +221,8 @@ public final class CastPlayback implements FCastSession.Listener {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(media -> {
-                    if (closed || request != generation || session.getConnectionState() != 2) {
-                        next.close();
+                    if (!ownsPreparation(request, item, next)) {
+                        discardPreparation(next);
                         return;
                     }
                     if (previousResolver != null) {
@@ -216,6 +231,7 @@ public final class CastPlayback implements FCastSession.Listener {
                     previousResolver = resolver;
                     resolver = next;
                     preparingResolver = null;
+                    receiverTag = tag;
                     // Local playback continues during preparation; take its handoff position now.
                     if (!active) {
                         position = player.getCurrentPosition();
@@ -240,9 +256,11 @@ public final class CastPlayback implements FCastSession.Listener {
                     player.onPlaybackParametersChanged(parameters);
                     notifyListeners();
                 }, failure -> {
-                    if (!closed && request == generation) {
+                    if (ownsPreparation(request, item, next)) {
                         onError(player.getContext().getString(R.string.fcast_source_error)
                                 + "\n" + failure.getMessage());
+                    } else {
+                        discardPreparation(next);
                     }
                 }));
         notifyListeners();
@@ -252,6 +270,7 @@ public final class CastPlayback implements FCastSession.Listener {
     public void onPlayerReset() {
         cancelPreparation();
         loadedTag = null;
+        receiverTag = null;
         loadedItem = null;
         ended = false;
         if (active) {
@@ -265,15 +284,55 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     /**
-     * During an active cast, quality reloads keep the item;
-     * another occurrence invalidates ownership.
+     * Quality reloads keep the item; another occurrence invalidates ownership,
+     * including initial preparation before the local-to-cast handoff.
      *
      * @param item the selected queue occurrence, not merely its video URL
      */
     public void onQueueItemChanged(final PlayQueueItem item) {
-        if (active && loadedItem != item) {
+        if (loadedItem != item) {
             onPlayerReset();
         }
+    }
+
+    private boolean ownsPreparation(final int request, final PlayQueueItem item,
+                                    final CastMediaResolver next) {
+        return item != null && !closed && request == generation && preparingResolver == next
+                && item == player.getCurrentItem() && session.getConnectionState() == 2;
+    }
+
+    private void discardPreparation(final CastMediaResolver next) {
+        if (preparingResolver == next) {
+            cancelSourcePreparation();
+        } else {
+            next.close();
+        }
+    }
+
+    private void cancelSourcePreparation() {
+        final long currentPosition = getPosition();
+        final boolean restoreReceiver = active && receiverTag != null && preparingResolver != null;
+        cancelPreparation();
+        loadedTag = active && receiverTag == null ? loadedTag : receiverTag;
+        preparing = active && receiverTag == null;
+        if (active) {
+            position = currentPosition;
+            updateTime = SystemClock.elapsedRealtime();
+            if (restoreReceiver && canControlReceiver()) {
+                // The replacement paused this source; restore the latest pending controls.
+                session.seek(position);
+                session.setSpeed(speed);
+                if (playWhenReady) {
+                    session.resume();
+                } else {
+                    session.pause();
+                }
+            }
+            player.onCastingStateChanged(preparing ? Player.STATE_BUFFERING
+                    : playWhenReady ? Player.STATE_PLAYING : Player.STATE_PAUSED);
+            player.onCastingChanged();
+        }
+        notifyListeners();
     }
 
     public void setPlayWhenReadyForSource(final boolean ready) {
@@ -292,7 +351,7 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private boolean canControlReceiver() {
         return !closed && session.getConnectionState() == 2 && !reloadOnConnection
-                && preparingResolver == null && loadedTag != null;
+                && preparingResolver == null && loadedTag != null && receiverTag != null;
     }
 
     public void play() {
@@ -376,6 +435,7 @@ public final class CastPlayback implements FCastSession.Listener {
         reloadOnConnection = false;
         cancelPreparation();
         loadedTag = null;
+        receiverTag = null;
         loadedItem = null;
         if (resolver != null) {
             resolver.close();
