@@ -120,6 +120,20 @@ are included in the restore, a change in the preferred settings format
 before preparation stops the restore and requires a new inspection.
 Database-only restores do not recheck the settings format.
 
+**Restore choices.** The overwrite confirmation still comes first. If the
+backup contains settings, **Restore backup** then explains the two actions:
+
+- **Restore without settings** restores the database while keeping current
+  settings.
+- **Restore with settings** restores the database and replaces current settings
+  with the backup's settings.
+- **Cancel**, Back and outside dismissal close the dialog without starting a
+  restore. Closing the settings view before choosing also does not start one.
+
+Legacy serialized settings retain their trust/security warning in this dialog.
+A backup without settings proceeds with database-only restore after the
+overwrite confirmation; it does not show a settings-choice dialog.
+
 **Imported settings are not trusted.** Before they replace the live ones,
 `ImportedPreferenceTypes.conformImport` checks their types. A preference the
 app declares as numeric must hold that kind of number, or one that converts
@@ -170,11 +184,14 @@ Unit tests, run by `make ci`:
 and
 [`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java).
 
-Instrumentation tests against Room on a device, not in `make ci`:
+Instrumentation tests on a device, not in `make ci`:
 [`FeedRefreshDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/feed/service/FeedRefreshDatabaseTest.kt),
-[`SubscriptionTransferDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferDatabaseTest.kt)
+[`SubscriptionTransferDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferDatabaseTest.kt),
+[`BackupRestoreIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreIntegrationTest.java)
 and
-[`BackupRestoreIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreIntegrationTest.java).
+[`BackupRestoreDialogTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreDialogTest.java).
+The dialog tests use the real settings fragment, isolated archive/database files
+and preferences, and a counting restart callback rather than restarting the app.
 [building.md](building.md) says where it is safe to run them.
 
 These tests exercise controlled workflow failures and local persistence.
