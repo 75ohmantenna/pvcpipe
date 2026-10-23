@@ -132,8 +132,8 @@ public final class KickApi {
     }
 
     /**
-     * Older shared links contain the legacy UUID; the current resource uses a new UUID.
-     * Try the channel-scoped resource first, and only a missing resource permits the legacy API.
+     * Channel-scoped links try the current resource first, with legacy fallback only for
+     * a missing resource. Older shared {@code video/} links use the legacy UUID API directly.
      */
     public static JsonObject video(final String streamId) throws IOException, ExtractionException {
         final String uuid = KickUrl.videoId(streamId);

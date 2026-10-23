@@ -96,12 +96,12 @@ public class PvcFromHlsRemuxer extends Postprocessing {
     }
 
     /**
-     * Runs one conversion in a directory of its own and removes the directory afterwards, also
-     * when the conversion fails. The failure of the conversion is what the caller gets.
+     * Runs one conversion in a directory of its own and attempts to remove it afterwards,
+     * also when conversion fails. Cleanup is best effort and does not replace a conversion failure.
      * <p>
      * When no other conversion is running, whatever is in the parent directory was left by a
      * conversion that never got to clean up: a build from before each conversion had its own
-     * directory, or a process that was killed half way. It is removed first.
+     * directory, or a process that was killed half way. Cleanup is attempted first.
      *
      * @param parent           the directory all conversions work under
      * @param missionTimestamp the timestamp of the mission

@@ -30,7 +30,7 @@ extractors return.
 
 | Service | ID | Media | Kiosks, default first | Playlists | Service subscription import |
 | --- | --- | --- | --- | --- | --- |
-| YouTube | 0 | audio, video, live | `live`, `trending_gaming`, `trending_music`, `trending_movies_and_shows`, `trending_podcasts_episodes` | yes | yes |
+| YouTube | 0 | audio, video, live | `live`, `trending_podcasts_episodes`, `trending_gaming`, `trending_movies_and_shows`, `trending_music` | yes | yes |
 | SoundCloud | 1 | audio | `New & hot` | yes | yes |
 | BitChute | 5 | video, live | `Trending Today`, `Trending This Week`, `Trending This Month`, `Popular`, `Suggested`, `live` | yes | no |
 | Rumble | 6 | audio, video, live | `Today's Battle Leaderboard Top 50`, `Editor Picks`, `Live`, `Trending Today`, `Latest`, `Shorts` | no | no |
@@ -326,16 +326,18 @@ unknown rather than failing the page.
 
 ### Media hosts
 
-`get` returns one address on `player.odycdn.com`. Livestreams play from
-`cloud.odysee.live`. Both hosts refuse requests that do not name the website
-as their referrer, so the app sends `Referer: https://odysee.com/` on every
-media request to them (`DownloaderImpl.getMediaReferer`): from the player,
-the downloader and the extractor downloader.
+The app supplies `Referer: https://odysee.com/` for media requests to
+`odycdn.com` and `odysee.live`, including their subdomains
+(`DownloaderImpl.getMediaReferer`). This covers the observed uploaded-media
+host `player.odycdn.com` and live-media host `cloud.odysee.live`, from the
+player, the downloader and the extractor downloader. The extractor downloader
+preserves an explicitly supplied referrer.
 
 The extractor uses `HEAD` on `player.odycdn.com` to discover HLS renditions:
 with the referrer, an uploaded file may redirect to a transcoded HLS master
-instead of describing the original file. The app therefore does not use
-`HEAD` to determine the uploaded file's size (`DownloaderImpl.isHeadUnusable`):
+instead of describing the original file. The app therefore avoids `HEAD` for
+size probes on `odycdn.com` and its subdomains unless the URL path ends in
+`.ts` or `.m3u8`, ignoring case (`DownloaderImpl.isHeadUnusable`):
 
 - Where the downloader would use `HEAD`, it asks with `GET`. Where that
   request would have asked for everything from a position on, it asks for one
@@ -343,8 +345,7 @@ instead of describing the original file. The app therefore does not use
   (`DownloadMission.openConnection`).
 - The size shown in the download dialog comes from the same kind of request
   (`PvcDownloaderImplUtils.getContentLengthViaGet`).
-- The playlists and segments of the HLS renditions answer `HEAD` like any
-  file and are asked as before.
+- URLs with `.m3u8` or `.ts` paths retain the ordinary `HEAD` size probe.
 
 An external player receives the media URL without PVCPipe's referrer header.
 [odysee-observations.md](odysee-observations.md) records what the hosts
@@ -376,8 +377,9 @@ Plain `kick.com/{slug}` links open the current broadcast; `/{slug}/videos`
 and `/{slug}/about` open the channel. VOD links use
 `/{slug}/videos/{uuid}`; older `/video/{uuid}` links are also understood.
 Some real legacy channel slugs begin with `@`; that character is preserved.
-Current VOD lookup falls back to the older UUID API only after HTTP 404,
-not after a private, expired, blocked or malformed response.
+Channel-scoped VOD lookup falls back to the older UUID API only after HTTP 404,
+not after a private, expired, blocked or malformed response. Older
+`/video/{uuid}` links use the legacy API directly.
 VOD links can include a nonnegative `?t=<seconds>` start offset. Extraction
 reads it from the original URL before canonicalization. Invalid or oversized
 values and encoded parameter-boundary lookalikes default to zero. Live playback

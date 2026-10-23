@@ -190,7 +190,7 @@ public class MediaSourceManager {
     //////////////////////////////////////////////////////////////////////////*/
 
     /**
-     * Dispose the manager and releases all message buses and loaders.
+     * Permanently retires the manager, cancels subscriptions/loaders and clears Handler callbacks.
      */
     public void dispose() {
         if (disposed) {
@@ -511,7 +511,7 @@ public class MediaSourceManager {
         loadingItems.remove(item);
 
         final int itemIndex = playQueue.indexOf(item);
-        // Only update the playlist timeline for items at the current index or after.
+        // Replace a timeline slot when its source identity or replacement policy requires it.
         if (isCorrectionNeeded(item)) {
             if (DEBUG) {
                 Log.d(TAG, "MediaSource - Updating index=[" + itemIndex + "] with "
@@ -528,10 +528,10 @@ public class MediaSourceManager {
      * for a given {@link PlayQueueItem} needs replacement, either due to gapless playback
      * readiness or playlist desynchronization.
      * <p>
-     * If the given {@link PlayQueueItem} is currently being played and is already loaded,
-     * then correction is not only needed if the playlist is desynchronized. Otherwise, the
-     * check depends on the status (e.g. expiration or placeholder) of the
-     * {@link ManagedMediaSource}.
+     * This check retains a loaded source for the selected occurrence even after expiration;
+     * neighboring sources may be refreshed. Selection-time renewal is handled separately by
+     * {@link #maybeRenewCurrentIndex()}. Each slot delegates to its
+     * {@link ManagedMediaSource} policy.
      * </p>
      *
      * @param item {@link PlayQueueItem} to check
@@ -549,11 +549,8 @@ public class MediaSourceManager {
      * If so, the expired source is replaced by a dummy {@link ManagedMediaSource} and
      * {@link #loadImmediate()} is called to reload the current item.
      * <br><br>
-     * If not, then the media source at the current index is ready for playback, and
-     * {@link #maybeSynchronizePlayer()} is called.
-     * <br><br>
-     * Under both cases, {@link #maybeSync(boolean)} will be called to ensure the listener
-     * is up-to-date.
+     * Otherwise, attempts synchronization if the queue and selected source are ready.
+     * Synchronization after invalidation waits for the replacement source's completion.
      */
     private void maybeRenewCurrentIndex() {
         if (disposed) {

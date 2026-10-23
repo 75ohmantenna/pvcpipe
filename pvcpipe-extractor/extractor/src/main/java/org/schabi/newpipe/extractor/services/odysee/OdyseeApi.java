@@ -86,7 +86,7 @@ public final class OdyseeApi {
     /**
      * Looks a claim up by its LBRY URI.
      *
-     * @param lbryUri such as {@code lbry://@channel#c/video#v}
+     * @param lbryUri such as {@code lbry://@channel#c/video#a}
      * @return the claim
      * @throws ContentNotAvailableException if there is no such claim
      */

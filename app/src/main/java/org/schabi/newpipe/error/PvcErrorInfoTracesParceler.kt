@@ -11,11 +11,10 @@ import java.util.zip.GZIPOutputStream
 import kotlinx.parcelize.Parceler
 
 /**
- * The binder can not handle too much data and throws TransactionTooLargeException.
- *
- * This Parceler tries to skip this fact with temporary gzip the data. Seems to
- * work -- but sending over eMail still needs some truncating
- * see {@link PvcErrorActivityHelper}.
+ * Bounds and GZIP-compresses error traces to reduce the Binder parcel payload.
+ * The compressed representation stores a trace count and length-prefixed UTF-8 traces,
+ * so trace contents do not require a separator. This does not guarantee that the complete
+ * parcel fits Binder's transaction limit.
  */
 object PvcErrorInfoTracesParceler : Parceler<Array<String>> {
     override fun create(parcel: Parcel): Array<String> {

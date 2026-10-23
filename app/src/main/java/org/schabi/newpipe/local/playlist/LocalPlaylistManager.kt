@@ -204,7 +204,7 @@ open class LocalPlaylistManager internal constructor(
         isPermanent
     )
 
-    // The two lookups below return Singles so that no caller can run their queries on the main thread.
+    // Schedule both lookup queries on IO; callers must still avoid blocking the main thread.
     open fun getIsPlaylistThumbnailPermanent(playlistId: Long): Single<Boolean> = Single.fromCallable {
         val playlist = playlistTable.getPlaylistSync(playlistId)
             ?: throw NoSuchElementException("Playlist does not exist: $playlistId")

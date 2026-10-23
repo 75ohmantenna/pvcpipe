@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Grants a single direct-download file without mapping its parent directory into FileProvider.
- * The opaque URI survives process death so a recipient can open it after the chooser closes.
+ * The URI mapping survives process death; opening it still requires Android's read URI grant.
  * SAF downloads use their document URI instead and never pass through this provider.
  */
 public final class MissionFileProvider extends ContentProvider {

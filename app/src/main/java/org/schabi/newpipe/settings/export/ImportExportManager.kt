@@ -193,7 +193,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
     }
 
     /**
-     * Remove all shared preferences from the app and load the preferences supplied to the manager.
+     * Replace the live preferences with the decoded legacy settings entry from the archive.
      */
     @Deprecated(
         "Legacy Java-serialized preferences require restricted deserialization; prefer JSON",

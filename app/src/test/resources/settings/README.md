@@ -8,5 +8,8 @@ contain no user backup data. Their names describe the entries:
   serialized preferences, an injection payload, or is missing.
 - `json` or `nojson`: whether `preferences.json` is in it.
 
-`newpipe.db` is a database by itself. `BackupRestoreFailureTest` packs it
-into archives it builds while it runs.
+The standalone `newpipe.db` is a text placeholder, not a SQLite database.
+`BackupRestoreFailureTest` packs it into archives built during the test, and
+`ImportExportManagerTest` compares its text after export. Those controlled
+rollback/preparation and archive-copy tests do not establish that SQLite can
+open that payload; device/Room tests are separate evidence.

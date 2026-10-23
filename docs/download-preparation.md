@@ -25,9 +25,10 @@ type, postprocessing and recovery use that captured format; later dialog
 selection changes do not alter the pending plan.
 
 Size probes use the same service-specific user agent as media downloads,
-including BitChute's seed-host workaround. When HEAD is unavailable, a GET
-probe requests only the first byte and closes the response after reading its
-size headers.
+including BitChute's seed-host workaround. For hosts marked HEAD-unusable,
+the dialog uses a GET probe requesting only the first byte and closes the
+response after reading its size headers. Other HEAD failures leave the size
+unknown; this dialog probe does not automatically retry them with GET.
 
 ## What "submitted" means
 
@@ -48,12 +49,15 @@ unfinished downloads are not migrated.
 - A checkpoint replaces the previous one atomically (`Utility.writeToFile`
   uses Android's `AtomicFile`). A write that fails leaves the previous
   checkpoint readable.
-- A mission that is done saves a last checkpoint and then tells the service
-  (`DownloadMission.notifyFinished`). `DownloadManager.setFinished` writes
-  the row in the finished-downloads database first, and only then drops the
-  mission from the pending list and deletes its checkpoint.
-- If the app stops between those steps, the next start finds a checkpoint
-  that says "finished" and records it then.
+- A mission that is done attempts a last checkpoint, then tells the service
+  (`DownloadMission.notifyFinished`) even if that write fails.
+  `DownloadManager.setFinished` writes the row in the finished-downloads
+  database first, and only then drops the mission from the pending list and
+  deletes its checkpoint.
+- If the app stops between those steps and the final checkpoint was saved,
+  the next start finds a checkpoint that says "finished" and records it then.
+  If the final write failed, only an earlier checkpoint is available; it
+  does not necessarily describe the completed file.
 
 The media file, the checkpoint and the finished-downloads database are three
 separate things on disk. No transaction spans them.
@@ -70,7 +74,9 @@ places:
   back to `_`. Path separators are replaced even when a custom pattern keeps
   them. The settings screen refuses such a replacement too.
 - `DownloadPreparation.save` fails with `FILE_CREATION` before any picker or
-  file change when the name is not a plain file name.
+  file change when the constructed filename (base name plus suffix) is not a
+  plain file name. A missing or blank base name fails earlier as
+  `INVALID_SELECTION`.
 - `StoredDirectoryHelper` and the path-based `StoredFileHelper` constructor
   refuse empty names, `.`, `..` and names containing a separator or NUL. The
   constructor checks before `Files.deleteIfExists`, so a refused name changes
@@ -80,11 +86,13 @@ places:
 
 ## Removing entries
 
-"Delete" removes an entry and its file. "Delete entry" keeps the file and is
-offered only for finished downloads. An unfinished mission keeps its threads
-and its checkpoint, so forgetting only its entry would bring it back when it
-finished or at the next start. `DownloadManager.deleteMission` refuses that
-case as well as the menu hiding it.
+"Delete" removes an entry and requests deletion of its file. The manager
+does not check the file-deletion result, so a removed entry does not prove
+the file was erased. "Delete entry" keeps the file and is offered only for
+finished downloads. An unfinished mission can still own workers or a
+checkpoint; removing only its entry would not stop those workers or prevent
+checkpoint replay at the next start. `DownloadManager.deleteMission` refuses
+entry-only removal for unfinished missions, as well as the menu hiding it.
 
 ## HLS downloads
 
@@ -144,6 +152,9 @@ grants read access to that one file.
 instrumentation tests and need a device. Before running any instrumentation
 on a phone that has the app installed, read
 [local-playlist-mutations.md](local-playlist-mutations.md).
+
+These tests cover controlled preparation and persistence scenarios, not
+every host's media URLs, Android process-death timing or live HLS expiration.
 
 [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) records dated phone checks
 of download pause/resume behavior and media checksums.

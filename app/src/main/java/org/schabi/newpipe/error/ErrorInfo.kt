@@ -36,8 +36,8 @@ import org.schabi.newpipe.pvc.feature.logcat.PvcLogcatDumper
 import org.schabi.newpipe.util.text.getText
 
 /**
- * An error has occurred in the app. This class contains plain old parcelable data that can be used
- * to report the error and to show it to the user along with correct action buttons.
+ * Parcelable error details for display and reporting. Public constructors bound traces
+ * and request preference-controlled log capture; parcel reconstruction bypasses those helpers.
  */
 @Parcelize
 class ErrorInfo private constructor(
@@ -48,12 +48,13 @@ class ErrorInfo private constructor(
     val serviceId: Int?,
     private val message: ErrorMessage,
     /**
-     * If `true`, a report button will be shown for this error. Otherwise the error is not something
-     * that can really be reported (e.g. a network issue, or content not being available at all).
+     * Whether this error is eligible for reporting. Error panels may show a CAPTCHA action
+     * instead. Expected failures such as unknown hosts or explicitly unavailable content
+     * can be classified as unreportable.
      */
     val isReportable: Boolean,
     /**
-     * If `true`, the process causing this error can be retried, otherwise not.
+     * Whether retrying is permitted. A retry button also requires a caller-provided retry action.
      */
     val isRetryable: Boolean,
     /**

@@ -65,9 +65,6 @@ public abstract class PlayQueue implements Serializable {
 
     /**
      * Initializes the play queue message buses.
-     * <p>
-     * Also starts a self reporter for logging if debug mode is enabled.
-     * </p>
      */
     public void init() {
         eventBroadcast = PublishSubject.create();
@@ -228,9 +225,10 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
-     * Gets an immutable view of the play queue's items.
+     * Gets an unmodifiable view of the current backing list, not a snapshot.
+     * {@link #unshuffle()} replaces that list; obtain a new view afterwards.
      *
-     * @return an immutable view of the play queue
+     * @return an unmodifiable view of the current backing list
      */
     @NonNull
     public List<PlayQueueItem> getStreams() {
@@ -255,7 +253,7 @@ public abstract class PlayQueue implements Serializable {
     /**
      * Changes the current playing index by an offset amount.
      * <p>
-     * Will emit a {@link SelectEvent} if offset is non-zero.
+     * Emits a {@link SelectEvent} even when the offset is zero.
      * </p>
      *
      * @param offset the offset relative to the current index
@@ -468,8 +466,8 @@ public abstract class PlayQueue implements Serializable {
      * Will emit a {@link ReorderEvent} if shuffled.
      * </p>
      *
-     * @implNote Does nothing if the queue has a size <= 2 (the currently playing video must stay on
-     * top, so shuffling a size-2 list does nothing)
+     * @implNote For size <= 2, ensures a shuffle backup exists but leaves order and index unchanged
+     * and emits no reorder event.
      */
     public synchronized void shuffle() {
         // Create a backup if it doesn't already exist
