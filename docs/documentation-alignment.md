@@ -52,6 +52,11 @@ Kotlin, resources, external sites or historical test artifacts.
   through PR #140. A later 2026-10-23 correction revalidated the unchanged
   post-#140 baseline and added ownership-gated synchronization retry; see
   [cast synchronization liveness and evidence boundaries](playback.md#cast-synchronization-liveness--corrected-2026-10-23).
+  PR #141's remaining active-cast clock-attribution concern was subsequently
+  reproduced on unchanged post-#141 master: reset zero replaced B's pending
+  recovery and was passed to the history adapter. The focused correction adds
+  occurrence/clock provenance at acceptance and guards disconnect's position
+  override; see [active-cast checkpoints and evidence limits](playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23).
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to
