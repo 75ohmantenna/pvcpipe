@@ -19,9 +19,7 @@ callers, configuration and the scope of relevant tests.
 | License files, copyright headers, incorporated third-party source, json2java4nanoJson notices, Protobuf/Wire output | Preserve legal/provenance content; no stylistic normalization of generated or third-party comments |
 
 The only tracked agent-instruction file in the inventory is root `AGENTS.md`.
-Existing local changes to `.gitignore`, `docs/building.md` and untracked `.omp/`
-were excluded from this pass's commits. The build guide's local language-server
-instructions are user work, not newly established validation evidence.
+Unrelated uncommitted workspace changes were excluded.
 
 Build checks used `Makefile`, `app/build.gradle.kts`, both extractor build scripts,
 `settings.gradle.kts`, the version catalogs, wrapper properties, daemon criteria
@@ -50,6 +48,10 @@ Kotlin, resources, external sites or historical test artifacts.
   submission destination. The email target is also inherited configuration
   (`crashreport@gmx.com`). Changing report destinations is executable behavior and
   requires a focused product/privacy decision; no report was submitted there.
+- `privacy_policy_url` points to `https://newpipe.net/legal/privacy/`, while the
+  report dialog calls it PVCPipe's policy. Resolve the policy content and URL
+  before adopting the proposed privacy-dialog wording. Neither a wording update
+  nor this audit establishes legal compliance.
 - Live service availability, receiver decoding, secure-v4 interoperability and
   device-specific behavior cannot be established by mocked JVM tests or assembling
   APKs. Earlier device/receiver observations retain their original date and build.

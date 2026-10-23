@@ -36,8 +36,8 @@ import org.schabi.newpipe.pvc.feature.logcat.PvcLogcatDumper
 import org.schabi.newpipe.util.text.getText
 
 /**
- * Parcelable error details for display and reporting. Throwable-based construction also
- * records traces and requests log capture.
+ * Parcelable error details for display and reporting. Public constructors bound traces
+ * and request preference-controlled log capture; parcel reconstruction bypasses those helpers.
  */
 @Parcelize
 class ErrorInfo private constructor(
