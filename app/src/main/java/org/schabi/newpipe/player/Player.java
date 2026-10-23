@@ -68,6 +68,7 @@ import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
 import org.schabi.newpipe.player.helper.PlayerHelper;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
+import org.schabi.newpipe.player.mediasource.LoadedMediaSource;
 import org.schabi.newpipe.player.mediasession.MediaSessionPlayerUi;
 import org.schabi.newpipe.player.notification.NotificationPlayerUi;
 import org.schabi.newpipe.player.playback.MediaSourceManager;
@@ -644,11 +645,20 @@ public final class Player implements PlaybackListener, Listener {
             return;
         }
 
+        // Selection can advance before ExoPlayer switches sources. Only the loaded source's
+        // occurrence owns its clock; URLs, indices and currentItem can already match another item.
+        final boolean ownsPosition = MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                .flatMap(tag -> tag.getMaybeExtras(LoadedMediaSource.class))
+                .map(source -> source.getStream() == playQueue.getItem())
+                .orElse(false);
+        if (!ownsPosition) {
+            return;
+        }
+
         final int queuePos = playQueue.getIndex();
         final long windowPos = getCurrentPosition();
         final long duration = getDuration();
 
-        // No checks due to https://github.com/TeamNewPipe/NewPipe/pull/7195#issuecomment-962624380
         setRecovery(queuePos, MathUtils.clamp(windowPos, 0, duration));
     }
 
