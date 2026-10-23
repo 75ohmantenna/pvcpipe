@@ -645,15 +645,7 @@ public final class Player implements PlaybackListener, Listener {
             return;
         }
 
-        // Selection can advance before ExoPlayer switches sources. Only the loaded source's
-        // occurrence owns its clock; URLs, indices and currentItem can already match another item.
-        final boolean ownsPosition = MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
-                .flatMap(tag -> tag.getMaybeExtras(Object.class))
-                .filter(LoadedMediaSource.class::isInstance)
-                .map(LoadedMediaSource.class::cast)
-                .map(source -> source.getStream() == playQueue.getItem())
-                .orElse(false);
-        if (!ownsPosition) {
+        if (!loadedSourceOwnsSelectedItem()) {
             return;
         }
 
@@ -662,6 +654,20 @@ public final class Player implements PlaybackListener, Listener {
         final long duration = getDuration();
 
         setRecovery(queuePos, MathUtils.clamp(windowPos, 0, duration));
+    }
+
+    private boolean loadedSourceOwnsSelectedItem() {
+        if (playQueue == null || playQueue.getItem() == null || exoPlayerIsNull()) {
+            return false;
+        }
+        // Selection can advance or reindex before ExoPlayer switches sources. Neither a URL,
+        // numerical index nor currentItem establishes which occurrence owns the captured clock.
+        return MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                .flatMap(tag -> tag.getMaybeExtras(Object.class))
+                .filter(LoadedMediaSource.class::isInstance)
+                .map(LoadedMediaSource.class::cast)
+                .map(source -> source.getStream() == playQueue.getItem())
+                .orElse(false);
     }
 
     private void setRecovery(final int queuePos, final long windowPos) {
@@ -1653,8 +1659,13 @@ public final class Player implements PlaybackListener, Listener {
     //region StreamInfo history: views and progress
 
     private PlaybackHistory.Snapshot historySnapshot() {
+        // PROGRESS accepts only a clock owned by the selected occurrence, before either
+        // recovery mutation or asynchronous persistence. Accepted writes keep their lifetime.
+        // VIEWED and COMPLETED remain metadata observations, independent of this clock gate.
         return new PlaybackHistory.Snapshot(getCurrentStreamInfo().orElse(null), playQueue,
-                exoPlayerIsNull() || currentMetadata == null
+                currentMetadata == null || !loadedSourceOwnsSelectedItem()
+                        || MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                                .filter(tag -> tag == currentMetadata).isEmpty()
                         ? -1 : simpleExoPlayer.getCurrentMediaItemIndex(),
                 casting.isActive() ? casting.getPosition()
                         : exoPlayerIsNull() ? 0 : simpleExoPlayer.getContentPosition(),

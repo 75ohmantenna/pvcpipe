@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -16,6 +17,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -38,6 +40,7 @@ import com.google.android.exoplayer2.source.SinglePeriodTimeline;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.schabi.newpipe.R;
@@ -45,6 +48,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.cast.CastPlayback;
+import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
@@ -56,6 +60,7 @@ import org.schabi.newpipe.player.playqueue.PlayQueueEvent.SelectEvent;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.player.resolver.PlaybackSources;
+import org.schabi.newpipe.player.ui.PlayerUiList;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
@@ -66,6 +71,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.functions.Function;
@@ -83,6 +90,7 @@ import io.reactivex.rxjava3.schedulers.TestScheduler;
  */
 public class PlayerRecoveryTest {
     private static final long PLAYING_POSITION = 45_000L;
+    private static final long CONTENT_POSITION = 31_000L;
     private static final long SELECTED_RECOVERY = 12_000L;
 
     private final TestScheduler mainThread = new TestScheduler();
@@ -93,6 +101,7 @@ public class PlayerRecoveryTest {
     private CastPlayback casting;
     private StreamInfo stream;
     private SharedPreferences preferences;
+    private boolean historyEnabled;
     private Function<Callable<Scheduler>, Scheduler> previousMainInitializer;
     private MockedStatic<AndroidSchedulers> androidSchedulers;
     private MockedStatic<PreferenceManager> preferenceManager;
@@ -118,7 +127,11 @@ public class PlayerRecoveryTest {
         });
         logs = mockStatic(Log.class);
         images = mockStatic(ImageStrategy.class);
-        records = mockConstruction(HistoryRecordManager.class);
+        records = mockConstruction(HistoryRecordManager.class, (recordManager, ignored) -> {
+            when(recordManager.saveStreamState(any(StreamInfo.class), anyLong()))
+                    .thenReturn(Completable.complete());
+            when(recordManager.onViewed(any(StreamInfo.class))).thenReturn(Maybe.empty());
+        });
         preferences = mock(SharedPreferences.class);
         final Context context = mock(Context.class);
         when(context.getString(R.string.enable_watch_history_key)).thenReturn("watch_history");
@@ -154,9 +167,11 @@ public class PlayerRecoveryTest {
             queue.dispose();
         }
         try {
-            // Disabled persistent history must not be used to manufacture a successful resume.
             assertEquals(1, records.constructed().size());
-            verifyNoInteractions(records.constructed().get(0));
+            if (!historyEnabled) {
+                // Recovery must not be manufactured through persistent history when disabled.
+                verifyNoInteractions(records.constructed().get(0));
+            }
         } finally {
             preferenceManager.close();
             records.close();
@@ -325,6 +340,249 @@ public class PlayerRecoveryTest {
     }
 
     @Test
+    public void equalIndexQualityKeepsExistingRecoveryWithHistoryEnabled() throws Exception {
+        equalIndexTrackChange(true, SELECTED_RECOVERY, true);
+    }
+
+    @Test
+    public void equalIndexQualityKeepsUnsetRecoveryWithHistoryEnabled() throws Exception {
+        equalIndexTrackChange(true, PlayQueueItem.RECOVERY_UNSET, true);
+    }
+
+    @Test
+    public void equalIndexAudioKeepsExistingRecoveryWithHistoryEnabled() throws Exception {
+        equalIndexTrackChange(false, SELECTED_RECOVERY, true);
+    }
+
+    @Test
+    public void equalIndexAudioKeepsUnsetRecoveryWithHistoryEnabled() throws Exception {
+        equalIndexTrackChange(false, PlayQueueItem.RECOVERY_UNSET, true);
+    }
+
+    @Test
+    public void equalIndexQualityKeepsExistingRecoveryWithHistoryDisabled() throws Exception {
+        equalIndexTrackChange(true, SELECTED_RECOVERY, false);
+    }
+
+    @Test
+    public void equalIndexQualityKeepsUnsetRecoveryWithHistoryDisabled() throws Exception {
+        equalIndexTrackChange(true, PlayQueueItem.RECOVERY_UNSET, false);
+    }
+
+    @Test
+    public void equalIndexAudioKeepsExistingRecoveryWithHistoryDisabled() throws Exception {
+        equalIndexTrackChange(false, SELECTED_RECOVERY, false);
+    }
+
+    @Test
+    public void equalIndexAudioKeepsUnsetRecoveryWithHistoryDisabled() throws Exception {
+        equalIndexTrackChange(false, PlayQueueItem.RECOVERY_UNSET, false);
+    }
+
+    @Test
+    public void alignedProgressSavesMetadataPlaybackPositionAndConsumesContentRecovery()
+            throws Exception {
+        start();
+        enableHistory();
+        when(exoPlayer.getContentPosition()).thenReturn(CONTENT_POSITION);
+
+        player.saveStreamProgressState();
+
+        assertEquals(CONTENT_POSITION, queue.getItem().getRecoveryPosition());
+        assertSavedProgress(PLAYING_POSITION);
+        queue.setIndex(0);
+        synchronizeAndAssert(0, CONTENT_POSITION);
+    }
+
+    @Test
+    public void alignedQualitySavesPlaybackPositionBeforeReloadAndConsumesRecovery()
+            throws Exception {
+        alignedTrackHistory(true);
+    }
+
+    @Test
+    public void alignedAudioSavesPlaybackPositionBeforeReloadAndConsumesRecovery()
+            throws Exception {
+        alignedTrackHistory(false);
+    }
+
+    @Test
+    public void alignedProgressWithHistoryDisabledStillConsumesContentRecovery() throws Exception {
+        start();
+        when(exoPlayer.getContentPosition()).thenReturn(CONTENT_POSITION);
+
+        player.saveStreamProgressState();
+
+        assertEquals(CONTENT_POSITION, queue.getItem().getRecoveryPosition());
+        verifyNoInteractions(records.constructed().get(0));
+        queue.setIndex(0);
+        synchronizeAndAssert(0, CONTENT_POSITION);
+    }
+
+    @Test
+    public void pendingNavigationQualityPersistsOnlyThePreviouslyAlignedMetadata()
+            throws Exception {
+        start();
+        enableHistory();
+        final PlayQueueItem playing = queue.getItem();
+        final PlayQueueItem selected = new PlayQueueItem(stream);
+        queue.append(List.of(selected));
+        queue.setRecovery(1, SELECTED_RECOVERY);
+
+        // Selection accepts a coherent old-stream write before advancing the queue.
+        player.selectQueueItem(selected);
+        player.setPlaybackQuality("720p");
+
+        assertEquals(PLAYING_POSITION, playing.getRecoveryPosition());
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertSavedProgress(PLAYING_POSITION);
+        synchronizeAndAssert(1, SELECTED_RECOVERY);
+    }
+
+    @Test
+    public void alignedCastProgressSavesReceiverPositionNotLocalEnginePosition()
+            throws Exception {
+        start();
+        enableHistory();
+        when(casting.isActive()).thenReturn(true);
+        when(casting.getPosition()).thenReturn(73_000L);
+        when(casting.getDuration()).thenReturn(120_000L);
+
+        player.saveStreamProgressState();
+
+        assertEquals(73_000L, queue.getItem().getRecoveryPosition());
+        assertSavedProgress(73_000L);
+        queue.setIndex(0);
+        synchronizeAndAssert(0, 73_000L);
+    }
+
+    @Test
+    public void equalIndexCastQualityCannotSaveReceiverClockForAnotherOccurrence()
+            throws Exception {
+        start();
+        enableHistory();
+        final PlayQueueItem oldOccurrence = queue.getItem();
+        final PlayQueueItem selected = removePlayingOccurrence(SELECTED_RECOVERY);
+        when(casting.isActive()).thenReturn(true);
+        when(casting.getPosition()).thenReturn(73_000L);
+        when(casting.getDuration()).thenReturn(120_000L);
+
+        player.setPlaybackQuality("720p");
+
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, oldOccurrence.getRecoveryPosition());
+        verifyNoInteractions(records.constructed().get(0));
+        queue.setIndex(0);
+        synchronizeAndAssert(0, SELECTED_RECOVERY);
+    }
+
+    @Test
+    public void selectedPreparedSourceWaitsForItsMetadataBeforeSavingItsClock()
+            throws Exception {
+        start();
+        enableHistory();
+        setField("listeners", mock(PlayerListeners.class));
+        setField("UIs", mock(PlayerUiList.class));
+        final StreamInfo previousInfo = stream;
+        // The engine has switched to B, but cached metadata still names A. Accepting this
+        // snapshot would genuinely misattribute B's position to A's persistent stream state.
+        stream = distinctStream();
+        final PlayQueueItem selected = new PlayQueueItem(stream);
+        queue.append(List.of(selected));
+        queue.remove(0);
+        // Keep a following item so metadata delivery does not enter auto-queue/network policy.
+        queue.append(List.of(new PlayQueueItem(previousInfo)));
+        queue.setRecovery(0, SELECTED_RECOVERY);
+        setField("currentItem", selected);
+        final MediaItem selectedSource = loadedItem(selected);
+        when(exoPlayer.getCurrentMediaItem()).thenReturn(selectedSource);
+        when(exoPlayer.getContentPosition()).thenReturn(CONTENT_POSITION);
+        assertSame(selected, owner(selectedSource));
+        assertSame(previousInfo, player.getCurrentStreamInfo().orElse(null));
+
+        player.saveStreamProgressState();
+
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        verifyNoInteractions(records.constructed().get(0));
+
+        // Deliver the real aggregate callback, rather than manufacturing an accepted Snapshot.
+        player.onEvents(exoPlayer, mock(com.google.android.exoplayer2.Player.Events.class));
+        assertSame(stream, player.getCurrentStreamInfo().orElse(null));
+        verify(casting).onSourceChanged();
+        // New metadata legitimately counts B as viewed; progress must also name B, never A.
+        verify(records.constructed().get(0)).onViewed(stream);
+        player.saveStreamProgressState();
+
+        assertEquals(CONTENT_POSITION, selected.getRecoveryPosition());
+        assertSavedProgress(PLAYING_POSITION);
+        queue.setIndex(0);
+        synchronizeAndAssert(0, CONTENT_POSITION);
+    }
+
+    @Test
+    public void equalIndexQualityDoesNotWriteOldMetadataOrCorruptDistinctSelectedRecovery()
+            throws Exception {
+        equalIndexDistinctUrlTrackChange(true);
+    }
+
+    @Test
+    public void equalIndexAudioDoesNotWriteOldMetadataOrCorruptDistinctSelectedRecovery()
+            throws Exception {
+        equalIndexDistinctUrlTrackChange(false);
+    }
+
+    @Test
+    public void synchronizationSeekCannotSaveSelectedClockUsingPreviousMetadata()
+            throws Exception {
+        start();
+        enableHistory();
+        setField("listeners", mock(PlayerListeners.class));
+        setField("UIs", mock(PlayerUiList.class));
+        setField("isPrepared", true);
+        final StreamInfo previousInfo = stream;
+        final MediaItem previousSource = exoPlayer.getCurrentMediaItem();
+        stream = distinctStream();
+        final PlayQueueItem selected = new PlayQueueItem(stream);
+        queue.append(List.of(selected));
+        queue.remove(0);
+        // Avoid entering unrelated auto-queue resolution when B's metadata arrives.
+        queue.append(List.of(new PlayQueueItem(previousInfo)));
+        queue.setRecovery(0, SELECTED_RECOVERY);
+        final MediaItem selectedSource = loadedItem(selected);
+        doAnswer(call -> {
+            final long position = call.getArgument(1);
+            // Model ExoPlayer's synchronous seek observation, before its aggregate onEvents.
+            when(exoPlayer.getCurrentMediaItem()).thenReturn(selectedSource);
+            when(exoPlayer.getCurrentPosition()).thenReturn(position);
+            when(exoPlayer.getContentPosition()).thenReturn(position);
+            player.onPositionDiscontinuity(
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, previousSource, null, 0,
+                            PLAYING_POSITION, CONTENT_POSITION, -1, -1),
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, selectedSource, null, 0, position, position, -1, -1),
+                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK);
+            return null;
+        }).when(exoPlayer).seekTo(0, SELECTED_RECOVERY);
+
+        player.onPlaybackSynchronize(selected, true);
+
+        verify(exoPlayer).seekTo(0, SELECTED_RECOVERY);
+        assertSame(selected, player.getCurrentItem());
+        assertSame(selected, owner(exoPlayer.getCurrentMediaItem()));
+        assertSame(previousInfo, player.getCurrentStreamInfo().orElseThrow());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, selected.getRecoveryPosition());
+        verifyNoInteractions(records.constructed().get(0));
+
+        player.onEvents(exoPlayer, mock(com.google.android.exoplayer2.Player.Events.class));
+        player.saveStreamProgressState();
+        verify(records.constructed().get(0)).onViewed(stream);
+
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertSavedProgress(SELECTED_RECOVERY);
+    }
+
+    @Test
     public void absentMediaItemCannotOverwriteRecoveryAndSynchronizationStillResumes()
             throws Exception {
         start();
@@ -429,6 +687,122 @@ public class PlayerRecoveryTest {
         synchronizeAndAssert(0, recovery);
     }
 
+    private void equalIndexTrackChange(final boolean quality, final long recovery,
+                                      final boolean saveHistory) throws Exception {
+        start();
+        if (saveHistory) {
+            enableHistory();
+        }
+        final PlayQueueItem oldOccurrence = queue.getItem();
+        final PlayQueueItem selected = removePlayingOccurrence(recovery);
+
+        // Exercise both calls in their real order: history progress first, direct recovery next.
+        // A direct setRecovery() test alone misses the earlier history recovery overwrite.
+        changeTrack(quality);
+
+        assertSame(selected, queue.getItem());
+        assertEquals(recovery, selected.getRecoveryPosition());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, oldOccurrence.getRecoveryPosition());
+        // Reject the incoherent selected-progress snapshot as a whole. A baseline write would
+        // still name old metadata with its own engine clock, not the selected occurrence.
+        verifyNoInteractions(records.constructed().get(0));
+        queue.setIndex(0);
+        synchronizeAndAssert(0, recovery);
+    }
+
+    private void equalIndexDistinctUrlTrackChange(final boolean quality) throws Exception {
+        start();
+        enableHistory();
+        final StreamInfo metadataInfo = player.getCurrentStreamInfo()
+                .orElseThrow(AssertionError::new);
+        final PlayQueueItem oldOccurrence = queue.getItem();
+        final PlayQueueItem selected = removePlayingOccurrence(SELECTED_RECOVERY, distinctStream());
+
+        changeTrack(quality);
+
+        assertSame(metadataInfo,
+                player.getCurrentStreamInfo().orElseThrow(AssertionError::new));
+        assertEquals(stream.getUrl(), metadataInfo.getUrl());
+        assertTrue(!metadataInfo.getUrl().equals(selected.getUrl()));
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, oldOccurrence.getRecoveryPosition());
+        // The old metadata names A, not selected B. Reject the incoherent capture entirely:
+        // no A progress write, and no recovery derived from A's clock may be placed on B.
+        verifyNoInteractions(records.constructed().get(0));
+        queue.setIndex(0);
+        synchronizeAndAssert(0, SELECTED_RECOVERY);
+    }
+
+    private static StreamInfo distinctStream() {
+        final String url = "https://example.com/watch/distinct-selected";
+        final StreamInfo info = new StreamInfo(0, url, url,
+                StreamType.VIDEO_STREAM, "distinct selected", "selected", 0);
+        info.setDuration(180);
+        return info;
+    }
+
+    private PlayQueueItem removePlayingOccurrence(final long recovery) throws Exception {
+        final PlayQueueItem oldOccurrence = queue.getItem();
+        final PlayQueueItem selected = removePlayingOccurrence(recovery, stream);
+        assertEquals(selected.getUrl(), oldOccurrence.getUrl());
+        return selected;
+    }
+
+    private PlayQueueItem removePlayingOccurrence(final long recovery,
+                                                 final StreamInfo selectedInfo) throws Exception {
+        final PlayQueueItem oldOccurrence = queue.getItem();
+        final MediaItem oldSource = exoPlayer.getCurrentMediaItem();
+        final PlayQueueItem selected = new PlayQueueItem(selectedInfo);
+        queue.append(List.of(selected));
+        queue.remove(0);
+        if (recovery != PlayQueueItem.RECOVERY_UNSET) {
+            queue.setRecovery(0, recovery);
+        }
+        // A rebuilt selection may already match numerically and in Player.currentItem while
+        // the prepared window still identifies the removed occurrence that owns the clock.
+        setField("currentItem", selected);
+        assertEquals(queue.getIndex(), exoPlayer.getCurrentMediaItemIndex());
+        assertSame(selected, queue.getItem());
+        assertSame(oldOccurrence, owner(oldSource));
+        assertNotSame(selected, oldOccurrence);
+        return selected;
+    }
+
+    private void alignedTrackHistory(final boolean quality) throws Exception {
+        start();
+        enableHistory();
+        when(exoPlayer.getContentPosition()).thenReturn(CONTENT_POSITION);
+
+        changeTrack(quality);
+
+        // Progress uses content time, then setRecovery intentionally replaces it with the
+        // playback clock used for quality/audio source reloads. Persistence uses playback time.
+        assertEquals(PLAYING_POSITION, queue.getItem().getRecoveryPosition());
+        assertSavedProgress(PLAYING_POSITION);
+        queue.setIndex(0);
+        synchronizeAndAssert(0, PLAYING_POSITION);
+    }
+
+    private void enableHistory() {
+        historyEnabled = true;
+        when(preferences.getBoolean("watch_history", true)).thenReturn(true);
+    }
+
+    private void assertSavedProgress(final long expectedPosition) {
+        final ArgumentCaptor<StreamInfo> info = ArgumentCaptor.forClass(StreamInfo.class);
+        final ArgumentCaptor<Long> position = ArgumentCaptor.forClass(Long.class);
+        final HistoryRecordManager manager = records.constructed().get(0);
+        // Capture arguments crossing the real AndroidPlaybackHistoryEnvironment, not a fake
+        // environment echoing Snapshot fields. Room/SQLite is the deliberately mocked boundary.
+        verify(manager).saveStreamState(info.capture(), position.capture());
+        assertSame(player.getCurrentStreamInfo().orElseThrow(AssertionError::new), info.getValue());
+        assertSame(stream, info.getValue());
+        assertEquals(stream.getServiceId(), info.getValue().getServiceId());
+        assertEquals(stream.getUrl(), info.getValue().getUrl());
+        assertEquals(expectedPosition, position.getValue().longValue());
+        verifyNoMoreInteractions(manager);
+    }
+
     private void start() throws Exception {
         final String url = "https://example.com/watch/same-url";
         stream = new StreamInfo(0, url, url, StreamType.VIDEO_STREAM, "same", "same", 0);
@@ -437,8 +811,10 @@ public class PlayerRecoveryTest {
         queue.init();
         setField("playQueue", queue);
         setField("currentItem", queue.getItem());
-        setField("currentMetadata", StreamInfoTag.of(stream));
+        // Cached metadata must be the actual decorated prepared-window tag, as after onEvents.
         final MediaItem initialSource = loadedItem(queue.getItem());
+        setField("currentMetadata",
+                MediaItemTag.from(initialSource).orElseThrow(AssertionError::new));
         when(exoPlayer.getCurrentMediaItem()).thenReturn(initialSource);
         subscriptions.add(queue.getBroadcastReceiver()
                 .filter(event -> event instanceof SelectEvent)

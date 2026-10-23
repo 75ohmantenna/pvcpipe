@@ -345,9 +345,8 @@ Android effects, resolution and manager reload are mocked; the delayed readiness
 callback stands in for the manager. Child source preparation is controlled rather
 than running a decoder thread; source publication, timeline windows, queue objects,
 Player methods and disabled-history policy are real. Cast transport is mocked.
-The separate history progress path
-still uses its existing index guard; this correction does not claim to replace
-that guard with occurrence ownership or resolve other navigation defects.
+The separate history progress path still used its index-only guard after this
+correction; the later equal-index correction below covers that acceptance path.
 
 ### Initial cast preparation ownership — corrected 2026-10-23
 
@@ -423,12 +422,63 @@ controlled Rx scheduling. ExoPlayer delivery/decoding, source preparation,
 extraction/resolution, Android effects/error logging, metadata history/UI effects
 and SDK/receiver transport are mocked; no device or receiver playback is established.
 
-### Unresolved navigation defects
+### Equal-index history snapshot ownership — corrected 2026-10-23
 
-The separate equal-index history-write race and other navigation follow-ups
-remain outside these finding-4/5 corrections. The history progress path retains
-its existing numerical-index guard; these controlled checks do not establish
-occurrence ownership for history writes.
+After removal/reindexing, a selected occurrence and ExoPlayer's still-loaded
+occurrence can share a numerical index. Quality/audio changes call
+`saveStreamProgressState()` before `setRecovery()`: the former's index-only
+acceptance could replace selected recovery before the latter rejected the old
+source. Recovery uses content position; persistence receives playback position
+and cached metadata, not the selected queue item's metadata.
+
+History progress capture now reuses `setRecovery()`'s exact loaded-source
+occurrence check. The engine tag must also be the cached metadata tag, so a new
+engine clock cannot be paired with metadata awaiting aggregate event delivery.
+Missing ownership or incoherent metadata invalidates progress before recovery
+mutation or write acceptance. URL equality and equal indices cannot authorize
+capture. Aligned local and active-cast captures retain their clocks; active-cast
+eligibility still uses the local source guard, not a new receiver-ownership check.
+View/completion observations retain their metadata-based interpretation.
+
+Ownership is checked synchronously, not when persistence finishes. Accepted
+writes remain application-owned, ordered ahead of subsequent resume lookups,
+and survive navigation and player destruction. Disabled persistent history still
+permits valid queue recovery. Shutdown retains its final progress checkpoint and
+the existing subsequent `setRecovery()` capture.
+
+Controlled JVM observation on unchanged post-#139 master
+(`fbbd843c695091e35f213862856858da237596ab`) reproduced selected recovery changing
+from 12 seconds to the old source's 31-second content position, then an actual
+seek to 31 seconds and recovery consumption. The old occurrence's recovery
+remained unset. The history adapter received the old metadata and 45-second
+playback position: that is an old-stream checkpoint, not evidence that a distinct
+selected stream's persistent state was overwritten. Same-URL occurrences share
+one persistent stream identity. `saveStreamState` upserts stream metadata and a
+valid stream-state position; it does not increment views or write stream-history
+records. A separate engine-selected/cached-metadata mismatch regression checks
+rejection until actual aggregate metadata delivery restores coherent capture.
+The rejected equal-index snapshot can contain a correctly attributed A checkpoint;
+dropping it together with selected recovery is intentional, retaining progress's
+existing all-or-nothing acceptance model rather than adding a second write path.
+The cached-metadata mismatch is different: a synchronous recovery seek can expose
+B's clock before aggregate metadata delivery, so the coherence check also prevents
+A metadata from accepting B's resume clock. A regression drives the actual
+synchronization → seek → discontinuity → aggregate-event sequence.
+
+The desired-behavior regressions call real quality/audio, selection, progress,
+metadata delivery, synchronization and destruction methods with controlled
+scheduling. They cover existing/unset recovery, enabled/disabled history,
+same/distinct URLs, actual database-facing arguments, content/playback position
+separation, aligned local/cast clocks, final shutdown, accepted writes completing
+after navigation/destruction and resume ordering. Source windows and ownership,
+queue objects, `PlaybackHistory` and its Android adapter are real. Android
+plumbing/preferences, ExoPlayer decoding/delivery, source-manager reload, cast
+transport and the database-facing record manager are mocked. Persistence ordering
+also uses a controlled history environment; this is not SQLite or device-playback
+evidence. Baseline and corrected observations use separate worktree build outputs
+without build-cache reuse. Disposable observation code is not retained.
+
+### Unresolved navigation defects
 
 Read-only review also raised a separate removal/resynchronization liveness gap:
 preloaded next-item metadata can precede `Player.currentItem` synchronization,
@@ -467,10 +517,11 @@ connects it to the preferences and to the Room-backed
 - A stream with no history, a finished one, or a failed lookup has no resume
   position.
 - Progress recording updates the queue's recovery position from the content
-  position even with watch history off, but only when the queue and engine media
-  indices agree. Database progress uses the playback position and requires watch
-  history to be on. `Player.setRecovery()` is separate and now checks loaded-source
-  occurrence ownership as described above; history's index guard is unchanged.
+  position even with watch history off, but only when the selected occurrence owns
+  the engine source, its tag matches the captured metadata, and media indices agree.
+  Database progress uses the playback position and requires watch history to be
+  on. `Player.setRecovery()` shares the loaded-source occurrence check, retaining
+  its separate playback-clock capture for source reloads.
 
 ## Broadcasts
 

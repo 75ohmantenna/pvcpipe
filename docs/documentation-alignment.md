@@ -46,7 +46,10 @@ Kotlin, resources, external sites or historical test artifacts.
   A subsequent 2026-10-23 correction revalidated and fixed finding **5**, including
   failed metadata delivery and late initial-cast completion on same-URL distinct
   occurrences; see [the correction and mocked boundaries](playback.md#initial-cast-preparation-ownership--corrected-2026-10-23).
-  The separate equal-index history-write race remains outside both corrections.
+  A further 2026-10-23 correction addresses the separate equal-index history
+  snapshot race; see [snapshot acceptance and write lifetime](playback.md#equal-index-history-snapshot-ownership--corrected-2026-10-23).
+  Metadata-before-occurrence-synchronization cast liveness remains a separate
+  unresolved follow-up, not an ownership workaround.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to
