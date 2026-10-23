@@ -670,6 +670,17 @@ public final class Player implements PlaybackListener, Listener {
                 .orElse(false);
     }
 
+    /**
+     * Cast preparation needs coherent selection, engine ownership and delivered metadata.
+     * @return whether the selected occurrence owns the engine source and cached metadata
+     */
+    public boolean isCurrentSourceSynchronized() {
+        return loadedSourceOwnsSelectedItem() && currentItem == playQueue.getItem()
+                && currentMetadata != null
+                && MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                        .filter(tag -> tag == currentMetadata).isPresent();
+    }
+
     private void setRecovery(final int queuePos, final long windowPos) {
         if (playQueue == null || playQueue.size() <= queuePos) {
             return;
@@ -1264,6 +1275,9 @@ public final class Player implements PlaybackListener, Listener {
                     listeners.onAudioTrackUpdate();
                 }
             });
+            if (loadedSourceOwnsSelectedItem()) {
+                casting.onQueueItemChanged(playQueue.getItem());
+            }
             casting.onSourceChanged();
         });
     }
@@ -1500,6 +1514,8 @@ public final class Player implements PlaybackListener, Listener {
                 simpleExoPlayer.seekToDefaultPosition(playQueueIndex);
             }
         }
+        // Metadata may already have arrived for this occurrence before manager synchronization.
+        casting.onSourceChanged();
     }
 
     public void seekTo(final long positionMillis) {
