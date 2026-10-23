@@ -11,9 +11,9 @@ import java.util.function.BooleanSupplier;
 /**
  * What the player does with a queue it is asked to play.
  * <p>
- * Starting a queue from scratch needs network calls, so the first three choices exist to avoid
- * that when the stream is already there or its position is known. The checks run in the order
- * of the constants; the first one that applies wins.
+ * Seeking in place and keeping the current queue avoid source reinitialization. A history
+ * lookup chooses a saved starting position before initializing the incoming queue.
+ * The checks run in the order of the constants; the first one that applies wins.
  */
 enum QueuePlaybackChoice {
     /**

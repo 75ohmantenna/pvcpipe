@@ -27,8 +27,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Blocking preparation for one receiver load. Resources persist for replay and close on
- * replacement, disconnect, error, or shutdown rather than natural playback completion.
+ * Blocking preparation for one receiver load. The playback controller retains current and
+ * previous load resources for handoff/replay, then closes them on replacement or teardown,
+ * not on natural playback completion.
  */
 public final class CastMediaResolver implements Closeable {
     private final Context context;

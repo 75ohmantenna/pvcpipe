@@ -158,7 +158,7 @@ public final class CastPlayback implements FCastSession.Listener {
         notifyListeners();
     }
 
-    /** Called for every newly resolved local source, including quality/audio changes. */
+    /** Called when local source metadata changes, including quality/audio changes and failures. */
     public void onSourceChanged() {
         if (session.getConnectionState() == 2) {
             loadCurrent(false);
@@ -265,7 +265,7 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     /**
-     * Quality reloads keep the queue item; moving to another occurrence invalidates ownership.
+     * During an active cast, quality reloads keep the item; another occurrence invalidates ownership.
      *
      * @param item the selected queue occurrence, not merely its video URL
      */

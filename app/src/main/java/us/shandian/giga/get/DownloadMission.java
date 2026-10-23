@@ -532,8 +532,8 @@ public class DownloadMission extends Mission {
         enqueued = false;
         running = false;
 
-        // Keep a complete checkpoint until the finished row is committed by the manager.
-        // If this write fails, the initial checkpoint remains available for restart recovery.
+        // Try to keep a complete checkpoint until the finished row is committed by the manager.
+        // If this write fails, restart sees the previous checkpoint, which may not be finished.
         if (!writeThisToFile()) {
             Log.w(TAG, "Unable to save final checkpoint for " + storage.getName());
         }
@@ -919,9 +919,9 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Indicates whatever is possible to start the mission.
+     * Checks for a failed or held post-processing state, or an already-finished mission.
      *
-     * @return {@code true} is this mission its "healthy", otherwise, {@code false}
+     * @return {@code true} for those states when the resource list is nonempty
      */
     public boolean isCorrupt() {
         if (urls.length < 1) {

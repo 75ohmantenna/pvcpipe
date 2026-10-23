@@ -17,8 +17,8 @@ import javax.annotation.Nullable;
 /**
  * The anonymous visitor token of Odysee. The website registers one for every visitor who is
  * not signed in, and Odysee answers a few questions, such as how often a video was viewed,
- * only to a client that has one. The token stands for no account and no person: registering
- * takes no name, address or password.
+ * only to a client that has one. Registration takes no name, address or password, but the
+ * token lets Odysee associate subsequent count requests with the same anonymous visitor.
  * <p>
  * One token is registered when it is first needed and kept for as long as Odysee accepts it,
  * so that a client does not leave a new visitor behind every time it starts. Where it is kept

@@ -164,7 +164,7 @@ class ErrorActivity : PvcErrorActivity() {
                 ShareUtils.openUrlInApp(context, context.getString(R.string.privacy_policy_url))
             }
             .setPositiveButton(R.string.accept) { _, _ ->
-                if (action == "EMAIL") { // send on email
+                if (action == "EMAIL") { // open an email composer
                     val intent = Intent(Intent.ACTION_SENDTO)
                         .setData("mailto:".toUri()) // only email apps should handle this
                         .putExtra(Intent.EXTRA_EMAIL, arrayOf(ERROR_EMAIL_ADDRESS))
@@ -172,7 +172,7 @@ class ErrorActivity : PvcErrorActivity() {
                         .putExtra(Intent.EXTRA_TEXT, buildJson())
                     pvcAddLogcatLogAttachmentToMail(context, intent, errorInfo)
                     ShareUtils.openIntentInApp(context, intent)
-                } else if (action == "GITHUB") { // open the NewPipe issue page on GitHub
+                } else if (action == "GITHUB") { // open the configured GitHub issue tracker
                     ShareUtils.openUrlInApp(this, ERROR_GITHUB_ISSUE_URL)
                 }
             }
@@ -249,8 +249,7 @@ class ErrorActivity : PvcErrorActivity() {
                 appendLine("* __Version:__ ${BuildConfig.VERSION_NAME}")
                 appendLine("* __OS:__ $osString")
 
-                // Collapse all logs to a single paragraph when there are more than one
-                // to keep the GitHub issue clean.
+                // Group multiple traces in an outer collapsible section to keep the report compact.
                 if (errorInfo.stackTraces.size > 1) {
                     append("<details><summary><b>Exceptions (")
                     append(errorInfo.stackTraces.size)
