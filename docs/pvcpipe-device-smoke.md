@@ -1079,3 +1079,110 @@ After this final fixture-ordering correction, the rebuilt APK without the smoke
 source passed all 16 durable checks, and `make ci` passed again with unchanged
 outputs reused where reported.
 
+## API 37 startup investigation follow-up, 2026-10-23
+
+Started from current master `df6393755eccf03404e74dce5f45d535209921b1`
+(PRs #134–143 merged). The failed instrumentation record above remains unchanged.
+This follow-up did not reproduce its BIND APPLICATION ANR: the controlled
+attempt stopped at emulator boot, before installation or application startup.
+No production or test initialization change is justified by this evidence.
+
+### Environment and bounded boot experiment
+
+No ADB device, emulator or Gradle build was running at baseline. The host was
+Linux x64, Intel Core i7 Q720 at 1.60 GHz (4 cores/8 threads), with 7.7 GiB
+RAM and 9.9 GiB swap. Initially 5.6 GiB RAM and 6.0 GiB swap were used,
+2.1 GiB RAM was available, and load averages were 3.85/4.92/6.23.
+The existing browser and Java/Kotlin language-server processes remained running;
+they were not terminated to manufacture an idle-host result. This is an occupied
+host measurement, not an isolated comparison proving resource causality.
+
+Created only the disposable AVD `pvcpipe_anr37_20261023`, using the Pixel 2
+profile and installed `system-images;android-37.0;google_apis;x86_64` revision 6.
+Guest fingerprint:
+`google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys`.
+Emulator version was 37.1.11.0, build 15917651. KVM acceleration check passed.
+One emulator was launched, with no concurrent build:
+
+```sh
+$ANDROID_HOME/emulator/emulator -avd pvcpipe_anr37_20261023 -port 5580 \
+  -no-window -no-audio -no-snapshot -gpu swiftshader \
+  -cores 2 -memory 2048 -feature -HardwareDecoder
+```
+
+Console observations (recorded in the investigation session, not the local
+capture files below): the emulator increased guest RAM to **4096 MiB**,
+warned that the suggested host minimum was **16384 MiB** versus 7869 MiB
+present, and forced **one vCPU**
+because the host did not support its modern multicore virtualization features.
+Requested memory/core values therefore do not describe the effective setup.
+No ANR timeout, SELinux policy, application security mechanism or installed
+Google package was changed.
+
+The console's initial readiness wait expired after 240 seconds. A subsequent bounded
+readiness observation sampled `sys.boot_completed`, `service check activity`
+and `service check package` twelve times over 242 seconds. At the final check,
+15:29:56 UTC in the session transcript (roughly ten minutes after launch),
+boot completion was still unset
+and both services were absent. ADB shell/logcat remained responsive. Boot logs
+showed zygote preload taking 29985 ms, system server starting at guest uptime
+148030 ms, and scanning 318 system packages taking 139446 ms. The latest
+captured package-manager progress was uncompressing the system Trichrome stub;
+this locates observed progress, not a demonstrated Trichrome defect.
+
+The retained 15:29:37 UTC host sample shows 2.0 GiB available RAM, 8.1 GiB
+swap used and load averages 20.53/16.75/11.49. Its `vmstat` interval samples
+show 12–22 runnable tasks, up to 4524 KiB/s swap-out and 1904 KiB/s swap-in,
+and CPU idle of 1/2/1/5%. These observations demonstrate contention during
+this attempt; they do not prove that it caused either the boot delay or the
+earlier application ANRs.
+The owned emulator was stopped with `adb -s emulator-5580 emu kill`;
+the disposable AVD files were retained. No unchanged boot retry was attempted.
+Unlike the earlier record's eventual API 37 boot after two attempts, this
+fresh AVD did not reach a usable baseline within the bounded observation.
+
+### Artifact identity and unexecuted boundaries
+
+The existing APKs were fingerprinted but **not installed or rebuilt for this
+boot experiment**. Their hashes identify local artifacts, not a proven
+reproducible build of the recorded master:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `app/build/outputs/apk/debug/app-debug.apk` | `b2ad27eb5b80c095c59703b3f0126e7f8512003baf5c908c28ebd163d1b5c7fb` |
+| `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` | `89c7cca13fd900a54daa134656366aab381c87b49c8de7c1e6d2ec67dc002827` |
+
+| Boundary | Follow-up result |
+| --- | --- |
+| Emulator boot/responsiveness | Shell responsive; boot/activity/package readiness failed within the bounded observation. |
+| Normal PVCPipe launch | Not reached; no APK installed. |
+| Minimal instrumentation startup | Not reached. |
+| Prepared manager, recovery, SQLite classes individually | Not reached. |
+| Complete serial 16-test suite and repeats | Not reached; zero new API 37 test results. |
+| Unchanged pre-#143 comparison | Not run; no usable common runtime baseline. |
+| API 26 | Not rerun; no application/test code changed. Earlier 16-test passes retain only their original scope. |
+
+Captured logcat, guest properties/services and host pressure/readiness samples
+were retained locally in `/tmp/pvcpipe-anr37-20261023/`; they are temporary local
+evidence, not repository artifacts. The guest ANR directory listing was empty;
+activity exit-info was unavailable without ActivityManager. No original ANR
+trace was recovered in this fresh AVD, so application/provider initialization,
+runner startup and test-specific failure remain unseparated for the original
+incident. Source inspection alone is not runtime exoneration of any of them.
+
+The remaining prerequisite is a usable API 37 baseline: sufficient free host
+resources and supported CPU/emulator execution, with boot completion and stable
+activity/package service responses measured before installing the APKs.
+A quieter or better-resourced host is a proposed comparison, not a verified fix.
+After establishing that baseline, measure normal cold launch, minimal runner
+startup, each integration class serially, then the full 16-test suite with
+repeat execution and exit-info/log/trace capture. No API 37 playback assertion
+has failed in this follow-up; none has executed. No compressed-video,
+physical-device or receiver behavior is established.
+
+### Documentation gate
+
+After stopping the emulator, `make ci` passed all five serial stages
+(static/build-logic checks, app JVM/offline extractor tests, lint, debug and
+release APK assembly), with unchanged outputs reused where Gradle reported
+them up to date. This repository gate is not API 37 runtime validation.
