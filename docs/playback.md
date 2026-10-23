@@ -387,9 +387,13 @@ ownership. This correction does not make `currentItem` an engine-source identity
 An accepted handoff records the receiver's established tag separately from the
 pending tag. Same-occurrence placeholder/failed metadata cancels only preparation,
 restoring that established tag so receiver controls and replacement clock survive.
-Changing occurrence or returning to the device clears the established tag.
+If replacement paused that established source, cancellation reapplies the latest
+seek, speed and play/pause intent to it before exposing an advancing clock.
+Changing occurrence, switching receivers or returning to the device clears the
+established tag. A new receiver without a load keeps its pending clock frozen and
+does not accept playback commands intended for the old receiver.
 
-Fourteen durable `CastPlaybackTest` regressions cover failed B metadata followed by
+Sixteen durable `CastPlaybackTest` regressions cover failed B metadata followed by
 late A success/failure, distinct same-URL occurrences, same-occurrence failed
 metadata, completion without the selection notification, newer-preparation cleanup,
 valid initial handoff and successful B metadata replacement. The first nine
@@ -402,7 +406,11 @@ review found same-occurrence empty metadata losing established receiver control;
 that regression was reproduced before correction. Its strengthened check starts
 with a real handoff, delivers placeholder and failed metadata, cancels replacement
 preparation, verifies receiver controls and retries the same replacement tag at
-the retained remote position. All 56 cast checks pass after correction.
+the retained remote position. A third review identified playing-intent restoration
+and receiver-switch tag lifetime defects; both were reproduced before correction.
+Their checks verify receiver seek/speed/resume after canceled playing replacement,
+retry position after elapsed time, and frozen pending controls for a new empty
+receiver. All 58 cast checks pass after correction.
 The observation harness recorded one receiver load and one local handoff before
 the fix, versus zero of each afterward, with A resolving after B's metadata in
 both runs. The obsolete resolver closed and preparation became inactive afterward.

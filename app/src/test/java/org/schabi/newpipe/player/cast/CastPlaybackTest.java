@@ -1296,6 +1296,58 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void cancelingPlayingReplacementRestoresReceiverIntentAndPendingControls()
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            final MediaItemTag replacement = newTag();
+            fixture.deliverSuccess(replacement);
+            verify(playback.getSession()).pause();
+            playback.onPlaybackChanged(2, 42000, 120000, 1.5);
+            playback.seek(65000);
+            playback.setSpeed(2);
+            clearInvocations(player);
+            fixture.deliverFailure(fixture.first);
+            verify(playback.getSession()).seek(65000);
+            verify(playback.getSession()).setSpeed(2);
+            verify(playback.getSession()).resume();
+            verify(player).onCastingStateChanged(Player.STATE_PLAYING);
+            now.addAndGet(1000);
+            assertEquals(67000, playback.getPosition());
+            fixture.deliverSuccess(replacement);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 67000, 2, true, "Video", null);
+        }
+    }
+
+    @Test
+    public void failedMetadataDuringReceiverSwitchCannotRestoreTheOldReceiverSource()
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            playback.connect("192.0.2.2", 46899);
+            playback.onConnectionChanged();
+            clearInvocations(playback.getSession());
+            fixture.deliverFailure(fixture.first);
+            playback.seek(65000);
+            playback.setSpeed(2);
+            playback.pause();
+            verify(playback.getSession(), never()).resume();
+            verify(playback.getSession(), never()).pause();
+            verify(playback.getSession(), never()).seek(anyLong());
+            verify(playback.getSession(), never()).setSpeed(anyFloat());
+            assertTrue(playback.isPreparing());
+            now.addAndGet(1000);
+            assertEquals(65000, playback.getPosition());
+            fixture.deliverSuccess(newTag());
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 65000, 2, false, "Video", null);
+        }
+    }
+
+    @Test
     public void validInitialCompletionUsesLatestLocalPositionAndHandsOffOnce() throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
             final CastMediaResolver first = fixture.begin();

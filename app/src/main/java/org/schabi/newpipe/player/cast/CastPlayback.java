@@ -134,6 +134,7 @@ public final class CastPlayback implements FCastSession.Listener {
         error = null;
         final long currentPosition = getPosition();
         cancelPreparation();
+        receiverTag = null;
         reloadOnConnection = true;
         if (active) {
             position = currentPosition;
@@ -309,13 +310,28 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private void cancelSourcePreparation() {
         final long currentPosition = getPosition();
+        final boolean restoreReceiver = active && receiverTag != null && preparingResolver != null;
         cancelPreparation();
-        loadedTag = receiverTag;
+        loadedTag = active && receiverTag == null ? loadedTag : receiverTag;
         preparing = active && receiverTag == null;
         if (active) {
             position = currentPosition;
             updateTime = SystemClock.elapsedRealtime();
+            if (restoreReceiver && canControlReceiver()) {
+                // The replacement paused this source; restore the latest pending controls.
+                session.seek(position);
+                session.setSpeed(speed);
+                if (playWhenReady) {
+                    session.resume();
+                } else {
+                    session.pause();
+                }
+            }
+            player.onCastingStateChanged(preparing ? Player.STATE_BUFFERING
+                    : playWhenReady ? Player.STATE_PLAYING : Player.STATE_PAUSED);
+            player.onCastingChanged();
         }
+        notifyListeners();
     }
 
     public void setPlayWhenReadyForSource(final boolean ready) {
@@ -334,7 +350,7 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private boolean canControlReceiver() {
         return !closed && session.getConnectionState() == 2 && !reloadOnConnection
-                && preparingResolver == null && loadedTag != null;
+                && preparingResolver == null && loadedTag != null && receiverTag != null;
     }
 
     public void play() {
