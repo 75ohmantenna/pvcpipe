@@ -109,9 +109,13 @@ For a paused startup, the session therefore enforces Pause and exposes Paused
 immediately; it does not adopt synthetic Playing as playback intent or wait for a
 corrective callback. This freezes the application clock and retains paused intent
 for another replacement or receiver switch. Explicit Resume cancels startup pause
-enforcement; explicit Pause during preparation re-arms it. Enforcement is one-shot,
-so later receiver Playing/Paused transitions remain authoritative. v2 has no such
-synthetic source callback, and v4 does not use this state-deduplication path.
+enforcement; explicit Pause during preparation re-arms it. The latest explicit
+request survives an early Paused snapshot: a first matching source echo re-arms
+startup enforcement from that request, rather than losing it before the SDK's
+synthetic Playing. Repeated acknowledgements do not re-arm it. After startup,
+receiver Playing/Paused transitions remain authoritative; a later rebuffer does
+not re-arm startup enforcement. v2 has no such synthetic source callback, and
+v4 does not use this state-deduplication path.
 
 The paused-startup regressions in `CastPlaybackTest` exercise the actual session
 policy and playback controller with controlled preparation scheduling and clock

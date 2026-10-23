@@ -448,6 +448,11 @@ internal class FCastPlaybackState(
     private var positionMs = 0L
     private var durationMs = 0L
     private var speed = 1.0
+
+    // Keep explicit intent after one-shot enforcement: the first source echo can arrive
+    // after an accepted Paused snapshot on a connection that has not learned echoes yet.
+    private var requestedPlayWhenReady = true
+
     private var pauseOnLoad = false
     private var endedReported = false
     private var playedThisLoad = false
@@ -460,6 +465,7 @@ internal class FCastPlaybackState(
         pendingLoad = true
         this.positionMs = positionMs.coerceAtLeast(0L)
         this.speed = speed
+        requestedPlayWhenReady = playWhenReady
         pauseOnLoad = !playWhenReady
         endedReported = false
         playedThisLoad = false
@@ -468,6 +474,7 @@ internal class FCastPlaybackState(
     fun sourceChanged(source: Source) {
         val expected = expectedSource ?: return
         if (source == expected) {
+            if (!sourceAcknowledged && !requestedPlayWhenReady) pauseOnLoad = true
             sourceAcknowledged = true
             sourceEchoObserved = true
         } else if (sourceAcknowledged || !pendingLoad) {
@@ -534,9 +541,13 @@ internal class FCastPlaybackState(
     }
 
     fun setPlayWhenReady(ready: Boolean) {
+        requestedPlayWhenReady = ready
         // Explicit Resume cancels startup enforcement; a later Pause must re-arm it while
-        // preparation is pending, including after a Buffering observation.
-        pauseOnLoad = !ready && (pendingLoad || pauseOnLoad || receiverState == PlaybackState.BUFFERING)
+        // preparation is pending, including startup Buffering, but not a later rebuffer.
+        pauseOnLoad = !ready && (
+            pendingLoad || pauseOnLoad ||
+                receiverState == PlaybackState.BUFFERING && !playedThisLoad
+            )
     }
 
     fun seek(positionMs: Long) {
@@ -555,6 +566,7 @@ internal class FCastPlaybackState(
         positionMs = 0L
         durationMs = 0L
         speed = 1.0
+        requestedPlayWhenReady = true
         pauseOnLoad = false
         endedReported = false
         playedThisLoad = false

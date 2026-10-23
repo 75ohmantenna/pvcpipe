@@ -651,6 +651,60 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void firstSourceEchoPreservesPauseDespiteAnEarlierPausedObservation() {
+        final StartupReceiver receiver = new StartupReceiver(false, true, true);
+        playback.onPlaybackChanged(2, 42000, 120000, 1);
+        beginReplacement();
+        io.triggerActions();
+        // Before learning source echoes, the policy must accept no-echo playback evidence.
+        receiver.state.playbackStateChanged(PlaybackState.PAUSED);
+        receiver.acknowledge();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        verify(playback.getSession()).pause();
+        assertPausedClockAndControls();
+
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        clearInvocations(playback.getSession());
+        receiver.acknowledge();
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void resumeBeforeFirstSourceEchoOverridesTheOriginalPausedLoad() {
+        final StartupReceiver receiver = new StartupReceiver(false, true, true);
+        playback.onPlaybackChanged(2, 42000, 120000, 1);
+        beginReplacement();
+        io.triggerActions();
+        receiver.state.playbackStateChanged(PlaybackState.PAUSED);
+        playback.play();
+        receiver.acknowledge();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void remotePlayingAfterAnEstablishedRebufferIsNotStartupPauseEvidence() {
+        final StartupReceiver receiver = new StartupReceiver(false, false, true);
+        receiver.establishPreviousSource(true);
+        receiver.state.playbackStateChanged(PlaybackState.BUFFERING);
+        playback.pause();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        verify(player).onCastingStateChanged(Player.STATE_PLAYING);
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
     public void explicitControlsDuringAcknowledgedBufferingUpdateStartupIntent() {
         final StartupReceiver receiver = new StartupReceiver(false, false, true);
         receiver.establishPreviousSource(true);
