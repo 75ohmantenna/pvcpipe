@@ -97,7 +97,7 @@ corrections, not approved localized copy. Resource keys below refer to
 | `start_accept_privacy_policy` | `ErrorActivity.openPrivacyPolicyDialog`; acceptance opens a composer or issue list, not submission; code does not establish GDPR compliance | “Please read and accept PVCPipe’s privacy policy before continuing to report this error.” Legal/policy review required |
 | `recaptcha_request_toast` | `ErrorInfo.getMessage` and `RouterActivity`; router opens the challenge directly, error panels offer Solve | “A reCAPTCHA challenge is required to continue” |
 | `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | “Download request submitted” |
-| `cancel` in the `import_settings` dialog | `BackupRestoreSettingsFragment.importDatabase`; the negative action starts database-only restore rather than cancelling | Use a dedicated “Restore without settings” label at this call site; do not rewrite the shared Cancel resource |
+| `cancel` in the former `import_settings` dialog | At the alignment pass, `BackupRestoreSettingsFragment.importDatabase` started database-only restore from its negative Cancel action | Corrected in the [backup-restore follow-up](#backup-restore-actions--corrected-2026-10-23); the shared Cancel resource is unchanged |
 | `file_deleted` | `Deleter.next`; feedback precedes delayed commit, and the manager ignores the file-deletion result | “Download marked for deletion: %1$s” while undo is available; later feedback must not claim confirmed erasure without a behavior change |
 | `import_subscriptions_skipped` (plurals) | `SubscriptionImportWorker`; starts with “Imported.” even when no supported source entries were processed | “Import finished. Skipped %d unsupported entry/entries.” Supply proper plural forms; processed entries are not necessarily new subscriptions |
 
@@ -134,3 +134,75 @@ head checks, fresh read-only Claude review, adjudication and merge evidence belo
 on the PR so they can identify the final commit without a self-referential hash in
 this record. No instrumentation, user-device installation, live-service extraction
 or real receiver test is claimed for this prose/comment-only pass.
+
+## Backup-restore actions — corrected 2026-10-23
+
+Started from post-PR-#144 master. The settings-choice dialog now uses dedicated
+translatable `restore_without_settings` and `restore_with_settings` actions:
+**Restore without settings** submits the existing `DATABASE_ONLY` operation;
+**Restore with settings** submits `DATABASE_AND_SETTINGS`. The negative
+**Cancel** button only dismisses. The title is **Restore backup**, and the
+message explains whether current settings are kept or replaced and that either
+restore replaces the database and restarts the app. The preceding overwrite
+confirmation and legacy-format trust/security warning remain unchanged.
+
+Only dialog presentation/action wiring changed. Archive inspection, restored
+contents, settings parsing/normalization, accepted-work ownership, restart and
+database activation/migration semantics were not changed. See
+[the maintained restore guide](library-data.md#backup-and-restore).
+
+### Localization
+
+The resource inventory contains default `values/strings.xml` and
+`values/strings_fcast.xml`, but no non-default locale string files or verified
+equivalent translations for these actions. The four new title/message/action
+keys remain translatable default-English resources; other locales use Android's
+normal default fallback. Non-English translations are an explicit gap, not
+unverified translations supplied by this correction. Shared Cancel/OK strings
+were not changed. The obsolete, singly used `import_settings` title key was
+replaced rather than retained as an alias.
+
+### Controlled behavior evidence
+
+`BackupRestoreDialogTest` exercises the real settings activity/fragment with
+synthetic ZIPs, isolated preferences/database files and a counting restart
+callback. Restoring the old negative-button callback temporarily made its
+Cancel regression fail on changed preferences; the corrected handler passed.
+Both restore actions passed for JSON and legacy settings, with the expected
+preference contents, staged database and exactly one restart callback. Cancel,
+Back, outside touch, view destruction and inspection completing after view
+destruction initiated no restore. Overwrite cancellation performed no inspection;
+accepting it reached the settings choice. A settings-free archive retained its
+direct database-only path. The two existing real-preferences/file integration
+checks also passed.
+
+All 16 dialog checks and both existing integration checks passed together.
+The UI matrix used a 320dp-wide portrait dialog at font scales 1.0, 1.3 and
+2.0 for JSON and legacy settings. Screenshots were inspected at normal size
+and at 2.0 scale. AppCompat stacks the three buttons; at larger fonts its
+button panel scrolls. Each action was scrolled into view and checked for a
+fully visible, unellipsized label, non-overlapping sibling geometry, a visible
+touch target of at least 48dp, and an enabled/clickable accessibility node whose
+name matches the label. This is rendered UI/accessibility-node evidence, not a
+TalkBack speech/focus-order session or proof for unavailable translations.
+
+Initial layout checks incorrectly required all button bounds to be visible
+simultaneously and mixed screen/root coordinates; they were corrected to check
+the full label and usable touch target after native scrolling. Window-enter
+animation completion is awaited before captures. No production layout/security
+workaround or shortened restore label was introduced to make those checks pass.
+
+The complete `make ci` gate passed: build-logic/static checks, full app JVM
+suite, offline extractor gate, Android lint and debug/release assembly.
+Instrumentation assembly and Checkstyle also passed after the final UI-harness
+corrections. Gradle reused unchanged outputs where reported. A first focused
+attempt caught overlong Java lines, which were wrapped before successful
+validation. Exact reviewed-head, final gate and merge evidence are recorded
+on the PR rather than embedded as a self-referential commit hash here.
+
+These are controlled API 26 emulator observations, not a restore over a user's
+database, real application restart, migration or physical-device evidence.
+The emulator was freshly created under a temporary directory and had no PVCPipe
+installation before this run. Direct targeted instrumentation avoided Gradle's
+install/test/uninstall task. No existing installation or user database was
+modified. API 37 remains environment-blocked and was not retried.

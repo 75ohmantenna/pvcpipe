@@ -190,14 +190,18 @@ public class BackupRestoreSettingsFragment extends BasePreferenceFragment {
                             != BackupRestore.PreferenceFormat.NONE) {
                         importSettingsDialog =
                                 new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle(R.string.import_settings)
-                                .setMessage(inspection.preferenceFormat()
-                                        == BackupRestore.PreferenceFormat.JSON ? null : getString(
-                                        R.string.import_settings_vulnerable_format))
-                                .setNegativeButton(R.string.cancel, (dialog, which) ->
+                                .setTitle(R.string.restore_backup_title)
+                                .setMessage(getString(R.string.restore_settings_message)
+                                        + (inspection.preferenceFormat()
+                                        == BackupRestore.PreferenceFormat.JSON ? "" : "\n\n"
+                                        + getString(R.string.import_settings_vulnerable_format)))
+                                .setNegativeButton(R.string.cancel, null)
+                                .setNeutralButton(R.string.restore_without_settings,
+                                        (dialog, which) ->
                                         performImport(inspection,
                                                 BackupRestore.RestoreChoice.DATABASE_ONLY))
-                                .setPositiveButton(R.string.ok, (dialog, which) ->
+                                .setPositiveButton(R.string.restore_with_settings,
+                                        (dialog, which) ->
                                         performImport(inspection,
                                                 BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS))
                                 .show();
