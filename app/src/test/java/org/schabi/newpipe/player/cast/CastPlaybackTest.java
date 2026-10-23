@@ -1477,6 +1477,47 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void removingUnloadedSelectionRetriesCanceledInitialPreparation() throws Exception {
+        assertRemovalRestoresCoherence(false);
+    }
+
+    @Test
+    public void removingUnloadedSelectionRetriesCanceledReplacement() throws Exception {
+        assertRemovalRestoresCoherence(true);
+    }
+
+    private void assertRemovalRestoresCoherence(final boolean established) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            final PlayQueueItem unloaded = new PlayQueueItem(fixture.info);
+            fixture.queue.append(List.of(unloaded));
+            if (established) {
+                fixture.handoff();
+                fixture.deliverSuccess(newTag());
+            } else {
+                fixture.begin();
+            }
+            final MediaItemTag unchanged = player.getCurrentMetadata();
+            fixture.queue.setIndex(2);
+            io.triggerActions();
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            fixture.queue.remove(2);
+            assertSame(fixture.first, fixture.queue.getItem());
+            assertSame(fixture.first, player.getCurrentItem());
+            doCallRealMethod().when(player).onPlayQueueEdited();
+            player.onPlayQueueEdited(); // Manager REMOVE notification; no synchronization.
+            io.triggerActions();
+            assertSame(unchanged, player.getCurrentMetadata());
+            verify(player, never()).onPlaybackSynchronize(any(), anyBoolean());
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            player.onPlayQueueEdited();
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
     public void returningToSynchronizedOccurrenceRetriesCanceledInitialPreparation()
             throws Exception {
         assertReturningSelectionRetries(false);

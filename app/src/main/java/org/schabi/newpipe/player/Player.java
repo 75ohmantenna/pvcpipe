@@ -1815,6 +1815,10 @@ public final class Player implements PlaybackListener, Listener {
 
     @Override
     public void onPlayQueueEdited() {
+        // Removing an unloaded selection can restore the unchanged engine occurrence.
+        if (isCurrentSourceSynchronized()) {
+            casting.onSourceChanged();
+        }
         notifyPlaybackUpdateToListeners();
         UIs.call(PlayerUi::onPlayQueueEdited);
     }

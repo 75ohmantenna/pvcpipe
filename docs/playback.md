@@ -510,15 +510,18 @@ Explicit pending seek intent takes precedence over the engine's preview position
 when deferred preparation starts; pause/resume and speed retain their latest
 values. Navigation resets that intent. Failed metadata cancels work; disconnect
 and receiver changes retain their existing cancellation/resource rules.
-Recovery capture and history acceptance/write lifetime are unchanged.
+Recovery capture and history acceptance/write lifetime algorithms are unchanged.
 Retry also runs when synchronization returns to the already-current occurrence:
 selecting an unloaded neighbor can invalidate an in-flight completion without
 changing either `currentItem` or engine metadata. Returning must retry the rejected
 request, not depend on another metadata event. Conversely, synchronization does
 not synthesize failed-source delivery from metadata temporarily cleared by blocking;
 the established receiver's buffering clock remains frozen.
+Queue edits also retry when source coherence is already established: removing an
+unloaded selection can return to A without any synchronization or metadata change.
+The existing manager queue-edit notification supplies that missing opportunity.
 
-Twenty added durable cast regressions cover both callback orders for removal
+Twenty-two added durable cast regressions cover both callback orders for removal
 and automatic advancement during initial and established casting, distinct
 same-URL occurrences, repeated pending/loaded notifications, deferred controls,
 and navigation/disconnect/failure before eligibility. Advancement drives actual
@@ -530,11 +533,24 @@ on baseline versus one on corrected code, without a second metadata callback, fo
 both initial and established removal and actual automatic-discontinuity advancement.
 Fresh review additionally reproduced initial/replacement retry loss after returning
 to an unchanged occurrence and a block/synchronization-only clock-unfreeze defect.
-Five further regressions cover those corrections and actual recovery/default-seek
-position changes, including reentrant metadata delivery during a mocked engine seek.
+Of that total, five first-review regressions cover those corrections and actual
+recovery/default-seek position changes, including simulated reentrant metadata
+delivery during a mocked engine seek.
 A disposable executable probe observed rejected old loads followed by exactly one
 retry on returning to A, and a frozen 42000 ms buffering clock after synchronization
 without metadata. Source-coherence rejection remains required throughout.
+Two second-review regressions and an executable probe confirm that removing the
+unloaded last selection restarts initial/replacement preparation exactly once via
+the actual Player queue-edit method, without synchronization or metadata delivery.
+
+An inherited active-cast attribution concern remains separate: history eligibility
+still uses local-source ownership rather than authoritative receiver ownership.
+Source review indicates that pausing between B metadata and B synchronization can
+checkpoint B's reset/pending cast position (zero without explicit seek); the
+baseline could instead credit B with A's remote clock, then zero after synchronization.
+The earlier ownership reset changes the clock visible in this interval, not the
+history acceptance algorithm or accepted-write lifetime. This is a reported
+remaining concern, not an intentional recovery guarantee or SQLite observation.
 
 These are controlled JVM observations, not proof of real ExoPlayer scheduling,
 device playback or physical receiver decoding. Engine callback delivery/decoding,
