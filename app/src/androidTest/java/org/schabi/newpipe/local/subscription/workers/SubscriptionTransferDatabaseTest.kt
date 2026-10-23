@@ -101,6 +101,34 @@ class SubscriptionTransferDatabaseTest {
     }
 
     @Test
+    fun duplicateEntriesAcrossBatchBoundaryCountProcessedChannelsNotStoredRows() = runBlocking {
+        val original = insertOriginal()
+        val duplicate = subscriptionItems(1).single()
+        val destination = ByteArrayOutputStream()
+        val transfer = transfer(List(51) { duplicate }, destination)
+        val progress = ConcurrentLinkedQueue<SubscriptionTransfer.Progress>()
+
+        val result = transfer.`import`(SubscriptionImportInput.PreviousExportMode(INPUT)) { progress.add(it) }
+
+        assertEquals(SubscriptionTransfer.Outcome.Success(51), result)
+        assertEquals(1, rowCount("subscriptions"))
+        assertEquals(1, rowCount("streams"))
+        assertEquals(1, rowCount("feed"))
+        assertEquals(1, rowCount("feed_last_updated"))
+        val stored = database.subscriptionDAO().getSubscription(1, duplicate.url).blockingGet()!!
+        assertEquals(original.uid, stored.uid)
+        assertEquals("updated-1", stored.name)
+        assertEquals(
+            listOf(0, 50, 51),
+            progress.filterIsInstance<SubscriptionTransfer.Progress.Importing>().map { it.current }
+        )
+        assertTrue(progress.filterIsInstance<SubscriptionTransfer.Progress.Importing>().all { it.total == 51 })
+
+        assertEquals(SubscriptionTransfer.Outcome.Success(1), transfer.export(OUTPUT) { })
+        assertEquals(1, JSONObject(destination.toString(Charsets.UTF_8.name())).getJSONArray("subscriptions").length())
+    }
+
+    @Test
     fun extractionFailureLeavesExistingSubscriptionAndFeedUnchanged() = runBlocking {
         val original = insertOriginal()
         val failure = IOException("Channel extraction failed")

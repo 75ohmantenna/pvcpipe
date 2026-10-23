@@ -46,7 +46,8 @@ class SubscriptionTransfer internal constructor(
 
     sealed class Outcome {
         /**
-         * @param count the number of subscriptions imported or exported
+         * @param count the number of supported input entries processed on import, or entries
+         * exported; imported entries are not necessarily newly inserted subscriptions
          * @param skipped the number of channels an import left out, because the app does not
          * have their service
          */
