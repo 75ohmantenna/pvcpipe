@@ -182,7 +182,8 @@ public final class CastPlayback implements FCastSession.Listener {
             cancelSourcePreparation();
             return;
         }
-        if (tag == loadedTag && !force) {
+        if (tag == loadedTag && !force
+                && (preparingResolver != null || receiverTag != null)) {
             return;
         }
         if (session.getLocalAddress() == null) {

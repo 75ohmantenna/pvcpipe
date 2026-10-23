@@ -410,7 +410,9 @@ the retained remote position. A third review identified playing-intent restorati
 and receiver-switch tag lifetime defects; both were reproduced before correction.
 Their checks verify receiver seek/speed/resume after canceled playing replacement,
 retry position after elapsed time, and frozen pending controls for a new empty
-receiver. All 58 cast checks pass after correction.
+receiver. Retrying the identical canceled tag on that new receiver was also
+reproduced before correcting duplicate-tag suppression: only pending or established
+work can suppress an unchanged tag. All 58 cast checks pass after correction.
 The observation harness recorded one receiver load and one local handoff before
 the fix, versus zero of each afterward, with A resolving after B's metadata in
 both runs. The obsolete resolver closed and preparation became inactive afterward.

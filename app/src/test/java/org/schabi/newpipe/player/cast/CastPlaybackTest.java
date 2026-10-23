@@ -1326,6 +1326,7 @@ public class CastPlaybackTest {
             throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
             fixture.handoff();
+            final MediaItemTag original = player.getCurrentMetadata();
             playback.onPlaybackChanged(1, 42000, 120000, 1.5);
             playback.connect("192.0.2.2", 46899);
             playback.onConnectionChanged();
@@ -1341,7 +1342,7 @@ public class CastPlaybackTest {
             assertTrue(playback.isPreparing());
             now.addAndGet(1000);
             assertEquals(65000, playback.getPosition());
-            fixture.deliverSuccess(newTag());
+            fixture.deliverSuccess(original);
             io.triggerActions();
             verify(playback.getSession()).load(media, 65000, 2, false, "Video", null);
         }
