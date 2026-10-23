@@ -14,7 +14,7 @@ callers, configuration and the scope of relevant tests.
 | `docs/dependency-audit.md` | Dated decisions and validation, including later dated follow-ups; classified as a record in the index |
 | `docs/pvcpipe-device-smoke.md`, `odysee-observations.md`, `local-playlist-mutations.md`, `service-protocol-observations.md` | Historical observations; earlier hardware, emulator and controlled-peer results do not verify newer heads |
 | `pvcpipe-extractor/README.md` | Maintained fork build/capability instructions with inherited-source provenance |
-| `app/src/test/resources/settings/README.md` | Synthetic fixture reference, not a record of user backup data |
+| `app/src/test/resources/settings/README.md` | Synthetic fixture reference; the standalone database-named file is a text placeholder, not SQLite-openability evidence |
 | `pvcpipe-extractor/timeago-parser/raw/README.md` | Generator input/entry-point reference; generated timeago Java is not hand-maintained prose |
 | License files, copyright headers, incorporated third-party source, json2java4nanoJson notices, Protobuf/Wire output | Preserve legal/provenance content; no stylistic normalization of generated or third-party comments |
 
