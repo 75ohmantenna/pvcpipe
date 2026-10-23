@@ -204,12 +204,12 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     }
 
     fun pause() = onMain {
-        playback.clearPauseOnLoad()
+        playback.setPlayWhenReady(false)
         command { it.pausePlayback() }
     }
 
     fun resume() = onMain {
-        playback.clearPauseOnLoad()
+        playback.setPlayWhenReady(true)
         command { it.resumePlayback() }
     }
 
@@ -426,7 +426,9 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
 
 /**
  * Main-thread playback policy, independent of the SDK connection and Android event loop.
- * Receiver state and duration are connection-wide: SDK 0.6.1 deduplicates unchanged v2/v3 values.
+ * Playback state and duration survive loads: SDK 0.6.1 deduplicates unchanged v2/v3 values.
+ * SDK observations are not all authoritative: v3 source echoes synthesize Playing without
+ * updating the SDK's receiver-state cache. Startup pause enforcement normalizes that observation.
  * Source echoes are learned from matching acknowledgements, not SDK feature/version guesses:
  * some working receivers never echo their own loads, including observed SDK-v3 connections.
  * Until an own-load echo is observed, readiness must use playback evidence; the protocol
@@ -446,6 +448,11 @@ internal class FCastPlaybackState(
     private var positionMs = 0L
     private var durationMs = 0L
     private var speed = 1.0
+
+    // Keep explicit intent after one-shot enforcement: the first source echo can arrive
+    // after an accepted Paused snapshot on a connection that has not learned echoes yet.
+    private var requestedPlayWhenReady = true
+
     private var pauseOnLoad = false
     private var endedReported = false
     private var playedThisLoad = false
@@ -458,6 +465,7 @@ internal class FCastPlaybackState(
         pendingLoad = true
         this.positionMs = positionMs.coerceAtLeast(0L)
         this.speed = speed
+        requestedPlayWhenReady = playWhenReady
         pauseOnLoad = !playWhenReady
         endedReported = false
         playedThisLoad = false
@@ -466,6 +474,7 @@ internal class FCastPlaybackState(
     fun sourceChanged(source: Source) {
         val expected = expectedSource ?: return
         if (source == expected) {
+            if (!sourceAcknowledged && !requestedPlayWhenReady) pauseOnLoad = true
             sourceAcknowledged = true
             sourceEchoObserved = true
         } else if (sourceAcknowledged || !pendingLoad) {
@@ -531,8 +540,14 @@ internal class FCastPlaybackState(
         if (expectedSource != null && !pendingLoad) relinquish()
     }
 
-    fun clearPauseOnLoad() {
-        pauseOnLoad = false
+    fun setPlayWhenReady(ready: Boolean) {
+        requestedPlayWhenReady = ready
+        // Explicit Resume cancels startup enforcement; a later Pause must re-arm it while
+        // preparation is pending, including startup Buffering, but not a later rebuffer.
+        pauseOnLoad = !ready && (
+            pendingLoad || pauseOnLoad ||
+                receiverState == PlaybackState.BUFFERING && !playedThisLoad
+            )
     }
 
     fun seek(positionMs: Long) {
@@ -551,6 +566,7 @@ internal class FCastPlaybackState(
         positionMs = 0L
         durationMs = 0L
         speed = 1.0
+        requestedPlayWhenReady = true
         pauseOnLoad = false
         endedReported = false
         playedThisLoad = false
@@ -586,7 +602,13 @@ internal class FCastPlaybackState(
     private fun applyPauseOnLoad() {
         if (pauseOnLoad && (receiverState == PlaybackState.PLAYING || receiverState == PlaybackState.PAUSED)) {
             pauseOnLoad = false
-            if (receiverState == PlaybackState.PLAYING) pause()
+            if (receiverState == PlaybackState.PLAYING) {
+                // The SDK can suppress the next unchanged receiver Paused snapshot. Expose
+                // our enforced startup policy now, rather than adopting synthetic Playing
+                // as intent and advancing the application clock until a callback that may never come.
+                receiverState = PlaybackState.PAUSED
+                pause()
+            }
         }
     }
 

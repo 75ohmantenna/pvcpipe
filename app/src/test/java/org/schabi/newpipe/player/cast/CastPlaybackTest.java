@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -580,6 +581,354 @@ public class CastPlaybackTest {
         io.triggerActions();
         verify(playback.getSession()).load(media, 10000, 1, false, "Video", null);
         assertFalse(playback.getPlayWhenReady());
+    }
+
+    @Test
+    public void pausedReplacementSyntheticPlayingPreservesIntentWithoutCorrectiveCallback() {
+        // Actual policy/controller; the existing mock session is only the transport boundary.
+        // Keep this regression on the original policy API for unchanged-baseline reproduction.
+        final FCastPlaybackState receiver = receiver(false);
+        receiver.setLegacyCompletionWithoutEcho(true);
+        receiver.load(source("previous"), 42000, 1, false);
+        receiver.sourceChanged(source("previous"));
+        receiver.durationChanged(120);
+        receiver.playbackStateChanged(PlaybackState.PAUSED);
+        final MediaItemTag replacement = newTag();
+        when(player.getCurrentMetadata()).thenReturn(replacement);
+        playback.onSourceChanged();
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+        receiver.load(source("replacement"), 42000, 1, false);
+        receiver.emit();
+        receiver.sourceChanged(source("replacement"));
+        clearInvocations(player, playback.getSession());
+
+        receiver.playbackStateChanged(PlaybackState.PLAYING);
+        // Do not feed the corrective Paused callback back into either real component.
+        verify(playback.getSession()).pause();
+        assertFalse(playback.getPlayWhenReady());
+        assertFalse(playback.isPreparing());
+        verify(player).onCastingStateChanged(Player.STATE_PAUSED);
+        verify(player, never()).onCastingStateChanged(Player.STATE_PLAYING);
+        now.addAndGet(5000);
+        assertEquals(42000, playback.getPosition());
+
+        final MediaItemTag anotherReplacement = newTag();
+        when(player.getCurrentMetadata()).thenReturn(anotherReplacement);
+        playback.onSourceChanged();
+        clearInvocations(playback.getSession());
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+        playback.connect("other-receiver.example", 46899);
+        now.addAndGet(5000);
+        assertFalse(playback.getPlayWhenReady());
+        assertTrue(playback.isPreparing());
+        assertEquals(42000, playback.getPosition());
+        clearInvocations(playback.getSession());
+        playback.onConnectionChanged();
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+    }
+
+    @Test
+    public void legacyPausedReplacementDoesNotNeedACorrectivePausedCallback() {
+        assertPausedStartupRetainsIntent(true, false, false);
+    }
+
+    @Test
+    public void sdkV3NoEchoPausedReplacementDoesNotNeedACorrectivePausedCallback() {
+        assertPausedStartupRetainsIntent(false, true, false);
+    }
+
+    @Test
+    public void v4NoEchoPausedReplacementDoesNotNeedACorrectivePausedCallback() {
+        assertPausedStartupRetainsIntent(false, false, false);
+    }
+
+    @Test
+    public void v4SourceEchoPausedReplacementDoesNotNeedACorrectivePausedCallback() {
+        assertPausedStartupRetainsIntent(false, false, true);
+    }
+
+    @Test
+    public void firstSourceEchoPreservesPauseDespiteAnEarlierPausedObservation() {
+        final StartupReceiver receiver = new StartupReceiver(false, true, true);
+        playback.onPlaybackChanged(2, 42000, 120000, 1);
+        beginReplacement();
+        io.triggerActions();
+        // Before learning source echoes, the policy must accept no-echo playback evidence.
+        receiver.state.playbackStateChanged(PlaybackState.PAUSED);
+        receiver.acknowledge();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        verify(playback.getSession()).pause();
+        assertPausedClockAndControls();
+
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        clearInvocations(playback.getSession());
+        receiver.acknowledge();
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void resumeBeforeFirstSourceEchoOverridesTheOriginalPausedLoad() {
+        final StartupReceiver receiver = new StartupReceiver(false, true, true);
+        playback.onPlaybackChanged(2, 42000, 120000, 1);
+        beginReplacement();
+        io.triggerActions();
+        receiver.state.playbackStateChanged(PlaybackState.PAUSED);
+        playback.play();
+        receiver.acknowledge();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void remotePlayingAfterAnEstablishedRebufferIsNotStartupPauseEvidence() {
+        final StartupReceiver receiver = new StartupReceiver(false, false, true);
+        receiver.establishPreviousSource(true);
+        receiver.state.playbackStateChanged(PlaybackState.BUFFERING);
+        playback.pause();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        verify(player).onCastingStateChanged(Player.STATE_PLAYING);
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void explicitControlsDuringAcknowledgedBufferingUpdateStartupIntent() {
+        final StartupReceiver receiver = new StartupReceiver(false, false, true);
+        receiver.establishPreviousSource(true);
+        beginReplacement();
+        io.triggerActions();
+        receiver.acknowledge();
+        receiver.state.playbackStateChanged(PlaybackState.BUFFERING);
+        playback.pause();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        verify(playback.getSession()).pause();
+        assertPausedClockAndControls();
+
+        beginReplacement();
+        io.triggerActions();
+        receiver.acknowledge();
+        receiver.state.playbackStateChanged(PlaybackState.BUFFERING);
+        playback.play();
+        clearInvocations(player, playback.getSession());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        assertFalse(playback.isPreparing());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        verify(player).onCastingStateChanged(Player.STATE_PLAYING);
+        verify(playback.getSession(), never()).pause();
+    }
+
+    @Test
+    public void explicitResumeAndPauseDuringPreparationUseTheLatestIntent() {
+        for (final boolean[] mode : startupModes()) {
+            final StartupReceiver receiver = new StartupReceiver(mode[0], mode[1], mode[2]);
+            receiver.establishPreviousSource(false);
+            beginReplacement();
+            clearInvocations(playback.getSession());
+            playback.play();
+            verify(playback.getSession(), never()).resume();
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 42000, 1, true, "Video", null);
+
+            // Preparation has sent Play, but its matching source/state is still pending.
+            playback.pause();
+            verify(playback.getSession()).pause();
+            receiver.acknowledge();
+            clearInvocations(player);
+            receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+            assertPausedClockAndControls();
+            verify(playback.getSession(), never()).resume();
+        }
+    }
+
+    @Test
+    public void explicitPauseThenResumeDuringPreparationCancelsStartupPause() {
+        for (final boolean[] mode : startupModes()) {
+            final StartupReceiver receiver = new StartupReceiver(mode[0], mode[1], mode[2]);
+            receiver.establishPreviousSource(true);
+            beginReplacement();
+            clearInvocations(playback.getSession());
+            playback.pause();
+            verify(playback.getSession(), never()).pause();
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+
+            playback.play();
+            verify(playback.getSession()).resume();
+            receiver.acknowledge();
+            clearInvocations(player, playback.getSession());
+            receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+            assertTrue(playback.getPlayWhenReady());
+            assertFalse(playback.isPreparing());
+            now.addAndGet(2000);
+            assertEquals(44000, playback.getPosition());
+            verify(player).onCastingStateChanged(Player.STATE_PLAYING);
+            verify(playback.getSession(), never()).pause();
+        }
+    }
+
+    private void assertPausedStartupRetainsIntent(final boolean legacy,
+                                                  final boolean v3,
+                                                  final boolean sourceEcho) {
+        final StartupReceiver receiver = new StartupReceiver(legacy, v3, sourceEcho);
+        receiver.establishPreviousSource(false);
+        beginReplacement();
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+        receiver.acknowledge();
+        clearInvocations(player, playback.getSession());
+
+        // Observe startup Playing despite requesting a paused replacement. SDK-v3 source
+        // echoes synthesize this callback; legacy/v4 modes exercise a receiver observation.
+        // Intentionally never deliver the receiver's corrective Paused callback.
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        verify(playback.getSession()).pause();
+        assertPausedClockAndControls();
+
+        beginReplacement();
+        clearInvocations(playback.getSession());
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+        receiver.acknowledge();
+        clearInvocations(player);
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertPausedClockAndControls();
+
+        playback.connect("other-receiver.example", 46899);
+        assertFalse(playback.getPlayWhenReady());
+        assertTrue(playback.isPreparing());
+        now.addAndGet(2000);
+        assertEquals(42000, playback.getPosition());
+        // The mocked transport has no connection lifecycle; model the new session policy.
+        receiver.resetConnection();
+        clearInvocations(playback.getSession());
+        playback.onConnectionChanged();
+        io.triggerActions();
+        verify(playback.getSession()).load(media, 42000, 1, false, "Video", null);
+        receiver.acknowledge();
+        clearInvocations(player);
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertPausedClockAndControls();
+
+        // Startup enforcement is one-shot, not a permanent veto of remote controls.
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        assertFalse(playback.isPreparing());
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        receiver.state.timeChanged(44);
+        receiver.state.playbackStateChanged(PlaybackState.PAUSED);
+        clearInvocations(player);
+        now.addAndGet(2000);
+        assertEquals(44000, playback.getPosition());
+        assertFalse(playback.getPlayWhenReady());
+        receiver.state.playbackStateChanged(PlaybackState.PLAYING);
+        assertTrue(playback.getPlayWhenReady());
+        now.addAndGet(1000);
+        assertEquals(45000, playback.getPosition());
+    }
+
+    private void beginReplacement() {
+        final MediaItemTag replacement = newTag();
+        when(player.getCurrentMetadata()).thenReturn(replacement);
+        playback.onSourceChanged();
+        assertTrue(playback.isPreparing());
+    }
+
+    private void assertPausedClockAndControls() {
+        assertTrue(playback.isActive());
+        assertFalse(playback.isPreparing());
+        assertFalse(playback.getPlayWhenReady());
+        assertEquals(42000, playback.getPosition());
+        now.addAndGet(5000);
+        assertEquals(42000, playback.getPosition());
+        verify(player).onCastingStateChanged(Player.STATE_PAUSED);
+        verify(player, never()).onCastingStateChanged(Player.STATE_PLAYING);
+    }
+
+    private static boolean[][] startupModes() {
+        return new boolean[][]{
+                {true, false, false},
+                {false, true, false},
+                {false, true, true},
+                {false, false, false},
+                {false, false, true}
+        };
+    }
+
+    /**
+     * Real playback controller and policy; only Android/SDK transport and media resolution
+     * are mocked. Forward session commands at the same policy boundary as FCastSession.
+     */
+    private final class StartupReceiver {
+        private final boolean legacy;
+        private final boolean v3;
+        private final boolean sourceEcho;
+        private final FCastPlaybackState state;
+        private Source pendingSource;
+        private int loads;
+
+        private StartupReceiver(final boolean legacy, final boolean v3,
+                                final boolean sourceEcho) {
+            this.legacy = legacy;
+            this.v3 = v3;
+            this.sourceEcho = sourceEcho;
+            state = receiver(legacy);
+            state.setLegacyCompletionWithoutEcho(v3);
+            doAnswer(invocation -> {
+                pendingSource = source("startup-" + ++loads);
+                state.load(pendingSource, invocation.getArgument(1),
+                        ((Float) invocation.getArgument(2)).doubleValue(),
+                        invocation.getArgument(3));
+                state.emit();
+                return null;
+            }).when(playback.getSession()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            doAnswer(invocation -> {
+                state.setPlayWhenReady(false);
+                return null;
+            }).when(playback.getSession()).pause();
+            doAnswer(invocation -> {
+                state.setPlayWhenReady(true);
+                return null;
+            }).when(playback.getSession()).resume();
+        }
+
+        private void establishPreviousSource(final boolean playing) {
+            pendingSource = source("previous");
+            state.load(pendingSource, 42000, 1, playing);
+            acknowledge();
+            state.durationChanged(120);
+            state.playbackStateChanged(playing ? PlaybackState.PLAYING : PlaybackState.PAUSED);
+            clearInvocations(player, playback.getSession());
+        }
+
+        private void acknowledge() {
+            if (sourceEcho) {
+                state.sourceChanged(pendingSource);
+            }
+        }
+
+        private void resetConnection() {
+            state.reset();
+            state.setLegacyReceiver(legacy);
+            state.setLegacyCompletionWithoutEcho(v3);
+        }
     }
 
     @Test
