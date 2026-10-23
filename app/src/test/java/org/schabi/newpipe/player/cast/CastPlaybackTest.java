@@ -1189,6 +1189,85 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void blockedQualityReloadRetainsPendingRemoteControls() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            set("active", true);
+            set("loadedItem", fixture.first);
+            set("loadedTag", player.getCurrentMetadata());
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            final MediaItemTag oldTag = player.getCurrentMetadata();
+            player.onPlaybackBlock();
+            fixture.deliverSuccess(oldTag);
+            playback.seek(65000);
+            playback.pause();
+            playback.setSpeed(2);
+            io.triggerActions();
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            player.onPlaybackSynchronize(fixture.first, false);
+            fixture.deliverSuccess(newTag());
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 65000, 2, false, "Video", null);
+            assertEquals(65000, playback.getPosition());
+        }
+    }
+
+    @Test
+    public void blockedInitialReloadCannotHandoffWithoutCurrentOccurrence() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            final CastMediaResolver first = fixture.begin();
+            when(first.resolve(any(), any(), any(InetAddress.class))).thenAnswer(invocation -> {
+                final MediaItemTag oldTag = player.getCurrentMetadata();
+                player.onPlaybackBlock();
+                fixture.deliverSuccess(oldTag);
+                return media;
+            });
+            io.triggerActions();
+            assertNoInitialHandoff();
+            verify(first).close();
+            player.onPlaybackSynchronize(fixture.first, false);
+            fixture.deliverSuccess(newTag());
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
+    public void activeFailedSelectionKeepsTheRemoteClockFrozen() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            set("active", true);
+            set("loadedItem", fixture.first);
+            set("loadedTag", player.getCurrentMetadata());
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            fixture.selectSecond();
+            fixture.deliverFailure(fixture.second);
+            final long frozen = playback.getPosition();
+            now.addAndGet(5000);
+            assertTrue(playback.isPreparing());
+            assertEquals(frozen, playback.getPosition());
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+        }
+    }
+
+    @Test
+    public void differentSourceAfterRemovalDoesNotInheritRemovedRemoteClock() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            set("active", true);
+            set("loadedItem", fixture.first);
+            set("loadedTag", player.getCurrentMetadata());
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            fixture.queue.remove(0);
+            // A preloaded source can transition before Player receives another synchronization.
+            final MediaItemTag nextTag = newTag();
+            when(nextTag.getStreamUrl()).thenReturn("https://example.invalid/next");
+            fixture.deliverSuccess(nextTag);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
     public void validInitialCompletionUsesLatestLocalPositionAndHandsOffOnce() throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
             final CastMediaResolver first = fixture.begin();
@@ -1272,6 +1351,11 @@ public class CastPlaybackTest {
             doCallRealMethod().when(player).exoPlayerIsNull();
             doCallRealMethod().when(player).onPlaybackSynchronize(any(), anyBoolean());
             doCallRealMethod().when(player).onEvents(any(), any());
+            doCallRealMethod().when(player).onPlaybackBlock();
+            for (final String field : List.of("thumbnail", "playbackHistory", "listeners")) {
+                setPlayer(field, mock(Player.class.getDeclaredField(field).getType()));
+            }
+            setPlayer("UIs", player.UIs());
             when(player.getPlayWhenReady()).thenReturn(true);
             set("active", false);
             set("loadedTag", null);
@@ -1289,6 +1373,15 @@ public class CastPlaybackTest {
             queue.setIndex(1);
             player.onPlaybackSynchronize(second, false);
             assertSame(second, player.getCurrentItem());
+        }
+
+        private void deliverSuccess(final MediaItemTag tag) {
+            when(tag.getMaybeStreamInfo()).thenReturn(Optional.of(info));
+            final MediaItem item = new MediaItem.Builder()
+                    .setUri(tag.getStreamUrl()).setTag(tag).build();
+            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
+            player.onEvents(player.getExoPlayer(),
+                    mock(com.google.android.exoplayer2.Player.Events.class));
         }
 
         private void deliverFailure(final PlayQueueItem item) {

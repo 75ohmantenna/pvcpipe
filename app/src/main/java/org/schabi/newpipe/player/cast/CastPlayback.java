@@ -170,12 +170,16 @@ public final class CastPlayback implements FCastSession.Listener {
             return;
         }
         final PlayQueueItem item = player.getCurrentItem();
-        onQueueItemChanged(item);
+        // Queue-manager reloads temporarily clear currentItem without changing occurrence.
+        if (item == null) {
+            return;
+        }
         final StreamInfo info = player.getCurrentStreamInfo().orElse(null);
         final MediaItemTag tag = player.getCurrentMetadata();
         if (info == null || tag == null) {
             cancelPreparation();
             loadedTag = null;
+            preparing = active;
             return;
         }
         if (tag == loadedTag && !force) {
@@ -185,7 +189,8 @@ public final class CastPlayback implements FCastSession.Listener {
             onError(player.getContext().getString(R.string.fcast_no_route));
             return;
         }
-        final boolean continuing = active && loadedTag != null && loadedItem == item;
+        final boolean continuing = active && loadedTag != null
+                && loadedTag.getStreamUrl().equals(tag.getStreamUrl());
         final long start = continuing ? getPosition() : player.getExoPlayer().getCurrentPosition();
         final boolean shouldPlay = active ? playWhenReady : player.getPlayWhenReady();
         if (continuing && !force && canControlReceiver()) {
@@ -216,7 +221,7 @@ public final class CastPlayback implements FCastSession.Listener {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(media -> {
                     if (!ownsPreparation(request, item, next)) {
-                        next.close();
+                        discardPreparation(next);
                         return;
                     }
                     if (previousResolver != null) {
@@ -253,7 +258,7 @@ public final class CastPlayback implements FCastSession.Listener {
                         onError(player.getContext().getString(R.string.fcast_source_error)
                                 + "\n" + failure.getMessage());
                     } else {
-                        next.close();
+                        discardPreparation(next);
                     }
                 }));
         notifyListeners();
@@ -289,8 +294,18 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private boolean ownsPreparation(final int request, final PlayQueueItem item,
                                     final CastMediaResolver next) {
-        return !closed && request == generation && preparingResolver == next
+        return item != null && !closed && request == generation && preparingResolver == next
                 && item == player.getCurrentItem() && session.getConnectionState() == 2;
+    }
+
+    private void discardPreparation(final CastMediaResolver next) {
+        if (preparingResolver == next) {
+            cancelPreparation();
+            loadedTag = null;
+            preparing = active;
+        } else {
+            next.close();
+        }
     }
 
     public void setPlayWhenReadyForSource(final boolean ready) {

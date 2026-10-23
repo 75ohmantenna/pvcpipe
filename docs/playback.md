@@ -379,12 +379,22 @@ must retain the captured occurrence, generation, resolver lifetime and connected
 session before affecting the operation; stale callbacks close only their captured
 resolver, never a newer request's resources. Same-occurrence quality/audio
 replacement and forced receiver reload retain their existing pending controls.
+Queue-manager blocking temporarily clears `Player.currentItem`; that absence is
+not navigation and cannot authorize a preparation or handoff. Active failed-source
+waiting keeps the remote clock frozen. The existing URL-based source-clock
+continuation heuristic is unchanged; URL equality never authorizes preparation
+ownership. This correction does not make `currentItem` an engine-source identity.
 
-Nine durable `CastPlaybackTest` regressions cover failed B metadata followed by
+Thirteen durable `CastPlaybackTest` regressions cover failed B metadata followed by
 late A success/failure, distinct same-URL occurrences, same-occurrence failed
 metadata, completion without the selection notification, newer-preparation cleanup,
-valid initial handoff and successful B metadata replacement. Five desired-behavior
-checks fail on unchanged production code; all 51 cast checks pass with the fix.
+valid initial handoff and successful B metadata replacement. The first nine
+regressions yield five failures on unchanged production code. Fresh review then
+identified candidate regressions around temporary null occurrences, source-clock
+continuation after removal, and active failed-source clock freezing. Four added
+checks reproduced those candidate failures before correction, including real
+block/events/synchronization with pending seek/pause/speed controls. All 55 cast
+checks pass after correction.
 The observation harness recorded one receiver load and one local handoff before
 the fix, versus zero of each afterward, with A resolving after B's metadata in
 both runs. The obsolete resolver closed and preparation became inactive afterward.
@@ -392,8 +402,8 @@ both runs. The obsolete resolver closed and preparation became inactive afterwar
 The harness uses real queue occurrences, `FailedMediaSource` metadata,
 `Player.onPlaybackSynchronize()`, `Player.onEvents()` and `CastPlayback`, with
 controlled Rx scheduling. ExoPlayer delivery/decoding, source preparation,
-extraction/resolution, Android effects/error logging and SDK/receiver transport are
-mocked; no device or receiver playback is established.
+extraction/resolution, Android effects/error logging, metadata history/UI effects
+and SDK/receiver transport are mocked; no device or receiver playback is established.
 
 ### Unresolved navigation defects
 
