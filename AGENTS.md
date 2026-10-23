@@ -25,9 +25,10 @@
 - Playback audit findings 4–5 and the equal-index history snapshot race have
   controlled JVM-verified ownership corrections; see `docs/playback.md` under
   "Recovery during pending navigation", "Initial cast preparation ownership"
-  and "Equal-index history snapshot ownership". Keep dated audit observations
-  separate from current guarantees; metadata-before-synchronization cast liveness
-  remains an unresolved follow-up.
+  and "Equal-index history snapshot ownership". The later "Cast synchronization
+  liveness" correction retries coherent source metadata after synchronization.
+  Keep dated audit observations and mocked JVM evidence separate from current
+  guarantees and real engine/device/receiver scheduling.
 
 ## RTK shell commands
 

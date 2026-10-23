@@ -42,6 +42,7 @@ public final class CastPlayback implements FCastSession.Listener {
     private boolean playWhenReady;
     private boolean ended;
     private boolean reloadOnConnection;
+    private boolean pendingSeek;
     private int generation;
     private long position;
     private long duration;
@@ -182,6 +183,9 @@ public final class CastPlayback implements FCastSession.Listener {
             cancelSourcePreparation();
             return;
         }
+        if (!player.isCurrentSourceSynchronized()) {
+            return; // Synchronization or the next engine metadata delivery will retry.
+        }
         if (tag == loadedTag && !force
                 && (preparingResolver != null || receiverTag != null)) {
             return;
@@ -192,7 +196,8 @@ public final class CastPlayback implements FCastSession.Listener {
         }
         final boolean continuing = active && loadedTag != null
                 && loadedTag.getStreamUrl().equals(tag.getStreamUrl());
-        final long start = continuing ? getPosition() : player.getExoPlayer().getCurrentPosition();
+        final long start = continuing || (active && pendingSeek)
+                ? getPosition() : player.getExoPlayer().getCurrentPosition();
         final boolean shouldPlay = active ? playWhenReady : player.getPlayWhenReady();
         if (continuing && !force && canControlReceiver()) {
             // Freeze the old source at the position used by a quality/audio replacement.
@@ -203,6 +208,7 @@ public final class CastPlayback implements FCastSession.Listener {
         loadedItem = item;
         preparing = true;
         playWhenReady = shouldPlay;
+        pendingSeek = false;
         if (active) {
             // Pending controls belong to this load, not to the receiver's previous source.
             position = start;
@@ -273,6 +279,7 @@ public final class CastPlayback implements FCastSession.Listener {
         receiverTag = null;
         loadedItem = null;
         ended = false;
+        pendingSeek = false;
         if (active) {
             if (!closed && session.getConnectionState() == 2) {
                 session.pause();
@@ -292,13 +299,15 @@ public final class CastPlayback implements FCastSession.Listener {
     public void onQueueItemChanged(final PlayQueueItem item) {
         if (loadedItem != item) {
             onPlayerReset();
+            loadedItem = item;
         }
     }
 
     private boolean ownsPreparation(final int request, final PlayQueueItem item,
                                     final CastMediaResolver next) {
         return item != null && !closed && request == generation && preparingResolver == next
-                && item == player.getCurrentItem() && session.getConnectionState() == 2;
+                && item == player.getCurrentItem() && player.isCurrentSourceSynchronized()
+                && session.getConnectionState() == 2;
     }
 
     private void discardPreparation(final CastMediaResolver next) {
@@ -381,6 +390,7 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     public void seek(final long target) {
+        pendingSeek = active && preparing;
         position = duration > 0 ? Math.min(duration, Math.max(0, target)) : Math.max(0, target);
         if (duration <= 0 || position < duration) {
             ended = false;

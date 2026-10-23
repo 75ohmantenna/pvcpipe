@@ -48,8 +48,10 @@ Kotlin, resources, external sites or historical test artifacts.
   occurrences; see [the correction and mocked boundaries](playback.md#initial-cast-preparation-ownership--corrected-2026-10-23).
   A further 2026-10-23 correction addresses the separate equal-index history
   snapshot race; see [snapshot acceptance and write lifetime](playback.md#equal-index-history-snapshot-ownership--corrected-2026-10-23).
-  Metadata-before-occurrence-synchronization cast liveness remains a separate
-  unresolved follow-up, not an ownership workaround.
+  Metadata-before-occurrence-synchronization cast liveness was left separate
+  through PR #140. A later 2026-10-23 correction revalidated the unchanged
+  post-#140 baseline and added ownership-gated synchronization retry; see
+  [cast synchronization liveness and evidence boundaries](playback.md#cast-synchronization-liveness--corrected-2026-10-23).
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to

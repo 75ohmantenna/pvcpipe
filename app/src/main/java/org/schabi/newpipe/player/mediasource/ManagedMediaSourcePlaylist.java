@@ -71,15 +71,18 @@ public class ManagedMediaSourcePlaylist {
      * Removes a {@link ManagedMediaSource} from {@link ConcatenatingMediaSource}
      * at the given index. If this index is out of bound, then the removal is ignored.
      *
-     * @see ConcatenatingMediaSource#removeMediaSource(int)
+     * @see ConcatenatingMediaSource#removeMediaSource(int, Handler, Runnable)
      * @param index of {@link ManagedMediaSource} to be removed
+     * @param handler handler for completion after the engine timeline changes
+     * @param finalizingAction action after removal, guarded by its owner's lifetime
      */
-    public synchronized void remove(final int index) {
+    public synchronized void remove(final int index, @Nullable final Handler handler,
+                                    @Nullable final Runnable finalizingAction) {
         if (index < 0 || index >= internalSource.getSize()) {
             return;
         }
 
-        internalSource.removeMediaSource(index);
+        internalSource.removeMediaSource(index, handler, finalizingAction);
     }
 
     /**

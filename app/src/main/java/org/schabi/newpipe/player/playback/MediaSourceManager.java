@@ -267,7 +267,8 @@ public class MediaSourceManager {
                 break;
             case REMOVE:
                 final RemoveEvent removeEvent = (RemoveEvent) event;
-                playlist.remove(removeEvent.getRemoveIndex());
+                playlist.remove(removeEvent.getRemoveIndex(), removeMediaSourceHandler,
+                        this::maybeSynchronizePlayer);
                 break;
             case MOVE:
                 final MoveEvent moveEvent = (MoveEvent) event;

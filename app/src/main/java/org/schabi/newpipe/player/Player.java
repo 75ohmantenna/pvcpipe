@@ -670,6 +670,17 @@ public final class Player implements PlaybackListener, Listener {
                 .orElse(false);
     }
 
+    /**
+     * Cast preparation needs coherent selection, engine ownership and delivered metadata.
+     * @return whether the selected occurrence owns the engine source and cached metadata
+     */
+    public boolean isCurrentSourceSynchronized() {
+        return loadedSourceOwnsSelectedItem() && currentItem == playQueue.getItem()
+                && currentMetadata != null
+                && MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                        .filter(tag -> tag == currentMetadata).isPresent();
+    }
+
     private void setRecovery(final int queuePos, final long windowPos) {
         if (playQueue == null || playQueue.size() <= queuePos) {
             return;
@@ -1264,6 +1275,9 @@ public final class Player implements PlaybackListener, Listener {
                     listeners.onAudioTrackUpdate();
                 }
             });
+            if (loadedSourceOwnsSelectedItem()) {
+                casting.onQueueItemChanged(playQueue.getItem());
+            }
             casting.onSourceChanged();
         });
     }
@@ -1452,8 +1466,15 @@ public final class Player implements PlaybackListener, Listener {
             Log.d(TAG, "Playback - onPlaybackSynchronize(was blocked: " + wasBlocked
                     + ") called with item=[" + item.getTitle() + "], url=[" + item.getUrl() + "]");
         }
-        if (exoPlayerIsNull() || playQueue == null || currentItem == item) {
-            return; // nothing to synchronize
+        if (exoPlayerIsNull() || playQueue == null) {
+            return;
+        }
+        if (currentItem == item) {
+            // Returning to an unchanged engine source can restore previously lost coherence.
+            if (currentMetadata != null) {
+                casting.onSourceChanged();
+            }
+            return;
         }
 
         final int playQueueIndex = playQueue.indexOf(item);
@@ -1499,6 +1520,10 @@ public final class Player implements PlaybackListener, Listener {
             } else {
                 simpleExoPlayer.seekToDefaultPosition(playQueueIndex);
             }
+        }
+        // Metadata may already have arrived for this occurrence before manager synchronization.
+        if (currentMetadata != null) {
+            casting.onSourceChanged();
         }
     }
 

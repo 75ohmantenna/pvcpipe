@@ -3,7 +3,6 @@ package org.schabi.newpipe.player.cast;
 import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -16,46 +15,28 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import android.content.Context;
-import android.net.Uri;
-import android.os.PowerManager;
-import android.os.SystemClock;
-import android.text.TextUtils;
-import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
-import com.google.android.exoplayer2.Timeline;
 
 import org.fcast.sender_sdk.PlaybackState;
 import org.fcast.sender_sdk.Source;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.mockito.MockedConstruction;
-import org.mockito.MockedStatic;
-import org.schabi.newpipe.error.ErrorInfo;
-import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 import org.schabi.newpipe.player.mediaitem.PlaceholderTag;
-import org.schabi.newpipe.player.mediasource.FailedMediaSource;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
-import org.schabi.newpipe.player.ui.PlayerUiList;
-import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
 import java.net.InetAddress;
@@ -63,77 +44,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import kotlin.Unit;
-import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
-import io.reactivex.rxjava3.schedulers.Schedulers;
-import io.reactivex.rxjava3.schedulers.TestScheduler;
 
-public class CastPlaybackTest {
-    private final AtomicLong now = new AtomicLong(1000);
-    private MockedStatic<SystemClock> clock;
-    private MockedConstruction<FCastSession> sessions;
-    private CastPlayback playback;
-    private Player player;
-    private MockedConstruction<CastMediaResolver> resolvers;
-    private final TestScheduler io = new TestScheduler();
-    private final CastMedia media = mock(CastMedia.class);
-
-    @Before
-    public void setUp() throws Exception {
-        RxJavaPlugins.setIoSchedulerHandler(scheduler -> io);
-        RxAndroidPlugins.setInitMainThreadSchedulerHandler(scheduler -> Schedulers.trampoline());
-        RxAndroidPlugins.setMainThreadSchedulerHandler(scheduler -> Schedulers.trampoline());
-        resolvers = mockConstruction(CastMediaResolver.class, (resolver, context) ->
-                when(resolver.resolve(any(), any(), any(InetAddress.class))).thenReturn(media));
-        clock = mockStatic(SystemClock.class);
-        clock.when(SystemClock::elapsedRealtime).thenAnswer(invocation -> now.get());
-        sessions = mockConstruction(FCastSession.class, (session, arguments) -> {
-            when(session.getConnectionState()).thenReturn(2);
-            when(session.getLocalAddress()).thenReturn(
-                    InetAddress.getByAddress(new byte[]{(byte) 192, 0, 2, 1}));
-        });
-        final Context context = mock(Context.class);
-        final PowerManager power = mock(PowerManager.class);
-        when(context.getSystemService(Context.POWER_SERVICE)).thenReturn(power);
-        when(power.newWakeLock(anyInt(), anyString()))
-                .thenReturn(mock(PowerManager.WakeLock.class));
-        player = mock(Player.class);
-        when(player.getContext()).thenReturn(context);
-        final ExoPlayer exo = mock(ExoPlayer.class);
-        when(exo.getCurrentPosition()).thenReturn(10000L);
-        when(player.getExoPlayer()).thenReturn(exo);
-        when(player.getCurrentPosition()).thenReturn(10000L);
-        when(player.UIs()).thenReturn(mock(PlayerUiList.class));
-        final StreamInfo info = mock(StreamInfo.class);
-        when(info.getDuration()).thenReturn(120L);
-        when(info.getName()).thenReturn("Video");
-        when(info.getThumbnails()).thenReturn(List.of());
-        when(player.getCurrentStreamInfo()).thenReturn(Optional.of(info));
-        playback = new CastPlayback(player);
-        when(player.getPlaybackSpeed()).thenAnswer(invocation ->
-                playback.isActive() ? playback.getSpeed() : 1.5f);
-        set("active", true);
-        final MediaItemTag tag = newTag();
-        set("loadedTag", tag);
-        set("receiverTag", tag);
-        when(player.getCurrentMetadata()).thenReturn(tag);
-        final PlayQueueItem item = mock(PlayQueueItem.class);
-        when(player.getCurrentItem()).thenReturn(item);
-        set("loadedItem", item);
-    }
-
-    @After
-    public void tearDown() {
-        playback.close();
-        sessions.close();
-        resolvers.close();
-        clock.close();
-        RxAndroidPlugins.reset();
-        RxJavaPlugins.reset();
-    }
+public class CastPlaybackTest extends CastPlaybackTestFixture {
 
     @Test
     public void remoteClockFollowsSpeedStopsWhilePausedAndClampsAtEnd() {
@@ -1123,8 +1039,7 @@ public class CastPlaybackTest {
                 fixture.deliverFailure(fixture.second);
                 final MediaItemTag replacement = newTag();
                 when(replacement.getMaybeStreamInfo()).thenReturn(Optional.of(fixture.info));
-                setPlayer("currentMetadata", replacement);
-                playback.onSourceChanged();
+                fixture.deliverSuccess(replacement);
                 final CastMediaResolver newer = resolvers.constructed().get(1);
                 when(newer.resolve(any(), any(), any(InetAddress.class)))
                         .thenAnswer(newInvocation -> {
@@ -1257,7 +1172,13 @@ public class CastPlaybackTest {
             // A preloaded source can transition before Player receives another synchronization.
             final MediaItemTag nextTag = newTag();
             when(nextTag.getStreamUrl()).thenReturn("https://example.invalid/next");
+            ownSource(nextTag, fixture.second);
             fixture.deliverSuccess(nextTag);
+            io.triggerActions();
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            player.onPlaybackSynchronize(fixture.second, false);
             io.triggerActions();
             verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
         }
@@ -1369,6 +1290,414 @@ public class CastPlaybackTest {
         }
     }
 
+    @Test
+    public void initialRemovalMetadataBeforeSynchronizationEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(false, true, true);
+    }
+
+    @Test
+    public void activeRemovalMetadataBeforeSynchronizationEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(true, true, true);
+    }
+
+    @Test
+    public void initialAdvanceMetadataBeforeSynchronizationEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(false, false, true);
+    }
+
+    @Test
+    public void activeAdvanceSynchronizationBeforeMetadataEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(true, false, false);
+    }
+
+    @Test
+    public void initialRemovalSynchronizationBeforeMetadataEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(false, true, false);
+    }
+
+    @Test
+    public void activeRemovalSynchronizationBeforeMetadataEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(true, true, false);
+    }
+
+    @Test
+    public void activeAdvanceMetadataBeforeSynchronizationEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(true, false, true);
+    }
+
+    @Test
+    public void initialAdvanceSynchronizationBeforeMetadataEventuallyLoads() throws Exception {
+        assertSynchronizationLiveness(false, false, false);
+    }
+
+    @Test
+    public void synchronizationWithoutDeliveredMetadataKeepsReceiverBufferingFrozen()
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(3, 42000, 120000, 1.5);
+            player.onPlaybackBlock();
+            player.onPlaybackSynchronize(fixture.first, false);
+            now.addAndGet(3000);
+            assertTrue(playback.isPreparing());
+            assertEquals(42000, playback.getPosition());
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+        }
+    }
+
+    @Test
+    public void metadataFirstPreparationUsesSynchronizedRecoveryPosition() throws Exception {
+        assertSynchronizationSeekPosition(true);
+    }
+
+    @Test
+    public void metadataDuringDefaultSeekLoadsOnceAtUpdatedEnginePosition() throws Exception {
+        assertSynchronizationSeekPosition(false);
+    }
+
+    private void assertSynchronizationSeekPosition(final boolean recovery) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.begin();
+            final MediaItemTag next = newTag();
+            ownSource(next, fixture.second);
+            fixture.queue.setIndex(1);
+            final long expected = recovery ? 25000 : 7000;
+            if (recovery) {
+                fixture.queue.setRecovery(1, expected);
+                fixture.deliverSuccess(next);
+            }
+            when(player.isPlaying()).thenReturn(false);
+            final ExoPlayer exo = player.getExoPlayer();
+            final org.mockito.stubbing.Answer<Void> seek = invocation -> {
+                when(player.getExoPlayer().getCurrentPosition()).thenReturn(expected);
+                when(player.getCurrentPosition()).thenReturn(expected);
+                // ExoPlayer may synchronously flush aggregate metadata during the seek.
+                fixture.deliverSuccess(next);
+                return null;
+            };
+            if (recovery) {
+                doAnswer(seek).when(exo).seekTo(1, expected);
+            } else {
+                doAnswer(seek).when(exo).seekToDefaultPosition(1);
+            }
+            player.onPlaybackSynchronize(fixture.second, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, expected, 1.5f, true, "Video", null);
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, fixture.second.getRecoveryPosition());
+        }
+    }
+
+    @Test
+    public void managerRemovalMetadataFirstCompletesInitialHandoff() throws Exception {
+        assertManagedRemoval(false, true);
+    }
+
+    @Test
+    public void managerRemovalMetadataFirstCompletesEstablishedLoad() throws Exception {
+        assertManagedRemoval(true, true);
+    }
+
+    @Test
+    public void managerRemovalCompletionFirstCompletesInitialHandoff() throws Exception {
+        assertManagedRemoval(false, false);
+    }
+
+    @Test
+    public void managerRemovalCompletionFirstCompletesEstablishedLoad() throws Exception {
+        assertManagedRemoval(true, false);
+    }
+
+    private void assertManagedRemoval(final boolean established, final boolean metadataFirst)
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+             ManagedRemoval sources = new ManagedRemoval(fixture)) {
+            final MediaItem firstSource = sources.playlist().get(0).getMediaItem();
+            final MediaItem secondSource = sources.playlist().get(1).getMediaItem();
+            sources.deliver(firstSource);
+            if (established) {
+                io.triggerActions();
+                sources.drain();
+                assertTrue(playback.isActive());
+                clearInvocations(player, playback.getSession());
+            }
+            sources.holdCompletions = true;
+            fixture.queue.remove(0);
+            sources.drain(); // Real REMOVE policy and debounce; B is already loaded.
+            assertSame(fixture.first, player.getCurrentItem());
+            if (metadataFirst) {
+                sources.deliverRemoval(firstSource, secondSource);
+                assertSame(fixture.first, player.getCurrentItem());
+                sources.completeRemoval();
+            } else {
+                sources.completeRemoval();
+                sources.deliverRemoval(firstSource, secondSource);
+            }
+            // No test directly invokes synchronization, and no subsequent metadata is delivered.
+            assertSame(fixture.second, player.getCurrentItem());
+            io.triggerActions();
+            sources.drain();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            final MediaItemTag tag = MediaItemTag.from(secondSource).orElseThrow();
+            verify(resolvers.constructed().get(resolvers.constructed().size() - 1))
+                    .resolve(fixture.info, tag, playback.getSession().getLocalAddress());
+            if (!established) {
+                verify(resolvers.constructed().get(0), never())
+                        .resolve(any(), any(), any(InetAddress.class));
+            }
+        }
+    }
+
+    @Test
+    public void removingUnloadedSelectionRetriesCanceledInitialPreparation() throws Exception {
+        assertRemovalRestoresCoherence(false);
+    }
+
+    @Test
+    public void removingUnloadedSelectionRetriesCanceledReplacement() throws Exception {
+        assertRemovalRestoresCoherence(true);
+    }
+
+    private void assertRemovalRestoresCoherence(final boolean established) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            final PlayQueueItem unloaded = spy(new PlayQueueItem(fixture.info));
+            doReturn(Single.never()).when(unloaded).getStream();
+            fixture.queue.append(List.of(unloaded));
+            try (ManagedRemoval sources = new ManagedRemoval(fixture)) {
+                sources.deliver(sources.playlist().get(0).getMediaItem());
+                if (established) {
+                    io.triggerActions();
+                    sources.drain();
+                    clearInvocations(player, playback.getSession());
+                    fixture.deliverSuccess(newTag());
+                }
+                final MediaItemTag unchanged = player.getCurrentMetadata();
+                fixture.queue.setIndex(2);
+                sources.drain();
+                io.triggerActions();
+                sources.drain();
+                verify(playback.getSession(), never()).load(
+                        any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+                fixture.queue.remove(2);
+                sources.drain();
+                assertSame(fixture.first, fixture.queue.getItem());
+                assertSame(fixture.first, player.getCurrentItem());
+                io.triggerActions();
+                sources.drain();
+                assertSame(unchanged, player.getCurrentMetadata());
+                verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+                player.onPlaybackSynchronize(fixture.first, false);
+                io.triggerActions();
+                sources.drain();
+                verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            }
+        }
+    }
+
+    @Test
+    public void returningToSynchronizedOccurrenceRetriesCanceledInitialPreparation()
+            throws Exception {
+        assertReturningSelectionRetries(false);
+    }
+
+    @Test
+    public void returningToSynchronizedOccurrenceRetriesCanceledReplacement() throws Exception {
+        assertReturningSelectionRetries(true);
+    }
+
+    private void assertReturningSelectionRetries(final boolean established) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            if (established) {
+                fixture.handoff();
+                fixture.deliverSuccess(newTag());
+            } else {
+                fixture.begin();
+            }
+            fixture.queue.setIndex(1); // An unloaded selection has not synchronized or delivered.
+            io.triggerActions();
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            fixture.queue.setIndex(0);
+            assertSame(fixture.first, player.getCurrentItem());
+            player.onPlaybackSynchronize(fixture.first, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            player.onPlaybackSynchronize(fixture.first, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
+    public void deferredMetadataFirstLoadRetainsLatestControls() throws Exception {
+        assertDeferredControls(true, false);
+    }
+
+    @Test
+    public void deferredSynchronizationFirstLoadRetainsLatestControls() throws Exception {
+        assertDeferredControls(false, false);
+    }
+
+    @Test
+    public void deferredMetadataFirstLoadRetainsExplicitResume() throws Exception {
+        assertDeferredControls(true, true);
+    }
+
+    @Test
+    public void deferredSynchronizationFirstLoadRetainsExplicitResume() throws Exception {
+        assertDeferredControls(false, true);
+    }
+
+    private void assertDeferredControls(final boolean metadataFirst, final boolean resume)
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            final MediaItemTag next = newTag();
+            ownSource(next, fixture.second);
+            fixture.queue.setIndex(1);
+            if (metadataFirst) {
+                fixture.deliverSuccess(next);
+            } else {
+                player.onPlaybackSynchronize(fixture.second, false);
+            }
+            playback.pause();
+            playback.seek(65000);
+            playback.setSpeed(2);
+            playback.play();
+            if (!resume) {
+                playback.pause();
+            }
+            now.addAndGet(3000);
+            assertEquals(65000, playback.getPosition());
+            clearInvocations(playback.getSession());
+            if (metadataFirst) {
+                player.onPlaybackSynchronize(fixture.second, false);
+            } else {
+                fixture.deliverSuccess(next);
+            }
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 65000, 2, resume, "Video", null);
+            verify(playback.getSession(), never()).seek(anyLong());
+            verify(playback.getSession(), never()).resume();
+            verify(playback.getSession(), never()).setSpeed(anyFloat());
+        }
+    }
+
+    @Test
+    public void navigationBeforeDeferredEligibilityCannotLoad() throws Exception {
+        assertDeferredCancellation(0);
+    }
+
+    @Test
+    public void disconnectBeforeDeferredEligibilityCannotLoad() throws Exception {
+        assertDeferredCancellation(1);
+    }
+
+    @Test
+    public void failureBeforeDeferredEligibilityCannotLoad() throws Exception {
+        assertDeferredCancellation(2);
+    }
+
+    private void assertDeferredCancellation(final int cancellation) throws Exception {
+        final StreamInfo info = player.getCurrentStreamInfo().orElseThrow();
+        for (final boolean established : new boolean[]{false, true}) {
+            when(player.getCurrentStreamInfo()).thenReturn(Optional.of(info));
+            try (InitialPreparation fixture = new InitialPreparation()) {
+                final int firstResolver = resolvers.constructed().size();
+                if (established) {
+                    fixture.handoff();
+                } else {
+                    fixture.begin();
+                }
+                final MediaItemTag next = newTag();
+                ownSource(next, fixture.second);
+                fixture.queue.setIndex(1);
+                fixture.deliverSuccess(next);
+                if (cancellation == 0) {
+                    final PlayQueueItem third = new PlayQueueItem(fixture.info);
+                    fixture.queue.append(List.of(third));
+                    fixture.queue.setIndex(2);
+                    when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(2);
+                    player.onPlaybackSynchronize(third, false);
+                } else if (cancellation == 1) {
+                    playback.stop(false);
+                    when(playback.getSession().getConnectionState()).thenReturn(0);
+                    player.onPlaybackSynchronize(fixture.second, false);
+                } else {
+                    fixture.deliverFailure(fixture.second);
+                    player.onPlaybackSynchronize(fixture.second, false);
+                }
+                io.triggerActions();
+                verify(playback.getSession(), never()).load(
+                        any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+                if (!established) {
+                    verify(resolvers.constructed().get(firstResolver), never())
+                            .resolve(any(), any(), any(InetAddress.class));
+                }
+                when(playback.getSession().getConnectionState()).thenReturn(2);
+                clearInvocations(playback.getSession());
+            }
+        }
+    }
+
+    private void assertSynchronizationLiveness(final boolean established, final boolean removal,
+                                               final boolean metadataFirst) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            doCallRealMethod().when(player).isCurrentSourceSynchronized();
+            final MediaItemTag original = player.getCurrentMetadata();
+            ownSource(original, fixture.first);
+            fixture.deliverSuccess(original);
+            if (established) {
+                fixture.handoff();
+            } else {
+                fixture.begin();
+            }
+            final MediaItemTag replacement = newTag();
+            when(replacement.getMaybeStreamInfo()).thenReturn(Optional.of(fixture.info));
+            ownSource(replacement, fixture.second);
+            if (removal) {
+                fixture.queue.remove(0);
+                when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            } else {
+                fixture.advanceLocally(replacement);
+            }
+            if (metadataFirst) {
+                fixture.deliverSuccess(replacement);
+                assertSame(fixture.first, player.getCurrentItem());
+                io.triggerActions();
+                verify(playback.getSession(), never()).load(
+                        any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+                player.onPlaybackSynchronize(fixture.second, false);
+            } else {
+                player.onPlaybackSynchronize(fixture.second, false);
+                io.triggerActions();
+                verify(playback.getSession(), never()).load(
+                        any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+                fixture.deliverSuccess(replacement);
+            }
+            // There is deliberately no second metadata callback.
+            io.triggerActions();
+            assertTrue("valid selected B must eventually hand off", playback.isActive());
+            verify(playback.getSession()).load(
+                    media, 10000, 1.5f, true, "Video", null);
+            verify(resolvers.constructed().get(resolvers.constructed().size() - 1))
+                    .resolve(fixture.info, replacement, playback.getSession().getLocalAddress());
+            if (!established) {
+                verify(resolvers.constructed().get(0), never())
+                        .resolve(any(), any(), any(InetAddress.class));
+            }
+            player.onPlaybackSynchronize(fixture.second, false);
+            fixture.deliverSuccess(replacement);
+            playback.onSourceChanged();
+            playback.onSourceChanged();
+            io.triggerActions();
+            verify(playback.getSession()).load(
+                    media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+
     private void assertNoInitialHandoff() {
         assertFalse(playback.isActive());
         assertNull(playback.getError());
@@ -1378,133 +1707,9 @@ public class CastPlaybackTest {
         verify(player, never()).restoreLocalAfterCasting(anyLong(), anyBoolean());
     }
 
-    /**
-     * Real Player selection/events/getters, queue occurrences and FailedMediaSource metadata.
-     * Source extraction and FCast transport retain the class's construction mocks; Android
-     * URI/text/logging/image selection and error-notification delivery are the extra boundaries.
-     * No ExoPlayer decoding, media-source preparation or receiver/device is exercised here.
-     */
-    private final class InitialPreparation implements AutoCloseable {
-        private final MockedStatic<Uri> uris = mockStatic(Uri.class);
-        private final MockedStatic<TextUtils> text = mockStatic(TextUtils.class);
-        private final MockedStatic<Log> logs = mockStatic(Log.class);
-        private final MockedStatic<ImageStrategy> images = mockStatic(ImageStrategy.class);
-        private final MockedStatic<ErrorUtil> errors = mockStatic(ErrorUtil.class);
-        private final MockedConstruction<ErrorInfo> errorInfos = mockConstruction(ErrorInfo.class);
-        private final MockedStatic<Toast> toasts = mockStatic(Toast.class);
-        private final StreamInfo info = player.getCurrentStreamInfo().orElseThrow();
-        private final SinglePlayQueue queue;
-        private final PlayQueueItem first;
-        private final PlayQueueItem second;
 
-        private InitialPreparation() throws Exception {
-            uris.when(() -> Uri.parse(anyString())).thenReturn(mock(Uri.class));
-            text.when(() -> TextUtils.isEmpty(any())).thenAnswer(invocation -> {
-                final CharSequence value = invocation.getArgument(0);
-                return value == null || value.length() == 0;
-            });
-            toasts.when(() -> Toast.makeText(any(Context.class), anyString(), anyInt()))
-                    .thenReturn(mock(Toast.class));
-            when(info.getUrl()).thenReturn("https://example.invalid/video");
-            first = new PlayQueueItem(info);
-            second = new PlayQueueItem(info);
-            assertNotSame(first, second);
-            assertEquals(first.getUrl(), second.getUrl());
-            queue = new SinglePlayQueue(first);
-            queue.append(List.of(second));
-            final ExoPlayer exo = player.getExoPlayer();
-            final Timeline timeline = mock(Timeline.class);
-            when(timeline.getWindowCount()).thenReturn(2);
-            when(exo.getCurrentTimeline()).thenReturn(timeline);
-            // The queue sync path need not exercise a decoder or thumbnail clearing.
-            when(player.isPlaying()).thenReturn(true);
-            when(exo.getCurrentMediaItemIndex()).thenReturn(1);
-            setPlayer("simpleExoPlayer", exo);
-            setPlayer("casting", playback);
-            setPlayer("playQueue", queue);
-            setPlayer("currentItem", first);
-            final MediaItemTag initialTag = newTag();
-            when(initialTag.getMaybeStreamInfo()).thenReturn(Optional.of(info));
-            setPlayer("currentMetadata", initialTag);
-            doCallRealMethod().when(player).getCurrentMetadata();
-            doCallRealMethod().when(player).getCurrentStreamInfo();
-            doCallRealMethod().when(player).getCurrentItem();
-            doCallRealMethod().when(player).exoPlayerIsNull();
-            doCallRealMethod().when(player).onPlaybackSynchronize(any(), anyBoolean());
-            doCallRealMethod().when(player).onEvents(any(), any());
-            doCallRealMethod().when(player).onPlaybackBlock();
-            for (final String field : List.of("thumbnail", "playbackHistory", "listeners")) {
-                setPlayer(field, mock(Player.class.getDeclaredField(field).getType()));
-            }
-            setPlayer("UIs", player.UIs());
-            when(player.getPlayWhenReady()).thenReturn(true);
-            set("active", false);
-            set("loadedTag", null);
-            set("receiverTag", null);
-            set("loadedItem", null);
-        }
 
-        private CastMediaResolver begin() {
-            playback.onSourceChanged();
-            assertTrue(playback.isPreparing());
-            assertFalse(playback.isActive());
-            return resolvers.constructed().get(0);
-        }
 
-        private void handoff() {
-            begin();
-            io.triggerActions();
-            clearInvocations(player, playback.getSession());
-        }
-
-        private void selectSecond() {
-            queue.setIndex(1);
-            player.onPlaybackSynchronize(second, false);
-            assertSame(second, player.getCurrentItem());
-        }
-
-        private void deliverSuccess(final MediaItemTag tag) {
-            when(tag.getMaybeStreamInfo()).thenReturn(Optional.of(info));
-            final MediaItem item = new MediaItem.Builder()
-                    .setUri(tag.getStreamUrl()).setTag(tag).build();
-            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
-            player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
-        }
-
-        private void deliverFailure(final PlayQueueItem item) {
-            final FailedMediaSource failed = new FailedMediaSource(item,
-                    new FailedMediaSource.StreamInfoLoadException(
-                            new IllegalStateException("selected occurrence failed")),
-                    Long.MAX_VALUE);
-            final MediaItem failedItem = failed.getMediaItem();
-            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(failedItem);
-            player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
-            assertSame(MediaItemTag.from(failedItem).orElseThrow(), player.getCurrentMetadata());
-            assertSame(failed, player.getCurrentMetadata()
-                    .getMaybeExtras(FailedMediaSource.class).orElseThrow());
-            assertTrue(player.getCurrentStreamInfo().isEmpty());
-        }
-
-        @Override
-        public void close() {
-            queue.dispose();
-            toasts.close();
-            errors.close();
-            errorInfos.close();
-            images.close();
-            logs.close();
-            text.close();
-            uris.close();
-        }
-    }
-
-    private void setPlayer(final String name, final Object value) throws Exception {
-        final Field field = Player.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(player, value);
-    }
 
     private FCastPlaybackState receiver(final boolean legacy) {
         final FCastPlaybackState receiver = new FCastPlaybackState(playback, () -> {
@@ -1519,15 +1724,5 @@ public class CastPlaybackTest {
         return new Source.Url("http://192.0.2.1:8080/" + capability, "video/mp4");
     }
 
-    private static MediaItemTag newTag() {
-        final MediaItemTag tag = mock(MediaItemTag.class);
-        when(tag.getStreamUrl()).thenReturn("https://example.invalid/video");
-        return tag;
-    }
 
-    private void set(final String name, final Object value) throws Exception {
-        final Field field = CastPlayback.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(playback, value);
-    }
 }

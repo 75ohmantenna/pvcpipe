@@ -335,16 +335,29 @@ public class MediaSourceManagerTest {
         final PlayQueueItem second = item("second");
         start(first, second);
         final ManagedMediaSourcePlaylist sources = playlist();
-        sources.remove(-1);
-        sources.remove(sources.size());
-        sources.remove(sources.size() + 1);
+        sources.remove(-1, null, null);
+        sources.remove(sources.size(), null, null);
+        sources.remove(sources.size() + 1, null, null);
         assertTailAndOrder(first, second);
-        sources.remove(0);
+        sources.remove(0, null, null);
         assertEquals(1, sources.size());
         assertTrue(sources.get(0).isStreamEqual(second));
-        sources.remove(0);
-        sources.remove(0);
+        sources.remove(0, null, null);
+        sources.remove(0, null, null);
         assertEquals(0, sources.size());
+    }
+
+    @Test
+    public void removalCompletionAfterDisposalCannotSynchronizePlayback() throws Exception {
+        start(item("removed"), item("survivor"));
+        holdCompletions = true;
+        queue.remove(0);
+        drain();
+        assertEquals(1, completions.size());
+        manager.dispose();
+        clearInvocations(listener);
+        runCompletions();
+        verifyNoInteractions(listener);
     }
 
     @Test
