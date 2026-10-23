@@ -37,12 +37,15 @@ Kotlin, resources, external sites or historical test artifacts.
 
 ## Important unresolved discrepancies
 
-- Playback audit findings **4–5 remain unresolved**: recovery can pair the selected
-  queue occurrence with the previous engine clock, and initial cast preparation
-  can survive a failed subsequent selection. See
-  [the affected paths and evidence limits](playback.md#unresolved-navigation-defects).
-  Queue accounting, playlist cancellation and paused-cast-startup corrections do
-  not establish their resolution. These are defects, not intended contracts.
+- At this alignment pass, playback audit findings **4–5 were unresolved**:
+  recovery could pair the selected occurrence with the previous engine clock,
+  and initial cast preparation could survive a failed subsequent selection.
+  A later 2026-10-23 correction revalidated and fixed finding **4** with isolated
+  baseline/fixed controlled JVM recovery-and-seek evidence; see
+  [the correction and its boundaries](playback.md#recovery-during-pending-navigation--corrected-2026-10-23).
+  Finding **5** remains [a separate unresolved defect](playback.md#unresolved-navigation-defects).
+  Queue accounting, playlist cancellation and paused-cast-startup corrections
+  alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to
   `https://github.com/pvcpipe/NewPipeExtractor/issues`, not this project's permitted
   submission destination. The email target is also inherited configuration
