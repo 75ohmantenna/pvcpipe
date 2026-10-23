@@ -487,9 +487,9 @@ and build outputs without build-cache reuse. Removal or local automatic advancem
 selects B; the engine delivers B's preloaded source tag while `currentItem` is
 still A. The tag's `LoadedMediaSource.getStream()` identifies B by instance,
 including distinct occurrences with identical URLs. Previously, casting attributed
-this metadata to A. Synchronization then invalidated that preparation, but neither
-it nor an unchanged-tag aggregate event restarted B. The established-cast variant
-also stalled. Initial removal/advancement and active removal desired-behavior
+this metadata to A. When synchronization followed, it invalidated that preparation,
+but neither it nor an unchanged-tag aggregate event restarted B. The established-cast
+variant also stalled. Initial removal/advancement and active removal desired-behavior
 regressions failed on the unchanged baseline; the reverse-order control passed.
 
 `Player` now notifies casting when delivered loaded-source ownership matches
@@ -517,13 +517,15 @@ changing either `currentItem` or engine metadata. Returning must retry the rejec
 request, not depend on another metadata event. Conversely, synchronization does
 not synthesize failed-source delivery from metadata temporarily cleared by blocking;
 the established receiver's buffering clock remains frozen.
-Queue edits also retry when source coherence is already established: removing an
-unloaded selection can return to A without any synchronization or metadata change.
-The existing manager queue-edit notification supplies that missing opportunity.
+Removal now synchronizes through `MediaSourceManager` after ExoPlayer's timeline
+completion, including when B is already preloaded and no further source load would
+produce a callback. The completion checks manager lifetime and readiness before
+synchronizing. A queue-edit notification alone is not engine-completion evidence.
+Removing an unloaded selection also uses this completion to retry unchanged A.
 
-Twenty-two added durable cast regressions cover both callback orders for removal
-and automatic advancement during initial and established casting, distinct
-same-URL occurrences, repeated pending/loaded notifications, deferred controls,
+Twenty-six added cast regressions plus one manager-retirement regression cover
+both callback orders for removal and automatic advancement in initial and established
+casting, same-URL occurrences, repeated pending/loaded notifications, deferred controls,
 and navigation/disconnect/failure before eligibility. Advancement drives actual
 `Player.onPositionDiscontinuity()` and `PlaybackHistory.onDiscontinuity()` queue
 policy; metadata and synchronization drive the actual Player methods. An existing
@@ -539,9 +541,16 @@ delivery during a mocked engine seek.
 A disposable executable probe observed rejected old loads followed by exactly one
 retry on returning to A, and a frozen 42000 ms buffering clock after synchronization
 without metadata. Source-coherence rejection remains required throughout.
-Two second-review regressions and an executable probe confirm that removing the
-unloaded last selection restarts initial/replacement preparation exactly once via
-the actual Player queue-edit method, without synchronization or metadata delivery.
+Two second-review regressions cover removal of an unloaded last selection. Their
+final fixtures use the real manager completion, not the superseded queue-edit retry.
+Four third-review regressions combine the real manager, playlist, loaded-source
+tags, Player REMOVE discontinuity, history queue policy, metadata and synchronization
+for a complete two-item queue with no neighbor loading to supply synchronization.
+All four failed before adding removal completion; both callback orders now load B
+once in initial and established casting without directly invoking synchronization.
+An executable probe observes B metadata while `currentItem` is A, then the real
+manager completion establishes B and loads it once without another metadata event.
+The manager-retirement regression rejects late removal completion after disposal.
 
 An inherited active-cast attribution concern remains separate: history eligibility
 still uses local-source ownership rather than authoritative receiver ownership.
@@ -554,10 +563,13 @@ remaining concern, not an intentional recovery guarantee or SQLite observation.
 
 These are controlled JVM observations, not proof of real ExoPlayer scheduling,
 device playback or physical receiver decoding. Engine callback delivery/decoding,
-successful source/metadata doubles, extraction/cast resolution, Android effects
-and preferences/autoqueue, database writes, and SDK/receiver transport are mocked.
-Existing manager and prepared-window ownership regressions cover their own real
-application boundaries; no new live manager/decoder/receiver integration is claimed.
+extraction/cast resolution, Android effects/preferences/autoqueue, database writes,
+and SDK/receiver transport are mocked. The managed-removal fixture uses real
+successful source tags, wrappers, queue/manager policy and ExoPlayer playlist
+completion dispatch, with Android Handler scheduling and engine metadata delivery
+controlled. Earlier controller-only fixtures use successful source/metadata doubles.
+Prepared-window ownership remains covered by its existing real-source regressions;
+no live decoder/receiver integration is claimed.
 
 ## Volume, mute and audio focus
 

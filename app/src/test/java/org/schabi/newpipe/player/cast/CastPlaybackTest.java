@@ -13,18 +13,23 @@ import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.text.TextUtils;
@@ -35,6 +40,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.source.MediaSource;
 
 import org.fcast.sender_sdk.PlaybackState;
 import org.fcast.sender_sdk.Source;
@@ -53,11 +59,16 @@ import org.schabi.newpipe.player.helper.PlayerHelper;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 import org.schabi.newpipe.player.mediaitem.PlaceholderTag;
+import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.player.mediasource.FailedMediaSource;
 import org.schabi.newpipe.player.mediasource.LoadedMediaSource;
+import org.schabi.newpipe.player.mediasource.ManagedMediaSourcePlaylist;
+import org.schabi.newpipe.player.playback.MediaSourceManager;
+import org.schabi.newpipe.player.playback.PlaybackListener;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.player.ui.PlayerUiList;
+import org.schabi.newpipe.util.SponsorBlock;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
@@ -65,11 +76,14 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import kotlin.Unit;
 import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
@@ -1477,6 +1491,66 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void managerRemovalMetadataFirstCompletesInitialHandoff() throws Exception {
+        assertManagedRemoval(false, true);
+    }
+
+    @Test
+    public void managerRemovalMetadataFirstCompletesEstablishedLoad() throws Exception {
+        assertManagedRemoval(true, true);
+    }
+
+    @Test
+    public void managerRemovalCompletionFirstCompletesInitialHandoff() throws Exception {
+        assertManagedRemoval(false, false);
+    }
+
+    @Test
+    public void managerRemovalCompletionFirstCompletesEstablishedLoad() throws Exception {
+        assertManagedRemoval(true, false);
+    }
+
+    private void assertManagedRemoval(final boolean established, final boolean metadataFirst)
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+             ManagedRemoval sources = new ManagedRemoval(fixture)) {
+            final MediaItem firstSource = sources.playlist().get(0).getMediaItem();
+            final MediaItem secondSource = sources.playlist().get(1).getMediaItem();
+            sources.deliver(firstSource);
+            if (established) {
+                io.triggerActions();
+                sources.drain();
+                assertTrue(playback.isActive());
+                clearInvocations(player, playback.getSession());
+            }
+            sources.holdCompletions = true;
+            fixture.queue.remove(0);
+            sources.drain(); // Real REMOVE policy and debounce; B is already loaded.
+            assertSame(fixture.first, player.getCurrentItem());
+            if (metadataFirst) {
+                sources.deliverRemoval(firstSource, secondSource);
+                assertSame(fixture.first, player.getCurrentItem());
+                sources.completeRemoval();
+            } else {
+                sources.completeRemoval();
+                sources.deliverRemoval(firstSource, secondSource);
+            }
+            // No test directly invokes synchronization, and no subsequent metadata is delivered.
+            assertSame(fixture.second, player.getCurrentItem());
+            io.triggerActions();
+            sources.drain();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            final MediaItemTag tag = MediaItemTag.from(secondSource).orElseThrow();
+            verify(resolvers.constructed().get(resolvers.constructed().size() - 1))
+                    .resolve(fixture.info, tag, playback.getSession().getLocalAddress());
+            if (!established) {
+                verify(resolvers.constructed().get(0), never())
+                        .resolve(any(), any(), any(InetAddress.class));
+            }
+        }
+    }
+
+    @Test
     public void removingUnloadedSelectionRetriesCanceledInitialPreparation() throws Exception {
         assertRemovalRestoresCoherence(false);
     }
@@ -1488,32 +1562,37 @@ public class CastPlaybackTest {
 
     private void assertRemovalRestoresCoherence(final boolean established) throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
-            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
-            final PlayQueueItem unloaded = new PlayQueueItem(fixture.info);
+            final PlayQueueItem unloaded = spy(new PlayQueueItem(fixture.info));
+            doReturn(Single.never()).when(unloaded).getStream();
             fixture.queue.append(List.of(unloaded));
-            if (established) {
-                fixture.handoff();
-                fixture.deliverSuccess(newTag());
-            } else {
-                fixture.begin();
+            try (ManagedRemoval sources = new ManagedRemoval(fixture)) {
+                sources.deliver(sources.playlist().get(0).getMediaItem());
+                if (established) {
+                    io.triggerActions();
+                    sources.drain();
+                    clearInvocations(player, playback.getSession());
+                    fixture.deliverSuccess(newTag());
+                }
+                final MediaItemTag unchanged = player.getCurrentMetadata();
+                fixture.queue.setIndex(2);
+                sources.drain();
+                io.triggerActions();
+                sources.drain();
+                verify(playback.getSession(), never()).load(
+                        any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+                fixture.queue.remove(2);
+                sources.drain();
+                assertSame(fixture.first, fixture.queue.getItem());
+                assertSame(fixture.first, player.getCurrentItem());
+                io.triggerActions();
+                sources.drain();
+                assertSame(unchanged, player.getCurrentMetadata());
+                verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+                player.onPlaybackSynchronize(fixture.first, false);
+                io.triggerActions();
+                sources.drain();
+                verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
             }
-            final MediaItemTag unchanged = player.getCurrentMetadata();
-            fixture.queue.setIndex(2);
-            io.triggerActions();
-            verify(playback.getSession(), never()).load(
-                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
-            fixture.queue.remove(2);
-            assertSame(fixture.first, fixture.queue.getItem());
-            assertSame(fixture.first, player.getCurrentItem());
-            doCallRealMethod().when(player).onPlayQueueEdited();
-            player.onPlayQueueEdited(); // Manager REMOVE notification; no synchronization.
-            io.triggerActions();
-            assertSame(unchanged, player.getCurrentMetadata());
-            verify(player, never()).onPlaybackSynchronize(any(), anyBoolean());
-            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
-            player.onPlayQueueEdited();
-            io.triggerActions();
-            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
         }
     }
 
@@ -1741,6 +1820,119 @@ public class CastPlaybackTest {
     }
 
     /**
+     * Real manager/playlist/source tags and Player callbacks. Android Handler delivery and
+     * engine source installation/decoding are controlled; cast resolver/SDK remain mocked.
+     */
+    private final class ManagedRemoval implements AutoCloseable {
+        private final TestScheduler callbacks = new TestScheduler();
+        private final List<Runnable> completions = new ArrayList<>();
+        private final MockedStatic<AndroidSchedulers> androidSchedulers =
+                mockStatic(AndroidSchedulers.class);
+        private final MockedStatic<Schedulers> schedulers =
+                mockStatic(Schedulers.class, CALLS_REAL_METHODS);
+        private final MockedStatic<Looper> loopers = mockStatic(Looper.class);
+        private final MockedStatic<SponsorBlock> sponsorBlock = mockStatic(SponsorBlock.class);
+        private final MockedConstruction<Handler> handlers;
+        private final MediaSourceManager manager;
+        private boolean holdCompletions;
+
+        private ManagedRemoval(final InitialPreparation fixture) {
+            androidSchedulers.when(AndroidSchedulers::mainThread).thenReturn(callbacks);
+            schedulers.when(Schedulers::single).thenReturn(callbacks);
+            schedulers.when(Schedulers::computation).thenReturn(callbacks);
+            schedulers.when(Schedulers::io).thenReturn(io);
+            loopers.when(Looper::getMainLooper).thenReturn(mock(Looper.class));
+            handlers = mockConstruction(Handler.class, (handler, context) ->
+                    when(handler.post(any(Runnable.class))).thenAnswer(call -> {
+                        final Runnable action = call.getArgument(0);
+                        if (holdCompletions) {
+                            completions.add(action);
+                        } else {
+                            callbacks.scheduleDirect(action);
+                        }
+                        return true;
+                    }));
+            final PlaybackListener listener = mock(PlaybackListener.class);
+            doAnswer(call -> {
+                final StreamInfo info = call.getArgument(1);
+                final MediaSource source = mock(MediaSource.class);
+                final MediaItem item = new MediaItem.Builder()
+                        .setUri(info.getUrl()).setTag(StreamInfoTag.of(info)).build();
+                when(source.getMediaItem()).thenReturn(item);
+                return source;
+            }).when(listener).sourceOf(any(), any());
+            doAnswer(call -> {
+                player.onPlaybackBlock();
+                return null;
+            }).when(listener).onPlaybackBlock();
+            doAnswer(call -> {
+                player.onPlaybackSynchronize(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(listener).onPlaybackSynchronize(any(), anyBoolean());
+            doCallRealMethod().when(player).onPlayQueueEdited();
+            doAnswer(call -> {
+                player.onPlayQueueEdited();
+                return null;
+            }).when(listener).onPlayQueueEdited();
+            doReturn(Single.just(fixture.info)).when(fixture.first).getStream();
+            doReturn(Single.just(fixture.info)).when(fixture.second).getStream();
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            fixture.queue.init();
+            manager = new MediaSourceManager(player.getContext(), listener, fixture.queue);
+            drain();
+        }
+
+        private ManagedMediaSourcePlaylist playlist() throws Exception {
+            final Field field = MediaSourceManager.class.getDeclaredField("playlist");
+            field.setAccessible(true);
+            return (ManagedMediaSourcePlaylist) field.get(manager);
+        }
+
+        private void deliver(final MediaItem item) {
+            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
+            player.onEvents(player.getExoPlayer(),
+                    mock(com.google.android.exoplayer2.Player.Events.class));
+        }
+
+        private void deliverRemoval(final MediaItem previous, final MediaItem item) {
+            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
+            doCallRealMethod().when(player).onPositionDiscontinuity(any(), any(), anyInt());
+            final PlaybackHistory history = (PlaybackHistory) getPlayerField("playbackHistory");
+            doCallRealMethod().when(history).onDiscontinuity(any(), any());
+            player.onPositionDiscontinuity(
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, previous, null, 0, 120000, 120000, -1, -1),
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, item, null, 0, 10000, 10000, -1, -1),
+                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+            deliver(item);
+        }
+
+        private void drain() {
+            callbacks.triggerActions();
+            callbacks.advanceTimeBy(1, TimeUnit.SECONDS);
+        }
+
+        private void completeRemoval() {
+            final List<Runnable> pending = new ArrayList<>(completions);
+            completions.clear();
+            holdCompletions = false;
+            pending.forEach(Runnable::run);
+            drain();
+        }
+
+        @Override
+        public void close() {
+            manager.dispose();
+            handlers.close();
+            sponsorBlock.close();
+            loopers.close();
+            schedulers.close();
+            androidSchedulers.close();
+        }
+    }
+
+    /**
      * Real Player selection/events/getters, queue occurrences and FailedMediaSource metadata.
      * Source extraction and FCast transport retain the class's construction mocks; Android
      * URI/text/logging/image selection and error-notification delivery are the extra boundaries.
@@ -1769,8 +1961,8 @@ public class CastPlaybackTest {
             toasts.when(() -> Toast.makeText(any(Context.class), anyString(), anyInt()))
                     .thenReturn(mock(Toast.class));
             when(info.getUrl()).thenReturn("https://example.invalid/video");
-            first = new PlayQueueItem(info);
-            second = new PlayQueueItem(info);
+            first = spy(new PlayQueueItem(info));
+            second = spy(new PlayQueueItem(info));
             assertNotSame(first, second);
             assertEquals(first.getUrl(), second.getUrl());
             queue = new SinglePlayQueue(first);
