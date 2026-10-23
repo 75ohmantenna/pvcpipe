@@ -62,9 +62,11 @@ source and retain the latest position and playback intent. Receiver buffering
 does not turn a paused load into a playing one, and changing quality after
 completion does not automatically replay the video.
 
-- **Disconnect** stops the receiver and leaves the phone paused at the
-  receiver's latest position.
-- **Play on this device** stops the receiver and resumes locally there.
+- **Disconnect** stops the receiver and leaves the phone paused at its latest
+  attributable position. A selected replacement without an owned clock retains
+  its pending recovery instead of applying a reset position.
+- **Play on this device** stops the receiver and resumes locally at that
+  attributable position or the selected occurrence's pending recovery.
 - Connection or preparation failure leaves local playback available.
   A dropped active connection returns to local playback paused, rather than
   unexpectedly starting the phone's speakers.
@@ -583,6 +585,11 @@ reset zero, replacing B's 12-second recovery and passing metadata/zero to the
 production history adapter's mocked record manager. Subsequent real synchronization
 seeks B to zero and consumes that recovery. The corrected executable sequence keeps
 12 seconds, accepts no reset checkpoint and seeks B to 12 seconds instead.
+This probe pauses before synchronization, causing the indexed recovery seek.
+In the inherited playing/metadata-first case, matching indices can instead
+skip that seek and start the receiver from the engine preview despite pending
+recovery. That separate source-start concern is not an intentional resume
+guarantee or a clock-attribution correction made here.
 Progress during replacement and disconnect's independent local seek also exposed
 unowned clocks. Same-URL occurrences remain distinct recovery owners, but share one
 persistent stream identity; database-facing arguments are not SQLite corruption proof.
@@ -594,9 +601,13 @@ that threshold; no real SQLite transaction was executed in these JVM scenarios.
 
 `CastPlayback.ownsClock()` now requires the exact occurrence and a usable clock:
 accepted receiver time under the session's existing source policy, a carried
-established checkpoint for the same occurrence, or an explicit sender seek.
-Reset zeros and load-request/state/duration/speed-only emissions do not establish
-that provenance. Receiver-observed zero and explicitly requested zero are valid.
+established checkpoint for the same occurrence, or owned sender intent. That
+intent includes an explicit seek and a coherent synchronized engine start once
+no selected recovery remains outstanding, including a local-to-cast handoff.
+The latter retains recovery already consumed into an indexed engine seek; it
+must survive navigation even before receiver time arrives. Reset zeros and
+load-request/state/duration/speed emissions alone do not establish provenance.
+Receiver-observed zero, requested zero and a synchronized default zero are valid.
 Replacing a source or switching receivers retains the same occurrence's checkpoint;
 an unobserved load emission cannot replace it or the latest seek intent. A new
 receiver time may supersede it. A seek invalidates the policy's pre-seek sample,
@@ -629,12 +640,23 @@ resolution and the database-facing record manager/SDK transport are controlled
 or mocked. `FCastObservedPositionTest` exercises the real session policy for
 v2/no-echo v3/v4, learned echo gates, buffering, zero and late/reset observations.
 Accepted-write regressions use the real history adapter with controlled completion.
-The corrected no-build-cache focused gate passes 210 checks: 17 clock-attribution,
+The corrected no-build-cache focused gate passes 215 checks: 22 clock-attribution,
 9 protocol-provenance, 84 cast, 39 recovery, 33 history, 22 manager and 6 audio.
 The unchanged baseline passes all 176 existing cast/recovery/history/manager checks;
 six of the first ten desired-behavior regressions fail. Additional controlled
 checks exposed pre-seek sample reuse, pre-metadata disconnect, local play-here
 preview capture and unknown-duration seek clamping before their corrections.
+Fresh complete-PR review found consumed recovery could be lost before receiver
+time if the guard also rejected a coherent synchronized start. Three new checks
+failed on that candidate before correction: real Next/select navigation during
+resolution, after load submission and with history disabled. Their engine mock
+follows indexed seeks; they verify 12-second recovery consumption, re-checkpointing
+before another navigation, and a 12-second load on return. A synchronized-default
+zero control passes. A further local-handoff check reproduced the same loss of
+an owned local checkpoint before receiver time; handoff now carries its coherent
+position when no recovery remains outstanding. These five checks are included
+in the 22 above. The paused callback probe and the navigation probe remain
+controlled engine/application observations, not real masked-position scheduling.
 These are controlled JVM/application-policy results, not SQLite verification,
 device playback, prepared decoder scheduling or physical receiver evidence.
 

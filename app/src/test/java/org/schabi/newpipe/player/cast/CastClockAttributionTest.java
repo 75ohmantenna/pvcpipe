@@ -86,9 +86,9 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
                 HistoryCapture history = new HistoryCapture()) {
             fixture.handoff();
             fixture.queue.setIndex(1);
+            fixture.queue.setRecovery(1, 12000);
             deliverSecond(fixture);
             fixture.selectSecond();
-            fixture.queue.setRecovery(1, 12000);
             player.saveStreamProgressState();
             player.setRecovery();
             assertEquals(12000, fixture.second.getRecoveryPosition());
@@ -241,10 +241,10 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
                 HistoryCapture history = new HistoryCapture()) {
             fixture.handoff();
             fixture.queue.setIndex(1);
+            fixture.queue.setRecovery(1, 12000);
             deliverSecond(fixture);
             fixture.selectSecond();
             io.triggerActions();
-            fixture.queue.setRecovery(1, 12000);
             final FCastPlaybackState receiver = new FCastPlaybackState(playback,
                     () -> kotlin.Unit.INSTANCE);
             when(playback.getSession().hasObservedPosition())
@@ -408,6 +408,120 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
             assertEquals(12000, fixture.second.getRecoveryPosition());
             verify(exo).play();
             verify(history.record).saveStreamState(fixture.info, 12000);
+        }
+    }
+
+    @Test
+    public void synchronizedResumeSurvivesNavigationDuringResolution() throws Exception {
+        synchronizedResumeSurvivesNavigation(false, true);
+    }
+
+    @Test
+    public void synchronizedResumeSurvivesNavigationAfterLoadBeforeReceiverTime() throws Exception {
+        synchronizedResumeSurvivesNavigation(true, true);
+    }
+
+    @Test
+    public void synchronizedResumeSurvivesNavigationWithHistoryDisabled() throws Exception {
+        synchronizedResumeSurvivesNavigation(true, false);
+    }
+
+    private void synchronizedResumeSurvivesNavigation(final boolean submitted,
+                                                      final boolean historyEnabled)
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+                HistoryCapture history = new HistoryCapture(historyEnabled)) {
+            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final java.util.concurrent.atomic.AtomicLong local =
+                    new java.util.concurrent.atomic.AtomicLong(10000);
+            final java.util.concurrent.atomic.AtomicInteger index =
+                    new java.util.concurrent.atomic.AtomicInteger(0);
+            when(exo.getCurrentPosition()).thenAnswer(call -> local.get());
+            when(exo.getContentPosition()).thenAnswer(call -> local.get());
+            when(exo.getCurrentMediaItemIndex()).thenAnswer(call -> index.get());
+            when(exo.getCurrentTimeline().getWindowCount()).thenReturn(3);
+            org.mockito.Mockito.doAnswer(call -> {
+                index.set(call.getArgument(0));
+                local.set(call.getArgument(1));
+                return null;
+            }).when(exo).seekTo(org.mockito.ArgumentMatchers.anyInt(), anyLong());
+            org.mockito.Mockito.doAnswer(call -> {
+                index.set(call.getArgument(0));
+                local.set(0);
+                return null;
+            }).when(exo).seekToDefaultPosition(org.mockito.ArgumentMatchers.anyInt());
+            doCallRealMethod().when(player).playNext();
+            doCallRealMethod().when(player).selectQueueItem(any());
+            final PlayQueueItem third = new PlayQueueItem(fixture.info);
+            fixture.queue.append(List.of(third));
+            fixture.handoff();
+            playback.onPlaybackChanged(1, 45000, 120000, 1);
+            fixture.queue.setRecovery(1, 12000);
+            player.playNext();
+            fixture.selectSecond();
+            assertEquals(12000, local.get());
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, fixture.second.getRecoveryPosition());
+            deliverSecond(fixture);
+            if (submitted) {
+                io.triggerActions();
+                verify(playback.getSession()).load(media, 12000, playback.getSpeed(), true,
+                        "Video", null);
+            }
+            clearInvocations(history.record);
+            player.playNext();
+            assertEquals(12000, fixture.second.getRecoveryPosition());
+            if (historyEnabled) {
+                verify(history.record).saveStreamState(fixture.info, 12000);
+            } else {
+                verify(history.record, never()).saveStreamState(any(StreamInfo.class), anyLong());
+            }
+            player.onPlaybackSynchronize(third, false);
+            final MediaItemTag thirdTag = newTag();
+            ownSource(thirdTag, third);
+            fixture.deliverSuccess(thirdTag);
+            player.selectQueueItem(fixture.second);
+            clearInvocations(playback.getSession());
+            fixture.selectSecond();
+            assertEquals(12000, local.get());
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, fixture.second.getRecoveryPosition());
+            deliverSecond(fixture);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 12000, playback.getSpeed(), true,
+                    "Video", null);
+        }
+    }
+
+    @Test
+    public void synchronizedDefaultZeroIsOwnedBeforeReceiverTime() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+                HistoryCapture history = new HistoryCapture()) {
+            fixture.handoff();
+            fixture.queue.setIndex(1);
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            org.mockito.Mockito.doAnswer(call -> {
+                when(exo.getCurrentMediaItemIndex()).thenReturn(1);
+                when(exo.getCurrentPosition()).thenReturn(0L);
+                return null;
+            }).when(exo).seekToDefaultPosition(1);
+            fixture.selectSecond();
+            verify(exo).seekToDefaultPosition(1);
+            deliverSecond(fixture);
+            player.saveStreamProgressState();
+            assertEquals(0, fixture.second.getRecoveryPosition());
+            verify(history.record).saveStreamState(fixture.info, 0);
+        }
+    }
+
+    @Test
+    public void initialHandoffKeepsOwnedLocalCheckpointWithoutReceiverTime() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+                HistoryCapture history = new HistoryCapture()) {
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            fixture.handoff();
+            playback.pause();
+            assertEquals(10000, fixture.first.getRecoveryPosition());
+            verify(history.record).saveStreamState(fixture.info, 10000);
         }
     }
 

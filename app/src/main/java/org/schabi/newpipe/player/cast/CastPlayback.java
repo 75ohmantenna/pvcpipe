@@ -79,7 +79,7 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     /**
-     * A receiver-observed/carried checkpoint or explicit seek, never a reset/load request.
+     * A receiver-observed/carried checkpoint or owned sender intent, never a reset clock.
      * @param item the selected queue occurrence
      * @return whether this occurrence owns a usable checkpoint
      */
@@ -222,6 +222,9 @@ public final class CastPlayback implements FCastSession.Listener {
         if (active) {
             // Pending controls belong to this load, not to the receiver's previous source.
             position = start;
+            // Synchronization may already have consumed B's recovery into this engine
+            // position. With none outstanding, this coherent start is owned sender intent.
+            clockValid |= item.getRecoveryPosition() == PlayQueueItem.RECOVERY_UNSET;
             duration = Math.max(0, info.getDuration() * 1000L);
             updateTime = SystemClock.elapsedRealtime();
         }
@@ -251,6 +254,8 @@ public final class CastPlayback implements FCastSession.Listener {
                     // Local playback continues during preparation; take its handoff position now.
                     if (!active) {
                         position = player.getCurrentPosition();
+                        clockValid = item.getRecoveryPosition()
+                                == PlayQueueItem.RECOVERY_UNSET;
                     }
                     duration = Math.max(0, info.getDuration() * 1000L);
                     speed = player.getPlaybackSpeed();

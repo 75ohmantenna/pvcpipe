@@ -57,6 +57,9 @@ Kotlin, resources, external sites or historical test artifacts.
   recovery and was passed to the history adapter. The focused correction adds
   occurrence/clock provenance at acceptance and guards disconnect's position
   override; see [active-cast checkpoints and evidence limits](playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23).
+  Fresh review additionally reproduced consumed recovery being lost before
+  receiver time; coherent synchronized starts and local handoffs now retain
+  that owned resume intent without authorizing reset or outstanding-preview clocks.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to
