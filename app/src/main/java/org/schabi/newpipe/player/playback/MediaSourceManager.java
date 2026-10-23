@@ -528,9 +528,10 @@ public class MediaSourceManager {
      * for a given {@link PlayQueueItem} needs replacement, either due to gapless playback
      * readiness or playlist desynchronization.
      * <p>
-     * A loaded source for the selected occurrence is retained even after expiration;
-     * neighboring sources may be refreshed. Each existing slot delegates identity and
-     * replacement decisions to its {@link ManagedMediaSource} policy.
+     * This check retains a loaded source for the selected occurrence even after expiration;
+     * neighboring sources may be refreshed. Selection-time renewal is handled separately by
+     * {@link #maybeRenewCurrentIndex()}. Each slot delegates to its
+     * {@link ManagedMediaSource} policy.
      * </p>
      *
      * @param item {@link PlayQueueItem} to check

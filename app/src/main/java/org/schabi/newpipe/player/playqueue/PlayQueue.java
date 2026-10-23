@@ -225,9 +225,10 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
-     * Gets an unmodifiable live view of the play queue's items.
+     * Gets an unmodifiable view of the current backing list, not a snapshot.
+     * {@link #unshuffle()} replaces that list; obtain a new view afterwards.
      *
-     * @return an unmodifiable view, not a snapshot of the play queue
+     * @return an unmodifiable view of the current backing list
      */
     @NonNull
     public List<PlayQueueItem> getStreams() {
