@@ -99,9 +99,7 @@ public class Deleter {
 
         final String msg;
         if (fileToBeDeleted.isPresent()) {
-            msg = mContext.getString(R.string.file_deleted)
-                    .concat(":\n")
-                    .concat(fileToBeDeleted.get());
+            msg = mContext.getString(R.string.file_deleted, fileToBeDeleted.get());
         } else {
             msg = mContext.getString(R.string.entry_deleted);
         }
