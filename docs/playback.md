@@ -283,6 +283,13 @@ calling the shared playback listener, loading sources or mutating playback.
 Blocking, initialization and source resets do not retire the current manager;
 the processed queue/timeline accounting above still applies.
 
+Installing the replacement engine timeline remains blocked until
+`setMediaSource` returns. Its synchronous REMOVE discontinuity describes source
+replacement at the old engine index, not navigation back to that occurrence.
+Only afterward does Player enter buffering and prepare. The
+[2026-10-23 prepared-engine/SQLite validation](pvcpipe-device-smoke.md#combined-playback-integration-validation-2026-10-23)
+records the real-engine regression and the API/receiver evidence limits.
+
 Rx cancellation does not cancel ExoPlayer's separately retained completion
 actions. In the resolved ExoPlayer **2.19.1**,
 [`ConcatenatingMediaSource.releaseSourceInternal()`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L525-L539)

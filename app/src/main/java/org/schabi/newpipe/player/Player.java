@@ -1009,10 +1009,12 @@ public final class Player implements PlaybackListener, Listener {
         if (exoPlayerIsNull()) {
             return;
         }
+        // Installing a replacement timeline can synchronously report REMOVE at the old
+        // engine index. Keep it blocked so history cannot mistake that reset for navigation.
+        simpleExoPlayer.setMediaSource(mediaSource, false);
         if (currentState == STATE_BLOCKED) {
             changeState(STATE_BUFFERING);
         }
-        simpleExoPlayer.setMediaSource(mediaSource, false);
         simpleExoPlayer.prepare();
     }
 
