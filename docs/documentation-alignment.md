@@ -83,22 +83,24 @@ Kotlin, resources, external sites or historical test artifacts.
 
 ## User-facing text: separate follow-up
 
-No resource text, key or translation is changed by this pass. These are proposed
-corrections, not approved localized copy. Resource keys below refer to
+No resource text, key or translation was changed by the original alignment pass.
+The table records its proposed corrections; the backup-restore and
+[cache/history/download follow-ups](#cache-history-and-download-messages--corrected-2026-10-23)
+below identify subsequent fixes. Resource keys refer to
 `app/src/main/res/values/strings.xml`.
 
 | Key | Call sites / factual issue | Suggested wording |
 | --- | --- | --- |
-| `metadata_cache_wipe_summary` | `HistorySettingsFragment` → `InfoCache.clearCache`; clears extracted in-memory metadata, not all cached webpage/WebView data | “Clear cached stream, channel, playlist, and other metadata” |
-| `delete_view_history_alert` | `HistorySettingsFragment.openDeleteWatchHistoryDialog`, also opened by `StatisticsPlaylistFragment`; deletes playback positions as well as stream history | “Delete all watch history and playback positions?” |
+| `metadata_cache_wipe_summary` | `HistorySettingsFragment` → `InfoCache.clearCache`; clears extracted in-memory metadata, not all cached webpage/WebView data | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Clear cached stream, channel, playlist, and other extracted metadata” |
+| `delete_view_history_alert` | `HistorySettingsFragment.openDeleteWatchHistoryDialog`, also opened by `StatisticsPlaylistFragment`; deletes playback positions as well as stream history | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Delete all watch history and saved playback positions?” |
 | `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; classification does not prove a network-wide restriction | “Too many requests to %1$s. Try again later.” |
 | `parsing_error` | `ErrorInfo.getMessage` for remaining `ExtractionException`s; extraction failure need not be website parsing | “Could not extract the requested information” |
 | `error_report_open_github_notice` | `activity_error.xml`, shown by `ErrorActivity` for non-crash failures too | Replace “this crash” with “this error” |
 | `start_accept_privacy_policy` | `ErrorActivity.openPrivacyPolicyDialog`; acceptance opens a composer or issue list, not submission; code does not establish GDPR compliance | “Please read and accept PVCPipe’s privacy policy before continuing to report this error.” Legal/policy review required |
 | `recaptcha_request_toast` | `ErrorInfo.getMessage` and `RouterActivity`; router opens the challenge directly, error panels offer Solve | “A reCAPTCHA challenge is required to continue” |
-| `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | “Download request submitted” |
+| `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Download request submitted” |
 | `cancel` in the former `import_settings` dialog | At the alignment pass, `BackupRestoreSettingsFragment.importDatabase` started database-only restore from its negative Cancel action | Corrected in the [backup-restore follow-up](#backup-restore-actions--corrected-2026-10-23); the shared Cancel resource is unchanged |
-| `file_deleted` | `Deleter.next`; feedback precedes delayed commit, and the manager ignores the file-deletion result | “Download marked for deletion: %1$s” while undo is available; later feedback must not claim confirmed erasure without a behavior change |
+| `file_deleted` | `Deleter.next`; feedback precedes delayed commit, and the manager ignores the file-deletion result | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Marked for deletion: %1$s” while undo is available; later feedback must not claim confirmed erasure without a behavior change |
 | `import_subscriptions_skipped` (plurals) | `SubscriptionImportWorker`; starts with “Imported.” even when no supported source entries were processed | “Import finished. Skipped %d unsupported entry/entries.” Supply proper plural forms; processed entries are not necessarily new subscriptions |
 
 Preserve `%1$s` as a positional service-name placeholder. The existing
@@ -206,3 +208,89 @@ The emulator was freshly created under a temporary directory and had no PVCPipe
 installation before this run. Direct targeted instrumentation avoided Gradle's
 install/test/uninstall task. No existing installation or user database was
 modified. API 37 remains environment-blocked and was not retried.
+
+## Cache, history and download messages — corrected 2026-10-23
+
+Started from post-PR-#145 master; the backup-restore correction is unchanged.
+Source inspection reconfirmed four factual discrepancies:
+
+| Resource | Corrected message | Verified action boundary |
+| --- | --- | --- |
+| `metadata_cache_wipe_summary` | Clear cached stream, channel, playlist, and other extracted metadata | `InfoCache.clearCache()` evicts the in-memory extracted-info LRU: streams, channels, channel tabs, comments, playlists and kiosks. It does not clear downloads, images, cookies or all WebView data. |
+| `delete_view_history_alert` | Delete all watch history and saved playback positions? | The shared confirmation is used by settings and `StatisticsPlaylistFragment`. Confirmation launches separate playback-state deletion, stream-history deletion and orphan-cleanup subscriptions; there is no atomic combined-success guarantee. |
+| `download_has_started` | Download request submitted | `DownloadPreparation` calls `submitted()` after dispatch returns; Android dispatch calls `startService`, and mission preparation/execution happens later. Dispatch failure follows the existing error path instead. |
+| `file_deleted` | Marked for deletion: %1$s | `Deleter.next()` displays the filename while Undo remains available, before the delayed commit. The manager does not establish successful file erasure for this feedback. |
+
+Only messages, filename formatting and the watch-history question's placement
+change. At 320dp and 2× font, the original title layout hid the playback-position
+consequence, so this question now uses the wrapping dialog body; other deletion
+dialogs retain their titles. The filename is passed as one positional string
+argument to the complete translatable resource rather than concatenated with
+punctuation. Configuration keys, shared generic strings, callbacks, separate
+deletion operations, timers, undo, error handling, storage and service semantics
+are unchanged. The entry-only deletion message is outside these four
+discrepancies and is not globally rewritten.
+
+### Localization coverage
+
+The source inventory contains only default `values/strings.xml` and
+`values/strings_fcast.xml`; none of these four keys has a locale or configuration
+override. Existing identifiers are retained, with no duplicate fallback keys
+or compatibility aliases. All four messages remain translatable; non-English
+translations are an explicit gap and use Android's default-English fallback.
+No verified equivalent translation was removed. Translators must preserve the
+filename's `%1$s` placeholder and the pending/submitted action boundaries.
+
+### Controlled verification and limits
+
+A freshly created disposable API 26 emulator had no PVCPipe package before
+installation. Direct, serial instrumentation targeted only that emulator; no
+user installation/data, Gradle connected-test cleanup or API 37 retry was used.
+The temporary rendering harness was removed after evidence collection; no
+English-literal or resource-wiring-only permanent tests were added.
+
+At 320dp portrait width and font scales 1.0 and 2.0, the actual metadata
+preference summary and history-screen confirmation were rendered and their
+screenshots inspected. The final history question wraps fully in the body,
+including saved playback positions; Cancel and Delete remain visible. The
+history-screen Cancel check requested none of the three deletion operations.
+The existing `HistoryRecordManagerTest` passed all 12 checks on the emulator.
+
+The real `Deleter` with an isolated download database and owned media file
+displayed the formatted filename, hid the staged row, restored it on Undo and
+preserved the file and database row beyond the five-second commit deadline.
+Both font-scale checks passed. A filename containing literal `100%` and `%1$s`
+was preserved intact in the message and accessibility node; it was not
+recursively interpreted as a format string. The long filename is visually
+ellipsized by the existing two-line snackbar. The shorter **Marked for deletion**
+prefix keeps that pending-state meaning visible at 2× font, with an enabled,
+clickable, visible Undo node. Full filename visibility is not claimed.
+
+These are rendered screenshots and accessibility-node observations, not a
+TalkBack speech/focus-order session or non-English coverage. Download submission's
+Toast remains source-only verification: the callback follows successful request
+dispatch, not confirmed execution. No live download or file-erasure success is
+claimed. Initial throwaway checks incorrectly compared themed uppercase button
+nodes to mixed-case resources and initialized UiAutomation from the UI thread;
+the harness assertions/setup were corrected without production workarounds.
+The initial longer pending-state prefix and history title were visibly clipped;
+the final shorter prefix/body placement were rerendered after correction.
+
+All 21 source values XML files parsed successfully; the four message definitions
+were unique with no locale overrides, and the filename had exactly one positional
+`%1$s` placeholder. The app JVM gate passed 1,008 checks, including 44
+`DownloadPreparationTest`, 10 `DownloadDialogPreparationTest` and four
+`DownloadManagerDeleteEntryTest` checks. An overlapping instrumentation build
+failed with missing compiled symbols while `make ci` succeeded; serial
+instrumentation assembly then succeeded. Temporary harness Checkstyle line-length
+failures were confined to the subsequently removed evidence files.
+
+After the final shorter message, wrapping-dialog correction and removal of
+temporary harnesses, the complete serial `make ci` gate passed again:
+build-logic/static checks, app JVM suite, offline extractor gate, Android lint
+and debug/release assembly. Gradle reused unchanged outputs where reported.
+Fresh read-only Claude Code review used `claude-opus-5-5` at medium effort.
+Its sole actionable finding was ambiguity in the original proposal table;
+the four rows now explicitly link to this correction and show the shipped copy.
+Optional heading/TalkBack and entry-only deletion wording observations remain
+separate work. Exact-head review, validation and merge evidence belongs on the PR.

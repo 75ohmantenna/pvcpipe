@@ -98,7 +98,7 @@
     <string name="prefer_descriptive_audio_summary">Select a descriptive audio track for visually impaired people, if available</string>
     <string name="thumbnail_cache_wipe_complete_notice">Image cache wiped</string>
     <string name="metadata_cache_wipe_title">Wipe cached metadata</string>
-    <string name="metadata_cache_wipe_summary">Remove all cached webpage data</string>
+    <string name="metadata_cache_wipe_summary">Clear cached stream, channel, playlist, and other extracted metadata</string>
     <string name="metadata_cache_wipe_complete_notice">Metadata cache wiped</string>
     <string name="auto_queue_title">Auto-enqueue next stream</string>
     <string name="auto_queue_summary">Append a related stream when a non-repeating playback queue reaches its end</string>
@@ -173,7 +173,7 @@
     <string name="clear">Clear</string>
     <string name="best_resolution">Best resolution</string>
     <string name="undo">Undo</string>
-    <string name="file_deleted">File deleted</string>
+    <string name="file_deleted">Marked for deletion: %1$s</string>
     <string name="play_all">Play all</string>
     <string name="always">Always</string>
     <string name="just_once">Just once</string>
@@ -200,7 +200,7 @@
     <string name="clear_cookie_summary">Clear cookies that PVCPipe stores when you solve a reCAPTCHA</string>
     <string name="clear_views_history_title">Clear watch history</string>
     <string name="clear_views_history_summary">Delete the history of played streams and their playback positions</string>
-    <string name="delete_view_history_alert">Delete entire watch history?</string>
+    <string name="delete_view_history_alert">Delete all watch history and saved playback positions?</string>
     <string name="watch_history_deleted">Watch history deleted</string>
     <string name="clear_playback_states_title">Delete playback positions</string>
     <string name="clear_playback_states_summary">Deletes all playback positions</string>
@@ -719,7 +719,7 @@
     <string name="night_theme_summary">Select your favorite night theme — %s</string>
     <string name="select_night_theme_toast">You can select your favorite night theme below</string>
     <string name="night_theme_available">This option is only available if %s is selected for Theme</string>
-    <string name="download_has_started">Download has started</string>
+    <string name="download_has_started">Download request submitted</string>
     <string name="description_select_note">You can now select text inside the description. Note that the page may flicker and links may not be clickable while in selection mode.</string>
     <string name="description_select_enable">Enable selecting text in the description</string>
     <string name="description_select_disable">Disable selecting text in the description</string>
