@@ -1059,3 +1059,23 @@ assembly and the complete `make ci` gate passed again, reusing unchanged outputs
 where reported. The rebuilt APK without the disposable smoke source then passed
 all 16 durable integration checks again on API 26.
 
+### Failed gated-write cleanup follow-up
+
+The third fresh complete-PR review approved production at
+`f5af3406fb7aecaf1c07b6a00044afd86cd79722` and identified one non-blocking
+fixture failure path: shutting down a gated executor immediately after an
+assertion failure can reject the next accepted write and stall the process-wide
+history queue. A disposable real-engine/SQLite check reproduced a subsequent
+resume timeout and teardown timeout on that candidate.
+
+Both fixture executor finalizers now await the shared accepted-write barrier
+before shutdown, with bounded waits and shutdown in `finally`. The identical
+forced-failure check then resumed the committed 9000 ms checkpoint successfully;
+all 16 durable integrations passed afterward in the same process (17 checks).
+The disposable smoke source was removed. This corrects fixture failure
+diagnostics/isolation, not a newly discovered production playback defect.
+
+After this final fixture-ordering correction, the rebuilt APK without the smoke
+source passed all 16 durable checks, and `make ci` passed again with unchanged
+outputs reused where reported.
+

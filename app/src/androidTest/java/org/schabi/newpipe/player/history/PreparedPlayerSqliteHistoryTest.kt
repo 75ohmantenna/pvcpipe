@@ -336,11 +336,15 @@ class PreparedPlayerSqliteHistoryTest {
                 }
             }
         } finally {
-            laterExecutor.shutdown()
-            assertTrue(
-                "Later history executor finished",
-                laterExecutor.awaitTermination(30, TimeUnit.SECONDS)
-            )
+            try {
+                awaitHistoryWrites()
+            } finally {
+                laterExecutor.shutdown()
+                assertTrue(
+                    "Later history executor finished",
+                    laterExecutor.awaitTermination(30, TimeUnit.SECONDS)
+                )
+            }
         }
     }
 
@@ -397,10 +401,23 @@ class PreparedPlayerSqliteHistoryTest {
         } finally {
             RxJavaPlugins.setIoSchedulerHandler(previous)
             released.countDown()
-            executor.shutdown()
-            assertTrue("History executor finished", executor.awaitTermination(30, TimeUnit.SECONDS))
-            blocker.get(30, TimeUnit.SECONDS)
+            try {
+                awaitHistoryWrites()
+            } finally {
+                executor.shutdown()
+                assertTrue("History executor finished", executor.awaitTermination(30, TimeUnit.SECONDS))
+                blocker.get(30, TimeUnit.SECONDS)
+            }
         }
+    }
+
+    private fun awaitHistoryWrites() {
+        // Queued operations capture their scheduler before subscription. Keep both executors
+        // alive until concatMap has subscribed and completed every accepted write, even on failure.
+        assertTrue(
+            "Accepted history writes finish before executor shutdown",
+            AndroidPlaybackHistoryEnvironment.WRITES.afterPrevious().blockingAwait(30, TimeUnit.SECONDS)
+        )
     }
 
     private fun resume(item: LocalItem): Long = history.resumePosition(item)
