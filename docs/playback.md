@@ -565,9 +565,16 @@ These are controlled JVM observations, not proof of real ExoPlayer scheduling,
 device playback or physical receiver decoding. Engine callback delivery/decoding,
 extraction/cast resolution, Android effects/preferences/autoqueue, database writes,
 and SDK/receiver transport are mocked. The managed-removal fixture uses real
-successful source tags, wrappers, queue/manager policy and ExoPlayer playlist
-completion dispatch, with Android Handler scheduling and engine metadata delivery
-controlled. Earlier controller-only fixtures use successful source/metadata doubles.
+successful source tags, wrappers and queue/manager policy. Its unprepared
+`ConcatenatingMediaSource` posts removal completion to a mocked Android Handler;
+the fixture holds that post to exercise both callback orders. It does not execute
+the prepared playback-thread timeline path. Inspected resolved ExoPlayer 2.19.1
+source separates these branches in `removePublicMediaSources`: prepared removal
+uses `MSG_REMOVE`, timeline refresh and `MSG_ON_COMPLETION` before Handler dispatch;
+unprepared removal posts directly. That ordering is source evidence, not a real
+engine scheduling observation. Earlier controller-only fixtures use successful
+source/metadata doubles. Controlled boundaries live in `CastPlaybackTestFixture`;
+behavior assertions remain in `CastPlaybackTest`.
 Prepared-window ownership remains covered by its existing real-source regressions;
 no live decoder/receiver integration is claimed.
 
