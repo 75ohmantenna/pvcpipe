@@ -166,17 +166,26 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     private void loadCurrent(final boolean force) {
+        if (closed) {
+            return;
+        }
+        final PlayQueueItem item = player.getCurrentItem();
+        onQueueItemChanged(item);
         final StreamInfo info = player.getCurrentStreamInfo().orElse(null);
         final MediaItemTag tag = player.getCurrentMetadata();
-        if (info == null || tag == null || tag == loadedTag && !force || closed) {
+        if (info == null || tag == null) {
+            cancelPreparation();
+            loadedTag = null;
+            return;
+        }
+        if (tag == loadedTag && !force) {
             return;
         }
         if (session.getLocalAddress() == null) {
             onError(player.getContext().getString(R.string.fcast_no_route));
             return;
         }
-        final boolean continuing = active && loadedTag != null
-                && loadedTag.getStreamUrl().equals(tag.getStreamUrl());
+        final boolean continuing = active && loadedTag != null && loadedItem == item;
         final long start = continuing ? getPosition() : player.getExoPlayer().getCurrentPosition();
         final boolean shouldPlay = active ? playWhenReady : player.getPlayWhenReady();
         if (continuing && !force && canControlReceiver()) {
@@ -185,7 +194,7 @@ public final class CastPlayback implements FCastSession.Listener {
         }
         cancelPreparation();
         loadedTag = tag;
-        loadedItem = player.getCurrentItem();
+        loadedItem = item;
         preparing = true;
         playWhenReady = shouldPlay;
         if (active) {
@@ -206,7 +215,7 @@ public final class CastPlayback implements FCastSession.Listener {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(media -> {
-                    if (closed || request != generation || session.getConnectionState() != 2) {
+                    if (!ownsPreparation(request, item, next)) {
                         next.close();
                         return;
                     }
@@ -240,9 +249,11 @@ public final class CastPlayback implements FCastSession.Listener {
                     player.onPlaybackParametersChanged(parameters);
                     notifyListeners();
                 }, failure -> {
-                    if (!closed && request == generation) {
+                    if (ownsPreparation(request, item, next)) {
                         onError(player.getContext().getString(R.string.fcast_source_error)
                                 + "\n" + failure.getMessage());
+                    } else {
+                        next.close();
                     }
                 }));
         notifyListeners();
@@ -265,15 +276,21 @@ public final class CastPlayback implements FCastSession.Listener {
     }
 
     /**
-     * During an active cast, quality reloads keep the item;
-     * another occurrence invalidates ownership.
+     * Quality reloads keep the item; another occurrence invalidates ownership,
+     * including initial preparation before the local-to-cast handoff.
      *
      * @param item the selected queue occurrence, not merely its video URL
      */
     public void onQueueItemChanged(final PlayQueueItem item) {
-        if (active && loadedItem != item) {
+        if (loadedItem != item) {
             onPlayerReset();
         }
+    }
+
+    private boolean ownsPreparation(final int request, final PlayQueueItem item,
+                                    final CastMediaResolver next) {
+        return !closed && request == generation && preparingResolver == next
+                && item == player.getCurrentItem() && session.getConnectionState() == 2;
     }
 
     public void setPlayWhenReadyForSource(final boolean ready) {
