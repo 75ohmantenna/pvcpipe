@@ -1,8 +1,11 @@
 package org.schabi.newpipe.player.mediasource;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.source.ForwardingTimeline;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.WrappingMediaSource;
 
@@ -12,6 +15,7 @@ import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 public class LoadedMediaSource extends WrappingMediaSource implements ManagedMediaSource {
     private final PlayQueueItem stream;
     private final MediaItem mediaItem;
+    private final MediaItemTag ownedTag;
     private final long expireTimestamp;
 
     /**
@@ -34,7 +38,8 @@ public class LoadedMediaSource extends WrappingMediaSource implements ManagedMed
         this.stream = stream;
         this.expireTimestamp = expireTimestamp;
 
-        this.mediaItem = tag.withExtras(this).asMediaItem();
+        this.ownedTag = tag.withExtras(this);
+        this.mediaItem = ownedTag.asMediaItem();
     }
 
     public PlayQueueItem getStream() {
@@ -49,6 +54,38 @@ public class LoadedMediaSource extends WrappingMediaSource implements ManagedMed
     @Override
     public MediaItem getMediaItem() {
         return mediaItem;
+    }
+
+    @Nullable
+    @Override
+    public Timeline getInitialTimeline() {
+        final Timeline timeline = super.getInitialTimeline();
+        return timeline == null ? null : withOwnership(timeline);
+    }
+
+    @Override
+    protected void onChildSourceInfoRefreshed(final Timeline timeline) {
+        refreshSourceInfo(withOwnership(timeline));
+    }
+
+    private Timeline withOwnership(final Timeline timeline) {
+        // ExoPlayer reads prepared media items from windows, not getMediaItem(). Tag each
+        // window without changing the child's playback configuration, timing or period UIDs.
+        final MediaItem[] items = new MediaItem[timeline.getWindowCount()];
+        final Timeline.Window scratch = new Timeline.Window();
+        for (int index = 0; index < items.length; index++) {
+            items[index] = timeline.getWindow(index, scratch).mediaItem.buildUpon()
+                    .setTag(ownedTag).build();
+        }
+        return new ForwardingTimeline(timeline) {
+            @Override
+            public Window getWindow(final int windowIndex, final Window window,
+                                    final long defaultPositionProjectionUs) {
+                super.getWindow(windowIndex, window, defaultPositionProjectionUs);
+                window.mediaItem = items[windowIndex];
+                return window;
+            }
+        };
     }
 
     @Override

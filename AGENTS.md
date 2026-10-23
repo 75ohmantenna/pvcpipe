@@ -22,8 +22,9 @@
   Follow `docs/playback.md` and `app/src/main/java/org/schabi/newpipe/player/cast/`.
 - Verify significant behavior by running the changed path. Distinguish controlled
   protocol peers and emulator results from real receiver/hardware evidence.
-- Playback audit findings 4–5 remain unresolved unless new evidence establishes
-  otherwise; see `docs/playback.md` under "Unresolved navigation defects".
+- Playback audit finding 4 has a controlled JVM-verified recovery-ownership
+  correction; finding 5 remains unresolved. See `docs/playback.md` under
+  "Recovery during pending navigation" and "Unresolved navigation defects".
   Keep dated audit observations separate from current guarantees.
 
 ## RTK shell commands

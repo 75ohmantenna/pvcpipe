@@ -302,18 +302,59 @@ a decoder/playback thread. These are JVM/framework-source checks, not device or
 receiver playback evidence. Accepted history writes retain their independent
 lifetime described below.
 
+### Recovery during pending navigation — corrected 2026-10-23
+
+Finding **4** from the 2026-10-22 audit was reproduced against unchanged
+post-#137 master (`ee76a5e539fe2a0474664543a54e6a6a241eea79`), using a disposable
+worktree with separate build outputs and no build-cache reuse. Quality and audio
+changes copied A's 45-second engine clock into selected occurrence B; a standalone
+controlled JVM scenario also observed the subsequent seek to 45 seconds instead
+of B's intended 12 seconds.
+
+`Player.setRecovery()` now captures a position only when ExoPlayer's current
+media-item tag carries a `LoadedMediaSource` whose `getStream()` is the selected
+`PlayQueueItem` instance. URL equality, matching numerical indices and
+`currentItem` are not ownership evidence. Missing or mismatched source ownership
+leaves the selected occurrence's existing recovery (including unset) unchanged.
+`LoadedMediaSource` carries that tag through both initial and published child
+timeline windows, preserving child media configuration, timing and period UIDs.
+This is necessary because ExoPlayer reads prepared media items from the timeline,
+not the wrapper's `getMediaItem()`. Extras are inspected without an unchecked
+loaded-source cast: placeholder and failed-source clocks cannot authorize capture.
+Aligned capture retains the existing local/active-receiver clock and clamping.
+
+`PlayerRecoveryTest` holds queue selection delivery on a `TestScheduler`, calls
+the actual selection, quality/audio, recovery and synchronization methods, and
+checks stored recovery plus the eventual seek/default-position command and
+recovery consumption. It covers same-URL distinct occurrences, existing/unset
+recovery, equal-index stale sources, missing tags and valid aligned capture with
+watch history disabled. The first 11-check harness exposed eight failures on the
+unchanged baseline, but its wrapper-only media items did not establish prepared
+timeline ownership. Fresh review caught the missing timeline propagation and an
+unsafe extras cast; both were reproduced before correction.
+
+The strengthened 18 checks use real initial/published `SinglePeriodTimeline`
+windows and caller dispatch, including direct aligned capture without a prior
+history write, placeholder/failed extras, and active-receiver clock boundaries.
+All pass. A repeated standalone quality/audio scenario using prepared windows
+observes 45-second storage/seek on unchanged master and the intended 12 seconds
+after the correction.
+
+These are controlled JVM checks, not device playback evidence. ExoPlayer decoding,
+Android effects, resolution and manager reload are mocked; the delayed readiness
+callback stands in for the manager. Child source preparation is controlled rather
+than running a decoder thread; source publication, timeline windows, queue objects,
+Player methods and disabled-history policy are real. Cast transport is mocked.
+The separate history progress path
+still uses its existing index guard; this correction does not claim to replace
+that guard with occurrence ownership or resolve other navigation defects.
+
 ### Unresolved navigation defects
 
-Findings **4–5** from the 2026-10-22 playback concurrency audit (baseline
-`29018edf312868bbd2634bc5c00b1e73bc69b3f1`) remain unresolved in the current
-implementation. They are defects, not supported playback contracts:
+Finding **5** from the 2026-10-22 playback concurrency audit (baseline
+`29018edf312868bbd2634bc5c00b1e73bc69b3f1`) remains unresolved. It is a defect,
+not a supported playback contract:
 
-- **4 — Recovery during pending navigation.** Quality/audio changes call
-  `Player.setRecovery()`, which pairs the selected queue index with the current
-  playback clock without checking that both represent the same occurrence.
-  Selecting B while the engine still represents A, then changing quality/audio,
-  can copy A's position into B. `PlaybackHistory`'s progress-index guard does not
-  protect this separate recovery path.
 - **5 — Initial cast preparation after a failed selection.**
   `CastPlayback.onQueueItemChanged()` invalidates another occurrence only when
   casting is already active. During initial preparation for A, selecting a
@@ -322,12 +363,11 @@ implementation. They are defects, not supported playback contracts:
   preparation generation and connection, but not the captured queue occurrence,
   and can hand the skipped A to the receiver.
 
-The original audit demonstrated these application-state failures with controlled
-JVM scenarios. Current source inspection still shows the missing ownership
-checks; the committed active-cast invalidation regression does not cover initial
-preparation followed by a failed selection. Neither the original audit nor this
-documentation review establishes the full failed-source/receiver sequence on a
-device.
+The original audit demonstrated this application-state failure with a controlled
+JVM scenario. The committed active-cast invalidation regression does not cover
+initial preparation followed by a failed selection. The finding-4 correction
+above does not change that path or establish the failed-source/receiver sequence
+on a device.
 
 ## Volume, mute and audio focus
 
@@ -361,8 +401,8 @@ connects it to the preferences and to the Room-backed
 - Progress recording updates the queue's recovery position from the content
   position even with watch history off, but only when the queue and engine media
   indices agree. Database progress uses the playback position and requires watch
-  history to be on. Other recovery callers, including `Player.setRecovery()`,
-  are separate from this guard; see the unresolved navigation defect above.
+  history to be on. `Player.setRecovery()` is separate and now checks loaded-source
+  occurrence ownership as described above; history's index guard is unchanged.
 
 ## Broadcasts
 
@@ -436,6 +476,7 @@ instrumentation tests (see [building.md](building.md)).
 | FCast media | [`CastManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastManifestTest.java), [`CastInlineManifestTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastInlineManifestTest.java), [`CastMediaServerTest`](../app/src/test/java/org/schabi/newpipe/player/cast/CastMediaServerTest.java); on a device [`CastDashReceiverCompatibilityTest`](../app/src/androidTest/java/org/schabi/newpipe/player/cast/CastDashReceiverCompatibilityTest.java) |
 | FCast discovery | [`FCastDiscoveryTest`](../app/src/test/java/org/schabi/newpipe/player/cast/FCastDiscoveryTest.java) |
 | Queue requests | [`QueuePlaybackChoiceTest`](../app/src/test/java/org/schabi/newpipe/player/QueuePlaybackChoiceTest.java), [`PlayerIntentTest`](../app/src/test/java/org/schabi/newpipe/player/PlayerIntentTest.java) |
+| Recovery ownership | [`PlayerRecoveryTest`](../app/src/test/java/org/schabi/newpipe/player/PlayerRecoveryTest.java) |
 | Queue events and timeline | [`PlayQueueTest`](../app/src/test/java/org/schabi/newpipe/player/playqueue/PlayQueueTest.java), [`MediaSourceManagerTest`](../app/src/test/java/org/schabi/newpipe/player/playback/MediaSourceManagerTest.java) |
 | Audio | [`PlaybackAudioTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioTest.java), [`PlaybackAudioFocusProtocolTest`](../app/src/test/java/org/schabi/newpipe/player/audio/PlaybackAudioFocusProtocolTest.java), on a device [`PlaybackAudioIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/audio/PlaybackAudioIntegrationTest.kt) |
 | History | [`PlaybackHistoryTest`](../app/src/test/java/org/schabi/newpipe/player/history/PlaybackHistoryTest.java), [`PlaybackHistoryPlayerLifecycleTest`](../app/src/test/java/org/schabi/newpipe/player/history/PlaybackHistoryPlayerLifecycleTest.java), on a device [`PlaybackHistoryIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/player/history/PlaybackHistoryIntegrationTest.kt) |
