@@ -377,7 +377,10 @@
     <string name="no_valid_zip_file">No valid ZIP file</string>
     <string name="could_not_import_all_files">Warning: Could not import all files</string>
     <string name="override_current_data">This will override your current setup.</string>
-    <string name="import_settings">Do you also want to import settings?</string>
+    <string name="restore_backup_title">Restore backup</string>
+    <string name="restore_settings_message">This backup includes settings. Restore them to replace your current settings, or restore without them to keep your current settings. Either restore option replaces your database and restarts the app.</string>
+    <string name="restore_without_settings">Restore without settings</string>
+    <string name="restore_with_settings">Restore with settings</string>
     <string name="error_unable_to_load_comments">Could not load comments</string>
     <string name="select_a_feed_group">Select a feed group</string>
     <string name="no_feed_group_created_yet">No feed group created yet</string>
