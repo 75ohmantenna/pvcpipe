@@ -77,6 +77,7 @@ import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
+import io.reactivex.rxjava3.subjects.CompletableSubject;
 
 /**
  * Exercises recovery storage and its eventual seek through real Player and queue methods.
@@ -274,6 +275,7 @@ public class PlayerRecoveryTest {
     public void alignedActiveCastRecoveryCapturesReceiverPositionAndSeeksIt() throws Exception {
         start();
         when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(queue.getItem())).thenReturn(true);
         when(casting.getPosition()).thenReturn(73_000L);
         when(casting.getDuration()).thenReturn(120_000L);
         queue.setRecovery(0, SELECTED_RECOVERY);
@@ -295,6 +297,8 @@ public class PlayerRecoveryTest {
         queue.setRecovery(1, SELECTED_RECOVERY);
         queue.setIndex(1);
         when(casting.isActive()).thenReturn(true);
+        // Isolate the original local-source guard even if casting claims this occurrence.
+        when(casting.ownsClock(selected)).thenReturn(true);
         when(casting.getPosition()).thenReturn(73_000L);
         when(casting.getDuration()).thenReturn(120_000L);
         assertNotSame(playing, selected);
@@ -445,6 +449,7 @@ public class PlayerRecoveryTest {
         start();
         enableHistory();
         when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(queue.getItem())).thenReturn(true);
         when(casting.getPosition()).thenReturn(73_000L);
         when(casting.getDuration()).thenReturn(120_000L);
 
@@ -464,6 +469,8 @@ public class PlayerRecoveryTest {
         final PlayQueueItem oldOccurrence = queue.getItem();
         final PlayQueueItem selected = removePlayingOccurrence(SELECTED_RECOVERY);
         when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(selected)).thenReturn(true);
+        // Even receiver ownership cannot bypass the original loaded-source ownership guard.
         when(casting.getPosition()).thenReturn(73_000L);
         when(casting.getDuration()).thenReturn(120_000L);
 
@@ -474,6 +481,77 @@ public class PlayerRecoveryTest {
         verifyNoInteractions(records.constructed().get(0));
         queue.setIndex(0);
         synchronizeAndAssert(0, SELECTED_RECOVERY);
+    }
+
+    @Test
+    public void acceptedCastProgressSurvivesNavigationAndDelayedCompletion() throws Exception {
+        acceptedCastProgressSurvivesLifecycle(false);
+    }
+
+    @Test
+    public void acceptedCastProgressSurvivesPlayerResetAndDelayedCompletion() throws Exception {
+        acceptedCastProgressSurvivesLifecycle(true);
+    }
+
+    private void acceptedCastProgressSurvivesLifecycle(final boolean destroy) throws Exception {
+        start();
+        enableHistory();
+        final PlayQueueItem accepted = queue.getItem();
+        final StreamInfo acceptedInfo = stream;
+        final HistoryRecordManager manager = records.constructed().get(0);
+        final CompletableSubject database = CompletableSubject.create();
+        final AtomicInteger completed = new AtomicInteger();
+        when(manager.saveStreamState(acceptedInfo, 73_000L))
+                .thenReturn(database.doOnComplete(completed::incrementAndGet));
+        when(manager.loadStreamState(accepted)).thenReturn(Maybe.empty());
+        when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(accepted)).thenReturn(true);
+        when(casting.getPosition()).thenReturn(73_000L);
+        when(casting.getDuration()).thenReturn(120_000L);
+        final Field historyField = Player.class.getDeclaredField("playbackHistory");
+        historyField.setAccessible(true);
+        final PlaybackHistory history = (PlaybackHistory) historyField.get(player);
+
+        player.saveStreamProgressState();
+
+        assertTrue(database.hasObservers());
+        assertEquals(73_000L, accepted.getRecoveryPosition());
+        final var resume = history.resumePosition(accepted).test();
+        resume.assertNoValues().assertNotComplete();
+        verify(manager, never()).loadStreamState(any(PlayQueueItem.class));
+
+        final PlayQueueItem selected = new PlayQueueItem(distinctStream());
+        queue.append(List.of(selected));
+        queue.setRecovery(1, SELECTED_RECOVERY);
+        queue.setIndex(1);
+        when(casting.ownsClock(accepted)).thenReturn(false);
+        when(casting.ownsClock(selected)).thenReturn(false);
+        when(casting.getPosition()).thenReturn(0L);
+        player.saveStreamProgressState();
+        player.setRecovery();
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertEquals(73_000L, accepted.getRecoveryPosition());
+
+        if (destroy) {
+            setField("UIs", mock(PlayerUiList.class));
+            doAnswer(call -> false).when(player).isProgressLoopRunning();
+            final var destroyPlayer = Player.class.getDeclaredMethod("destroyPlayer");
+            destroyPlayer.setAccessible(true);
+            destroyPlayer.invoke(player);
+            verify(casting).onPlayerReset();
+            verify(exoPlayer).release();
+        } else {
+            synchronizeAndAssert(1, SELECTED_RECOVERY);
+        }
+
+        assertEquals(0, completed.get());
+        database.onComplete();
+        assertEquals(1, completed.get());
+        resume.assertResult(PlayQueueItem.RECOVERY_UNSET);
+        verify(manager).saveStreamState(acceptedInfo, 73_000L);
+        verify(manager).loadStreamState(accepted);
+        verifyNoMoreInteractions(manager);
+        assertEquals(73_000L, accepted.getRecoveryPosition());
     }
 
     @Test

@@ -52,6 +52,20 @@ Kotlin, resources, external sites or historical test artifacts.
   through PR #140. A later 2026-10-23 correction revalidated the unchanged
   post-#140 baseline and added ownership-gated synchronization retry; see
   [cast synchronization liveness and evidence boundaries](playback.md#cast-synchronization-liveness--corrected-2026-10-23).
+  PR #141's remaining active-cast clock-attribution concern was subsequently
+  reproduced on unchanged post-#141 master: reset zero replaced B's pending
+  recovery and was passed to the history adapter. The focused correction adds
+  occurrence/clock provenance at acceptance and guards disconnect's position
+  override; see [active-cast checkpoints and evidence limits](playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23).
+  Fresh review additionally reproduced consumed recovery being lost before
+  receiver time; coherent synchronized starts and local handoffs now retain
+  that owned resume intent without authorizing reset or outstanding-preview clocks.
+  A second fresh review reproduced stale local progress suppressing a newer
+  handoff checkpoint; local handoff now carries the already-owned engine clock
+  regardless of that stored progress. Next/close regressions exercise the correction.
+  The third review's optional same-URL continuation case was also reproduced:
+  quality reload now carries only an owned position, preserving the forced
+  engine recovery seek instead of promoting an unowned preview.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to

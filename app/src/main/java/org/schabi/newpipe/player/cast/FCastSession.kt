@@ -77,6 +77,9 @@ class FCastSession(context: Context, private val listener: Listener) : AutoClose
     private val playback = FCastPlaybackState(listener) { command { it.pausePlayback() } }
     private var timeout: Runnable? = null
 
+    /** Whether this load has accepted a receiver clock sample, including an observed zero. */
+    fun hasObservedPosition(): Boolean = playback.hasObservedPosition
+
     // Accessed only by the IO executor, never from a native callback.
     private var active: Attempt? = null
 
@@ -446,6 +449,8 @@ internal class FCastPlaybackState(
     private var sourceAcknowledged = false
     private var pendingLoad = false
     private var positionMs = 0L
+    var hasObservedPosition = false
+        private set
     private var durationMs = 0L
     private var speed = 1.0
 
@@ -463,6 +468,7 @@ internal class FCastPlaybackState(
         expectedSource = source
         sourceAcknowledged = false
         pendingLoad = true
+        hasObservedPosition = false
         this.positionMs = positionMs.coerceAtLeast(0L)
         this.speed = speed
         requestedPlayWhenReady = playWhenReady
@@ -486,6 +492,7 @@ internal class FCastPlaybackState(
 
     fun timeChanged(time: Double) {
         if (!acceptsPlayback() || !time.isFinite()) return
+        hasObservedPosition = true
         val next = secondsToMillis(time)
         if (pendingLoad && receiverState == PlaybackState.PLAYING && next > positionMs) {
             // A playing receiver need not send another PLAYING callback after load().
@@ -551,6 +558,8 @@ internal class FCastPlaybackState(
     }
 
     fun seek(positionMs: Long) {
+        // Later state-only emissions still contain the pre-seek sample, not the request.
+        hasObservedPosition = false
         if (durationMs <= 0L || positionMs < durationMs) endedReported = false
     }
 
@@ -563,6 +572,7 @@ internal class FCastPlaybackState(
         expectedSource = null
         sourceAcknowledged = false
         pendingLoad = false
+        hasObservedPosition = false
         positionMs = 0L
         durationMs = 0L
         speed = 1.0
@@ -595,6 +605,7 @@ internal class FCastPlaybackState(
         expectedSource = null
         sourceAcknowledged = false
         pendingLoad = false
+        hasObservedPosition = false
         pauseOnLoad = false
         listener.onStopped()
     }

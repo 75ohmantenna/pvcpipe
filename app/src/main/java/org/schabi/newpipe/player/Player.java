@@ -645,7 +645,8 @@ public final class Player implements PlaybackListener, Listener {
             return;
         }
 
-        if (!loadedSourceOwnsSelectedItem()) {
+        if (!loadedSourceOwnsSelectedItem()
+                || casting.isActive() && !casting.ownsClock(playQueue.getItem())) {
             return;
         }
 
@@ -653,7 +654,9 @@ public final class Player implements PlaybackListener, Listener {
         final long windowPos = getCurrentPosition();
         final long duration = getDuration();
 
-        setRecovery(queuePos, MathUtils.clamp(windowPos, 0, duration));
+        // A pending cast seek is valid intent even before its duration is known.
+        setRecovery(queuePos, casting.isActive() && duration <= 0
+                ? Math.max(0, windowPos) : MathUtils.clamp(windowPos, 0, duration));
     }
 
     private boolean loadedSourceOwnsSelectedItem() {
@@ -1689,6 +1692,7 @@ public final class Player implements PlaybackListener, Listener {
         // VIEWED and COMPLETED remain metadata observations, independent of this clock gate.
         return new PlaybackHistory.Snapshot(getCurrentStreamInfo().orElse(null), playQueue,
                 currentMetadata == null || !loadedSourceOwnsSelectedItem()
+                        || casting.isActive() && !casting.ownsClock(playQueue.getItem())
                         || MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
                                 .filter(tag -> tag == currentMetadata).isEmpty()
                         ? -1 : simpleExoPlayer.getCurrentMediaItemIndex(),
@@ -2066,7 +2070,16 @@ public final class Player implements PlaybackListener, Listener {
         if (exoPlayerIsNull()) {
             return;
         }
-        simpleExoPlayer.seekTo(position);
+        // A negative position means casting had only a reset/pending clock. Leave the
+        // selected occurrence's engine position/recovery for normal synchronization.
+        if (position >= 0) {
+            simpleExoPlayer.seekTo(position);
+        } else if (playHere && loadedSourceOwnsSelectedItem()
+                && playQueue.getItem().getRecoveryPosition() != PlayQueueItem.RECOVERY_UNSET) {
+            // Play here can precede manager synchronization. Apply B's pending recovery
+            // before play() checkpoints its local preview; leave consumption to synchronization.
+            simpleExoPlayer.seekTo(playQueue.getIndex(), playQueue.getItem().getRecoveryPosition());
+        }
         if (currentState == STATE_PAUSED_SEEK) {
             changeState(STATE_PAUSED);
         }

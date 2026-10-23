@@ -62,9 +62,11 @@ source and retain the latest position and playback intent. Receiver buffering
 does not turn a paused load into a playing one, and changing quality after
 completion does not automatically replay the video.
 
-- **Disconnect** stops the receiver and leaves the phone paused at the
-  receiver's latest position.
-- **Play on this device** stops the receiver and resumes locally there.
+- **Disconnect** stops the receiver and leaves the phone paused at its latest
+  attributable position. A selected replacement without an owned clock retains
+  its pending recovery instead of applying a reset position.
+- **Play on this device** stops the receiver and resumes locally at that
+  attributable position or the selected occurrence's pending recovery.
 - Connection or preparation failure leaves local playback available.
   A dropped active connection returns to local playback paused, rather than
   unexpectedly starting the phone's speakers.
@@ -436,9 +438,9 @@ occurrence check. The engine tag must also be the cached metadata tag, so a new
 engine clock cannot be paired with metadata awaiting aggregate event delivery.
 Missing ownership or incoherent metadata invalidates progress before recovery
 mutation or write acceptance. URL equality and equal indices cannot authorize
-capture. Aligned local and active-cast captures retain their clocks; active-cast
-eligibility still uses the local source guard, not a new receiver-ownership check.
-View/completion observations retain their metadata-based interpretation.
+capture. At this correction, aligned active-cast capture still relied on local
+source eligibility; the later active-cast clock correction below adds its clock
+ownership check. View/completion observations retain their metadata interpretation.
 
 Ownership is checked synchronously, not when persistence finishes. Accepted
 writes remain application-owned, ordered ahead of subsequent resume lookups,
@@ -552,14 +554,9 @@ An executable probe observes B metadata while `currentItem` is A, then the real
 manager completion establishes B and loads it once without another metadata event.
 The manager-retirement regression rejects late removal completion after disposal.
 
-An inherited active-cast attribution concern remains separate: history eligibility
-still uses local-source ownership rather than authoritative receiver ownership.
-Source review indicates that pausing between B metadata and B synchronization can
-checkpoint B's reset/pending cast position (zero without explicit seek); the
-baseline could instead credit B with A's remote clock, then zero after synchronization.
-The earlier ownership reset changes the clock visible in this interval, not the
-history acceptance algorithm or accepted-write lifetime. This is a reported
-remaining concern, not an intentional recovery guarantee or SQLite observation.
+PR #141 left active-cast history/recovery clock attribution as a separate concern:
+local-source coherence was not receiver-clock ownership. The later correction
+below reproduces and addresses that concern without changing accepted-write lifetime.
 
 These are controlled JVM observations, not proof of real ExoPlayer scheduling,
 device playback or physical receiver decoding. Engine callback delivery/decoding,
@@ -577,6 +574,111 @@ source/metadata doubles. Controlled boundaries live in `CastPlaybackTestFixture`
 behavior assertions remain in `CastPlaybackTest`.
 Prepared-window ownership remains covered by its existing real-source regressions;
 no live decoder/receiver integration is claimed.
+
+### Active-cast checkpoint attribution — corrected 2026-10-23
+
+The concern reported during PR #141 was reproduced on unchanged post-#141 master
+`ab306d87a54bd5d37f68508cff4466f935e6b249`, in a disposable worktree with separate
+build outputs and no build-cache reuse. With A established at 45 seconds, selected
+B's engine metadata arrives before B synchronization. Pause accepts the cast's
+reset zero, replacing B's 12-second recovery and passing metadata/zero to the
+production history adapter's mocked record manager. Subsequent real synchronization
+seeks B to zero and consumes that recovery. The corrected executable sequence keeps
+12 seconds, accepts no reset checkpoint and seeks B to 12 seconds instead.
+This probe pauses before synchronization, causing the indexed recovery seek.
+In the inherited playing/metadata-first case, matching indices can instead
+skip that seek and start the receiver from the engine preview despite pending
+recovery. That separate source-start concern is not an intentional resume
+guarantee or a clock-attribution correction made here.
+Returning to an already-current occurrence after a neighbor's metadata reset can
+also leave recovery unconsumed through synchronization's early return. Source
+review identifies the analogous preview-start risk there; no real scheduling
+or broader source-start correction is claimed for either sequence.
+Progress during replacement and disconnect's independent local seek also exposed
+unowned clocks. Same-URL occurrences remain distinct recovery owners, but share one
+persistent stream identity; database-facing arguments are not SQLite corruption proof.
+`HistoryRecordManager.saveStreamState()` upserts stream metadata but filters
+invalid positions before stream-state upsert. Zero fails the current positive-duration
+save threshold, so this reset-zero observation does not establish a persistent
+resume overwrite. The pending 10-second preview is a different value and passes
+that threshold; no real SQLite transaction was executed in these JVM scenarios.
+
+`CastPlayback.ownsClock()` now requires the exact occurrence and a usable clock:
+accepted receiver time under the session's existing source policy, a carried
+established checkpoint for the same occurrence, or owned sender intent. That
+intent includes an explicit seek and, during active replacement, a coherent
+synchronized engine start once no selected recovery remains outstanding. That
+retains recovery already consumed into an indexed seek before receiver time
+arrives. An accepted local-to-cast handoff carries its already-owned local engine
+clock independently of stored local progress: a checkpoint is not necessarily
+an outstanding resume request. Reset zeros and load-request/state/duration/speed
+emissions alone do not establish provenance.
+Receiver-observed zero, requested zero and a synchronized default zero are valid.
+Replacing a source or switching receivers retains the same occurrence's checkpoint;
+an unobserved load emission cannot replace it or the latest seek intent. A new
+receiver time may supersede it. A seek invalidates the policy's pre-seek sample,
+so state-only emissions cannot silently reinstate that older position.
+Same-URL continuation cannot carry a position without that ownership. If a pending
+preview has no provenance, replacement starts from the coherent engine position,
+including a forced indexed recovery seek, rather than promoting the old preview.
+Direct recovery does not clamp a valid pending seek to reset duration zero;
+an unknown cast duration supplies no upper bound. Known durations still clamp.
+
+History progress and direct recovery validate this ownership synchronously in
+addition to their existing local-source/metadata guards. Pause, reload and shutdown
+reuse those capture paths. Disconnect also requires coherent source ownership
+before overriding the local position; otherwise it leaves pending recovery and
+the preview clock for normal synchronization, without treating zero as absent.
+**Play on this device** applies a selected pending recovery before starting the
+local engine, so its immediate progress checkpoint cannot replace that recovery
+with an unsynchronized preview. Manager synchronization retains recovery consumption.
+Play/pause, seek and speed controls retain their existing pending-load behavior.
+No ownership check is deferred into persistence: accepted writes remain ordered,
+retain resume barriers and survive navigation/player retirement.
+
+The session distinguishes receiver time from requested positions without adding
+source acknowledgements. v2 and non-echoing v3/v4 continue using their available
+playback evidence. Their old-source versus new-source time ambiguity while a load
+is pending remains; this correction does not claim stronger protocol evidence.
+Echo-capable connections retain their learned source gate and connection generations.
+
+`CastClockAttributionTest` drives real Player metadata/synchronization/capture and
+CastPlayback methods, queue recovery, PlaybackHistory and its Android adapter.
+ExoPlayer delivery/decoding, loaded-source extras, Android services/preferences,
+resolution and the database-facing record manager/SDK transport are controlled
+or mocked. `FCastObservedPositionTest` exercises the real session policy for
+v2/no-echo v3/v4, learned echo gates, buffering, zero and late/reset observations.
+Accepted-write regressions use the real history adapter with controlled completion.
+The corrected no-build-cache focused gate passes 218 checks: 25 clock-attribution,
+9 protocol-provenance, 84 cast, 39 recovery, 33 history, 22 manager and 6 audio.
+The unchanged baseline passes all 176 existing cast/recovery/history/manager checks;
+six of the first ten desired-behavior regressions fail. Additional controlled
+checks exposed pre-seek sample reuse, pre-metadata disconnect, local play-here
+preview capture and unknown-duration seek clamping before their corrections.
+Fresh complete-PR review found consumed recovery could be lost before receiver
+time if the guard also rejected a coherent synchronized start. Three new checks
+failed on that candidate before correction: real Next/select navigation during
+resolution, after load submission and with history disabled. Their engine mock
+follows indexed seeks; they verify 12-second recovery consumption, re-checkpointing
+before another navigation, and a 12-second load on return. A synchronized-default
+zero control passes. A further local-handoff check reproduced the same loss of
+an owned local checkpoint before receiver time. A second fresh complete review
+then found stored local progress must not prevent carrying that clock: two new
+local-save → later handoff → Next/close checks failed on that candidate before
+the unconditional owned-local-clock handoff correction. The first five review
+checks and these two are included in the attribution total. Legacy controller
+fixtures model direct callbacks as observed; actual policy-backed tests establish
+the observed/unobserved distinction. Executable paused, navigation and local-handoff
+probes remain controlled application observations, not real engine scheduling.
+The third fresh review's optional quality-reload note was independently reproduced
+before correction: after a 12-second recovery seek, URL continuation reused an
+unowned 10-second preview and pause accepted it. The added real quality/block/
+metadata/synchronization/pause regression and an executable probe now observe the
+12-second engine seek, replacement clock, queue recovery and record-manager argument.
+This narrow continuation correction is included above; the separate inherited
+initial source-start risks remain reported rather than claimed fixed.
+These are controlled JVM/application-policy results, not SQLite verification,
+device playback, prepared decoder scheduling or physical receiver evidence.
 
 ## Volume, mute and audio focus
 
@@ -613,6 +715,8 @@ connects it to the preferences and to the Room-backed
   Database progress uses the playback position and requires watch history to be
   on. `Player.setRecovery()` shares the loaded-source occurrence check, retaining
   its separate playback-clock capture for source reloads.
+  Active casting additionally requires the selected occurrence's cast clock to
+  have the provenance described under active-cast checkpoint attribution above.
 
 ## Broadcasts
 
