@@ -96,9 +96,8 @@ class ErrorActivity : PvcErrorActivity() {
         // print current time, as zoned ISO8601 timestamp
         currentTimeStamp = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
-        // overwrite here again -- just leave above alone for less upstream irritation
-        // upstreams uses the current time, we use the time the error happened
-        pvcGetErrorCreationTimestamp(currentTimeStamp, errorInfo)
+        // Prefer ErrorInfo construction time over the time this report was opened.
+        currentTimeStamp = pvcGetErrorCreationTimestamp(currentTimeStamp, errorInfo)
 
         pvcAddCopyLogcatLogButton(
             this,
@@ -245,7 +244,6 @@ class ErrorActivity : PvcErrorActivity() {
                 appendLine("* __Service:__ ${errorInfo.getServiceName()}")
                 appendLine("* __Timestamp:__ $currentTimeStamp")
                 appendLine("* __Package:__ $packageName")
-                appendLine("* __Service:__ ${errorInfo.getServiceName()}")
                 appendLine("* __Version:__ ${BuildConfig.VERSION_NAME}")
                 appendLine("* __OS:__ $osString")
 
