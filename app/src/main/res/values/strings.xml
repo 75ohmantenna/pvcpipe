@@ -329,7 +329,7 @@
     <string name="title_activity_recaptcha">reCAPTCHA challenge</string>
     <string name="subtitle_activity_recaptcha">Press \"Done\" when solved</string>
     <string name="recaptcha_request_toast">A reCAPTCHA challenge is required to continue.</string>
-    <string name="too_many_requests">Too many requests to %1$s. Try again later.</string>
+    <string name="too_many_requests">%1$s is not accepting requests right now. Try again later.</string>
     <string name="recaptcha_solve">Solve</string>
     <string name="done">Done</string>
     <!-- Downloads -->

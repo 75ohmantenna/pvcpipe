@@ -94,7 +94,7 @@ below identify subsequent fixes. Resource keys refer to
 | --- | --- | --- |
 | `metadata_cache_wipe_summary` | `HistorySettingsFragment` → `InfoCache.clearCache`; clears extracted in-memory metadata, not all cached webpage/WebView data | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Clear cached stream, channel, playlist, and other extracted metadata” |
 | `delete_view_history_alert` | `HistorySettingsFragment.openDeleteWatchHistoryDialog`, also opened by `StatisticsPlaylistFragment`; deletes playback positions as well as stream history | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Delete all watch history and saved playback positions?” |
-| `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; classification does not prove a network-wide restriction | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “Too many requests to %1$s. Try again later.” |
+| `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; includes HTTP 429 and Kick security blocks, not necessarily a network-wide restriction or rate limit | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “%1$s is not accepting requests right now. Try again later.” |
 | `parsing_error` | `ErrorInfo.getMessage` for remaining `ExtractionException`s; extraction failure need not be website parsing | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “Could not extract the requested information” |
 | `error_report_open_github_notice` | `activity_error.xml`, shown by `ErrorActivity` for non-crash failures too | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “this error” replaces “this crash” |
 | `start_accept_privacy_policy` | `ErrorActivity.openPrivacyPolicyDialog`; acceptance opens a composer or issue list, not submission; code does not establish GDPR compliance | “Please read and accept PVCPipe’s privacy policy before continuing to report this error.” Legal/policy review required |
@@ -299,12 +299,16 @@ separate work. Exact-head review, validation and merge evidence belongs on the P
 ## Error messages — corrected 2026-10-23
 
 Started from post-PR-#146 master (`ddf26a13d`); PRs #145–146 and unrelated
-workspace changes are preserved. All four candidates were revalidated:
+workspace changes are preserved. Three proposed replacements were supported;
+the rate-limit proposal required broader wording after fresh review:
 
-- `too_many_requests`: **Too many requests to %1$s. Try again later.**
-  `DownloaderImpl.execute` maps HTTP 429 to `ReCaptchaException`;
-  `ErrorInfo.getMessage` selects this message when `solvableCaptchaUrl` is null.
-  This establishes neither an IP ban nor a network-wide restriction.
+- `too_many_requests`: **%1$s is not accepting requests right now. Try again later.**
+  `DownloaderImpl.execute` maps HTTP 429 to `ReCaptchaException`, but
+  `KickApi.body` also throws it for security-policy blocks and Cloudflare
+  challenges independently of status. `ErrorInfo.getMessage` selects this
+  message when `solvableCaptchaUrl` is null, including Kick. The proposed
+  “Too many requests” would falsely imply a rate limit on that path. The final
+  wording establishes neither an IP ban nor a network-wide restriction.
 - `parsing_error`: **Could not extract the requested information**.
   The remaining `ExtractionException` branch follows specific content, CAPTCHA
   and network classifications; it does not establish website parsing as the cause.
@@ -329,10 +333,10 @@ All 21 source values XML files parsed successfully. Each affected key has exactl
 one default definition and no locale/configuration override; no verified
 equivalent translation was removed. These remain translatable English defaults.
 Non-English equivalents are an explicit fallback gap for translators, who must
-retain `%1$s` and avoid reintroducing network-wide or parsing-only claims.
+retain `%1$s` and avoid reintroducing network-wide, rate-limit-only or parsing-only claims.
 
-A throwaway JVM smoke formatted the actual rate-limit resource with YouTube,
-SoundCloud, the unknown-service fallback, literal `100% %1$s`, and `A & B`.
+A throwaway JVM smoke formatted the actual request-refusal resource with YouTube,
+SoundCloud, Kick, the unknown-service fallback, literal `100% %1$s`, and `A & B`.
 Arguments survived positional formatting without recursive interpretation.
 This checks the Java formatting boundary, not Android's HTML conversion or
 rendered layout. Existing CAPTCHA tests cover allowed hosts, other-service
