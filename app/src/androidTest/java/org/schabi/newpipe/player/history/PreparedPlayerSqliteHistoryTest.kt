@@ -84,6 +84,7 @@ class PreparedPlayerSqliteHistoryTest {
         isAccessible = true
     }
     private var previousCache: Any? = null
+    private var cacheInstalled = false
     private lateinit var isolatedCache: SimpleCache
     private lateinit var directory: File
     private lateinit var application: Context
@@ -91,6 +92,7 @@ class PreparedPlayerSqliteHistoryTest {
     private lateinit var preferences: SharedPreferences
     private lateinit var database: AppDatabase
     private var previousDatabase: Any? = null
+    private var databaseInstalled = false
     private lateinit var preferenceName: String
     private lateinit var databaseName: String
     private lateinit var media: File
@@ -105,6 +107,8 @@ class PreparedPlayerSqliteHistoryTest {
 
     @Before
     fun setUp() {
+        previousDatabase = singleton.get(null)
+        previousCache = cacheField.get(null)
         application = ApplicationProvider.getApplicationContext()
         val id = UUID.randomUUID().toString()
         preferenceName = "prepared-history-$id"
@@ -113,16 +117,16 @@ class PreparedPlayerSqliteHistoryTest {
         directory = File(application.cacheDir, "prepared-history-$id").apply {
             assertTrue("Create isolated cache directory", mkdir())
         }
-        previousCache = cacheField.get(null)
         isolatedCache = createCache(File(directory, "media-cache"))
         cacheField.set(null, isolatedCache)
+        cacheInstalled = true
         context = object : ContextWrapper(application) {
             override fun getSharedPreferences(name: String, mode: Int): SharedPreferences = preferences
         }
         setRecording(true)
         database = openDatabase()
-        previousDatabase = singleton.get(null)
         singleton.set(null, database)
+        databaseInstalled = true
         media = File(directory, "source.wav")
         writePcm(media)
         first = LocalItem(info("$id/a"))
@@ -179,21 +183,34 @@ class PreparedPlayerSqliteHistoryTest {
 
     @After
     fun tearDown() {
-        try {
-            if (::player.isInitialized) onMain { destroyPlayer() }
-            if (::history.isInitialized && ::first.isInitialized) resume(first)
-        } finally {
-            if (::session.isInitialized) onMain { session.release() }
-            singleton.set(null, previousDatabase)
-            if (::database.isInitialized) database.close()
-            if (::databaseName.isInitialized) application.deleteDatabase(databaseName)
-            if (::preferenceName.isInitialized) application.deleteSharedPreferences(preferenceName)
-            cacheField.set(null, previousCache)
-            if (::isolatedCache.isInitialized) isolatedCache.release()
+        var failure: Throwable? = null
+        fun attempt(action: () -> Unit) {
+            try {
+                action()
+            } catch (error: Throwable) {
+                val earlier = failure
+                if (earlier == null) failure = error else earlier.addSuppressed(error)
+            }
+        }
+        attempt { if (::player.isInitialized) onMain { destroyPlayer() } }
+        attempt { if (::history.isInitialized && ::first.isInitialized) resume(first) }
+        attempt { if (::session.isInitialized) onMain { session.release() } }
+        attempt { if (databaseInstalled) singleton.set(null, previousDatabase) }
+        attempt { if (cacheInstalled) cacheField.set(null, previousCache) }
+        attempt { if (::database.isInitialized) database.close() }
+        attempt { if (::isolatedCache.isInitialized) isolatedCache.release() }
+        attempt {
+            if (::application.isInitialized && ::databaseName.isInitialized) application.deleteDatabase(databaseName)
+        }
+        attempt {
+            if (::application.isInitialized && ::preferenceName.isInitialized) application.deleteSharedPreferences(preferenceName)
+        }
+        attempt {
             if (::directory.isInitialized) {
                 assertTrue("Delete isolated media and cache", directory.deleteRecursively())
             }
         }
+        failure?.let { throw it }
     }
 
     @Test
@@ -425,7 +442,15 @@ class PreparedPlayerSqliteHistoryTest {
     }
 
     private fun onMain(block: () -> Unit) {
-        instrumentation.runOnMainSync { block() }
+        val failure = AtomicReference<Throwable>()
+        instrumentation.runOnMainSync {
+            try {
+                block()
+            } catch (error: Throwable) {
+                failure.set(error)
+            }
+        }
+        failure.get()?.let { throw it }
     }
 
     private fun info(id: String): StreamInfo = StreamInfo(

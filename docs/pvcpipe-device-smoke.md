@@ -1000,6 +1000,17 @@ writes before checking disabled-history storage, and restore singleton resources
 even if cache release fails. The complete-PR review's SQLite completion-shape
 note is qualified above rather than claimed as normal manager navigation.
 
+A second fresh complete-PR review approved the production correction at
+`412b209a9405c5e2dede26a63092b213eefd6310`, with two non-blocking SQLite-fixture
+failure-path findings. Both were accepted: main-thread assertions now return to
+the test thread, and cleanup restores only installed singletons while attempting
+every owned-resource cleanup even after an earlier failure. A disposable
+two-check smoke proved assertion delivery without process death and preservation
+of an existing isolated database/cache before setup. Those checks and all 16
+durable integrations passed together (18 checks); the smoke source was removed
+before rebuilding the final instrumentation APK. These are fixture failure-path
+checks, not additional playback or receiver evidence.
+
 Initial fixture failures were separate: assigning synthetic WAV metadata to
 YouTube incorrectly requested its indexed DASH resolver. The corrected local
 fixture uses SoundCloud's generic progressive path without live extraction.
@@ -1042,4 +1053,9 @@ reported them. Instrumentation assembly and the repeated API 26 smoke passed.
 Gate attempts caught 101-character Java test lines; both were wrapped before
 the successful full runs. The temporary targeted formatter script was removed.
 No live-service or physical-receiver check was run.
+
+After the second review's fixture-only failure-path corrections, instrumentation
+assembly and the complete `make ci` gate passed again, reusing unchanged outputs
+where reported. The rebuilt APK without the disposable smoke source then passed
+all 16 durable integration checks again on API 26.
 
