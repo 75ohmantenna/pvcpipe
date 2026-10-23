@@ -314,8 +314,7 @@ class ErrorInfo private constructor(
                 throwable != null && throwable.isNetworkRelated ->
                     ErrorMessage(R.string.network_error)
 
-                // an extraction exception unrelated to the network
-                // is likely an issue with parsing the website
+                // remaining extraction failures need not be website-parsing failures
                 throwable is ExtractionException ->
                     ErrorMessage(R.string.parsing_error)
 
