@@ -67,6 +67,11 @@ class ErrorInfo private constructor(
      * badly broken).
      */
     val openInBrowserUrl: String?,
+    /**
+     * Wall-clock milliseconds recorded by the capture trigger during ErrorInfo construction,
+     * even when log capture is disabled. Preserved when parcelled. ACRA's sender constructs
+     * a new ErrorInfo from its stored report, so this is not the original ACRA crash time.
+     */
     val pvcErrorInfoCreationTimestamp: Long
 ) : Parcelable {
 

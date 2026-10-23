@@ -1171,8 +1171,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             } else {
                 showSnackBarError(new ErrorInfo(result.getErrors(), UserAction.SEARCHED,
                         "\"" + searchString + "\" → pageUrl: " + nextPage.getUrl() + ", "
-                                + "pageIds: " + nextPage.getIds() + ", "
-                                + "pageCookies: " + nextPage.getCookies(),
+                                + "pageIds: " + nextPage.getIds(),
                         serviceId, getOpenInBrowserUrlForErrors()));
             }
         }

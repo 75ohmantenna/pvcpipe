@@ -11,10 +11,11 @@ import org.schabi.newpipe.pvc.feature.logcat.PvcLogcatDumper.Companion.CAPTURE_P
 /**
  * Dump the logcat entries for [CAPTURE_PERIOD_BEFORE_TIMESTAMP] ms before a given timestamp.
  *
- * The timestamp is the point in time at which the crash occurred.
+ * [triggerLogCapture] records the current wall-clock time when an ErrorInfo is constructed
+ * and returns it even if capture is disabled. For stored ACRA reports this can be later than
+ * the original crash; ACRA's sender constructs a new ErrorInfo when converting the report.
  *
- * Used in case of ACRA catches a crash to fetch the current logcat entries that might help
- * to actually see what happened before the crash in [org.schabi.newpipe.error.ErrorActivity]
+ * Enabled capture can help explain errors shown in [org.schabi.newpipe.error.ErrorActivity].
  */
 class PvcLogcatDumper {
 

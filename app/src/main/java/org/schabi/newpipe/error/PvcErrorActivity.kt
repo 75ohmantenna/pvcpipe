@@ -65,17 +65,19 @@ abstract class PvcErrorActivity : AppCompatActivity() {
     }
 
     /**
-     * Create the timestamp based on the time the ErrorInfo was first created.
+     * Format the ErrorInfo construction timestamp, regardless of log capture settings.
+     * For ACRA reports this is when the stored report was converted, not the original crash time.
      *
-     * @param currentTimeStamp in case we have no own timestamp we give this one back to the caller
+     * @param currentTimeStamp fallback when the creation timestamp is unavailable or invalid
      */
     protected fun pvcGetErrorCreationTimestamp(
         currentTimeStamp: String,
         errorInfo: ErrorInfo
     ): String {
-        if (!isLogcatDumperEnabled()) return currentTimeStamp
+        val timestamp = errorInfo.pvcErrorInfoCreationTimestamp
+        if (timestamp <= 0) return currentTimeStamp
 
-        val dateTime = Instant.ofEpochMilli(errorInfo.pvcErrorInfoCreationTimestamp)
+        val dateTime = Instant.ofEpochMilli(timestamp)
             .atZone(ZoneId.systemDefault())
         return dateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     }
@@ -132,8 +134,7 @@ abstract class PvcErrorActivity : AppCompatActivity() {
     ): File? {
         val logFileNameCreator = PvcLogFileNameErrorInfo()
         logFileNameCreator.setTimestamp(errorInfo.pvcErrorInfoCreationTimestamp)
-        // we assume that while the app was crashing a log file with
-        // that name was created
+        // Capture is requested at ErrorInfo construction when enabled; its file may be absent.
         val possibleLogFileBasedOnTimestamp = logFileNameCreator.getLogFileName()
 
         val logDir = logcatDump.getLogFolder(context)
