@@ -957,6 +957,10 @@ then reopens the database to check the committed resume value. It installs
 its controlled source directly, bypassing the source manager/extractor.
 Held writes use bounded executor gates; end-of-source completion is emitted
 by actual playback, not by calling Player's completion callback.
+That completion/navigation case intentionally has one engine window beneath a
+two-item queue; production-managed non-last items normally auto-transition.
+It proves accepted-write ordering and process-lifetime completion, not that
+normal manager navigation follows that fixture-shaped STATE_ENDED sequence.
 
 These are local PCM engine/application/storage observations, not live-service,
 compressed video-decoder, audible-output, process-death or Android-started
@@ -974,12 +978,27 @@ normal discontinuity navigation policy changed selection back from B to A.
 The engine then resumed A instead of starting B. Reindexed removal cases did
 not expose that index mismatch.
 
-`Player.onPlaybackUnblock()` now installs the replacement timeline while still
-blocked, then enters buffering and prepares. This keeps the existing
-discontinuity policy from treating source installation as user/engine navigation;
-no ownership, cancellation, TLS or protocol rule is relaxed. All ten recovery
-engine cases pass after this ordering correction. The integration regressions
-retain the real reentrant engine boundary.
+The first correction installed the replacement timeline before leaving blocked
+display state, then entered buffering and prepared. All ten recovery engine
+cases passed locally, retaining the real reentrant engine boundary.
+
+Fresh complete-PR review of candidate `6e859c42cbaf8a249ce5c6e710283b9ab59190fa`
+identified that active receiver state delivery can replace BLOCKED before source
+installation. Independently added JVM regressions reproduced this: the local
+control passed, but a real `onCastingStateChanged(PAUSED)` followed by synchronous
+REMOVE during mocked engine installation reselected A. The final correction
+also scopes an `installingSource` navigation guard around `setMediaSource`,
+cleared in `finally`, independently of display state. Real engine navigation
+after installation remains enabled. This is a controlled JVM cast-state boundary,
+not real SDK/receiver evidence. No ownership, cancellation, TLS or protocol rule
+is relaxed.
+
+The full `PlayerRecoveryTest` JVM class and all 16 API 26 integration cases
+passed after this review correction. Recovery cases now also await an actual
+playback-thread timed message after B starts, drain application-owned history
+writes before checking disabled-history storage, and restore singleton resources
+even if cache release fails. The complete-PR review's SQLite completion-shape
+note is qualified above rather than claimed as normal manager navigation.
 
 Initial fixture failures were separate: assigning synthetic WAV metadata to
 YouTube incorrectly requested its indexed DASH resolver. The corrected local
@@ -1013,12 +1032,14 @@ protocol acknowledgement.
 
 ### Final repository gate
 
-`make ci` passed after the unblock-order correction: build-logic/static checks,
-the app JVM suite (including cast/recovery/history/manager regressions), offline
-extractor gate, Android lint, and debug/release assembly. The final app JVM
-suite and lint executed; unchanged extractor and APK tasks reused up-to-date
-outputs where Gradle reported them. Instrumentation assembly also passed.
-The first gate attempt caught a new test's Checkstyle line length; it was
-corrected before this final run. Owned AVDs and the temporary targeted formatter
-script were removed. No live-service or physical-receiver check was run.
+`make ci` passed both for the initial unblock-order correction and again after
+the reviewed installation guard and fixture corrections: build-logic/static
+checks, the full app JVM suite (including cast/recovery/history/manager
+regressions), offline extractor gate, Android lint, and debug/release assembly.
+In the post-review run, app JVM tests, lint and release R8/assembly executed;
+unchanged extractor and debug APK tasks reused up-to-date outputs where Gradle
+reported them. Instrumentation assembly and the repeated API 26 smoke passed.
+Gate attempts caught 101-character Java test lines; both were wrapped before
+the successful full runs. The temporary targeted formatter script was removed.
+No live-service or physical-receiver check was run.
 

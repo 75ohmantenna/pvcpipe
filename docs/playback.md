@@ -283,10 +283,13 @@ calling the shared playback listener, loading sources or mutating playback.
 Blocking, initialization and source resets do not retire the current manager;
 the processed queue/timeline accounting above still applies.
 
-Installing the replacement engine timeline remains blocked until
-`setMediaSource` returns. Its synchronous REMOVE discontinuity describes source
-replacement at the old engine index, not navigation back to that occurrence.
-Only afterward does Player enter buffering and prepare. The
+Replacement timeline installation blocks discontinuity-driven navigation until
+`setMediaSource` returns, independently of display state: receiver updates can
+change that state while the manager is blocked. Its synchronous REMOVE describes
+source replacement at the old engine index, not navigation back to that occurrence.
+The installation guard is cleared in `finally`; normal engine navigation resumes
+afterward. Player then prepares, changing blocked display state to buffering when
+applicable. The
 [2026-10-23 prepared-engine/SQLite validation](pvcpipe-device-smoke.md#combined-playback-integration-validation-2026-10-23)
 records the real-engine regression and the API/receiver evidence limits.
 
@@ -581,6 +584,8 @@ source/metadata doubles. Controlled boundaries live in `CastPlaybackTestFixture`
 behavior assertions remain in `CastPlaybackTest`.
 Prepared-window ownership remains covered by its existing real-source regressions;
 no live decoder/receiver integration is claimed.
+The later [prepared-engine validation](pvcpipe-device-smoke.md#combined-playback-integration-validation-2026-10-23)
+adds actual playback-thread completion evidence separately from these JVM fixtures.
 
 ### Active-cast checkpoint attribution — corrected 2026-10-23
 

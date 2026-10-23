@@ -47,6 +47,7 @@ import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.player.helper.PlayerDataSource
+import org.schabi.newpipe.player.history.PlaybackHistory
 import org.schabi.newpipe.player.mediaitem.MediaItemTag
 import org.schabi.newpipe.player.mediasource.LoadedMediaSource
 import org.schabi.newpipe.player.playqueue.PlayQueue
@@ -69,8 +70,11 @@ class PlayerRecoveryEngineIntegrationTest {
     private lateinit var media: File
     private lateinit var database: AppDatabase
     private var previousDatabase: Any? = null
+    private var databaseInstalled = false
     private lateinit var cache: SimpleCache
     private var previousCache: Any? = null
+    private var cacheInstalled = false
+    private lateinit var history: PlaybackHistory
     private var player: Player? = null
     private var session: MediaSessionCompat? = null
     private var queue: PlayQueue? = null
@@ -98,6 +102,7 @@ class PlayerRecoveryEngineIntegrationTest {
         databaseField().let {
             previousDatabase = it.get(null)
             it.set(null, database)
+            databaseInstalled = true
         }
         // Use the file-backed index, not the application's persistent ExoPlayer SQLite DB.
         @Suppress("DEPRECATION")
@@ -106,7 +111,9 @@ class PlayerRecoveryEngineIntegrationTest {
         cacheField().let {
             previousCache = it.get(null)
             it.set(null, cache)
+            cacheInstalled = true
         }
+        history = PlaybackHistory(context)
         onMain {
             val service = PlayerService()
             ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
@@ -126,17 +133,31 @@ class PlayerRecoveryEngineIntegrationTest {
     fun tearDown() {
         try {
             onMain {
-                player?.destroy()
-                session?.release()
-                queue?.dispose()
+                try {
+                    player?.destroy()
+                } finally {
+                    try {
+                        session?.release()
+                    } finally {
+                        queue?.dispose()
+                    }
+                }
             }
         } finally {
-            cache.release()
-            cacheField().set(null, previousCache)
-            databaseField().set(null, previousDatabase)
-            database.close()
-            application.deleteSharedPreferences(preferenceName)
-            directory.deleteRecursively()
+            if (cacheInstalled) cacheField().set(null, previousCache)
+            if (databaseInstalled) databaseField().set(null, previousDatabase)
+            try {
+                if (::cache.isInitialized) cache.release()
+            } finally {
+                try {
+                    if (::database.isInitialized) database.close()
+                } finally {
+                    if (::application.isInitialized && ::preferenceName.isInitialized) {
+                        application.deleteSharedPreferences(preferenceName)
+                    }
+                    if (::directory.isInitialized) directory.deleteRecursively()
+                }
+            }
         }
     }
 
@@ -234,6 +255,7 @@ class PlayerRecoveryEngineIntegrationTest {
         }
         val expected = if (recovery == PlayQueueItem.RECOVERY_UNSET) 0 else recovery
         assertTrue("B started at $startedAt, expected $expected", startedAt >= expected && startedAt < expected + POSITION_TOLERANCE)
+        val advanced = CountDownLatch(1)
         onMain {
             assertSame(selected, playbackQueue.item)
             assertEquals(if (removePlaying) 0 else 1, engine.currentMediaItemIndex)
@@ -243,8 +265,18 @@ class PlayerRecoveryEngineIntegrationTest {
             if (!quality) {
                 assertEquals("french", requireNotNull(tag.maybeAudioTrack.get().selectedAudioStream).audioTrackId)
             }
+            engine.createMessage { _, _ -> advanced.countDown() }
+                .setPosition(engine.currentMediaItemIndex, engine.currentPosition + 300)
+                .send()
+        }
+        assertTrue("B must advance on the actual playback thread", advanced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        onMain {
+            assertSame(selected, owner(engine))
+            assertTrue(engine.isPlaying)
             engine.pause()
         }
+        // A resume lookup is an application-write barrier, not merely a synchronous DAO read.
+        history.resumePosition(selected).timeout(TIMEOUT_SECONDS, TimeUnit.SECONDS).blockingGet()
         assertTrue("Disabled recording must leave isolated history empty", database.streamHistoryDAO().getAll().blockingFirst().isEmpty())
         assertTrue("Disabled recording must leave isolated recovery storage empty", database.streamStateDAO().getAll().blockingFirst().isEmpty())
     }

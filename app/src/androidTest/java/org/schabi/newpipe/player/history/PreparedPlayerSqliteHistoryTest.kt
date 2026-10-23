@@ -68,6 +68,9 @@ import org.schabi.newpipe.player.ui.PlayerUiList
  *
  * The service is context-attached, not Android-started; notification/media-session UIs are omitted.
  * The source manager and extractor are bypassed by installing the controlled source directly.
+ * Its completion/navigation scenario intentionally uses one engine window under a two-item queue:
+ * real STATE_ENDED drives the production completion policy, but that navigation is fixture-shaped,
+ * not proof of normal manager-driven auto-transition scheduling.
  * These tests establish SQLite commits and application-process write lifetime, not process-death
  * durability, background-service survival, network extraction, audible output or receiver behavior.
  */
