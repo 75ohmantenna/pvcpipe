@@ -55,16 +55,12 @@ class SubscriptionImportWorker(
 
             is SubscriptionTransfer.Outcome.Success -> {
                 withContext(Dispatchers.Main) {
-                    if (outcome.skipped > 0) {
-                        val skipped = applicationContext.resources.getQuantityString(
-                            R.plurals.import_subscriptions_skipped,
-                            outcome.skipped,
-                            outcome.skipped
-                        )
-                        Toast.makeText(applicationContext, skipped, Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(applicationContext, R.string.import_complete_toast, Toast.LENGTH_SHORT).show()
-                    }
+                    val message = SubscriptionImportPresentation.completion(
+                        applicationContext.resources,
+                        outcome.skipped
+                    )
+                    val duration = if (outcome.skipped > 0) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                    Toast.makeText(applicationContext, message, duration).show()
                 }
                 Result.success()
             }
@@ -104,7 +100,13 @@ class SubscriptionImportWorker(
                     WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
                 ).apply {
                     if (currentProgress > 0 && maxProgress > 0) {
-                        setSubText("$currentProgress/$maxProgress")
+                        setSubText(
+                            SubscriptionImportPresentation.progress(
+                                applicationContext,
+                                currentProgress,
+                                maxProgress
+                            )
+                        )
                     }
                 }.build()
         return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)

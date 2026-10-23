@@ -373,7 +373,6 @@
     <string name="no_playlist_bookmarked_yet">No playlist bookmarks yet</string>
     <string name="select_a_kiosk">Select a kiosk</string>
     <string name="export_complete_toast">Exported</string>
-    <string name="import_complete_toast">Imported</string>
     <string name="no_valid_zip_file">No valid ZIP file</string>
     <string name="could_not_import_all_files">Warning: Could not import all files</string>
     <string name="override_current_data">This will override your current setup.</string>
@@ -478,9 +477,11 @@
         <item quantity="other">Importing %d subscriptions…</item>
     </plurals>
     <plurals name="import_subscriptions_skipped">
-        <item quantity="one">Imported. Skipped %d channel of a service PVCPipe does not support.</item>
-        <item quantity="other">Imported. Skipped %d channels of services PVCPipe does not support.</item>
+        <item quantity="one">Import finished. Skipped %1$d channel of a service PVCPipe does not support.</item>
+        <item quantity="other">Import finished. Skipped %1$d channels of services PVCPipe does not support.</item>
     </plurals>
+    <string name="subscription_import_finished">Import finished.</string>
+    <string name="subscription_import_progress">%1$s/%2$s</string>
     <string name="import_title">Import</string>
     <string name="import_from">Import from</string>
     <string name="export_to">Export to</string>

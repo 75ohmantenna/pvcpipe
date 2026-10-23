@@ -102,13 +102,14 @@ below identify subsequent fixes. Resource keys refer to
 | `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Download request submitted” |
 | `cancel` in the former `import_settings` dialog | At the alignment pass, `BackupRestoreSettingsFragment.importDatabase` started database-only restore from its negative Cancel action | Corrected in the [backup-restore follow-up](#backup-restore-actions--corrected-2026-10-23); the shared Cancel resource is unchanged |
 | `file_deleted` | `Deleter.next`; feedback precedes delayed commit, and the manager ignores the file-deletion result | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Marked for deletion: %1$s” while undo is available; later feedback must not claim confirmed erasure without a behavior change |
-| `import_subscriptions_skipped` (plurals) | `SubscriptionImportWorker`; starts with “Imported.” even when no supported source entries were processed | “Import finished. Skipped %d unsupported entry/entries.” Supply proper plural forms; processed entries are not necessarily new subscriptions |
+| `import_subscriptions_skipped` (plurals) | `SubscriptionImportWorker`; formerly started with “Imported.” even when no supported source entries were processed | Corrected in the [subscription-import follow-up](#subscription-import-presentation--corrected-2026-10-23): “Import finished.” plus the pluralized unsupported-service explanation; processed entries are not necessarily new subscriptions |
 
 Preserve `%1$s` as a positional service-name placeholder. The existing
 `<unknown_service>` fallback in `ErrorInfo.getServiceName` needs a separately
-localized fallback decision, not an English-only replacement. Keep the skipped-entry
-plural's quantity selection and `%d` placeholder; provide each locale's required
-plural forms. The proposed deletion message introduces `%1$s` for the filename
+localized fallback decision, not an English-only replacement. The subscription-import
+follow-up preserves the skipped-entry quantity selection and uses positional `%1$d`;
+future translations need each locale's required plural forms. The proposed deletion
+message introduces `%1$s` for the filename
 instead of concatenating `":\n"` and the name outside the resource. Other proposals
 introduce no numeric quantities. Deletion dialogs must describe consequences
 without relying on a settings summary, including for screen-reader users. Update
@@ -120,9 +121,10 @@ removal launches separate operations. Do not broaden the cookie action into a
 claim that all WebView cookies are cleared. General style/localization polishing
 is separate from the factual discrepancies listed here.
 
-Additional localization/accessibility work, separate from factual copy fixes:
-`SubscriptionImportWorker` formats progress as raw `"$currentProgress/$maxProgress"`;
-use locale-aware numbers and a translatable format. Subscription headers receive
+Additional localization/accessibility work was identified separately from factual
+copy fixes. The [subscription-import follow-up](#subscription-import-presentation--corrected-2026-10-23)
+addresses its raw progress interpolation with a complete translatable format and
+UI-locale numbers. Subscription headers still receive
 an untranslated `<unknown>` for retired IDs through `ServiceHelper`, and
 `subscription_header.xml` / `Header.kt` do not mark them as accessibility headings.
 Distinct fallback names and heading navigation need a focused design and TalkBack
@@ -348,3 +350,116 @@ UI, TalkBack, live service or challenge completion is claimed; panel, toast,
 notification and report-screen coverage above is source inspection. The blocked
 API 37 environment was not retried. Exact final gate, fresh read-only Claude
 review, adjudication and guarded merge evidence are recorded on the PR.
+
+## Subscription-import presentation — corrected 2026-10-23
+
+Started from post-PR-#147 master (`56360d4a5`). Source inspection reconfirmed
+that all-unsupported input and empty input can succeed without storing entries.
+Import `Success.count` is the number of supported source entries processed,
+including duplicates and updates of existing subscriptions, not newly created
+subscriptions. Export counts snapshot entries. The count documentation now
+states that distinction; counters and outcome semantics are unchanged.
+
+Successful imports use dedicated **Import finished.** text regardless of the
+processed count. With skipped entries they use **Import finished. Skipped 1
+channel of a service PVCPipe does not support.** or the plural **… Skipped 2
+channels of services PVCPipe does not support.** The former `import_complete_toast`
+had no remaining source callers and was removed, not globally rewritten. Failure
+copy, cancellation propagation, Toast durations, extraction, batch/transaction
+boundaries and work scheduling are unchanged.
+
+Notification subtext uses the complete translatable
+`subscription_import_progress` format, `%1$s/%2$s`, with both arguments formatted
+by one integer `NumberFormat` for the app UI locale. Active AppCompat locales
+take precedence; AndroidX `LocaleManagerCompat` supplies saved/framework locales
+when a worker starts without an AppCompat activity, then the system default is
+used when no app locale is selected. Numeric progress-bar values and plural
+selectors remain raw integers. Loading/importing
+determinate/indeterminate conditions, foreground ownership and Cancel actions
+are unchanged.
+
+### Localization
+
+All 21 source values XML files parsed successfully. The affected definitions
+exist only in default `values/strings.xml`; there are no locale or configuration
+overrides and no verified translations to remove. The skipped message retains
+English `one`/`other` forms with positional `%1$d`. New completion and progress
+resources are translatable. Non-English prose translations remain an explicit
+gap using normal Android default fallback. Localized number formatting does
+not supply translated prose. Translators must preserve positional placeholders,
+unsupported-service meaning and the absence of any newly-added count claim.
+
+### Verification boundaries
+
+Privacy/report destinations, subscription headings and broader accessibility
+work remain separate. No user installation/data was modified, and the blocked
+API 37 environment was not retried. Exact-head gate, independent review,
+adjudication and guarded merge evidence belong on the PR.
+
+On a freshly created disposable API 26 emulator, all five packaged-resource
+formatting checks and all four isolated Room transfer checks passed. Completion
+coverage includes zero/one/multiple skipped entries and singular/plural selection;
+progress covers grouped counts through `Int.MAX_VALUE` in en-US, de-DE and ar-EG,
+including Arabic digits and an app UI locale differing from both the process
+default and resource locale. The duplicate/upsert regression processes 51
+identical entries across the 50-entry boundary, preserves the original UID and
+one database/feed row, reports import count 51 and exports count 1.
+
+A subsequently removed runtime harness enqueued the real import worker through
+WorkManager using disposable empty, one-unsupported and two-unsupported source
+files. All three reached `SUCCEEDED`; logged Android-resource completions were
+the zero/singular/plural messages above. This exercises the real successful
+worker path, but logs and formatting assertions are not observations of rendered
+Toast or notification layout. Notification progress/bar transitions and Cancel
+action preservation are source inspection, not rendered-notification evidence.
+The existing 26 JVM transfer tests passed, including mixed/empty/supported input,
+source/extraction/storage failures and cancellation propagation.
+
+Direct targeted instrumentation was used only on the newly created API 26 AVD,
+which had no PVCPipe installation before this run. The runner is AndroidJUnitRunner;
+database checks use disposable in-memory Room storage. No connected-test
+install/uninstall cleanup was used. Initial Ktlint failures in expression-body
+layout and the temporary logging harness were corrected before successful
+style checks and APK/instrumentation assembly.
+
+Independent read-only Claude Code review used `claude-opus-5-5` at medium effort.
+It found no blocking behavioral issue, but flagged default-English plural
+fallback limitations, the now-unused legacy completion key and locale-test
+safety documentation. Locale tests temporarily change AppCompat/framework app
+language settings and restore them afterward; they are restricted to disposable
+environments because process death before teardown could leave a saved change.
+The initial complete serial `make ci` gate passed. A further API 26 regression
+then reproduced the review's cold-worker concern: with no active AppCompat
+locale, the original formatter ignored a saved ar-EG selection and used the
+process default. The focused presentation helper now reads that locale through
+AndroidX's supported API without changing global locale initialization. The
+regression redirects AndroidX's locale-record read to a disposable XML fixture;
+it does not overwrite the application's real saved-language file.
+
+The cold-locale regression failed before the correction and passed afterward;
+all five formatting and four Room checks then passed together. A removed
+Android-resource probe also verified the review's fallback warning: ru-RU
+quantity 21 (and 101) selects English `one`, producing “21 channel”, while 22
+selects `other`. This is an inherited default-English fallback limitation, not
+a Russian translation or a newly changed plural selector. Proper translated
+prose/plural forms remain a translator gap; numeric localization does not fix it.
+
+A fresh second complete-diff read-only review found no blocking issues. Its
+optional consistency observation was adjudicated separately: existing title
+and Toast counts still use application resources and can differ from progress
+digits on API 26–32. No translated progress-format override currently exists.
+Changing those other messages' locale ownership is outside this focused
+progress-number correction; future translations must also verify background
+resource-context selection. Review also noted that restoring an initially
+empty AppCompat locale can later clear a saved locale when an activity starts.
+The test's disposable-environment restriction covers that risk as well as
+process death; teardown is not a user-installation safety guarantee. API 33+
+locale/default scheduling was not exercised and is not claimed.
+
+After the material cold-locale correction and removal of temporary probes, the
+complete final serial `make ci` gate passed again: build-logic/static checks,
+full app JVM suite, offline extractor gate, Android lint and debug/release
+assembly. Instrumentation assembly also passed, and the final targeted API 26
+run repeated all nine retained checks successfully after probe removal. Gradle
+reused unchanged outputs where reported. The second review covered the complete
+corrected production/test diff; later edits only clarify review disposition and evidence.
