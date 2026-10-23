@@ -297,7 +297,8 @@ public class PlayerRecoveryTest {
         queue.setRecovery(1, SELECTED_RECOVERY);
         queue.setIndex(1);
         when(casting.isActive()).thenReturn(true);
-        when(casting.ownsClock(selected)).thenReturn(false);
+        // Isolate the original local-source guard even if casting claims this occurrence.
+        when(casting.ownsClock(selected)).thenReturn(true);
         when(casting.getPosition()).thenReturn(73_000L);
         when(casting.getDuration()).thenReturn(120_000L);
         assertNotSame(playing, selected);

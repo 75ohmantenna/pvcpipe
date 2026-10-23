@@ -590,6 +590,10 @@ In the inherited playing/metadata-first case, matching indices can instead
 skip that seek and start the receiver from the engine preview despite pending
 recovery. That separate source-start concern is not an intentional resume
 guarantee or a clock-attribution correction made here.
+Returning to an already-current occurrence after a neighbor's metadata reset can
+also leave recovery unconsumed through synchronization's early return. Source
+review identifies the analogous preview-start risk there; no real scheduling
+or broader source-start correction is claimed for either sequence.
 Progress during replacement and disconnect's independent local seek also exposed
 unowned clocks. Same-URL occurrences remain distinct recovery owners, but share one
 persistent stream identity; database-facing arguments are not SQLite corruption proof.
@@ -602,11 +606,13 @@ that threshold; no real SQLite transaction was executed in these JVM scenarios.
 `CastPlayback.ownsClock()` now requires the exact occurrence and a usable clock:
 accepted receiver time under the session's existing source policy, a carried
 established checkpoint for the same occurrence, or owned sender intent. That
-intent includes an explicit seek and a coherent synchronized engine start once
-no selected recovery remains outstanding, including a local-to-cast handoff.
-The latter retains recovery already consumed into an indexed engine seek; it
-must survive navigation even before receiver time arrives. Reset zeros and
-load-request/state/duration/speed emissions alone do not establish provenance.
+intent includes an explicit seek and, during active replacement, a coherent
+synchronized engine start once no selected recovery remains outstanding. That
+retains recovery already consumed into an indexed seek before receiver time
+arrives. An accepted local-to-cast handoff carries its already-owned local engine
+clock independently of stored local progress: a checkpoint is not necessarily
+an outstanding resume request. Reset zeros and load-request/state/duration/speed
+emissions alone do not establish provenance.
 Receiver-observed zero, requested zero and a synchronized default zero are valid.
 Replacing a source or switching receivers retains the same occurrence's checkpoint;
 an unobserved load emission cannot replace it or the latest seek intent. A new
@@ -640,7 +646,7 @@ resolution and the database-facing record manager/SDK transport are controlled
 or mocked. `FCastObservedPositionTest` exercises the real session policy for
 v2/no-echo v3/v4, learned echo gates, buffering, zero and late/reset observations.
 Accepted-write regressions use the real history adapter with controlled completion.
-The corrected no-build-cache focused gate passes 215 checks: 22 clock-attribution,
+The corrected no-build-cache focused gate passes 217 checks: 24 clock-attribution,
 9 protocol-provenance, 84 cast, 39 recovery, 33 history, 22 manager and 6 audio.
 The unchanged baseline passes all 176 existing cast/recovery/history/manager checks;
 six of the first ten desired-behavior regressions fail. Additional controlled
@@ -653,10 +659,14 @@ resolution, after load submission and with history disabled. Their engine mock
 follows indexed seeks; they verify 12-second recovery consumption, re-checkpointing
 before another navigation, and a 12-second load on return. A synchronized-default
 zero control passes. A further local-handoff check reproduced the same loss of
-an owned local checkpoint before receiver time; handoff now carries its coherent
-position when no recovery remains outstanding. These five checks are included
-in the 22 above. The paused callback probe and the navigation probe remain
-controlled engine/application observations, not real masked-position scheduling.
+an owned local checkpoint before receiver time. A second fresh complete review
+then found stored local progress must not prevent carrying that clock: two new
+local-save → later handoff → Next/close checks failed on that candidate before
+the unconditional owned-local-clock handoff correction. The first five review
+checks and these two are included in the attribution total. Legacy controller
+fixtures model direct callbacks as observed; actual policy-backed tests establish
+the observed/unobserved distinction. Executable paused, navigation and local-handoff
+probes remain controlled application observations, not real engine scheduling.
 These are controlled JVM/application-policy results, not SQLite verification,
 device playback, prepared decoder scheduling or physical receiver evidence.
 

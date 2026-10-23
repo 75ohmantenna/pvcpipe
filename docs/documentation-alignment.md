@@ -60,6 +60,9 @@ Kotlin, resources, external sites or historical test artifacts.
   Fresh review additionally reproduced consumed recovery being lost before
   receiver time; coherent synchronized starts and local handoffs now retain
   that owned resume intent without authorizing reset or outstanding-preview clocks.
+  A second fresh review reproduced stale local progress suppressing a newer
+  handoff checkpoint; local handoff now carries the already-owned engine clock
+  regardless of that stored progress. Next/close regressions exercise the correction.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
 - `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to

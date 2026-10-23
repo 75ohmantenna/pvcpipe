@@ -254,8 +254,9 @@ public final class CastPlayback implements FCastSession.Listener {
                     // Local playback continues during preparation; take its handoff position now.
                     if (!active) {
                         position = player.getCurrentPosition();
-                        clockValid = item.getRecoveryPosition()
-                                == PlayQueueItem.RECOVERY_UNSET;
+                        // This is the already-owned local clock; stored local progress
+                        // is not evidence that a different resume request remains pending.
+                        clockValid = true;
                     }
                     duration = Math.max(0, info.getDuration() * 1000L);
                     speed = player.getPlaybackSpeed();

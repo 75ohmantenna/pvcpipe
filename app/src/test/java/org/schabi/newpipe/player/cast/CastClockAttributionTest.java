@@ -525,6 +525,38 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
         }
     }
 
+    @Test
+    public void localProgressThenHandoffThenNextKeepsLatestLocalClock() throws Exception {
+        localProgressThenHandoff(false);
+    }
+
+    @Test
+    public void localProgressThenHandoffThenCloseKeepsLatestLocalClock() throws Exception {
+        localProgressThenHandoff(true);
+    }
+
+    private void localProgressThenHandoff(final boolean close) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+                HistoryCapture history = new HistoryCapture()) {
+            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            when(exo.getCurrentMediaItemIndex()).thenReturn(0);
+            when(exo.getContentPosition()).thenReturn(10000L);
+            player.saveStreamProgressState();
+            assertEquals(10000, fixture.first.getRecoveryPosition());
+            when(exo.getCurrentPosition()).thenReturn(60000L);
+            when(exo.getContentPosition()).thenReturn(60000L);
+            fixture.handoff();
+            if (close) {
+                playback.close();
+            } else {
+                doCallRealMethod().when(player).playNext();
+                player.playNext();
+            }
+            assertEquals(60000, fixture.first.getRecoveryPosition());
+            verify(history.record).saveStreamState(fixture.info, 60000);
+        }
+    }
+
     private final class HistoryCapture implements AutoCloseable {
         private final MockedStatic<PreferenceManager> preferences =
                 mockStatic(PreferenceManager.class);
