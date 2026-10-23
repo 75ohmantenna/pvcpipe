@@ -34,6 +34,7 @@ public final class CastPlayback implements FCastSession.Listener {
     @Nullable private CastMediaResolver preparingResolver;
     @Nullable private CastMediaResolver previousResolver;
     @Nullable private MediaItemTag loadedTag;
+    @Nullable private MediaItemTag receiverTag;
     @Nullable private PlayQueueItem loadedItem;
     private boolean active;
     private boolean preparing;
@@ -177,9 +178,7 @@ public final class CastPlayback implements FCastSession.Listener {
         final StreamInfo info = player.getCurrentStreamInfo().orElse(null);
         final MediaItemTag tag = player.getCurrentMetadata();
         if (info == null || tag == null) {
-            cancelPreparation();
-            loadedTag = null;
-            preparing = active;
+            cancelSourcePreparation();
             return;
         }
         if (tag == loadedTag && !force) {
@@ -230,6 +229,7 @@ public final class CastPlayback implements FCastSession.Listener {
                     previousResolver = resolver;
                     resolver = next;
                     preparingResolver = null;
+                    receiverTag = tag;
                     // Local playback continues during preparation; take its handoff position now.
                     if (!active) {
                         position = player.getCurrentPosition();
@@ -268,6 +268,7 @@ public final class CastPlayback implements FCastSession.Listener {
     public void onPlayerReset() {
         cancelPreparation();
         loadedTag = null;
+        receiverTag = null;
         loadedItem = null;
         ended = false;
         if (active) {
@@ -300,11 +301,20 @@ public final class CastPlayback implements FCastSession.Listener {
 
     private void discardPreparation(final CastMediaResolver next) {
         if (preparingResolver == next) {
-            cancelPreparation();
-            loadedTag = null;
-            preparing = active;
+            cancelSourcePreparation();
         } else {
             next.close();
+        }
+    }
+
+    private void cancelSourcePreparation() {
+        final long currentPosition = getPosition();
+        cancelPreparation();
+        loadedTag = receiverTag;
+        preparing = active && receiverTag == null;
+        if (active) {
+            position = currentPosition;
+            updateTime = SystemClock.elapsedRealtime();
         }
     }
 
@@ -408,6 +418,7 @@ public final class CastPlayback implements FCastSession.Listener {
         reloadOnConnection = false;
         cancelPreparation();
         loadedTag = null;
+        receiverTag = null;
         loadedItem = null;
         if (resolver != null) {
             resolver.close();

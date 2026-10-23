@@ -384,8 +384,12 @@ not navigation and cannot authorize a preparation or handoff. Active failed-sour
 waiting keeps the remote clock frozen. The existing URL-based source-clock
 continuation heuristic is unchanged; URL equality never authorizes preparation
 ownership. This correction does not make `currentItem` an engine-source identity.
+An accepted handoff records the receiver's established tag separately from the
+pending tag. Same-occurrence placeholder/failed metadata cancels only preparation,
+restoring that established tag so receiver controls and replacement clock survive.
+Changing occurrence or returning to the device clears the established tag.
 
-Thirteen durable `CastPlaybackTest` regressions cover failed B metadata followed by
+Fourteen durable `CastPlaybackTest` regressions cover failed B metadata followed by
 late A success/failure, distinct same-URL occurrences, same-occurrence failed
 metadata, completion without the selection notification, newer-preparation cleanup,
 valid initial handoff and successful B metadata replacement. The first nine
@@ -393,8 +397,12 @@ regressions yield five failures on unchanged production code. Fresh review then
 identified candidate regressions around temporary null occurrences, source-clock
 continuation after removal, and active failed-source clock freezing. Four added
 checks reproduced those candidate failures before correction, including real
-block/events/synchronization with pending seek/pause/speed controls. All 55 cast
-checks pass after correction.
+block/events/synchronization with pending seek/pause/speed controls. A second fresh
+review found same-occurrence empty metadata losing established receiver control;
+that regression was reproduced before correction. Its strengthened check starts
+with a real handoff, delivers placeholder and failed metadata, cancels replacement
+preparation, verifies receiver controls and retries the same replacement tag at
+the retained remote position. All 56 cast checks pass after correction.
 The observation harness recorded one receiver load and one local handoff before
 the fix, versus zero of each afterward, with A resolving after B's metadata in
 both runs. The obsolete resolver closed and preparation became inactive afterward.
@@ -411,6 +419,13 @@ The separate equal-index history-write race and other navigation follow-ups
 remain outside these finding-4/5 corrections. The history progress path retains
 its existing numerical-index guard; these controlled checks do not establish
 occurrence ownership for history writes.
+
+Read-only review also raised a separate removal/resynchronization liveness gap:
+preloaded next-item metadata can precede `Player.currentItem` synchronization,
+and the later synchronization can cancel preparation without another metadata
+callback. The active-cast variant predates this correction. This callback sequence
+was not runtime-revalidated here; it remains a separate follow-up, not a claim of
+universal engine-source ownership or removal/resynchronization liveness.
 
 ## Volume, mute and audio focus
 

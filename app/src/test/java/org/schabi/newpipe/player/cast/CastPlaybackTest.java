@@ -50,6 +50,7 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
+import org.schabi.newpipe.player.mediaitem.PlaceholderTag;
 import org.schabi.newpipe.player.mediasource.FailedMediaSource;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
@@ -117,6 +118,7 @@ public class CastPlaybackTest {
         set("active", true);
         final MediaItemTag tag = newTag();
         set("loadedTag", tag);
+        set("receiverTag", tag);
         when(player.getCurrentMetadata()).thenReturn(tag);
         final PlayQueueItem item = mock(PlayQueueItem.class);
         when(player.getCurrentItem()).thenReturn(item);
@@ -1191,9 +1193,7 @@ public class CastPlaybackTest {
     @Test
     public void blockedQualityReloadRetainsPendingRemoteControls() throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
-            set("active", true);
-            set("loadedItem", fixture.first);
-            set("loadedTag", player.getCurrentMetadata());
+            fixture.handoff();
             playback.onPlaybackChanged(1, 42000, 120000, 1.5);
             final MediaItemTag oldTag = player.getCurrentMetadata();
             player.onPlaybackBlock();
@@ -1235,9 +1235,7 @@ public class CastPlaybackTest {
     @Test
     public void activeFailedSelectionKeepsTheRemoteClockFrozen() throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
-            set("active", true);
-            set("loadedItem", fixture.first);
-            set("loadedTag", player.getCurrentMetadata());
+            fixture.handoff();
             playback.onPlaybackChanged(1, 42000, 120000, 1.5);
             fixture.selectSecond();
             fixture.deliverFailure(fixture.second);
@@ -1253,9 +1251,7 @@ public class CastPlaybackTest {
     @Test
     public void differentSourceAfterRemovalDoesNotInheritRemovedRemoteClock() throws Exception {
         try (InitialPreparation fixture = new InitialPreparation()) {
-            set("active", true);
-            set("loadedItem", fixture.first);
-            set("loadedTag", player.getCurrentMetadata());
+            fixture.handoff();
             playback.onPlaybackChanged(1, 42000, 120000, 1.5);
             fixture.queue.remove(0);
             // A preloaded source can transition before Player receives another synchronization.
@@ -1264,6 +1260,38 @@ public class CastPlaybackTest {
             fixture.deliverSuccess(nextTag);
             io.triggerActions();
             verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
+    public void sameOccurrenceEmptyMetadataRetainsReceiverControlsAndReplacementClock()
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(1, 42000, 120000, 1.5);
+            final MediaItem placeholder = PlaceholderTag.EMPTY.asMediaItem();
+            when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(placeholder);
+            player.onEvents(player.getExoPlayer(),
+                    mock(com.google.android.exoplayer2.Player.Events.class));
+            playback.seek(65000);
+            playback.pause();
+            verify(playback.getSession()).seek(65000);
+            verify(playback.getSession()).pause();
+            assertFalse(playback.isPreparing());
+            final MediaItemTag replacement = newTag();
+            fixture.deliverSuccess(replacement);
+            final CastMediaResolver abandoned = resolvers.constructed().get(1);
+
+            fixture.deliverFailure(fixture.first);
+            verify(abandoned).close();
+            playback.seek(70000);
+            playback.setSpeed(2);
+            verify(playback.getSession()).seek(70000);
+            verify(playback.getSession()).setSpeed(2);
+            assertFalse(playback.isPreparing());
+            fixture.deliverSuccess(replacement);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 70000, 2, false, "Video", null);
         }
     }
 
@@ -1359,6 +1387,7 @@ public class CastPlaybackTest {
             when(player.getPlayWhenReady()).thenReturn(true);
             set("active", false);
             set("loadedTag", null);
+            set("receiverTag", null);
             set("loadedItem", null);
         }
 
@@ -1367,6 +1396,12 @@ public class CastPlaybackTest {
             assertTrue(playback.isPreparing());
             assertFalse(playback.isActive());
             return resolvers.constructed().get(0);
+        }
+
+        private void handoff() {
+            begin();
+            io.triggerActions();
+            clearInvocations(player, playback.getSession());
         }
 
         private void selectSecond() {
