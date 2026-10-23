@@ -557,6 +557,50 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
         }
     }
 
+    @Test
+    public void qualityReloadCannotPromoteUnownedPreviewAfterRecoverySeek() throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation();
+                HistoryCapture history = new HistoryCapture()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(1, 45000, 120000, 1);
+            fixture.queue.setIndex(1);
+            fixture.queue.setRecovery(1, 12000);
+            deliverSecond(fixture);
+            fixture.selectSecond();
+            io.triggerActions();
+            org.junit.Assert.assertFalse(playback.ownsClock(fixture.second));
+            assertEquals(10000, playback.getPosition());
+            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final java.util.concurrent.atomic.AtomicLong local =
+                    new java.util.concurrent.atomic.AtomicLong(10000);
+            when(exo.getCurrentPosition()).thenAnswer(call -> local.get());
+            when(exo.getContentPosition()).thenAnswer(call -> local.get());
+            org.mockito.Mockito.doAnswer(call -> {
+                local.set(call.getArgument(1));
+                return null;
+            }).when(exo).seekTo(org.mockito.ArgumentMatchers.anyInt(), anyLong());
+            setPlayer("playbackSources",
+                    mock(org.schabi.newpipe.player.resolver.PlaybackSources.class));
+            doCallRealMethod().when(player).setPlaybackQuality(any());
+            player.setPlaybackQuality("720p");
+            assertEquals(12000, fixture.second.getRecoveryPosition());
+            player.onPlaybackBlock();
+            deliverSecond(fixture);
+            player.onPlaybackSynchronize(fixture.second, true);
+            verify(exo).seekTo(1, 12000);
+            assertEquals(12000, local.get());
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, fixture.second.getRecoveryPosition());
+            clearInvocations(history.record, playback.getSession());
+            playback.pause();
+            assertEquals(12000, fixture.second.getRecoveryPosition());
+            verify(history.record).saveStreamState(fixture.info, 12000);
+            verify(history.record, never()).saveStreamState(fixture.info, 10000);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 12000, playback.getSpeed(), false,
+                    "Video", null);
+        }
+    }
+
     private final class HistoryCapture implements AutoCloseable {
         private final MockedStatic<PreferenceManager> preferences =
                 mockStatic(PreferenceManager.class);

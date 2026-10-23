@@ -618,6 +618,9 @@ Replacing a source or switching receivers retains the same occurrence's checkpoi
 an unobserved load emission cannot replace it or the latest seek intent. A new
 receiver time may supersede it. A seek invalidates the policy's pre-seek sample,
 so state-only emissions cannot silently reinstate that older position.
+Same-URL continuation cannot carry a position without that ownership. If a pending
+preview has no provenance, replacement starts from the coherent engine position,
+including a forced indexed recovery seek, rather than promoting the old preview.
 Direct recovery does not clamp a valid pending seek to reset duration zero;
 an unknown cast duration supplies no upper bound. Known durations still clamp.
 
@@ -646,7 +649,7 @@ resolution and the database-facing record manager/SDK transport are controlled
 or mocked. `FCastObservedPositionTest` exercises the real session policy for
 v2/no-echo v3/v4, learned echo gates, buffering, zero and late/reset observations.
 Accepted-write regressions use the real history adapter with controlled completion.
-The corrected no-build-cache focused gate passes 217 checks: 24 clock-attribution,
+The corrected no-build-cache focused gate passes 218 checks: 25 clock-attribution,
 9 protocol-provenance, 84 cast, 39 recovery, 33 history, 22 manager and 6 audio.
 The unchanged baseline passes all 176 existing cast/recovery/history/manager checks;
 six of the first ten desired-behavior regressions fail. Additional controlled
@@ -667,6 +670,13 @@ checks and these two are included in the attribution total. Legacy controller
 fixtures model direct callbacks as observed; actual policy-backed tests establish
 the observed/unobserved distinction. Executable paused, navigation and local-handoff
 probes remain controlled application observations, not real engine scheduling.
+The third fresh review's optional quality-reload note was independently reproduced
+before correction: after a 12-second recovery seek, URL continuation reused an
+unowned 10-second preview and pause accepted it. The added real quality/block/
+metadata/synchronization/pause regression and an executable probe now observe the
+12-second engine seek, replacement clock, queue recovery and record-manager argument.
+This narrow continuation correction is included above; the separate inherited
+initial source-start risks remain reported rather than claimed fixed.
 These are controlled JVM/application-policy results, not SQLite verification,
 device playback, prepared decoder scheduling or physical receiver evidence.
 

@@ -206,7 +206,8 @@ public final class CastPlayback implements FCastSession.Listener {
         }
         final boolean continuing = active && loadedTag != null
                 && loadedTag.getStreamUrl().equals(tag.getStreamUrl());
-        final long start = continuing || (active && (pendingSeek || clockValid))
+        // URL continuation cannot carry an unowned preview past a synchronized recovery seek.
+        final long start = active && (pendingSeek || clockValid)
                 ? getPosition() : player.getExoPlayer().getCurrentPosition();
         final boolean shouldPlay = active ? playWhenReady : player.getPlayWhenReady();
         if (continuing && !force && canControlReceiver()) {
