@@ -301,6 +301,46 @@ public class PlaybackHistoryTest {
     }
 
     @Test
+    public void acceptedTransitionWritesSurviveNavigationAndQueueDisposalBeforeResume() {
+        final CompletableSubject progress = CompletableSubject.create();
+        final CompletableSubject completion = CompletableSubject.create();
+        environment.saves.add(progress);
+        environment.saves.add(completion);
+        environment.load = Maybe.defer(() -> {
+            assertEquals(Long.valueOf(121_000), environment.persistedPosition);
+            return Maybe.just(new StreamStateEntity(1, environment.persistedPosition));
+        });
+
+        history.onDiscontinuity(snapshot(0, 31_000, 33_000),
+                new Discontinuity(DISCONTINUITY_REASON_SEEK, 1,
+                        REPEAT_MODE_OFF, true, false));
+
+        assertEquals(1, queue.getIndex());
+        assertEquals(31_000, queue.getItem(0).getRecoveryPosition());
+        assertEquals(RECOVERY_UNSET, queue.getItem(1).getRecoveryPosition());
+        assertEquals(List.of(stream, stream), environment.saved);
+        assertEquals(List.of(33_000L, 121_000L), environment.positions);
+        assertEquals(List.of(0, 0), environment.queueIndicesOnSave);
+        assertTrue(progress.hasObservers());
+        assertFalse(completion.hasObservers());
+        final TestObserver<Long> resume = history.resumePosition(queue.getItem(0)).test();
+        queue.dispose();
+
+        assertTrue(queue.isDisposed());
+        assertNull(environment.persistedPosition);
+        resume.assertNoValues();
+        progress.onComplete();
+
+        assertEquals(Long.valueOf(33_000), environment.persistedPosition);
+        assertTrue(completion.hasObservers());
+        resume.assertNoValues();
+        completion.onComplete();
+
+        assertEquals(Long.valueOf(121_000), environment.persistedPosition);
+        resume.assertResult(RECOVERY_UNSET);
+    }
+
+    @Test
     public void slowEarlierWriteCannotOverwriteTheLatestAcceptedPosition() {
         final TestScheduler io = new TestScheduler();
         environment.saves.add(Completable.timer(2, TimeUnit.SECONDS, io));
