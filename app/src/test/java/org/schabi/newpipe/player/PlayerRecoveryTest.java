@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -528,6 +529,57 @@ public class PlayerRecoveryTest {
     public void equalIndexAudioDoesNotWriteOldMetadataOrCorruptDistinctSelectedRecovery()
             throws Exception {
         equalIndexDistinctUrlTrackChange(false);
+    }
+
+    @Test
+    public void synchronizationSeekCannotSaveSelectedClockUsingPreviousMetadata()
+            throws Exception {
+        start();
+        enableHistory();
+        setField("listeners", mock(PlayerListeners.class));
+        setField("UIs", mock(PlayerUiList.class));
+        setField("isPrepared", true);
+        final StreamInfo previousInfo = stream;
+        final MediaItem previousSource = exoPlayer.getCurrentMediaItem();
+        stream = distinctStream();
+        final PlayQueueItem selected = new PlayQueueItem(stream);
+        queue.append(List.of(selected));
+        queue.remove(0);
+        // Avoid entering unrelated auto-queue resolution when B's metadata arrives.
+        queue.append(List.of(new PlayQueueItem(previousInfo)));
+        queue.setRecovery(0, SELECTED_RECOVERY);
+        final MediaItem selectedSource = loadedItem(selected);
+        doAnswer(call -> {
+            final long position = call.getArgument(1);
+            // Model ExoPlayer's synchronous seek observation, before its aggregate onEvents.
+            when(exoPlayer.getCurrentMediaItem()).thenReturn(selectedSource);
+            when(exoPlayer.getCurrentPosition()).thenReturn(position);
+            when(exoPlayer.getContentPosition()).thenReturn(position);
+            player.onPositionDiscontinuity(
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, previousSource, null, 0,
+                            PLAYING_POSITION, CONTENT_POSITION, -1, -1),
+                    new com.google.android.exoplayer2.Player.PositionInfo(
+                            null, 0, selectedSource, null, 0, position, position, -1, -1),
+                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK);
+            return null;
+        }).when(exoPlayer).seekTo(0, SELECTED_RECOVERY);
+
+        player.onPlaybackSynchronize(selected, true);
+
+        verify(exoPlayer).seekTo(0, SELECTED_RECOVERY);
+        assertSame(selected, player.getCurrentItem());
+        assertSame(selected, owner(exoPlayer.getCurrentMediaItem()));
+        assertSame(previousInfo, player.getCurrentStreamInfo().orElseThrow());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, selected.getRecoveryPosition());
+        verifyNoInteractions(records.constructed().get(0));
+
+        player.onEvents(exoPlayer, mock(com.google.android.exoplayer2.Player.Events.class));
+        player.saveStreamProgressState();
+        verify(records.constructed().get(0)).onViewed(stream);
+
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        assertSavedProgress(SELECTED_RECOVERY);
     }
 
     @Test

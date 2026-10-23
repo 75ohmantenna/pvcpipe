@@ -436,8 +436,9 @@ occurrence check. The engine tag must also be the cached metadata tag, so a new
 engine clock cannot be paired with metadata awaiting aggregate event delivery.
 Missing ownership or incoherent metadata invalidates progress before recovery
 mutation or write acceptance. URL equality and equal indices cannot authorize
-capture. Coherent aligned local and active-cast captures retain their clocks;
-view/completion observations retain their metadata-based interpretation.
+capture. Aligned local and active-cast captures retain their clocks; active-cast
+eligibility still uses the local source guard, not a new receiver-ownership check.
+View/completion observations retain their metadata-based interpretation.
 
 Ownership is checked synchronously, not when persistence finishes. Accepted
 writes remain application-owned, ordered ahead of subsequent resume lookups,
@@ -456,6 +457,13 @@ one persistent stream identity. `saveStreamState` upserts stream metadata and a
 valid stream-state position; it does not increment views or write stream-history
 records. A separate engine-selected/cached-metadata mismatch regression checks
 rejection until actual aggregate metadata delivery restores coherent capture.
+The rejected equal-index snapshot can contain a correctly attributed A checkpoint;
+dropping it together with selected recovery is intentional, retaining progress's
+existing all-or-nothing acceptance model rather than adding a second write path.
+The cached-metadata mismatch is different: a synchronous recovery seek can expose
+B's clock before aggregate metadata delivery, so the coherence check also prevents
+A metadata from accepting B's resume clock. A regression drives the actual
+synchronization → seek → discontinuity → aggregate-event sequence.
 
 The desired-behavior regressions call real quality/audio, selection, progress,
 metadata delivery, synchronization and destruction methods with controlled
