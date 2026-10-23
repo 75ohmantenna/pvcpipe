@@ -73,9 +73,9 @@ completion does not automatically replay the video.
   Local headset disconnection and minimize-on-exit preferences do not pause
   an active receiver.
 - Rebuilding a source for the same queue item retains its remote clock.
-  During an active cast, synchronization to another queue occurrence invalidates
-  the old source even when both entries have the same video URL. Initial
-  preparation has an unresolved occurrence-invalidation gap described below.
+  Synchronization to another queue occurrence invalidates old preparation even
+  before the initial handoff, including when both entries have the same URL.
+  Failed metadata cancels preparation rather than leaving an obsolete load alive.
 - Returning to the phone during a timeline drag clears the remote seek state.
 - An initial idle report does not cancel a pending load. Once playback is
   established, an idle report that is not completion releases remote ownership.
@@ -349,25 +349,58 @@ The separate history progress path
 still uses its existing index guard; this correction does not claim to replace
 that guard with occurrence ownership or resolve other navigation defects.
 
+### Initial cast preparation ownership — corrected 2026-10-23
+
+Finding **5** from the 2026-10-22 playback concurrency audit was revalidated
+against unchanged post-#138 master
+(`21b1a6c9bd3a7aea2d89ad621d69ab626bef9807`) in a disposable worktree with
+separate build outputs. Existing cast checks passed before adding regressions.
+The regression/observation run disabled build-cache reuse.
+
+The historical defect was initial A preparation surviving selection of failed B.
+`onQueueItemChanged()` invalidated only active casts; `loadCurrent()` returned
+before cancellation when B had no `StreamInfo`. A's completion checked generation
+and connection, but not its captured occurrence. The original audit baseline was
+`29018edf312868bbd2634bc5c00b1e73bc69b3f1`; the finding-4 correction did not fix it.
+
+Revalidation delivered B's metadata, rather than omitting that callback:
+`FailedMediaSource` builds an `ExceptionTag` with empty stream info.
+`Player.onEvents()` stores that tag and calls `casting.onSourceChanged()` even
+without stream info. Known extraction/resolution failures publish a two-second
+silent timeline; unrelated failures instead propagate a source-refresh error.
+A successful B normally cancels A when its metadata starts replacement
+preparation, which is why successful-metadata delivery alone does not reproduce
+the failed-selection defect.
+
+Preparation now belongs to a queue-occurrence instance regardless of active
+handoff state. Occurrence changes invalidate its generation and close its resolver.
+Missing/failed metadata also cancels preparation. Success and failure callbacks
+must retain the captured occurrence, generation, resolver lifetime and connected
+session before affecting the operation; stale callbacks close only their captured
+resolver, never a newer request's resources. Same-occurrence quality/audio
+replacement and forced receiver reload retain their existing pending controls.
+
+Nine durable `CastPlaybackTest` regressions cover failed B metadata followed by
+late A success/failure, distinct same-URL occurrences, same-occurrence failed
+metadata, completion without the selection notification, newer-preparation cleanup,
+valid initial handoff and successful B metadata replacement. Five desired-behavior
+checks fail on unchanged production code; all 51 cast checks pass with the fix.
+The observation harness recorded one receiver load and one local handoff before
+the fix, versus zero of each afterward, with A resolving after B's metadata in
+both runs. The obsolete resolver closed and preparation became inactive afterward.
+
+The harness uses real queue occurrences, `FailedMediaSource` metadata,
+`Player.onPlaybackSynchronize()`, `Player.onEvents()` and `CastPlayback`, with
+controlled Rx scheduling. ExoPlayer delivery/decoding, source preparation,
+extraction/resolution, Android effects/error logging and SDK/receiver transport are
+mocked; no device or receiver playback is established.
+
 ### Unresolved navigation defects
 
-Finding **5** from the 2026-10-22 playback concurrency audit (baseline
-`29018edf312868bbd2634bc5c00b1e73bc69b3f1`) remains unresolved. It is a defect,
-not a supported playback contract:
-
-- **5 — Initial cast preparation after a failed selection.**
-  `CastPlayback.onQueueItemChanged()` invalidates another occurrence only when
-  casting is already active. During initial preparation for A, selecting a
-  failed B can leave A's preparation alive: B's metadata has no `StreamInfo`,
-  so `loadCurrent()` returns before cancelling it. The completion checks the
-  preparation generation and connection, but not the captured queue occurrence,
-  and can hand the skipped A to the receiver.
-
-The original audit demonstrated this application-state failure with a controlled
-JVM scenario. The committed active-cast invalidation regression does not cover
-initial preparation followed by a failed selection. The finding-4 correction
-above does not change that path or establish the failed-source/receiver sequence
-on a device.
+The separate equal-index history-write race and other navigation follow-ups
+remain outside these finding-4/5 corrections. The history progress path retains
+its existing numerical-index guard; these controlled checks do not establish
+occurrence ownership for history writes.
 
 ## Volume, mute and audio focus
 

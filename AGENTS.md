@@ -22,10 +22,10 @@
   Follow `docs/playback.md` and `app/src/main/java/org/schabi/newpipe/player/cast/`.
 - Verify significant behavior by running the changed path. Distinguish controlled
   protocol peers and emulator results from real receiver/hardware evidence.
-- Playback audit finding 4 has a controlled JVM-verified recovery-ownership
-  correction; finding 5 remains unresolved. See `docs/playback.md` under
-  "Recovery during pending navigation" and "Unresolved navigation defects".
-  Keep dated audit observations separate from current guarantees.
+- Playback audit findings 4–5 have controlled JVM-verified ownership corrections;
+  see `docs/playback.md` under "Recovery during pending navigation" and "Initial
+  cast preparation ownership". The separate equal-index history-write race is
+  untouched. Keep dated audit observations separate from current guarantees.
 
 ## RTK shell commands
 
