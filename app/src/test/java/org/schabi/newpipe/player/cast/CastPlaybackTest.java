@@ -1419,6 +1419,99 @@ public class CastPlaybackTest {
     }
 
     @Test
+    public void synchronizationWithoutDeliveredMetadataKeepsReceiverBufferingFrozen()
+            throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.handoff();
+            playback.onPlaybackChanged(3, 42000, 120000, 1.5);
+            player.onPlaybackBlock();
+            player.onPlaybackSynchronize(fixture.first, false);
+            now.addAndGet(3000);
+            assertTrue(playback.isPreparing());
+            assertEquals(42000, playback.getPosition());
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+        }
+    }
+
+    @Test
+    public void metadataFirstPreparationUsesSynchronizedRecoveryPosition() throws Exception {
+        assertSynchronizationSeekPosition(true);
+    }
+
+    @Test
+    public void metadataDuringDefaultSeekLoadsOnceAtUpdatedEnginePosition() throws Exception {
+        assertSynchronizationSeekPosition(false);
+    }
+
+    private void assertSynchronizationSeekPosition(final boolean recovery) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            fixture.begin();
+            final MediaItemTag next = newTag();
+            ownSource(next, fixture.second);
+            fixture.queue.setIndex(1);
+            final long expected = recovery ? 25000 : 7000;
+            if (recovery) {
+                fixture.queue.setRecovery(1, expected);
+                fixture.deliverSuccess(next);
+            }
+            when(player.isPlaying()).thenReturn(false);
+            final ExoPlayer exo = player.getExoPlayer();
+            final org.mockito.stubbing.Answer<Void> seek = invocation -> {
+                when(player.getExoPlayer().getCurrentPosition()).thenReturn(expected);
+                when(player.getCurrentPosition()).thenReturn(expected);
+                // ExoPlayer may synchronously flush aggregate metadata during the seek.
+                fixture.deliverSuccess(next);
+                return null;
+            };
+            if (recovery) {
+                doAnswer(seek).when(exo).seekTo(1, expected);
+            } else {
+                doAnswer(seek).when(exo).seekToDefaultPosition(1);
+            }
+            player.onPlaybackSynchronize(fixture.second, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, expected, 1.5f, true, "Video", null);
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, fixture.second.getRecoveryPosition());
+        }
+    }
+
+    @Test
+    public void returningToSynchronizedOccurrenceRetriesCanceledInitialPreparation()
+            throws Exception {
+        assertReturningSelectionRetries(false);
+    }
+
+    @Test
+    public void returningToSynchronizedOccurrenceRetriesCanceledReplacement() throws Exception {
+        assertReturningSelectionRetries(true);
+    }
+
+    private void assertReturningSelectionRetries(final boolean established) throws Exception {
+        try (InitialPreparation fixture = new InitialPreparation()) {
+            when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
+            if (established) {
+                fixture.handoff();
+                fixture.deliverSuccess(newTag());
+            } else {
+                fixture.begin();
+            }
+            fixture.queue.setIndex(1); // An unloaded selection has not synchronized or delivered.
+            io.triggerActions();
+            verify(playback.getSession(), never()).load(
+                    any(), anyLong(), anyFloat(), anyBoolean(), anyString(), any());
+            fixture.queue.setIndex(0);
+            assertSame(fixture.first, player.getCurrentItem());
+            player.onPlaybackSynchronize(fixture.first, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+            player.onPlaybackSynchronize(fixture.first, false);
+            io.triggerActions();
+            verify(playback.getSession()).load(media, 10000, 1.5f, true, "Video", null);
+        }
+    }
+
+    @Test
     public void deferredMetadataFirstLoadRetainsLatestControls() throws Exception {
         assertDeferredControls(true, false);
     }

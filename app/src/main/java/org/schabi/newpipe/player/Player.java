@@ -1466,8 +1466,15 @@ public final class Player implements PlaybackListener, Listener {
             Log.d(TAG, "Playback - onPlaybackSynchronize(was blocked: " + wasBlocked
                     + ") called with item=[" + item.getTitle() + "], url=[" + item.getUrl() + "]");
         }
-        if (exoPlayerIsNull() || playQueue == null || currentItem == item) {
-            return; // nothing to synchronize
+        if (exoPlayerIsNull() || playQueue == null) {
+            return;
+        }
+        if (currentItem == item) {
+            // Returning to an unchanged engine source can restore previously lost coherence.
+            if (currentMetadata != null) {
+                casting.onSourceChanged();
+            }
+            return;
         }
 
         final int playQueueIndex = playQueue.indexOf(item);
@@ -1515,7 +1522,9 @@ public final class Player implements PlaybackListener, Listener {
             }
         }
         // Metadata may already have arrived for this occurrence before manager synchronization.
-        casting.onSourceChanged();
+        if (currentMetadata != null) {
+            casting.onSourceChanged();
+        }
     }
 
     public void seekTo(final long positionMillis) {
