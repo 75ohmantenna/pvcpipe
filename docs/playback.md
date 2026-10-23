@@ -112,10 +112,13 @@ for another replacement or receiver switch. Explicit Resume cancels startup paus
 enforcement; explicit Pause during preparation re-arms it. The latest explicit
 request survives an early Paused snapshot: a first matching source echo re-arms
 startup enforcement from that request, rather than losing it before the SDK's
-synthetic Playing. Repeated acknowledgements do not re-arm it. After startup,
-receiver Playing/Paused transitions remain authoritative; a later rebuffer does
-not re-arm startup enforcement. v2 has no such synthetic source callback, and
-v4 does not use this state-deduplication path.
+synthetic Playing. Before echo support is learned, that first matching echo is
+still a startup boundary even if earlier playback observations were accepted:
+remote Play before it cannot be distinguished from load autoplay, so the latest
+explicit sender request wins at the echo. Repeated acknowledgements do not re-arm
+enforcement. After startup, receiver Playing/Paused transitions remain authoritative;
+a later rebuffer does not re-arm startup enforcement. v2 has no such synthetic
+source callback, and v4 does not use this state-deduplication path.
 
 The paused-startup regressions in `CastPlaybackTest` exercise the actual session
 policy and playback controller with controlled preparation scheduling and clock
