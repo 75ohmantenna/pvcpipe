@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -183,6 +184,56 @@ public class PlayerRecoveryTest {
             androidSchedulers.close();
             RxAndroidPlugins.setInitMainThreadSchedulerHandler(previousMainInitializer);
         }
+    }
+
+    @Test
+    public void localTimelineInstallationDoesNotNavigateBackToOldEngineIndex() throws Exception {
+        timelineInstallationPreservesSelection(false);
+    }
+
+    @Test
+    public void castStateDuringBlockCannotTurnTimelineInstallationIntoNavigation()
+            throws Exception {
+        timelineInstallationPreservesSelection(true);
+    }
+
+    private void timelineInstallationPreservesSelection(final boolean castState) throws Exception {
+        start();
+        setField("UIs", mock(PlayerUiList.class));
+        setField("listeners", mock(PlayerListeners.class));
+        doNothing().when(player).startProgressLoop();
+        doAnswer(call -> false).when(player).isProgressLoopRunning();
+        doAnswer(call -> com.google.android.exoplayer2.PlaybackParameters.DEFAULT)
+                .when(player).getPlaybackParameters();
+        final PlayQueueItem selected = new PlayQueueItem(stream);
+        queue.append(List.of(selected));
+        queue.setRecovery(1, SELECTED_RECOVERY);
+        queue.setIndex(1);
+        player.onPlaybackBlock();
+        if (castState) {
+            when(casting.isActive()).thenReturn(true);
+            // Real receiver/UI state delivery can replace the manager's blocked display state.
+            player.onCastingStateChanged(Player.STATE_PAUSED);
+        }
+        final var oldEnginePosition = new com.google.android.exoplayer2.Player.PositionInfo(
+                null, 0, exoPlayer.getCurrentMediaItem(), null, 0,
+                PLAYING_POSITION, PLAYING_POSITION, -1, -1);
+        doAnswer(call -> {
+            // ExoPlayer reports this synchronously while installing a replacement playlist.
+            player.onPositionDiscontinuity(oldEnginePosition, oldEnginePosition,
+                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+            return null;
+        }).when(exoPlayer).setMediaSource(any(MediaSource.class), anyBoolean());
+
+        player.onPlaybackUnblock(mock(MediaSource.class));
+
+        assertSame(selected, queue.getItem());
+        assertEquals(SELECTED_RECOVERY, selected.getRecoveryPosition());
+        verify(exoPlayer).prepare();
+        // Outside installation, a genuine engine REMOVE must still navigate normally.
+        player.onPositionDiscontinuity(oldEnginePosition, oldEnginePosition,
+                com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+        assertEquals(0, queue.getIndex());
     }
 
     @Test

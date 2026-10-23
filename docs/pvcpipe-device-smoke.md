@@ -883,3 +883,199 @@ matching the backup. The main app was not uninstalled or data-cleared.
 The controlled origin, ADB reverse mapping, temporary files and owned emulator
 were stopped or removed. The phone was not modified during this review.
 
+## Combined playback integration validation, 2026-10-23
+
+Started from master `f791ba32700f35b142fadee58704f7ae143485e6`
+(PRs #134–142 merged). This is focused integration validation, not a new
+concurrency audit. Existing observations above and the earlier controlled JVM
+records in [playback.md](playback.md) retain their original evidence limits.
+Unrelated local tooling/documentation edits were excluded.
+
+### Isolation and execution
+
+Created new disposable AVDs, `pvcpipe_playback_validation_26` and
+`pvcpipe_playback_validation_37`, from installed x86_64 images. No physical
+device was attached. API 27 had no installed image.
+
+API 37's Google APIs image eventually booted after two bounded startup
+attempts. Both APKs installed, but two direct instrumentation attempts exited
+before any test result with `Process crashed`. Android's process-exit records
+identify both as `BIND APPLICATION ANR` (reason 6, subreason 34), not a reported
+playback assertion. The second attempt disabled Google Play services, Search,
+Photos and Wellbeing only in this disposable AVD to reduce background contention;
+it still failed at startup. The emulator warned that it recommends 16 GiB host
+RAM; this host has about 8 GiB and was swapping. That is an environment concern,
+not proof of the ANR's root cause. **API 37 integration execution remains blocked;
+zero tests passed there.** No ANR timeout or application security policy was
+relaxed. Both owned emulators were stopped afterward.
+
+The runner is `androidx.test.runner.AndroidJUnitRunner`. The documented
+Gradle connected-test path can uninstall both APKs, so this run built APKs,
+installed them explicitly on the owned emulator serials, and used direct
+targeted instrumentation instead. No app was uninstalled or data-cleared.
+Each new fixture owns its generated local PCM WAV files. Player fixtures
+replace and restore the database/cache singletons, use unique preferences
+and isolated caches, and close/delete only their own storage. Run these
+classes serially in one instrumentation process, not concurrently with other
+singleton-replacing tests.
+
+```sh
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+adb -s '<owned-emulator>' install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s '<owned-emulator>' install -r \
+  app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s '<owned-emulator>' shell am instrument -w \
+  -e class org.schabi.newpipe.player.playback.PreparedMediaSourceManagerIntegrationTest,org.schabi.newpipe.player.PlayerRecoveryEngineIntegrationTest,org.schabi.newpipe.player.history.PreparedPlayerSqliteHistoryTest \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+### Prepared engine and SQLite evidence
+
+The final API 26 run passed **16 tests**:
+
+| Boundary | Checks | Observed behavior |
+| --- | ---: | --- |
+| Prepared source manager | 3 | Queued append/move/remove preserves occurrence correspondence; removing A synchronizes already-preloaded B without another resolution; a retained old-engine completion cannot re-enter the shared listener or alter prepared replacement playback. |
+| Pending navigation/recovery | 10 | Real Player/manager/resolver/engine delivery preserves B's explicit or unset recovery through quality/audio reload and removal/reindexing, including distinct same-URL occurrences; B actually starts at its intended position. |
+| On-disk Room/SQLite | 3 | Correct nonzero attribution and resume; actual zero filtering without erasing a stored checkpoint; accepted writes and resume barriers survive navigation/destruction; real end-of-source completion commits after earlier held writes. |
+
+The prepared-manager fixture waits for published non-placeholder timelines,
+uses playback-thread messages and playlist fences, and observes real Handler
+dispatch. It never manually invokes a completion. Its retirement case holds
+the old playback thread, prepares and plays a separate replacement through
+the shared listener, then releases the old completion and plays the replacement
+again. The timed playback message, not exact agreement with the asynchronously
+published application clock, proves progression.
+
+Recovery metadata is gated at `PlayQueueItem.getStream()`; resolution,
+`LoadedMediaSource` ownership, preparation, application listeners and seeks
+are real. Both audio labels use local WAV media. Quality changes exercise
+the actual recovery/reload path on audio, not video-quality decoding.
+The SQLite fixture uses a unique on-disk Room database and the production
+record manager. It independently asserts persisted state and queue recovery,
+then reopens the database to check the committed resume value. It installs
+its controlled source directly, bypassing the source manager/extractor.
+Held writes use bounded executor gates; end-of-source completion is emitted
+by actual playback, not by calling Player's completion callback.
+That completion/navigation case intentionally has one engine window beneath a
+two-item queue; production-managed non-last items normally auto-transition.
+It proves accepted-write ordering and process-lifetime completion, not that
+normal manager navigation follows that fixture-shaped STATE_ENDED sequence.
+
+These are local PCM engine/application/storage observations, not live-service,
+compressed video-decoder, audible-output, process-death or Android-started
+service/UI evidence. No mocked record-manager arguments are treated as
+database corruption.
+
+### Confirmed production defect and narrow correction
+
+On unchanged master, five pending-selection cases failed after actual playlist
+replacement. A played around 42 seconds; B was selected with metadata pending;
+quality/audio reload retained B's recovery initially. During unblock,
+`setMediaSource(..., false)` synchronously emitted `DISCONTINUITY_REASON_REMOVE`
+at old index 0. Player had already changed from blocked to buffering, so history's
+normal discontinuity navigation policy changed selection back from B to A.
+The engine then resumed A instead of starting B. Reindexed removal cases did
+not expose that index mismatch.
+
+The first correction installed the replacement timeline before leaving blocked
+display state, then entered buffering and prepared. All ten recovery engine
+cases passed locally, retaining the real reentrant engine boundary.
+
+Fresh complete-PR review of candidate `6e859c42cbaf8a249ce5c6e710283b9ab59190fa`
+identified that active receiver state delivery can replace BLOCKED before source
+installation. Independently added JVM regressions reproduced this: the local
+control passed, but a real `onCastingStateChanged(PAUSED)` followed by synchronous
+REMOVE during mocked engine installation reselected A. The final correction
+also scopes an `installingSource` navigation guard around `setMediaSource`,
+cleared in `finally`, independently of display state. Real engine navigation
+after installation remains enabled. This is a controlled JVM cast-state boundary,
+not real SDK/receiver evidence. No ownership, cancellation, TLS or protocol rule
+is relaxed.
+
+The full `PlayerRecoveryTest` JVM class and all 16 API 26 integration cases
+passed after this review correction. Recovery cases now also await an actual
+playback-thread timed message after B starts, drain application-owned history
+writes before checking disabled-history storage, and restore singleton resources
+even if cache release fails. The complete-PR review's SQLite completion-shape
+note is qualified above rather than claimed as normal manager navigation.
+
+A second fresh complete-PR review approved the production correction at
+`412b209a9405c5e2dede26a63092b213eefd6310`, with two non-blocking SQLite-fixture
+failure-path findings. Both were accepted: main-thread assertions now return to
+the test thread, and cleanup restores only installed singletons while attempting
+every owned-resource cleanup even after an earlier failure. A disposable
+two-check smoke proved assertion delivery without process death and preservation
+of an existing isolated database/cache before setup. Those checks and all 16
+durable integrations passed together (18 checks); the smoke source was removed
+before rebuilding the final instrumentation APK. These are fixture failure-path
+checks, not additional playback or receiver evidence.
+
+Initial fixture failures were separate: assigning synthetic WAV metadata to
+YouTube incorrectly requested its indexed DASH resolver. The corrected local
+fixture uses SoundCloud's generic progressive path without live extraction.
+An exact 300 ms application-clock assertion was also replaced with the real
+playback-thread timed-message proof and a seek-processing fence.
+
+### Cast and physical-receiver limits
+
+No retained real-SDK/controlled-peer harness was found; older dated smoke drivers
+were explicitly removed. This run does not repeat their transport evidence.
+JVM cast policy/transport doubles remain separate from prepared local playback
+and SQLite evidence. Neither establishes physical receiver picture/audio,
+secure-v4 interoperability, or ambiguous old/new-source timing on no-echo peers.
+
+Physical-receiver checklist for this combined head (not executed here):
+
+| Scenario | Required observation |
+| --- | --- |
+| Paused startup | Load paused; verify no audible/visible autoplay, frozen sender clock, and retained pause through buffering/first source report. |
+| Seek | Seek while paused and playing, including zero; verify receiver output/position and sender controls agree without accepting a pre-seek sample. |
+| Replacement | Change quality/audio while B metadata is pending, including same-URL occurrences and removal/reindexing; verify B's intended recovery and actual receiver start. |
+| Receiver switching | Switch while paused and playing with pending seek/speed; old receiver stops and the new receiver retains the selected occurrence and latest intent. |
+| Disconnect/local return | Disconnect and Play on this device during preparation/replacement; no reset clock overwrites recovery, old receiver stops, and local pause/resume follows the chosen action. |
+| History/resume | Save attributable nonzero receiver progress, navigate/destroy Player without killing the process, verify stored resume independently, and check zero filtering and completed-item behavior. |
+
+Record receiver model/version, negotiated protocol, source-echo capability,
+APK/head and actual picture/audio observations. Keep certificate/fingerprint
+verification enabled; do not infer decoding merely from a media request or
+protocol acknowledgement.
+
+### Final repository gate
+
+`make ci` passed both for the initial unblock-order correction and again after
+the reviewed installation guard and fixture corrections: build-logic/static
+checks, the full app JVM suite (including cast/recovery/history/manager
+regressions), offline extractor gate, Android lint, and debug/release assembly.
+In the post-review run, app JVM tests, lint and release R8/assembly executed;
+unchanged extractor and debug APK tasks reused up-to-date outputs where Gradle
+reported them. Instrumentation assembly and the repeated API 26 smoke passed.
+Gate attempts caught 101-character Java test lines; both were wrapped before
+the successful full runs. The temporary targeted formatter script was removed.
+No live-service or physical-receiver check was run.
+
+After the second review's fixture-only failure-path corrections, instrumentation
+assembly and the complete `make ci` gate passed again, reusing unchanged outputs
+where reported. The rebuilt APK without the disposable smoke source then passed
+all 16 durable integration checks again on API 26.
+
+### Failed gated-write cleanup follow-up
+
+The third fresh complete-PR review approved production at
+`f5af3406fb7aecaf1c07b6a00044afd86cd79722` and identified one non-blocking
+fixture failure path: shutting down a gated executor immediately after an
+assertion failure can reject the next accepted write and stall the process-wide
+history queue. A disposable real-engine/SQLite check reproduced a subsequent
+resume timeout and teardown timeout on that candidate.
+
+Both fixture executor finalizers now await the shared accepted-write barrier
+before shutdown, with bounded waits and shutdown in `finally`. The identical
+forced-failure check then resumed the committed 9000 ms checkpoint successfully;
+all 16 durable integrations passed afterward in the same process (17 checks).
+The disposable smoke source was removed. This corrects fixture failure
+diagnostics/isolation, not a newly discovered production playback defect.
+
+After this final fixture-ordering correction, the rebuilt APK without the smoke
+source passed all 16 durable checks, and `make ci` passed again with unchanged
+outputs reused where reported.
+

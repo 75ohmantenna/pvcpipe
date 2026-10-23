@@ -193,6 +193,7 @@ public final class Player implements PlaybackListener, Listener {
     // minimized to background but will resume automatically to the original player type
     private boolean isAudioOnly = false;
     private boolean isPrepared = false;
+    private boolean installingSource;
 
     /*//////////////////////////////////////////////////////////////////////////
     // UIs, listeners and disposables
@@ -1009,10 +1010,17 @@ public final class Player implements PlaybackListener, Listener {
         if (exoPlayerIsNull()) {
             return;
         }
+        // Source installation can synchronously report REMOVE at the old engine index.
+        // Cast updates may have changed the display state since the manager blocked.
+        installingSource = true;
+        try {
+            simpleExoPlayer.setMediaSource(mediaSource, false);
+        } finally {
+            installingSource = false;
+        }
         if (currentState == STATE_BLOCKED) {
             changeState(STATE_BUFFERING);
         }
-        simpleExoPlayer.setMediaSource(mediaSource, false);
         simpleExoPlayer.prepare();
     }
 
@@ -1326,7 +1334,7 @@ public final class Player implements PlaybackListener, Listener {
         }
         playbackHistory.onDiscontinuity(historySnapshot(),
                 new PlaybackHistory.Discontinuity(discontinuityReason, newIndex, getRepeatMode(),
-                        isPrepared, getCurrentState() == STATE_BLOCKED));
+                        isPrepared, installingSource || getCurrentState() == STATE_BLOCKED));
     }
 
     @Override
