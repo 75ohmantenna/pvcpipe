@@ -84,8 +84,9 @@ Kotlin, resources, external sites or historical test artifacts.
 ## User-facing text: separate follow-up
 
 No resource text, key or translation was changed by the original alignment pass.
-The table records its proposed corrections; the backup-restore and
-[cache/history/download follow-ups](#cache-history-and-download-messages--corrected-2026-10-23)
+The table records its proposed corrections; the backup-restore,
+[cache/history/download](#cache-history-and-download-messages--corrected-2026-10-23)
+and [error-message follow-ups](#error-messages--corrected-2026-10-23)
 below identify subsequent fixes. Resource keys refer to
 `app/src/main/res/values/strings.xml`.
 
@@ -93,11 +94,11 @@ below identify subsequent fixes. Resource keys refer to
 | --- | --- | --- |
 | `metadata_cache_wipe_summary` | `HistorySettingsFragment` → `InfoCache.clearCache`; clears extracted in-memory metadata, not all cached webpage/WebView data | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Clear cached stream, channel, playlist, and other extracted metadata” |
 | `delete_view_history_alert` | `HistorySettingsFragment.openDeleteWatchHistoryDialog`, also opened by `StatisticsPlaylistFragment`; deletes playback positions as well as stream history | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Delete all watch history and saved playback positions?” |
-| `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; classification does not prove a network-wide restriction | “Too many requests to %1$s. Try again later.” |
-| `parsing_error` | `ErrorInfo.getMessage` for remaining `ExtractionException`s; extraction failure need not be website parsing | “Could not extract the requested information” |
-| `error_report_open_github_notice` | `activity_error.xml`, shown by `ErrorActivity` for non-crash failures too | Replace “this crash” with “this error” |
+| `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; classification does not prove a network-wide restriction | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “Too many requests to %1$s. Try again later.” |
+| `parsing_error` | `ErrorInfo.getMessage` for remaining `ExtractionException`s; extraction failure need not be website parsing | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “Could not extract the requested information” |
+| `error_report_open_github_notice` | `activity_error.xml`, shown by `ErrorActivity` for non-crash failures too | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “this error” replaces “this crash” |
 | `start_accept_privacy_policy` | `ErrorActivity.openPrivacyPolicyDialog`; acceptance opens a composer or issue list, not submission; code does not establish GDPR compliance | “Please read and accept PVCPipe’s privacy policy before continuing to report this error.” Legal/policy review required |
-| `recaptcha_request_toast` | `ErrorInfo.getMessage` and `RouterActivity`; router opens the challenge directly, error panels offer Solve | “A reCAPTCHA challenge is required to continue” |
+| `recaptcha_request_toast` | `ErrorInfo.getMessage` and `RouterActivity`; router opens the challenge directly, error panels offer Solve | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “A reCAPTCHA challenge is required to continue.” |
 | `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Download request submitted” |
 | `cancel` in the former `import_settings` dialog | At the alignment pass, `BackupRestoreSettingsFragment.importDatabase` started database-only restore from its negative Cancel action | Corrected in the [backup-restore follow-up](#backup-restore-actions--corrected-2026-10-23); the shared Cancel resource is unchanged |
 | `file_deleted` | `Deleter.next`; feedback precedes delayed commit, and the manager ignores the file-deletion result | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Marked for deletion: %1$s” while undo is available; later feedback must not claim confirmed erasure without a behavior change |
@@ -294,3 +295,52 @@ Its sole actionable finding was ambiguity in the original proposal table;
 the four rows now explicitly link to this correction and show the shipped copy.
 Optional heading/TalkBack and entry-only deletion wording observations remain
 separate work. Exact-head review, validation and merge evidence belongs on the PR.
+
+## Error messages — corrected 2026-10-23
+
+Started from post-PR-#146 master (`ddf26a13d`); PRs #145–146 and unrelated
+workspace changes are preserved. All four candidates were revalidated:
+
+- `too_many_requests`: **Too many requests to %1$s. Try again later.**
+  `DownloaderImpl.execute` maps HTTP 429 to `ReCaptchaException`;
+  `ErrorInfo.getMessage` selects this message when `solvableCaptchaUrl` is null.
+  This establishes neither an IP ban nor a network-wide restriction.
+- `parsing_error`: **Could not extract the requested information**.
+  The remaining `ExtractionException` branch follows specific content, CAPTCHA
+  and network classifications; it does not establish website parsing as the cause.
+  Its misleading parsing comment was corrected without changing classification.
+- `recaptcha_request_toast`: **A reCAPTCHA challenge is required to continue.**
+  `RouterActivity.handleError` opens the challenge directly; `ErrorPanelHelper`
+  offers Solve. Neither context requires a separate message.
+- `error_report_open_github_notice`: **this error** replaces **this crash**.
+  `activity_error.xml` is also inflated for reportable extraction/other non-crash
+  failures in `ErrorActivity`; no report destination or consent copy changed.
+
+Shared `ErrorInfo` messages also reach `ErrorUtil` snackbars/notifications and
+the report screen. The existing positional `%1$s`, service lookup and
+`<unknown_service>` fallback are unchanged, as are retry/report eligibility,
+challenge host checks, logging, actions and navigation. Generic labels,
+subscription-import plurals, privacy-policy/legal content and report/email
+destinations are outside this correction.
+
+### Localization and verification boundaries
+
+All 21 source values XML files parsed successfully. Each affected key has exactly
+one default definition and no locale/configuration override; no verified
+equivalent translation was removed. These remain translatable English defaults.
+Non-English equivalents are an explicit fallback gap for translators, who must
+retain `%1$s` and avoid reintroducing network-wide or parsing-only claims.
+
+A throwaway JVM smoke formatted the actual rate-limit resource with YouTube,
+SoundCloud, the unknown-service fallback, literal `100% %1$s`, and `A & B`.
+Arguments survived positional formatting without recursive interpretation.
+This checks the Java formatting boundary, not Android's HTML conversion or
+rendered layout. Existing CAPTCHA tests cover allowed hosts, other-service
+rate limits, deceptive hosts, invalid URLs and retry/report eligibility.
+The existing instrumentation parcel test was inspected, not executed.
+
+No device was attached and no user installation/data was touched. No rendered
+UI, TalkBack, live service or challenge completion is claimed; panel, toast,
+notification and report-screen coverage above is source inspection. The blocked
+API 37 environment was not retried. Exact final gate, fresh read-only Claude
+review, adjudication and guarded merge evidence are recorded on the PR.
