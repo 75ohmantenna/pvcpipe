@@ -83,7 +83,7 @@ fallback worker. Before replacing media bytes, it must save the cleared-progress
 checkpoint; a failed save stops the restart and leaves the old file untouched.
 Completed earlier resources are retained.
 
-This fallback stays full-response-only until the current resource finishes.
+This fallback stays full-response-only until the current resource finishes or is reset.
 Its GETs send neither `Range` nor `If-Range`, and an unsolicited 206 is rejected.
 Each accepted full response truncates the current resource before replacement.
 A transport retry or pause/resume fetches the whole current resource again,
