@@ -151,6 +151,8 @@ public class DownloadMission extends Mission {
     /** Serialized with the partial bytes for the current resource; absent on older missions. */
     volatile ResourceIdentity resourceIdentity;
     private volatile boolean unverifiedCurrentBytes;
+    /** A clean retry must not repeat the ranged request that failed integrity validation. */
+    boolean forceFullDownload;
 
     private transient int finishCount;
     public transient volatile boolean running;
@@ -622,7 +624,16 @@ public class DownloadMission extends Mission {
 
     // Called under the mission monitor, after all previous workers have stopped.
     private void startDownload() {
-        if (reinitialize) {
+        if (blocks != null && errObject instanceof ValidatedRange.InvalidRangeException) {
+            // start() has joined every previous writer. Keep completed resources, but never
+            // resume questionable bytes or compare a fresh response with their old identity.
+            resetState(false, false, ERROR_NOTHING);
+            blocks = new int[0];
+            unknownLength = true;
+            forceFullDownload = true;
+            reinitialize = false;
+            writeThisToFile();
+        } else if (reinitialize) {
             resetState(false, true, ERROR_NOTHING);
             reinitialize = false;
         }
@@ -656,7 +667,7 @@ public class DownloadMission extends Mission {
         blockAcquired = new boolean[blocks.length];
 
         if (blocks.length < 1) {
-            threads = new Thread[]{new DownloadRunnableFallback(this)};
+            threads = new Thread[]{createFallbackWorker()};
             runAsync(1, threads[0]);
         } else {
             int remainingBlocks = 0;
@@ -785,6 +796,7 @@ public class DownloadMission extends Mission {
         blockAcquired = null;
         resourceIdentity = null;
         unverifiedCurrentBytes = false;
+        forceFullDownload = false;
 
         if (rollback) {
             current = 0;
@@ -807,6 +819,10 @@ public class DownloadMission extends Mission {
 
     Thread createDownloadWorker(final int index) {
         return new DownloadRunnable(this, index);
+    }
+
+    Thread createFallbackWorker() {
+        return new DownloadRunnableFallback(this);
     }
 
     private void writeThisToFileAsync() {

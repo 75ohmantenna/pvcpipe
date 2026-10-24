@@ -67,7 +67,7 @@ public class DownloadRunnableFallback extends Thread {
             try {
                 final long rangeStart = mMission.unknownLength || start < 1 ? -1 : start;
                 mConn = mMission.openConnection(false, rangeStart, -1);
-                if (mRetryCount == 0 && rangeStart == -1) {
+                if (mRetryCount == 0 && rangeStart == -1 && !mMission.forceFullDownload) {
                     // workaround: bypass android connection pool
                     mConn.setRequestProperty("Range", "bytes=0-");
                 }
@@ -75,6 +75,10 @@ public class DownloadRunnableFallback extends Thread {
                 final String sentIfRange = mConn.getRequestProperty("If-Range");
                 mMission.establishConnection(1, mConn);
                 final int status = mConn.getResponseCode();
+                if (mMission.forceFullDownload && rangeStart < 0 && status == 206) {
+                    throw new ValidatedRange.InvalidRangeException(
+                            "Clean restart requires a full response, not an unsolicited range");
+                }
 
                 if (status == 416) {
                     if (start > 0) {
