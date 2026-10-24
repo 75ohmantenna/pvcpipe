@@ -240,10 +240,20 @@
     <string name="error_report_notification_title">PVCPipe encountered an error. Tap to report it</string>
     <string name="error_report_notification_toast">An error occurred. See the notification</string>
     <string name="sorry_string">Sorry, that should not have happened.</string>
-    <string name="error_report_button_text">Report by email</string>
-    <string name="copy_for_github">Copy formatted report</string>
-    <string name="error_report_open_issue_button_text">Report on GitHub</string>
-    <string name="error_report_open_github_notice">Before reporting this error, please check whether an issue already exists. Duplicate reports take time away from fixing the bug.</string>
+    <string name="reporting_copy">Copy report</string>
+    <string name="reporting_share">Share report…</string>
+    <string name="reporting_notice">View reporting notice</string>
+    <string name="reporting_disclosure">Reports may contain sensitive requests/URLs, search terms, comments, exception details, language settings, and app/OS metadata. Inspect the report and any diagnostic log first. Copy report copies text only, never the log. Sharing gives the selected app the report immediately, plus one captured diagnostic log if selected. That app may process it without another Send action. This does not confirm submission or delivery to a maintainer.</string>
+    <string name="reporting_include_log">Include captured diagnostic log</string>
+    <string name="reporting_inspect_report">Inspect report</string>
+    <string name="reporting_inspect_log">Inspect diagnostic log</string>
+    <string name="reporting_report_preview_title">Report preview</string>
+    <string name="reporting_log_preview_title">Diagnostic log preview</string>
+    <string name="reporting_log_unavailable">No completed, readable diagnostic log is available for this report. Try again after capture finishes, or share without the log.</string>
+    <string name="reporting_log_read_failed">Could not read the diagnostic log. Inspect it again before sharing, or share without the log.</string>
+    <string name="reporting_share_failed">Could not open a sharing app. No report was sent by this action.</string>
+    <string name="reporting_notice_title">Reporting notice</string>
+    <string name="reporting_notice_body">This offline notice describes error reporting only; it is not a comprehensive privacy policy.\n\nReports may contain requests/URLs, search terms, comments, exception details, language settings, app/OS metadata, and other sensitive diagnostic content. Inspect the report before exporting it. Copy report places report text on the clipboard and never includes a diagnostic log.\n\nShare report opens Android sharing. Selecting an external app gives that app the report immediately. If you select Include captured diagnostic log, it also receives one matching log attachment with read access. Logs may contain additional sensitive activity and identifiers; inspect the log first. Attachment selection starts unchecked for each report and resets when the screen is recreated. The selected app controls subsequent processing and may act without another Send action. PVCPipe cannot confirm submission or delivery to a maintainer, or control the receiving app.\n\nThe Logcat dumper setting controls local error-log capture and remains enabled by default. Capture requests logs starting about 30 seconds before the error-construction timestamp; this is a lower bound, not an exact 30-second window. Local capture is separate from optional attachment selection. Disabling error reporting hides reporting screens and notifications; it does not turn off local log capture or ACRA crash collection.\n\nACRA retains its broader default local crash collection, which may include device/build/configuration data, an installation identifier, preferences, and logcat, depending on its collectors. The configured sender reads only the stored stack trace into the report screen; exported report text contains that trace and the report fields, not the whole stored ACRA record. PVCPipe does not automatically send this report. This notice makes no retention guarantee.</string>
     <string name="error_snackbar_message">Sorry, something went wrong.</string>
     <string name="error_snackbar_action">Report</string>
     <string name="what_device_headline">Info:</string>
@@ -348,8 +358,6 @@
     <string name="tab_licenses">Licenses</string>
     <string name="app_description">Libre lightweight streaming on Android.</string>
     <string name="view_on_github">View on GitHub</string>
-    <string name="privacy_policy_title">PVCPipe\'s Privacy Policy</string>
-    <string name="read_privacy_policy">Read privacy policy</string>
     <string name="app_license_title">PVCPipe\'s License</string>
     <string name="app_license">PVCPipe is copyleft libre software: you can use, study, share, and improve it at will. You can redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License or (at your option) any later version.</string>
     <string name="read_full_license">Read license</string>
@@ -515,11 +523,6 @@
     <string name="playback_reset">Reset</string>
     <string name="percent">Percent</string>
     <string name="semitone">Semitone</string>
-    <!-- GDPR dialog -->
-    <string name="start_accept_privacy_policy">To comply with the European General Data Protection Regulation (GDPR), please read PVCPipe\'s privacy policy carefully.
-\nYou must accept it to send us a bug report.</string>
-    <string name="accept">Accept</string>
-    <string name="decline">Decline</string>
     <!-- Limit mobile data usage  -->
     <string name="limit_data_usage_none_description">No limit</string>
     <string name="limit_mobile_data_usage_title">Limit resolution when using mobile data</string>
@@ -1010,9 +1013,7 @@
     <string name="pvc_settings_debug_logcat_viewer_title">Logcat viewer</string>
     <string name="pvc_settings_debug_logcat_viewer_summary">View, filter, and share PVCPipe\'s logcat output.</string>
     <string name="pvc_settings_debug_logcat_dumper_title">Logcat dumper</string>
-    <string name="pvc_settings_debug_logcat_dumper_summary">Include logcat output in error reports and email.</string>
-    <string name="logcat_log_unavailable">No logcat entries available</string>
-    <string name="logcat_log_read_failed">Could not read logcat entries</string>
+    <string name="pvc_settings_debug_logcat_dumper_summary">Capture error-related logcat output locally. Attaching a diagnostic log when sharing a report is a separate, optional choice.</string>
     <string name="internal_volume_unavailable">Internal volume control is unavailable</string>
     <string name="sort_order">Sort order</string>
     <string name="sort_by_name">Sort by name</string>
@@ -1031,7 +1032,6 @@
     <string name="local_network_permission_required">Local network access is required for this server. Allow Nearby devices in app permissions, then retry.</string>
     <string name="add_tab">Add tab</string>
     <string name="expand_player">Expand player</string>
-    <string name="pvc_copy_related_logcat_entries">Copy related logcat entries</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
     <string name="reorder_item">Reorder %1$s</string>

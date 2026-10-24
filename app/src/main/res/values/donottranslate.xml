@@ -16,7 +16,6 @@
     <string name="md5">MD5</string>
     <string name="sha1">SHA-1</string>
     <string name="recaptcha">reCAPTCHA</string>
-    <string name="privacy_policy_url">https://newpipe.net/legal/privacy/</string>
     <string name="service_kiosk_string">%1$s/%2$s</string>
     <string name="sponsor_block_api_url_hint">https://domain.com/api/</string>
     <string name="youtube">YouTube</string>

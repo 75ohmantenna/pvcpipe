@@ -68,15 +68,11 @@ Kotlin, resources, external sites or historical test artifacts.
   engine recovery seek instead of promoting an unowned preview.
   Queue accounting, playlist cancellation and paused-cast-startup corrections
   alone did not establish either resolution.
-- `ErrorActivity.ERROR_GITHUB_ISSUE_URL` still points to
-  `https://github.com/pvcpipe/NewPipeExtractor/issues`, not this project's permitted
-  submission destination. The email target is also inherited configuration
-  (`crashreport@gmx.com`). Changing report destinations is executable behavior and
-  requires a focused product/privacy decision; no report was submitted there.
-- `privacy_policy_url` points to `https://newpipe.net/legal/privacy/`, while the
-  report dialog calls it PVCPipe's policy. Resolve the policy content and URL
-  before adopting the proposed privacy-dialog wording. Neither a wording update
-  nor this audit establishes legal compliance.
+- The inherited reporting destinations and policy gate observed in this pass
+  were removed by the [2026-10-24 copy/share follow-up](#copyshare-reporting--follow-up-2026-10-24).
+  That change replaces fixed routing with user-selected Android sharing and a
+  bundled factual notice; it does not certify legal compliance or third-party
+  receiving-app policies. No report was submitted to the inherited destinations.
 - Live service availability, receiver decoding, secure-v4 interoperability and
   device-specific behavior cannot be established by mocked JVM tests or assembling
   APKs. Earlier device/receiver observations retain their original date and build.
@@ -96,8 +92,8 @@ below identify subsequent fixes. Resource keys refer to
 | `delete_view_history_alert` | `HistorySettingsFragment.openDeleteWatchHistoryDialog`, also opened by `StatisticsPlaylistFragment`; deletes playback positions as well as stream history | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Delete all watch history and saved playback positions?” |
 | `too_many_requests` | `ErrorInfo.getMessage` for a non-solvable `ReCaptchaException`; includes HTTP 429 and Kick security blocks, not necessarily a network-wide restriction or rate limit | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “%1$s is not accepting requests right now. Try again later.” |
 | `parsing_error` | `ErrorInfo.getMessage` for remaining `ExtractionException`s; extraction failure need not be website parsing | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “Could not extract the requested information” |
-| `error_report_open_github_notice` | `activity_error.xml`, shown by `ErrorActivity` for non-crash failures too | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “this error” replaces “this crash” |
-| `start_accept_privacy_policy` | `ErrorActivity.openPrivacyPolicyDialog`; acceptance opens a composer or issue list, not submission; code does not establish GDPR compliance | “Please read and accept PVCPipe’s privacy policy before continuing to report this error.” Legal/policy review required |
+| `error_report_open_github_notice` | At the alignment pass, shown for non-crash failures too | “this error” replaced “this crash” in the error-message follow-up; the reporting-only key and fixed routing were subsequently removed in the [copy/share follow-up](#copyshare-reporting--follow-up-2026-10-24) |
+| `start_accept_privacy_policy` | At the alignment pass, acceptance opened a composer or issue list, not submission; code did not establish GDPR compliance | Removed with the inherited policy gate in the [copy/share follow-up](#copyshare-reporting--follow-up-2026-10-24); replaced with a factual offline reporting notice, not a legal-policy claim |
 | `recaptcha_request_toast` | `ErrorInfo.getMessage` and `RouterActivity`; router opens the challenge directly, error panels offer Solve | Corrected in the [error-message follow-up](#error-messages--corrected-2026-10-23): “A reCAPTCHA challenge is required to continue.” |
 | `download_has_started` | `DownloadDialog.DownloadPresentation.submitted`; service dispatch is not confirmed mission execution | Corrected in the [cache/history/download follow-up](#cache-history-and-download-messages--corrected-2026-10-23): “Download request submitted” |
 | `cancel` in the former `import_settings` dialog | At the alignment pass, `BackupRestoreSettingsFragment.importDatabase` started database-only restore from its negative Cancel action | Corrected in the [backup-restore follow-up](#backup-restore-actions--corrected-2026-10-23); the shared Cancel resource is unchanged |
@@ -536,3 +532,92 @@ from these focused checks.
 After removal of the temporary surface smoke, Checkstyle, ktlint, the focused
 JVM extraction-boundary regression and instrumentation assembly passed. The
 final packaged retained suite then passed again on API 26: **9 tests**.
+
+## Copy/share reporting — follow-up 2026-10-24
+
+Started from post-PR-#149 master. The earlier reporting correctness corrections
+remain: pagination diagnostics omit cookie-map values, reports use positive
+ErrorInfo construction timestamps and Markdown includes Service once.
+
+The selected product configuration removes fixed email and GitHub reporting
+routes and the inherited policy-acceptance gate. The screen instead exposes
+**Copy report**, **Share report…**, report/log inspection and an offline
+**Reporting notice**, opened by **View reporting notice**. Copy exports Markdown
+text only. Sharing exports JSON as `text/plain` with an optional single matching
+diagnostic log granted read access; the receiving app and destination are chosen
+by the user. Inspection previews both exact text formats. Selecting an app hands
+it the data immediately, and it may process it without another Send action;
+submission or delivery to a maintainer is not confirmed. There is no second
+toolbar share action or standalone copy-log action. No report was submitted
+and no upstream repository was mutated as part of this resource/documentation
+work.
+
+Log attachment selection is initially unchecked and resets on recreation or a
+new report. Capture remains a separate setting, enabled by default. A selected
+log must be completed and readable; a failure does not silently drop the
+attachment. The disclosure names sensitive report inputs and asks users to
+inspect content. The notice is bundled as a resource, requires no network, and
+makes no GDPR, published-policy, retention or receiving-app privacy promise.
+Obsolete reporting-only routing/policy/consent resources and the duplicate share
+menu are removed. Project links, license content and SponsorBlock policy links
+are not changed.
+
+Source inspection confirms that `Disable error reporting` gates presentation,
+not constructor-triggered local capture or ACRA initialization. ACRA retains
+its default local collection configuration; the custom sender imports only the
+stored stack trace into ErrorInfo. The log toolkit uses internal cache storage,
+a requested 30-second lower bound and keep-last-files cleanup threshold 10.
+These do not establish an exact recording window, fixed retention period or
+hard instantaneous file cap. Changing capture defaults, limiting ACRA collection
+and redesigning the inherited debug viewer were expressly outside this choice.
+The maintained [reporting guide](error-reporting.md) documents these boundaries.
+
+The new copy, disclosure, inspection and notice resources are translatable
+default-English strings; no equivalent non-English translations are claimed.
+PR #149's dated evidence alone does not validate this newer copy/share behavior.
+
+### Controlled validation
+
+A newly created disposable API 26 emulator passed 21 targeted instrumentation
+checks: the nine PR #149 reporting/pagination regressions, eleven copy/share
+behavioral checks, and a separate-UID attachment receiver check. Outgoing report
+actions were intercepted; the only actual attachment recipient was a standalone
+activity in the test APK, with no network permission. It read the single selected
+file and was denied write access. These are controlled Android handoff results,
+not delivery evidence from a mail client, service or maintainer.
+
+The copy/share checks exercise clipboard text, JSON share text, unchecked grants,
+single-file ClipData/read permission, recreation/new-report reset, missing,
+unreadable and unfinished selected logs, report/log inspection and offline notice
+viewing. Negative availability assertions wait for asynchronous lookup completion.
+Capture preferences are restored by fixtures; these tests remain restricted to
+disposable environments, not user installations.
+
+A removed temporary probe also triggered the real log toolkit with a synthetic
+error and verified that its completed file was recognized and contained the
+synthetic diagnostic marker. Completion checking is therefore exercised against
+actual toolkit output, not only hand-written wrappers. The temporary capture and
+rendering probes both passed and were removed from the retained suite.
+
+The actual reporting activity was rendered at 320×640 mdpi with font scale 2.0
+on that disposable emulator. Disclosure text wrapped, the initially unchecked
+attachment choice and all full-width actions remained reachable by scrolling,
+and the bundled notice and separate log preview rendered as scrollable dialogs
+with reachable dismissal buttons. The real Android chooser was opened and
+canceled with Back without selecting a recipient. No TalkBack, physical-device,
+third-party receiver behavior or newer-API result is claimed.
+
+Fresh official Claude Code reviews used `--model claude-opus-5-5 --effort medium`
+with read/search-only tools and no session persistence. The first review's
+confirmed cleanup/style and test-synchronization issues were corrected; a second
+complete-change review found no confirmed bugs or merge blockers. Independent
+adjudication retained offered log inspection rather than adding an unrequested
+mandatory inspection gate. Whole-file preview cost, rapid repeated Share taps
+and the standard chooser's grant-propagation coverage gap remain nonblocking
+limitations; no third-party processing or delivery guarantee is inferred.
+
+The final serial `make ci` passed all five stages: build-logic/static checks,
+app JVM and offline extractor gates, Android lint, debug assembly and release
+assembly. Instrumentation assembly passed after temporary probe removal.
+Gradle reused unchanged outputs where reported. Existing compiler warnings do
+not establish runtime failures, and this gate does not exercise API 37 devices.
