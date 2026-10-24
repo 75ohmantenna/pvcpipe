@@ -37,7 +37,7 @@ public class DownloadRunnable extends Thread {
 
     private void releaseBlock(final Block block, final long remain) {
         // set the block offset to -1 if it is completed
-        mMission.releaseBlock(block.position, remain < 0 ? -1 : block.done);
+        mMission.releaseBlock(block, remain < 0 ? -1 : block.done);
     }
 
     @Override
@@ -55,142 +55,152 @@ public class DownloadRunnable extends Thread {
             return;
         }
 
-        while (mMission.running && mMission.errCode == DownloadMission.ERROR_NOTHING) {
-            if (!retry) {
-                block = mMission.acquireBlock();
-            }
-
-            if (block == null) {
-                if (DEBUG) {
-                    Log.d(TAG, mId + ":no more blocks left, exiting");
-                }
-                break;
-            }
-
-            if (DEBUG) {
-                if (retry) {
-                    Log.d(TAG, mId + ":retry block at position=" + block.position
-                            + " from the start");
-                } else {
-                    Log.d(TAG, mId + ":acquired block at position=" + block.position
-                            + " done=" + block.done);
-                }
-            }
-
-            long start = (long) block.position * DownloadMission.BLOCK_SIZE;
-            long end = start + DownloadMission.BLOCK_SIZE - 1;
-
-            start += block.done;
-
-            if (end >= mMission.length) {
-                end = mMission.length - 1;
-            }
-
-            try {
-                mConn = mMission.openConnection(false, start, end);
-                final String sentIfRange = mConn.getRequestProperty("If-Range");
-                mMission.establishConnection(mId, mConn);
-
-                // check if the download can be resumed
-                if (mConn.getResponseCode() == 416) {
-                    if (block.done > 0) {
-                        // try again from the start (of the block)
-                        mMission.notifyProgress(-block.done);
-                        block.done = 0;
-                        retry = true;
-                        mConn.disconnect();
-                        continue;
-                    }
-
-                    throw new DownloadMission.HttpError(416);
-                }
-
-                retry = false;
-
-                // The server may ignore the range request; a wrong 206 is more dangerous,
-                // since writing it at this block's offset would silently corrupt the file.
-                if (mConn.getResponseCode() != 206) {
-                    if (DEBUG) {
-                        Log.e(TAG, mId + ":Unsupported " + mConn.getResponseCode());
-                    }
-                    if (mConn.getResponseCode() == 200 && sentIfRange != null) {
-                        mMission.notifyError(new ValidatedRange.InvalidRangeException(
-                                "Resource changed during parallel download; restart required"));
-                    } else {
-                        mMission.notifyError(
-                                new DownloadMission.HttpError(mConn.getResponseCode()));
-                    }
-                    break;
-                }
-                final ValidatedRange range = ValidatedRange.from(mConn, start, end,
-                        mMission.length);
-                mMission.validatePartialRepresentation(mConn, sentIfRange);
-
-                f.seek(mMission.offsets[mMission.current] + start);
-
-                try (InputStream is = mConn.getInputStream()) {
-                    final byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
-                    // A valid server may send a shorter range than requested. Never write past
-                    // its advertised end or this worker's block; fetch the remainder separately.
-                    while (start <= range.end && mMission.running) {
-                        final int limit = (int) Math.min(buf.length, range.end - start + 1);
-                        final int len = is.read(buf, 0, limit);
-                        if (len < 0) {
-                            throw new EOFException("Truncated partial response at byte " + start);
-                        }
-                        if (len == 0) {
-                            throw new IOException("No progress reading partial response");
-                        }
-                        f.write(buf, 0, len);
-                        start += len;
-                        block.done += len;
-                        mMission.notifyProgress(len);
-                    }
-                }
-
-                if (DEBUG && mMission.running) {
-                    Log.d(TAG, mId + ":position " + block.position + " stopped " + start + "/"
-                            + end);
-                }
-            } catch (Exception e) {
-                if (!mMission.running || e instanceof ClosedByInterruptException) {
-                    break;
-                }
-
-                if (e instanceof ValidatedRange.InvalidRangeException) {
-                    mMission.notifyError(e);
-                    break;
-                }
-
-                if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
-                    // for youtube streams. The url has expired, recover
-                    f.close();
-
-                    if (mId == 1) {
-                        // only the first thread will execute the recovery procedure
-                        mMission.doRecover(ERROR_HTTP_FORBIDDEN);
-                    }
-                    return;
-                }
-
-                if (retryCount++ >= mMission.maxRetry) {
-                    mMission.notifyError(e);
-                    break;
-                }
-
-                retry = true;
-            } finally {
-                if (mConn != null) {
-                    mConn.disconnect();
-                    mConn = null;
-                }
+        long start = 0;
+        long end = 0;
+        try {
+            while (mMission.running && mMission.errCode == DownloadMission.ERROR_NOTHING) {
                 if (!retry) {
-                    releaseBlock(block, end - start);
+                    start = 0;
+                    end = 0;
+                    block = mMission.acquireBlock();
+                }
+
+                if (block == null) {
+                    if (DEBUG) {
+                        Log.d(TAG, mId + ":no more blocks left, exiting");
+                    }
+                    break;
+                }
+
+                if (DEBUG) {
+                    if (retry) {
+                        Log.d(TAG, mId + ":retry block at position=" + block.position
+                                + " from the start");
+                    } else {
+                        Log.d(TAG, mId + ":acquired block at position=" + block.position
+                                + " done=" + block.done);
+                    }
+                }
+
+                start = (long) block.position * DownloadMission.BLOCK_SIZE;
+                end = start + DownloadMission.BLOCK_SIZE - 1;
+
+                start += block.done;
+
+                if (end >= mMission.length) {
+                    end = mMission.length - 1;
+                }
+
+                try {
+                    mConn = mMission.openConnection(false, start, end);
+                    final String sentIfRange = mConn.getRequestProperty("If-Range");
+                    mMission.establishConnection(mId, mConn);
+
+                    // check if the download can be resumed
+                    if (mConn.getResponseCode() == 416) {
+                        if (block.done > 0) {
+                            // try again from the start (of the block)
+                            mMission.notifyProgress(-block.done);
+                            block.done = 0;
+                            retry = true;
+                            mConn.disconnect();
+                            continue;
+                        }
+
+                        throw new DownloadMission.HttpError(416);
+                    }
+
+                    retry = false;
+
+                    // A wrong 206 would silently corrupt the file at this block's offset.
+                    if (mConn.getResponseCode() != 206) {
+                        if (DEBUG) {
+                            Log.e(TAG, mId + ":Unsupported " + mConn.getResponseCode());
+                        }
+                        if (mConn.getResponseCode() == 200 && sentIfRange != null) {
+                            mMission.notifyError(new ValidatedRange.InvalidRangeException(
+                                    "Resource changed during parallel download; restart required"));
+                        } else {
+                            mMission.notifyError(
+                                    new DownloadMission.HttpError(mConn.getResponseCode()));
+                        }
+                        break;
+                    }
+                    final ValidatedRange range = ValidatedRange.from(mConn, start, end,
+                            mMission.length);
+                    mMission.validatePartialRepresentation(mConn, sentIfRange);
+
+                    f.seek(mMission.offsets[mMission.current] + start);
+
+                    try (InputStream is = mConn.getInputStream()) {
+                        final byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
+                        // A server may send a shorter range. Never write past its advertised
+                        // end or this worker's block; fetch the remainder separately.
+                        while (start <= range.end && mMission.running) {
+                            final int limit = (int) Math.min(buf.length, range.end - start + 1);
+                            final int len = is.read(buf, 0, limit);
+                            if (len < 0) {
+                                throw new EOFException(
+                                        "Truncated partial response at byte " + start);
+                            }
+                            if (len == 0) {
+                                throw new IOException("No progress reading partial response");
+                            }
+                            f.write(buf, 0, len);
+                            start += len;
+                            block.done += len;
+                            mMission.notifyProgress(len);
+                        }
+                    }
+
+                    if (DEBUG && mMission.running) {
+                        Log.d(TAG, mId + ":position " + block.position + " stopped " + start + "/"
+                                + end);
+                    }
+                } catch (Exception e) {
+                    if (!mMission.running || e instanceof ClosedByInterruptException) {
+                        break;
+                    }
+
+                    if (e instanceof ValidatedRange.InvalidRangeException) {
+                        mMission.notifyError(e);
+                        break;
+                    }
+
+                    if (e instanceof HttpError
+                            && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
+                        if (mId == 1) {
+                            // only the first thread will execute the recovery procedure
+                            mMission.doRecover(ERROR_HTTP_FORBIDDEN);
+                        }
+                        return;
+                    }
+
+                    if (retryCount++ >= mMission.maxRetry) {
+                        mMission.notifyError(e);
+                        break;
+                    }
+
+                    retry = true;
+                } finally {
+                    if (mConn != null) {
+                        mConn.disconnect();
+                        mConn = null;
+                    }
+                    if (!retry) {
+                        releaseBlock(block, end - start);
+                        block = null;
+                    }
                 }
             }
+        } finally {
+            // Retry intent is not ownership: pause, recovery or exhaustion can end the loop
+            // before another attempt. Publish once before this owner can be joined by Start.
+            if (block != null) {
+                releaseBlock(block, end - start);
+            }
+            f.close();
         }
-
-        f.close();
 
         if (DEBUG) {
             Log.d(TAG, "thread " + mId + " exited from main download loop");
