@@ -5,22 +5,31 @@
 
 package org.schabi.newpipe.error
 
-import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.Menu
 import android.view.MenuItem
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.IntentCompat
-import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.grack.nanojson.JsonWriter
+import java.io.File
+import java.io.IOException
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.schabi.newpipe.BuildConfig
 import org.schabi.newpipe.R
 import org.schabi.newpipe.databinding.ActivityErrorBinding
@@ -38,6 +47,11 @@ class ErrorActivity : PvcErrorActivity() {
     private lateinit var currentTimeStamp: String
 
     private lateinit var binding: ActivityErrorBinding
+    private var reportGeneration = 0
+    private var availableDiagnosticLog: File? = null
+    private var selectedDiagnosticLog: File? = null
+    private var diagnosticLogLookup: Job? = null
+    private var reportingDialog: AlertDialog? = null
 
     private val contentCountryString: String
         get() = Localization.getPreferredContentCountry(this).countryCode
@@ -54,9 +68,6 @@ class ErrorActivity : PvcErrorActivity() {
             val osBase = Build.VERSION.BASE_OS.ifEmpty { "Android" }
             return "$name $osBase ${Build.VERSION.RELEASE} - ${Build.VERSION.SDK_INT}"
         }
-
-    private val errorEmailSubject: String
-        get() = "$ERROR_EMAIL_SUBJECT ${getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}"
 
     // /////////////////////////////////////////////////////////////////////
     // Activity lifecycle
@@ -89,48 +100,54 @@ class ErrorActivity : PvcErrorActivity() {
             setDisplayShowTitleEnabled(true)
         }
 
-        errorInfo = IntentCompat.getParcelableExtra(intent, ERROR_INFO, ErrorInfo::class.java)!!
-
-        // important add guru meditation
         addGuruMeditation()
-        // print current time, as zoned ISO8601 timestamp
-        currentTimeStamp = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        configureReportActions()
+        displayReport()
+    }
 
-        // Prefer ErrorInfo construction time over the time this report was opened.
-        currentTimeStamp = pvcGetErrorCreationTimestamp(currentTimeStamp, errorInfo)
+    override fun onResume() {
+        super.onResume()
+        refreshDiagnosticLog()
+    }
 
-        pvcAddCopyLogcatLogButton(
-            this,
-            binding.errorReportCopyButton,
-            errorInfo
-        )
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        // Consent is deliberately not restored, even when Android restores other view state.
+        binding.includeDiagnosticLog.isChecked = false
+        selectedDiagnosticLog = null
+    }
 
-        binding.errorReportEmailButton.setOnClickListener { _ ->
-            openPrivacyPolicyDialog(this, "EMAIL")
-        }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        binding.errorCommentBox.text?.clear()
+        displayReport()
+        refreshDiagnosticLog()
+    }
 
-        binding.errorReportCopyButton.setOnClickListener { _ ->
-            ShareUtils.copyToClipboard(this, buildMarkdown())
-        }
+    override fun onDestroy() {
+        reportingDialog?.dismiss()
+        super.onDestroy()
+    }
 
-        binding.errorReportGitHubButton.setOnClickListener { _ ->
-            openPrivacyPolicyDialog(this, "GITHUB")
-        }
+    private fun displayReport() {
+        reportGeneration++
+        diagnosticLogLookup?.cancel()
+        reportingDialog?.dismiss()
+        availableDiagnosticLog = null
+        selectedDiagnosticLog = null
+        binding.includeDiagnosticLog.isChecked = false
+        binding.includeDiagnosticLog.isEnabled = false
+        errorInfo = IntentCompat.getParcelableExtra(intent, ERROR_INFO, ErrorInfo::class.java)!!
+        val now = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        currentTimeStamp = pvcGetErrorCreationTimestamp(now, errorInfo)
 
-        // normal bugreport
         buildInfo(errorInfo)
         binding.errorMessageView.setTextWithLinks(errorInfo.getMessage(this))
         binding.errorView.text = formErrorText(errorInfo.stackTraces)
-
         if (!pvcIsDumperEnabled()) {
-            // print stack trace once again for debugging:
             errorInfo.stackTraces.forEach { Log.e(TAG, it) }
         }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.error_menu, menu)
-        return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -140,43 +157,161 @@ class ErrorActivity : PvcErrorActivity() {
                 true
             }
 
-            R.id.menu_item_share_error -> {
-                ShareUtils.shareText(
-                    applicationContext,
-                    getString(R.string.error_report_title),
-                    buildJson()
-                )
-                true
-            }
-
-            else -> false
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun openPrivacyPolicyDialog(context: Context, action: String) {
-        AlertDialog.Builder(context)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .setTitle(R.string.privacy_policy_title)
-            .setMessage(R.string.start_accept_privacy_policy)
-            .setCancelable(false)
-            .setNeutralButton(R.string.read_privacy_policy) { _, _ ->
-                ShareUtils.openUrlInApp(context, context.getString(R.string.privacy_policy_url))
+    private fun configureReportActions() {
+        binding.errorReportCopyButton.setOnClickListener {
+            ShareUtils.copyToClipboard(this, buildMarkdown())
+        }
+        binding.errorReportShareButton.setOnClickListener { shareReport() }
+        binding.reportingNoticeButton.setOnClickListener {
+            reportingDialog?.dismiss()
+            reportingDialog = AlertDialog.Builder(this)
+                .setTitle(R.string.reporting_notice_title)
+                .setMessage(R.string.reporting_notice_body)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        }
+        binding.inspectReportButton.setOnClickListener {
+            val preview = getString(R.string.reporting_copy) + "\n\n" + buildMarkdown() +
+                "\n\n" + getString(R.string.reporting_share) + "\n\n" + buildJson()
+            showReportPreview(R.string.reporting_report_preview_title, preview)
+        }
+        binding.inspectDiagnosticLogButton.setOnClickListener { inspectDiagnosticLog() }
+        binding.includeDiagnosticLog.setOnCheckedChangeListener { _, checked ->
+            selectedDiagnosticLog = if (checked) availableDiagnosticLog else null
+            if (checked && selectedDiagnosticLog == null) {
+                binding.includeDiagnosticLog.isChecked = false
+                showDiagnosticLogUnavailable()
             }
-            .setPositiveButton(R.string.accept) { _, _ ->
-                if (action == "EMAIL") { // open an email composer
-                    val intent = Intent(Intent.ACTION_SENDTO)
-                        .setData("mailto:".toUri()) // only email apps should handle this
-                        .putExtra(Intent.EXTRA_EMAIL, arrayOf(ERROR_EMAIL_ADDRESS))
-                        .putExtra(Intent.EXTRA_SUBJECT, errorEmailSubject)
-                        .putExtra(Intent.EXTRA_TEXT, buildJson())
-                    pvcAddLogcatLogAttachmentToMail(context, intent, errorInfo)
-                    ShareUtils.openIntentInApp(context, intent)
-                } else if (action == "GITHUB") { // open the configured GitHub issue tracker
-                    ShareUtils.openUrlInApp(this, ERROR_GITHUB_ISSUE_URL)
+        }
+    }
+
+    private fun refreshDiagnosticLog() {
+        val info = errorInfo
+        val generation = reportGeneration
+        diagnosticLogLookup?.cancel()
+        diagnosticLogLookup = lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                ReportingLogFile.find(this@ErrorActivity, info)
+            }
+            if (generation == reportGeneration) updateDiagnosticLog(file)
+        }
+    }
+
+    private fun updateDiagnosticLog(file: File?) {
+        availableDiagnosticLog = file
+        binding.includeDiagnosticLog.isEnabled = file != null
+        if (file == null || selectedDiagnosticLog != file) {
+            binding.includeDiagnosticLog.isChecked = false
+            selectedDiagnosticLog = null
+        }
+    }
+
+    private fun showDiagnosticLogUnavailable() {
+        Toast.makeText(this, R.string.reporting_log_unavailable, Toast.LENGTH_LONG).show()
+        refreshDiagnosticLog()
+    }
+
+    private fun inspectDiagnosticLog() {
+        val info = errorInfo
+        val generation = reportGeneration
+        lifecycleScope.launch {
+            try {
+                val (file, text) = withContext(Dispatchers.IO) {
+                    val file = ReportingLogFile.find(this@ErrorActivity, info)
+                        ?: throw IOException("No completed diagnostic log for this report")
+                    val text = file.readText(Charsets.UTF_8)
+                    ReportingLogFile.requireComplete(file)
+                    file to text
+                }
+                if (generation != reportGeneration) return@launch
+                updateDiagnosticLog(file)
+                showReportPreview(R.string.reporting_log_preview_title, text)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: IOException) {
+                if (generation == reportGeneration) showDiagnosticLogUnavailable()
+            } catch (_: SecurityException) {
+                if (generation == reportGeneration) {
+                    Toast.makeText(
+                        this@ErrorActivity,
+                        R.string.reporting_log_read_failed,
+                        Toast.LENGTH_LONG
+                    ).show()
+                    refreshDiagnosticLog()
                 }
             }
-            .setNegativeButton(R.string.decline, null)
+        }
+    }
+
+    private fun showReportPreview(title: Int, text: String) {
+        reportingDialog?.dismiss()
+        reportingDialog = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(text)
+            .setPositiveButton(android.R.string.ok, null)
             .show()
+            .also { dialog ->
+                dialog.findViewById<TextView>(android.R.id.message)?.apply {
+                    setTextIsSelectable(true)
+                    typeface = Typeface.MONOSPACE
+                }
+            }
+    }
+
+    private fun shareReport() {
+        val info = errorInfo
+        val generation = reportGeneration
+        val includeLog = binding.includeDiagnosticLog.isChecked
+        val selectedLog = selectedDiagnosticLog
+        val text = buildJson()
+        lifecycleScope.launch {
+            val sendIntent = try {
+                withContext(Dispatchers.IO) {
+                    val file = if (includeLog) {
+                        val matchingFile = ReportingLogFile.find(this@ErrorActivity, info)
+                        if (selectedLog == null || matchingFile != selectedLog) {
+                            throw IOException("The selected diagnostic log is no longer available")
+                        }
+                        matchingFile
+                    } else {
+                        null
+                    }
+                    ReportingShareIntent.create(this@ErrorActivity, text, file)
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: IOException) {
+                if (generation == reportGeneration) showDiagnosticLogUnavailable()
+                return@launch
+            } catch (_: IllegalArgumentException) {
+                if (generation == reportGeneration) showShareFailed()
+                return@launch
+            } catch (_: SecurityException) {
+                if (generation == reportGeneration) showShareFailed()
+                return@launch
+            }
+            if (generation != reportGeneration ||
+                includeLog != binding.includeDiagnosticLog.isChecked ||
+                (includeLog && selectedLog != selectedDiagnosticLog)
+            ) {
+                return@launch
+            }
+            try {
+                startActivity(Intent.createChooser(sendIntent, getString(R.string.error_report_title)))
+            } catch (_: ActivityNotFoundException) {
+                showShareFailed()
+            } catch (_: SecurityException) {
+                showShareFailed()
+            }
+        }
+    }
+
+    private fun showShareFailed() {
+        Toast.makeText(this, R.string.reporting_share_failed, Toast.LENGTH_LONG).show()
     }
 
     private fun formErrorText(stacktrace: Array<String>): String {
@@ -292,10 +427,5 @@ class ErrorActivity : PvcErrorActivity() {
 
         // BUNDLE TAGS
         const val ERROR_INFO = "error_info"
-
-        private const val ERROR_EMAIL_ADDRESS = "crashreport@gmx.com"
-        private const val ERROR_EMAIL_SUBJECT = "Exception in "
-
-        private const val ERROR_GITHUB_ISSUE_URL = "https://github.com/pvcpipe/NewPipeExtractor/issues"
     }
 }

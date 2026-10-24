@@ -115,31 +115,51 @@
                 android:layout_height="wrap_content"
                 android:inputType="" />
 
-            <Button
-                android:id="@+id/errorReportEmailButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/error_report_button_text" />
-
             <org.schabi.newpipe.views.NewPipeTextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="5dp"
-                android:text="@string/error_report_open_github_notice"
-                android:textStyle="bold" />
+                android:text="@string/reporting_disclosure" />
+
+            <Button
+                android:id="@+id/inspectReportButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/reporting_inspect_report" />
+
+            <Button
+                android:id="@+id/inspectDiagnosticLogButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/reporting_inspect_log" />
+
+            <CheckBox
+                android:id="@+id/includeDiagnosticLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:enabled="false"
+                android:saveEnabled="false"
+                android:text="@string/reporting_include_log" />
 
             <Button
                 android:id="@+id/errorReportCopyButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/copy_for_github" />
+                android:text="@string/reporting_copy" />
 
             <Button
-                android:id="@+id/errorReportGitHubButton"
+                android:id="@+id/errorReportShareButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/error_report_open_issue_button_text" />
+                android:text="@string/reporting_share" />
+
+            <Button
+                android:id="@+id/reportingNoticeButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/reporting_notice" />
 
         </LinearLayout>
     </ScrollView>
