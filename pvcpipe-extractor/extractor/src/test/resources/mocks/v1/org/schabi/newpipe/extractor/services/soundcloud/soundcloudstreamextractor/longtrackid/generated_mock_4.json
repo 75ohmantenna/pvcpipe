@@ -1,7 +1,7 @@
 {
   "request": {
     "httpMethod": "GET",
-    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/hls?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ\u0026track_authorization\u003deyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJERSIsInN1YiI6IiIsInJpZCI6ImI0ZWZjMjBmLTY2MGQtNDhjMS1iMzNlLWZhZTBmYWIwODA3OCIsImlhdCI6MTc3MTYzNjEwMX0.EwHcS8NN4ooY6pm6HQDPJkLIT3NP62XsTp_nGIDpwaI",
+    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN",
     "headers": {
       "Accept-Language": [
         "en-GB, en;q\u003d0.9"
@@ -63,6 +63,6 @@
       ]
     },
     "responseBody": "{\"url\":\"https://cf-hls-media.sndcdn.com/playlist/Cs8zhDOA53fb.128.mp3/playlist.m3u8?Policy\u003deyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiKjovL2NmLWhscy1tZWRpYS5zbmRjZG4uY29tL3BsYXlsaXN0L0NzOHpoRE9BNTNmYi4xMjgubXAzL3BsYXlsaXN0Lm0zdTgqIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzcxNjM2NDIzfX19XX0_\u0026Signature\u003dAOthx0BZ0jv2s7zhosCYSZyjmiLlQna5fim4RTZDIr6bi-bonzore0fZBcRK6bwo07K5uRyQpxE1l97Oc-eHDW0b2iXhdPXdx5Ie8nxAaGzx6h3mkaGO6erpst9VtEqgpYoVCd2zTSKuxuKp2dsgLE6ClZP~zlb-k5QEi~VHQGkG5b7cELOAAQUL4v8gVrcxUBxoMRgvlXHEma-R-wNq~fU2vs9z5jZAqyEpBrkFzHGi41Mu-IN875rcQhKKY2MCmlLtYSpK-FoGtn0rVI-2PvK1fLpaWrp1y8-P-WCKLGHiYJyoczFtIXKjY5ZaxLQ6fG3aRZx-6VCjhFNexCf0cw__\u0026Key-Pair-Id\u003dAPKAI6TU7MMXM5DG6EPQ\"}",
-    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/hls?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ\u0026track_authorization\u003deyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJERSIsInN1YiI6IiIsInJpZCI6ImI0ZWZjMjBmLTY2MGQtNDhjMS1iMzNlLWZhZTBmYWIwODA3OCIsImlhdCI6MTc3MTYzNjEwMX0.EwHcS8NN4ooY6pm6HQDPJkLIT3NP62XsTp_nGIDpwaI"
+    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN"
   }
 }

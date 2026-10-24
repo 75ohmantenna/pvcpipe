@@ -41,4 +41,11 @@ guides and implementation for current behavior.
 | [dependency-audit.md](dependency-audit.md) | Dependency roles, compatibility decisions, toolchain and checksum verification, October 2026 |
 | [documentation-alignment.md](documentation-alignment.md) | Documentation/comment audit coverage, unresolved discrepancies and proposed UI-text follow-ups, 2026-10-23 |
 
+Detailed local evidence cited by temporary paths in these dated records was
+selectively consolidated into a separate local evidence repository on
+2026-10-24. Those paths identify original capture locations; some files have
+moved, and sanitized derivatives or structural descriptions in that local
+collection replace sensitive payloads. The public summaries retain their
+original tested-build and environment limits. The local collection is not a published artifact archive.
+
 `AGENTS.md` at the top of the repository holds the rules for coding agents.

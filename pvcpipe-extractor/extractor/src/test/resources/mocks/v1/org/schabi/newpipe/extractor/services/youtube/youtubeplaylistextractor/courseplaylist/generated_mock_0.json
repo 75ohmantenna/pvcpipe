@@ -76,8 +76,8 @@
         "ESF"
       ],
       "set-cookie": [
-        "YSC\u003d53hT5wtfQ8Q; Domain\u003d.youtube.com; Path\u003d/; Secure; HttpOnly; SameSite\u003dnone",
-        "VISITOR_INFO1_LIVE\u003d; Domain\u003d.youtube.com; Expires\u003dTue, 11-Apr-2023 19:58:36 GMT; Path\u003d/; Secure; HttpOnly; SameSite\u003dnone"
+        "YSC=SYNTHETIC_COOKIE; Domain=.youtube.com; Path=/; Secure; HttpOnly; SameSite=none",
+        "VISITOR_INFO1_LIVE=SYNTHETIC_COOKIE; Domain=.youtube.com; Expires=Tue, 11-Apr-2023 19:58:36 GMT; Path=/; Secure; HttpOnly; SameSite=none"
       ],
       "strict-transport-security": [
         "max-age\u003d31536000"

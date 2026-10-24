@@ -25,3 +25,6 @@ bin/
 *.keystore
 *.p12
 signing.properties
+
+# Python maintenance tool bytecode
+__pycache__/

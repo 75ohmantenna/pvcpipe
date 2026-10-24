@@ -38,7 +38,7 @@
         "am/2"
       ],
       "set-cookie": [
-        "datadome\u003dLbAccxtht7L~yjz2QHD2aDkV8AF1_cL7yNgtQA7zaNk_ONf6tyrItBqRK4sojsO6WMz4fCYLamYoYwNfXDaZBoUZdhj99yVJsfrO1OJPYb9so61ZzQEFzYS151asKT0Q; Max-Age\u003d31536000; Domain\u003d.soundcloud.com; Path\u003d/; Secure; SameSite\u003dLax"
+        "datadome=SYNTHETIC_COOKIE; Max-Age=31536000; Domain=.soundcloud.com; Path=/; Secure; SameSite=Lax"
       ],
       "strict-transport-security": [
         "max-age\u003d63072000"

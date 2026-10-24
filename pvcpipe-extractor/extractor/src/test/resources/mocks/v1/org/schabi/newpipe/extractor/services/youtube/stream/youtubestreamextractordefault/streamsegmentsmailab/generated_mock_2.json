@@ -404,7 +404,7 @@
         "0"
       ]
     },
-    "responseBody": "{\"responseContext\":{\"visitorData\":\"CgtpbTNGbDR3d3BTRSjvuJfRBjIoCgJGUhIiEh4SHAsMDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicgDmLfAgrcAjE5LllUPVhLNFVtdTM5NXdhN2VralZmTGFKSTZ4clV1UWp6bTJZOXpWNXJFZEFMRFAzRWJzWEFNblRMWHBYQ2tzdV9fQ1IxS2lQblhLQ1VpclVhcm1JaGdMNkRQblNKSU9BN1JYWTJTV2JLUmZpUHo3OF91ZzI1UlRiMzBGMHhUNVFKTTBVNlUyYmhMQlZRc2wtNmg0T0U0T0dqeFZVaVl4OG1ncThON0dOTUpzN25YZXFpVXZpWTVfNXRwV1IwcXdQZXZFZE9CMU1OcGtRN3hvSjVrVWtoeGhXeF9Nb2JDQ1ZWRFhPZWVBSzlqWmpHRVc3dURsVUp2UFd1WGJjWGdFcUViQkRMMkhZQWkyejNGczd2RFRhVU05dDFrUml6dEo4Z2ptSnhaQktFRFVsa3p0NE8yTGhJM1RBNkMtY1hsNDZkVG8zRjVkNVNMZGUwSHBzWC1QcV9EUWVXZw%3D%3D\",\"responseId\":\"IhMIqIvatoP2lAMVJVFBAh3HRj33\"}}",
+    "responseBody": "{\"responseContext\":{\"visitorData\":\"SYNTHETIC_VISITOR_DATA\",\"responseId\":\"IhMIqIvatoP2lAMVJVFBAh3HRj33\"}}",
     "latestUrl": "https://www.youtube.com/youtubei/v1/visitor_id?prettyPrint\u003dfalse"
   }
 }
