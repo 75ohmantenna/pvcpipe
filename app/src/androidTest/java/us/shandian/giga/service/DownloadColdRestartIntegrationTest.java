@@ -65,8 +65,11 @@ public class DownloadColdRestartIntegrationTest {
     private File output;
     private String name;
     private long loadedDone = -1;
+    private long loadedCheckpointDone = -1;
     private int[] loadedBlocks;
     private long loadedResumeOffset;
+    private long resumedDone = -1;
+    private long accountingBudget;
 
     @Test
     public void runPhase() throws Exception {
@@ -106,10 +109,18 @@ public class DownloadColdRestartIntegrationTest {
             loaded = snapshot(mission);
             if (mission instanceof DownloadMission pending) {
                 loadedDone = pending.done;
+                loadedCheckpointDone = loaded.getJSONObject("checkpoint").getLong("done");
                 final int[] blocks = (int[]) field(pending, "blocks");
                 loadedBlocks = blocks == null ? null : blocks.clone();
                 loadedResumeOffset = (long) field(pending, "fallbackResumeOffset");
                 assertFalse("Cold-loaded mission already running", pending.running);
+                if ("accounting".equals(required("coldScenario"))
+                        && "resume".equals(phase)) {
+                    accountingBudget = fixtureSize() - resumableCurrentBytes(pending)
+                            - integer("coldRemainingHold", 4096);
+                    assertTrue("Accounting replay must leave bytes to transfer",
+                            accountingBudget > 0);
+                }
                 if ("startReplacement".equals(phase)) {
                     assertTrue("Start must follow persisted integrity rejection",
                             integrityRejected(pending) && integrityRejected(checkpoint(pending)));
@@ -121,24 +132,43 @@ public class DownloadColdRestartIntegrationTest {
                 } else {
                     fail("Unknown phase " + phase);
                 }
+                if ("accounting".equals(required("coldScenario"))
+                        && "resume".equals(phase)) {
+                    // The host holds every body until this real Start has returned. Record
+                    // normalization separately from cold loading and from newly received bytes.
+                    resumedDone = pending.done;
+                    if (Boolean.parseBoolean(arguments.getString("coldShowUi", "false"))) {
+                        onMain(() -> context.startActivity(new Intent(context,
+                                org.schabi.newpipe.download.DownloadActivity.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+                    }
+                    publish("coldResumed", new JSONObject()
+                            .put("loaded", loaded).put("beforeBytes", snapshot(pending))
+                            .put("pid", Process.myPid()).put("byteBudget", accountingBudget));
+                }
             } else {
                 assertTrue("Only terminal phases may find finished history",
                         "assertComplete".equals(phase));
             }
         }
 
+        if ("start".equals(phase) && "accounting".equals(required("coldScenario"))) {
+            accountingBudget = integer("coldByteBudget", 0);
+            resumedDone = 0;
+        }
         final String expectation = "assertComplete".equals(phase) ? "complete"
                 : arguments.getString("coldExpectation", "loaded");
         final JSONObject result = awaitExpectation(expectation)
                 .put("pid", Process.myPid()).put("phase", phase).put("name", name)
                 .put("scenario", required("coldScenario"))
                 .put("loaded", loaded == null ? JSONObject.NULL : loaded);
+        if ("accounting".equals(required("coldScenario"))) {
+            result.put("byteBudget", accountingBudget).put("resumedDone", resumedDone);
+        }
         if ("complete".equals(expectation)) {
             assertFixture();
         }
-        final Bundle status = new Bundle();
-        status.putString("coldResult", result.toString());
-        instrumentation.sendStatus(0, status);
+        publish("coldResult", result);
         if ("assertComplete".equals(phase)) {
             return;
         }
@@ -146,6 +176,12 @@ public class DownloadColdRestartIntegrationTest {
         final CountDownLatch killedByHost = new CountDownLatch(1);
         killedByHost.await(integer("coldHoldSeconds", 180), TimeUnit.SECONDS);
         fail("Host did not SIGKILL the gated phase");
+    }
+
+    private void publish(final String key, final JSONObject result) {
+        final Bundle status = new Bundle();
+        status.putString(key, result.toString());
+        instrumentation.sendStatus(0, status);
     }
 
     private void bindService() throws Exception {
@@ -247,6 +283,13 @@ public class DownloadColdRestartIntegrationTest {
                                         && field(saved, "resourceIdentity") != null
                                         && advancedResumablePosition(saved);
                                 break;
+                            case "accounting":
+                                matches = pending.running
+                                        && pending.done == resumedDone + accountingBudget
+                                        && field(saved, "resourceIdentity") != null
+                                        && !(boolean) field(pending, "writingToFile")
+                                        && ((int[]) field(saved, "blocks")).length > 0;
+                                break;
                             case "rejected":
                                 matches = integrityRejected(pending) && integrityRejected(saved)
                                         && rejectionMessageMatches(pending, saved);
@@ -258,14 +301,14 @@ public class DownloadColdRestartIntegrationTest {
                                         && field(saved, "resourceIdentity") == null;
                                 break;
                             case "clearedPartial":
-                                // A loaded full-mode checkpoint already has progress. The host
-                                // caps this response below that progress so only a newly persisted
-                                // replacement checkpoint can satisfy the cold-resume gate.
+                                // Compare raw saved counters, not the cold-loaded logical counter:
+                                // restoration can discard uncheckpointed progress. The smaller
+                                // budget still proves that a fresh replacement snapshot was saved.
                                 matches = pending.running && pending.done > base
                                         && forceFull && saved.done > base
                                         && (!Boolean.parseBoolean(arguments.getString(
                                                 "coldFreshBelowLoaded", "false"))
-                                        || saved.done < loadedDone);
+                                        || saved.done < loadedCheckpointDone);
                                 break;
                             case "complete":
                                 matches = false;
@@ -332,7 +375,27 @@ public class DownloadColdRestartIntegrationTest {
         }
     }
 
-    private static JSONObject snapshot(final Mission mission) throws Exception {
+    private long resumableCurrentBytes(final DownloadMission mission) throws Exception {
+        final int[] blocks = (int[]) field(mission, "blocks");
+        if (blocks == null || blocks.length == 0) {
+            return (long) field(mission, "fallbackResumeOffset");
+        }
+        final long blockSize = 512 * 1024;
+        long bytes = 0;
+        for (int index = 0; index < blocks.length; index++) {
+            bytes += blocks[index] < 0
+                    ? Math.min(blockSize, mission.length - index * blockSize) : blocks[index];
+        }
+        return bytes;
+    }
+
+    private long resumableTotalBytes(final DownloadMission mission) throws Exception {
+        return mission.current >= mission.offsets.length ? mission.done
+                : mission.offsets[mission.current] - mission.offsets[0]
+                + resumableCurrentBytes(mission);
+    }
+
+    private JSONObject snapshot(final Mission mission) throws Exception {
         if (mission instanceof DownloadMission pending) {
             final DownloadMission saved = checkpoint(pending);
             final JSONObject result = pendingSnapshot(pending);
@@ -343,7 +406,7 @@ public class DownloadColdRestartIntegrationTest {
                 .put("running", false).put("length", mission.length);
     }
 
-    private static JSONObject pendingSnapshot(final DownloadMission mission) throws Exception {
+    private JSONObject pendingSnapshot(final DownloadMission mission) throws Exception {
         final Object identity = field(mission, "resourceIdentity");
         final JSONObject result = new JSONObject().put("state", "pending")
                 .put("timestamp", mission.timestamp).put("running", mission.running)
@@ -356,6 +419,9 @@ public class DownloadColdRestartIntegrationTest {
                 .put("blocks", field(mission, "blocks") == null ? JSONObject.NULL
                         : new JSONArray(field(mission, "blocks")))
                 .put("errCode", mission.errCode)
+                .put("resumableCurrentBytes", resumableCurrentBytes(mission))
+                .put("resumableTotalBytes", resumableTotalBytes(mission))
+                .put("doneAheadOfResumeBytes", mission.done - resumableTotalBytes(mission))
                 .put("errObject", mission.errObject == null ? JSONObject.NULL
                         : mission.errObject.getClass().getSimpleName())
                 .put("errMessage", mission.errObject == null ? JSONObject.NULL

@@ -331,6 +331,7 @@ public class DownloadRangeIntegrityTest {
     private void assertCompleted(final DownloadMission mission) throws Exception {
         assertEquals(DownloadMission.ERROR_NOTHING, mission.errCode);
         assertTrue(mission.isFinished());
+        assertEquals(content.length, mission.done);
         assertArrayEquals(content, Files.readAllBytes(target.toPath()));
     }
 
