@@ -107,6 +107,75 @@ Those fresh missions selected single-worker fallback; parallel range and
 partial-state integrity are separately covered by JVM HTTP fixtures. This does
 not establish correct parallel-capability detection for every host.
 
+### Cold process restart verification, 2026-10-24
+
+Follow-up from master `3d573fc7cb538b94273b9d3cc9d95912b7603a56`
+(PR #151) used one newly created disposable API 26 x86_64 emulator.
+`tools/pr151_cold_restart.py` controls a local HTTP peer and invokes
+`DownloadColdRestartIntegrationTest` in separate Android instrumentation
+processes. It exercised 25 fresh-process phases and 20 confirmed SIGKILL
+terminations. No production change was needed for the exercised integrity paths.
+
+| Scenario | Observed cold-restoration behavior | Integrity result |
+| --- | --- | --- |
+| Ordinary validated partial, including two repeated partial restarts | Restored initialized block checkpoints; requested saved incomplete ranges with the saved strong `If-Range` validator. | Exact 8 MiB fixture. |
+| Start after identity rejection, killed during replacement | Persisted full-only mode survived replacement bytes and cold loading; subsequent GETs omitted both range headers and fetched the whole resource. | Exact different, same-length 8 MiB replacement; no old/new mixture. |
+| Cleared checkpoint before replacement response | Killed with response headers held at the server, cleared progress and identity on disk, and zero replacement bytes sent. Cold Start continued full-only. | Old output unchanged at the boundary; exact replacement after completion. |
+| Unsolicited 206 after cold-loading full-only mode | Rejected without changing the file or marking the mission finished; a later explicit Start accepted a full 200 response. | Unchanged pre-rejection digest; exact completed replacement. |
+| Completed earlier resource | Killed with current resource 1 cleared and the earlier 8 MiB resource's offset retained; restored replacement fetched only the current resource. | Exact 16 MiB concatenation of original first resource and changed second resource. |
+
+The server gates transfer budgets or response headers; it does not choose crash
+times using sleeps. Each nonterminal instrumentation phase remains alive until
+the host kills its reported PID. The host checks disappearance before starting
+another process. Production `DownloadManagerService` creates the real manager
+and loads its private checkpoints; new missions use the service's submission API,
+and resumed missions use the same binder manager `resumeMission` path as Start.
+No checkpoint is edited, no restored mission is injected, and no pause,
+force-stop, data-clear or orderly shutdown precedes a crash. Checkpoints are
+observed under the production writer lock. The HTTP peer deliberately refuses
+HEAD with 405, exercising GET probes rather than incorrectly honoring Range on
+HEAD. Its hostile changed-validator 206 is intentional.
+
+The Android phase checks every completed byte. The host independently pulls and
+hashes output, compares request ranges with the loaded checkpoint, rejects
+overlapping media requests, and requires one full-only request per phase.
+Rejected and incomplete transfers remain pending. Uncheckpointed/in-flight block
+work can be fetched again: progress counters are not evidence that a byte interval
+was durably checkpointed, nor is replay itself corruption. Full-only mode
+intentionally discards partial replacement progress on the next transfer.
+
+There are no manager, storage, checkpoint, worker or HTTP-client mocks in this
+integration. The controlled HTTP origin replaces a real media host; instrumentation
+drives service/binder APIs, not DownloadActivity UI gestures. These results do not
+cover live hosts, SAF providers, parallel device scheduling, an interrupted
+AtomicFile commit, power loss, or filesystem durability. API 37 and physical
+receiver testing remain blocked and were not attempted. The earlier JVM tests
+still use Android/manager/storage doubles as described by their fixtures.
+
+Build and explicitly install both APKs on a disposable emulator, then run:
+
+```sh
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+adb -s '<owned-emulator>' install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s '<owned-emulator>' install -r \
+  app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+python3 tools/pr151_cold_restart.py --serial '<owned-emulator>' \
+  --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable
+```
+
+The host requires an initially stopped target process and checks the AVD name,
+emulator property and API level before proceeding. It leaves generated mission
+files and finished history in that disposable AVD for inspection; it removes only
+its ADB reverse mapping and stops its own HTTP server. JSONL wire/process events,
+phase checkpoints, raw instrumentation output, pulled bytes and `summary.json`
+are retained under the printed `/tmp/pvcpipe-cold-*` directory. Do not use the
+uninstalling Gradle connected-test task on a user's installation.
+
+All five scenarios passed in the final API 26 run. The 52 affected JVM checks
+also passed, followed by serial `make ci` (static checks, app/extractor tests,
+lint and debug/release assembly, reusing unchanged outputs where reported).
+Instrumentation remains separate from that repository gate.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the
