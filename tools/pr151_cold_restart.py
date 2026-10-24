@@ -113,9 +113,8 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
         self.connection.settimeout(state.timeout)
         path = urllib.parse.urlsplit(self.path).path
         with state.condition:
-            generation = state.generation
-            scenario, phase, epoch, policy = (state.scenario, state.phase,
-                                             state.epoch, state.policy)
+            generation, scenario, phase, epoch, policy = \
+                self.server.accepted_context[self.connection]
             request = dict(id=len(state.requests) + 1, scenario=scenario,
                            phase=phase, method=self.command, path=path,
                            range=self.headers.get("Range"),
@@ -184,7 +183,7 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
             # Mismatch deliberately returns 206 with a changed strong identity,
             # rather than honoring If-Range: this is the hostile integrity case.
             status = 206 if ranged or policy == "unsolicited206" else 200
-            request.update(status=status, start=start, end=end,
+            request.update(planned_status=status, start=start, end=end,
                            etag='"cold-' + scenario + '-' + str(epoch) + '"')
             # A cleared checkpoint precedes even representation binding. Holding
             # only the body is insufficient: response headers bind the identity.
@@ -217,6 +216,7 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Connection", "close")
             self.end_headers()
+            request["status"] = status
             state.evidence.record("http-response-headers", **request)
             if not body:
                 return
@@ -256,6 +256,25 @@ class PeerServer(http.server.ThreadingHTTPServer):
     # set, including connections buffered around the last process death.
     daemon_threads = False
     block_on_close = True
+
+    def __init__(self, *args):
+        self.accepted_context = {}
+        super().__init__(*args)
+
+    def get_request(self):
+        connection, address = super().get_request()
+        with self.state.condition:
+            self.accepted_context[connection] = (
+                self.state.generation, self.state.scenario, self.state.phase,
+                self.state.epoch, self.state.policy)
+        return connection, address
+
+    def close_request(self, request):
+        try:
+            super().close_request(request)
+        finally:
+            with self.state.condition:
+                self.accepted_context.pop(request, None)
 
 
 class Adb:
@@ -536,7 +555,11 @@ class Run:
                     or item["method"] not in ("GET", "HEAD"):
                 raise AssertionError("Unexpected phase request: " + repr(item))
             if "status" not in item:
-                continue  # An accepted handler may still be parsing this request.
+                if item.get("header_gated") and item.get("planned_status") == 200:
+                    continue  # Intentionally held before sending response headers.
+                if final:
+                    raise AssertionError("Request ended without an observed response: " + repr(item))
+                continue
             if suffix in ("media", "media2"):
                 expected_status = 302
             elif item["method"] == "HEAD":
@@ -842,7 +865,7 @@ def main():
         server.server_close()
         server = None
         labels = {item["label"] for item in run.results}
-        if any(not item.get("ended") or "status" not in item or item["phase"] not in labels
+        if any(not item.get("ended") or item["phase"] not in labels
                for item in state.requests):
             raise AssertionError("Final wire audit found an unfinished or unassigned request")
         for item in run.results:

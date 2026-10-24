@@ -131,10 +131,12 @@ another process. Production `DownloadManagerService` creates the real manager
 and loads its private checkpoints; new missions use the service's submission API,
 and resumed missions use the same binder manager `resumeMission` path as Start.
 No checkpoint is edited, no restored mission is injected, and no pause,
-force-stop, data-clear or orderly shutdown precedes a crash. Checkpoints are
-observed under the production writer lock. The HTTP peer deliberately refuses
-HEAD with 405, exercising GET probes rather than incorrectly honoring Range on
-HEAD. A `bytes=0-` probe without `If-Range` receives a valid one-byte 206;
+force-stop, data-clear or orderly shutdown precedes a crash. Running-mission
+checkpoints are observed under the production writer lock; manager-owned initial
+checkpoint writes are serialized with the driver by main-thread dispatch.
+The HTTP peer deliberately refuses HEAD with 405, exercising GET probes rather
+than incorrectly honoring Range on HEAD. A `bytes=0-` probe without `If-Range`
+receives a valid one-byte 206;
 the final-ten-byte capability probe receives its requested interval. The host
 asserts their expected counts and requires zero probes after initialized cold
 restoration. Its hostile changed-validator 206 is intentional.
@@ -142,14 +144,23 @@ restoration. Its hostile changed-validator 206 is intentional.
 The Android phase checks every completed byte. The host independently pulls and
 hashes output, compares request ranges with the loaded checkpoint, rejects
 overlapping media requests, and requires one full-only request per phase. Wire
-assertions run again after confirmed process exit to include late requests.
+assertions run again after confirmed process exit and joined handlers. Requests
+are attributed to the phase captured at connection acceptance; held responses
+record a planned status separately from headers actually sent.
 Full-mode resumes with saved partial progress require a newly persisted count
 below the loaded count, using a smaller server budget, rather than accepting the
 checkpoint just loaded. Earlier-resource re-fetches are explicitly forbidden.
-Rejected and incomplete transfers remain pending. Uncheckpointed/in-flight block
-work can be fetched again: progress counters are not evidence that a byte interval
-was durably checkpointed, nor is replay itself corruption. Full-only mode
-intentionally discards partial replacement progress on the next transfer.
+Ordinary partial-resume gates also require advancement of durable block offsets
+or the fallback resume offset, not just the progress counter.
+Rejected and incomplete transfers remain pending. Replaying uncheckpointed
+in-flight block work is distinguished from corruption by exact completed bytes.
+Full-only mode intentionally discards partial replacement progress on restart.
+
+Possible pre-existing progress-accounting defect: the controlled run observed
+saved `done` including in-flight work absent from durable block offsets; replay
+can count those bytes again. This is not an intended progress-display contract.
+An above-100% UI percentage is an inference from the counter and adapter code,
+not an observed UI result. No progress-accounting correction is included here.
 
 There are no manager, storage, checkpoint, worker or HTTP-client mocks in this
 integration. The controlled HTTP origin replaces a real media host; instrumentation
@@ -159,6 +170,10 @@ AtomicFile commit, power loss, or filesystem durability. API 37 and physical
 receiver testing remain blocked/outside scope; no physical device was tested.
 The earlier JVM tests still use Android/manager/storage doubles as described by
 their fixtures.
+
+The fixture persistently sets maximum transport retries to zero and the
+cross-network preference to false on this disposable AVD. Transport-retry paths
+are therefore not covered by this integration; those preferences are left set.
 
 Build and explicitly install both APKs on a disposable emulator, then run:
 

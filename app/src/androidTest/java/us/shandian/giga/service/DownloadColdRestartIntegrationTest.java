@@ -65,6 +65,8 @@ public class DownloadColdRestartIntegrationTest {
     private File output;
     private String name;
     private long loadedDone = -1;
+    private int[] loadedBlocks;
+    private long loadedResumeOffset;
 
     @Test
     public void runPhase() throws Exception {
@@ -104,6 +106,9 @@ public class DownloadColdRestartIntegrationTest {
             loaded = snapshot(mission);
             if (mission instanceof DownloadMission pending) {
                 loadedDone = pending.done;
+                final int[] blocks = (int[]) field(pending, "blocks");
+                loadedBlocks = blocks == null ? null : blocks.clone();
+                loadedResumeOffset = (long) field(pending, "fallbackResumeOffset");
                 assertFalse("Cold-loaded mission already running", pending.running);
                 if ("startReplacement".equals(phase)) {
                     assertTrue("Start must follow persisted integrity rejection",
@@ -240,7 +245,7 @@ public class DownloadColdRestartIntegrationTest {
                             case "partial":
                                 matches = pending.running && saved.done > Math.max(base, loadedDone)
                                         && field(saved, "resourceIdentity") != null
-                                        && resumablePosition(saved);
+                                        && advancedResumablePosition(saved);
                                 break;
                             case "rejected":
                                 matches = integrityRejected(pending) && integrityRejected(saved)
@@ -286,14 +291,15 @@ public class DownloadColdRestartIntegrationTest {
         throw new AssertionError("Timed out awaiting " + expectation + ": " + last);
     }
 
-    private static boolean resumablePosition(final DownloadMission mission) throws Exception {
-        if ((long) field(mission, "fallbackResumeOffset") > 0) {
+    private boolean advancedResumablePosition(final DownloadMission mission) throws Exception {
+        if ((long) field(mission, "fallbackResumeOffset") > loadedResumeOffset) {
             return true;
         }
         final int[] blocks = (int[]) field(mission, "blocks");
         if (blocks != null) {
-            for (final int block : blocks) {
-                if (block != 0) {
+            for (int index = 0; index < blocks.length; index++) {
+                final int previous = loadedBlocks == null ? 0 : loadedBlocks[index];
+                if (previous >= 0 && (blocks[index] < 0 || blocks[index] > previous)) {
                     return true;
                 }
             }
