@@ -1,0 +1,26 @@
+{
+  "request": {
+    "httpMethod": "GET",
+    "url": "https://m.soundcloud.com/discover",
+    "headers": {
+      "Accept-Language": [
+        "en-GB, en;q=0.9"
+      ]
+    },
+    "localization": {
+      "languageCode": "en",
+      "countryCode": "GB"
+    }
+  },
+  "response": {
+    "responseCode": 200,
+    "responseMessage": "OK",
+    "responseHeaders": {
+      "content-type": [
+        "text/html; charset=utf-8"
+      ]
+    },
+    "responseBody": "<script id=\"__NEXT_DATA__\" type=\"application/json\">{\"runtimeConfig\":{\"clientId\":\"0123456789abcdef0123456789abcdef\"}}</script>",
+    "latestUrl": "https://m.soundcloud.com/discover"
+  }
+}

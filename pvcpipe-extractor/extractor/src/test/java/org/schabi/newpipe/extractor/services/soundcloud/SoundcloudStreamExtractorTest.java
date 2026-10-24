@@ -7,6 +7,7 @@ import static org.schabi.newpipe.extractor.ServiceList.SoundCloud;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.ExtractorAsserts;
 import org.schabi.newpipe.extractor.MediaFormat;
@@ -25,6 +26,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+@Tag("offline")
 public class SoundcloudStreamExtractorTest {
     private static final String SOUNDCLOUD = "https://soundcloud.com/";
 

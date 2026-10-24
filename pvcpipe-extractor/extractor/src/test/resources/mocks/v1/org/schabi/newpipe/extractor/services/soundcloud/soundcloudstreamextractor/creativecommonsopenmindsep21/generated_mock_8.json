@@ -1,7 +1,7 @@
 {
   "request": {
     "httpMethod": "GET",
-    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/1abf07a8-57e2-4523-adca-2ba3a9dd1fe3/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN",
+    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/1abf07a8-57e2-4523-adca-2ba3a9dd1fe3/stream/hls?client_id=0123456789abcdef0123456789abcdef&track_authorization=SYNTHETIC_MEDIA_TOKEN",
     "headers": {
       "Accept-Language": [
         "en-GB, en;q\u003d0.9"
@@ -63,6 +63,6 @@
       ]
     },
     "responseBody": "{}",
-    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/1abf07a8-57e2-4523-adca-2ba3a9dd1fe3/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN"
+    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/1abf07a8-57e2-4523-adca-2ba3a9dd1fe3/stream/hls?client_id=0123456789abcdef0123456789abcdef&track_authorization=SYNTHETIC_MEDIA_TOKEN"
   }
 }

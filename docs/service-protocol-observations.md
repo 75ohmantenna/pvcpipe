@@ -25,6 +25,64 @@ unexpected configuration type, invalid identifiers, unsuccessful responses,
 network failures, socket timeouts, caching and cancellation. No live client
 identifier or captured page is included in the fixtures.
 
+### Offline stream replay follow-up — 2026-10-24
+
+The five recorded `SoundcloudStreamExtractorTest` groups lacked the mobile
+client-discovery request before and after PR #156. Their 198 failures stopped
+before extraction assertions; they did not establish a redaction regression.
+
+Each group now includes a synthetic HTTP 200 response for
+`GET https://m.soundcloud.com/discover`, with the minimal
+`script#__NEXT_DATA__` JSON shape consumed by
+`SoundcloudParsingHelper.clientId()`: a root `runtimeConfig` object and a
+32-character `clientId`. This shape is supported by the implementation,
+the original synthetic discovery tests and the dated observation above.
+The new page is synthetic, not a new recording. Its identifier is
+`0123456789abcdef0123456789abcdef`, already used by the discovery tests.
+The same identifier replaces the anonymous client id in these five groups'
+request URLs, response `latestUrl` fields and two related-item `next_href`
+values. Track metadata, media authorizations and extraction expectations are
+unchanged. Production discovery runs normally; no client id is injected into
+its cache.
+
+Replay uses `MockDownloader` and exact `Request.equals` matching: method,
+URL, headers, payload bytes and localization. The discovery wrappers use
+`en-GB` localization and `Accept-Language: en-GB, en;q=0.9`, matching the
+existing group requests. A missing mock throws without a live fallback.
+`SoundcloudStreamExtractorTest` is now tagged `offline`; `forkCiTest`, which
+is part of `make ci`, fixes the factory downloader to `MOCK` even if the
+invoking JVM requests another downloader.
+
+Serial runs in fresh test JVMs with separate logs and reports produced:
+
+| Suite | Passed | Failed | Existing skips |
+| --- | ---: | ---: | ---: |
+| CreativeCommonsOpenMindsEp21 | 40 | 0 | 0 |
+| SoundcloudGoPlusTrack | 39 | 0 | 1 |
+| SoundcloudGeoRestrictedTrack | 39 | 0 | 1 |
+| SmallTrackId | 40 | 0 | 0 |
+| LongTrackId | 40 | 0 | 0 |
+
+Each fresh-JVM suite completed discovery, and all 198 enabled cases executed
+their existing extraction checks. The three playable tracks exercised audio
+extraction; the two restricted tracks asserted empty audio-stream lists.
+The normal combined gate can reuse the cached client id between groups;
+each group's discovery wrapper was verified by its isolated run. The two
+restricted tracks' related-item tests remain disabled as before. No newly
+exposed missing fixture, obsolete expectation or production defect was observed.
+These results establish the enabled recorded extraction paths, not current
+live-service availability, media downloads or playback. Existing duplicate
+transcoding request keys in the Creative Commons group remain unchanged;
+this correction adds one unique discovery key per group and does not resolve
+historical response-selection ordering for those duplicates.
+
+The fixture sanitizer checked all 685 wrappers without further replacements.
+A scoped comparison found none of the 25 original sensitive values detected
+in the five pre-redaction groups in the repaired fixtures. The client-id remap
+preserved existing request-key equivalence classes: no merges or splits, and
+no collisions with the five added discovery keys. Other fixture groups were
+unchanged.
+
 ## YouTube channel cards
 
 The live <https://www.youtube.com/@YouTube/videos> response contained 30

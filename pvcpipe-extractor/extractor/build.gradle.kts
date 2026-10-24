@@ -44,6 +44,8 @@ tasks.test {
 tasks.register<Test>("forkCiTest") {
     group = "verification"
     description = "Runs deterministic offline regression tests maintained by the fork."
+    // Recorded suites must never use the factory's REAL default or record new traffic.
+    systemProperty("downloader", "MOCK")
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     useJUnitPlatform {
