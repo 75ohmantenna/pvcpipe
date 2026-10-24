@@ -296,6 +296,100 @@ disabled in the controlled integration; retry coverage is JVM-only. No user
 installation/data was cleared or uninstalled. API 37, physical receivers/devices,
 SAF/live sources and interrupted AtomicFile commits remain outside this evidence.
 
+### Resource-transition checkpoint correction, 2026-10-24
+
+The downloader triage's highest-ranked finding was reproduced on unchanged
+master after PR #153 (`9caa8ab03`). A real A worker queued a progress checkpoint;
+the writer was held before its production lock while A completed and reached
+the next initializer. That initializer had not yet cleared A's resource state.
+The queued writer then serialized B's index/output base with A's completed
+blocks, length and identity. Actual cold Start saw no remaining blocks and
+finished without requesting B. This was not a counter-only defect.
+
+| Transition checkpoint | `current` | `offsets` | `length` | `blocks` | Identity | Cold `done` |
+| --- | ---: | --- | ---: | --- | --- | ---: |
+| Unchanged production, queued writer after advancement | 1 | `[0,524425]` | 524425 | `[-1,-1]` | A | 1048850 |
+| Corrected staged JVM sequence, before B initialization | 1 | `[0,524425]` | 0 | null | null | 524425 |
+| Corrected API 26 service checkpoint and cold load | 1 | `[0,8388608]` | 0 | null | null | 8388608 |
+
+The unchanged reproduction left only A's 524,425 bytes, rather than the
+528,522-byte fixture. Releasing its original initializer was the positive
+control: B was requested and the exact concatenation completed. Evidence:
+`/tmp/pvcpipe-downloader-triage-20261024/transition/evidence/run-03`.
+
+`DownloadMission.notifyFinished` now takes `LOCK` while advancing `current`,
+deriving the next output offset from the completed resource's length, and
+resetting the next resource's length, blocks/acquisition state, fallback offset,
+identity, unverified/full-only/range-restart flags, errors, recovery validation
+condition and logical progress. Earlier resource offsets and bytes are retained.
+The delayed reset in `DownloadInitializer` is removed. The clean next-resource
+checkpoint is written before scheduling its initializer. At the final resource,
+the last length, offsets and completed state remain available to completion and
+postprocessing rather than being reset or indexing past the offsets array.
+
+The snapshot boundary is the actual `writeThisToFile` lock: it holds `LOCK`
+through `Utility.writeToFile`, `ObjectOutputStream` serialization and AtomicFile
+commit. Thus a queued writer observes the previous phase or the clean next phase,
+not their mixture. Locking only `current++` or only the mission monitor would
+not provide that guarantee. When both locks are needed the order remains mission
+monitor then `LOCK`. Block workers release `LOCK` before progress/completion
+callbacks; initialization releases it before mission-monitor callbacks. Writers
+do not acquire the mission monitor. No scheduling, worker join or external
+callback is added inside the transition's critical region. Restart still joins
+previous workers outside the mission monitor.
+
+Seven desired-behavior JVM regressions use actual initializers/workers, loopback
+HTTP, file writes and Java serialization at the production Utility boundary.
+They stage queued writes before and after transition, cover strong and absent
+identity plus fallback, require a B request and exact 724,428-byte A+B output,
+retain the uninterrupted positive control, preserve a real worker-produced B
+partial checkpoint and its conditional resume range, and check final-resource
+and pending-postprocessing boundaries. Android logging/handler/storage adapters
+and a Utility-boundary serialization adapter are explicit: these JVM tests do
+not exercise Android AtomicFile or run the media postprocessor. All 63 focused
+downloader JVM checks passed.
+The strong-identity desired-behavior regression also ran against preserved base
+production and failed at the clean-B length assertion (`0` expected, `524425`
+observed). The schedule reserves the queued writer before letting A finish,
+rather than relying on prompt thread execution.
+
+The targeted disposable API 26 `transition` scenario holds B's own initializer
+query after A's aggregate sizing query. It checks exact A bytes and the clean
+checkpoint, SIGKILLs the reported process, verifies disappearance, and asserts
+the real service/manager's cold-loaded state before explicit Start. Cold Start
+requests only B: its initialization probes and all sixteen ranged blocks.
+The independent host byte check passed for the exact 16,777,216-byte A+B output,
+SHA-256 `47525533208735cd48fd9c9f918aabffc8119d45500e68d578d2b1b2bbc863d3`.
+Evidence: `/tmp/pvcpipe-transition-api26` (two process phases, source/APK hashes,
+raw checkpoint, requests and pulled bytes). Run only this bounded scenario with:
+
+```sh
+python3 tools/pr151_cold_restart.py --serial '<owned-emulator>' \
+  --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable \
+  --scenario transition
+```
+
+This exercises production Android AtomicFile and cold service restoration, not
+the exact delayed-writer schedule (covered by JVM gates), an interrupted commit,
+power loss or filesystem durability. It used signature-checked `install -r`
+and direct targeted instrumentation; no installation/data was cleared or
+uninstalled. No full process-kill campaign, physical receiver/device, SAF or
+live-host run is claimed.
+The old initializer also saved a clean checkpoint before this HTTP gate:
+this Android scenario checks integration, not a before/after discriminator.
+The delayed-writer regression is established by the staged JVM sequence.
+
+No historical-checkpoint repair or persistence-format change is included.
+An identity bound to a different URL is evidence of an invalid association, but
+absent identity and repeated URLs offer no unambiguous marker distinguishing
+this mixture from a valid completed B checkpoint awaiting its finish callback.
+Resetting all completed/current>0 checkpoints would destroy valid resume state.
+This correction prevents new mixed transition snapshots; it does not
+universally repair checkpoints already written by older builds. PR #151's
+full-response-only/checkpoint-before-replacement recovery, PR #153's restored
+progress reconciliation and URL/validator/range/encoding checks are unchanged.
+The separately confirmed warm retry/block-release defect is not included.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the

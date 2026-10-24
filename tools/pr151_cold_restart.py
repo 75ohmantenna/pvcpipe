@@ -21,6 +21,11 @@ body gate, SIGKILL, actual manager load, then all replay bytes except 4KiB.
 --ui-hold-seconds 3 additionally opens the real Downloads screen at that final
 pending gate and captures its screenshot and accessibility hierarchy. Counter
 classification is reported separately; a full-looking bar is not UI text proof.
+
+Select --scenario transition for one clean A-to-B pre-initialization checkpoint,
+SIGKILL, real cold load before Start, and exact A+B completion with B-only resume
+traffic. B's next-initializer query is held after its initial sizing query. This
+is service/loader integration coverage, not a staged queued-checkpoint writer race.
 """
 
 import argparse
@@ -45,7 +50,7 @@ PACKAGE = "org.seventyfiveohmantenna.pvcpipe.debug"
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 TEST = "us.shandian.giga.service.DownloadColdRestartIntegrationTest#runPhase"
 SCENARIOS = ("stable", "replacement-bytes", "replacement-before-bytes",
-             "unsolicited206", "earlier-resource", "accounting")
+             "unsolicited206", "earlier-resource", "accounting", "transition")
 FIXTURE_SIZE = 8 * 1024 * 1024
 PARTIAL_BUDGET = 2 * 1024 * 1024
 ACCOUNTING_BUDGET = 768 * 1024
@@ -207,7 +212,16 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
             # A cleared checkpoint precedes even representation binding. Holding
             # only the body is insufficient: response headers bind the identity.
             probe = ranged and end - start + 1 <= 10
-            gated = not probe and not (scenario == "earlier-resource" and resource == 0)
+            gated = not probe and not (
+                scenario in ("earlier-resource", "transition") and resource == 0)
+            if scenario == "transition" and resource == 1 and request["range"] == "bytes=0-":
+                # Initializer A sizes both URLs. Let its first B query through,
+                # then hold B's own initializer before it can bind any B state.
+                with state.condition:
+                    queries = sum(item["phase"] == phase and item.get("resource") == 1
+                                  and item["method"] == "GET" and item["range"] == "bytes=0-"
+                                  for item in state.requests)
+                    gated |= state.hold_headers and queries == 2
             deadline = time.monotonic() + state.timeout
             if body and gated:
                 with state.condition:
@@ -447,7 +461,7 @@ class Run:
             raise AssertionError("A prior target process is still running before " + label)
         accounting_resume = scenario == "accounting" and phase == "resume"
         self.peer.configure(scenario, label, epoch, 0 if accounting_resume else budget, policy,
-                            hold_headers=expectation == "cleared",
+                            hold_headers=expectation in ("cleared", "transition"),
                             per_request_cap=ACCOUNTING_BUDGET // 2
                             if scenario == "accounting" and phase == "start" else None)
         arguments = dict(coldPhase=phase, coldExpectation=expectation,
@@ -465,7 +479,7 @@ class Run:
             arguments["coldErrorContains"] = "Clean restart requires a full response"
         if epoch > 0:
             arguments["coldReplacementSeed"] = seed + 97
-        if scenario == "earlier-resource":
+        if scenario in ("earlier-resource", "transition"):
             arguments["coldUrl2"] = arguments["coldUrl"].replace("/media", "/media2")
             arguments["coldCurrent"] = 1
         if scenario == "accounting":
@@ -475,6 +489,10 @@ class Run:
                 arguments["coldShowUi"] = "true"
         self.active = Instrumentation(self.adb, self.evidence, self.args.timeout,
                                       label, arguments)
+        if scenario == "transition" and phase != "start":
+            before = self.active.result("coldLoaded")
+            self.active_pid = int(before["pid"])
+            self.evidence.record("transition-loaded-before-start", label=label, **before)
         if accounting_resume:
             before = self.active.result("coldResumed")
             self.active_pid = int(before["pid"])
@@ -525,13 +543,19 @@ class Run:
                 if self.args.ui_hold_seconds:
                     self.capture_ui(label, result["done"] * 100 / result["length"],
                                     arguments["coldName"])
+        if expectation == "transition":
+            actual = self.output_digest(arguments["coldName"], label + "-before-death")
+            expected = dict(size=FIXTURE_SIZE, sha256=hashlib.sha256(
+                self.peer.fixtures[(scenario, 0)]).hexdigest())
+            if actual != expected:
+                raise AssertionError("Clean transition did not preserve exact A bytes")
         if complete:
             self.active.finish(killed=False)
         else:
             self.adb.kill(pid)
             self.active.finish(killed=True)
             self.previous_pid = pid
-            if scenario == "accounting":
+            if scenario in ("accounting", "transition"):
                 self.capture_checkpoint(result["timestamp"], label)
         # Repeat every wire assertion after exit: late retries/workers must not
         # escape the pre-kill snapshot. Shutdown performs one final joined audit.
@@ -643,7 +667,7 @@ class Run:
 
     def assert_output(self, scenario, name, label):
         digest = hashlib.sha256()
-        resources = 2 if scenario == "earlier-resource" else 1
+        resources = 2 if scenario in ("earlier-resource", "transition") else 1
         for resource in range(resources):
             digest.update(self.peer.fixtures[(scenario, resource)])
         expected = dict(size=FIXTURE_SIZE * resources, sha256=digest.hexdigest())
@@ -666,9 +690,13 @@ class Run:
                 all_downloads = [item for item in objects if "start" in item
                                  and item["end"] - item["start"] + 1 > 10]
                 downloads = [item for item in all_downloads
-                             if scenario != "earlier-resource" or item.get("resource") == 1]
+                             if scenario not in ("earlier-resource", "transition")
+                             or item.get("resource") == 1]
                 ready = downloads and (expectation != "cleared" or
                                        any(item.get("header_gated") for item in downloads))
+                if expectation == "transition":
+                    ready = any(item.get("resource") == 1 and item.get("header_gated")
+                                for item in probes)
                 if expectation in ("partial", "clearedPartial"):
                     ready = ready and any(item["bytes_sent"] > 0 for item in downloads)
                 if expectation == "accounting":
@@ -692,7 +720,9 @@ class Run:
                     or item["method"] not in ("GET", "HEAD"):
                 raise AssertionError("Unexpected phase request: " + repr(item))
             if "status" not in item:
-                if item.get("header_gated") and item.get("planned_status") == 200:
+                if item.get("header_gated") and (
+                        item.get("planned_status") == 200 or expectation == "transition"
+                        and item.get("resource") == 1 and item.get("planned_status") == 206):
                     continue  # Intentionally held before sending response headers.
                 if final:
                     raise AssertionError("Request ended without an observed response: " + repr(item))
@@ -707,7 +737,7 @@ class Run:
                 expected_status = 206 if item["range"] is not None or unsolicited else 200
             if item["status"] != expected_status:
                 raise AssertionError("Unexpected phase HTTP response: " + repr(item))
-        if scenario == "earlier-resource" and phase != "start" and any(
+        if scenario in ("earlier-resource", "transition") and phase != "start" and any(
                 item["path"].rsplit("/", 1)[-1] in ("media", "object") for item in requests):
             raise AssertionError("Cold restore re-requested the completed earlier resource")
 
@@ -719,23 +749,32 @@ class Run:
         if phase == "start":
             expected_probes[(0, "bytes=0-")] = 1
             expected_probes[(0, "bytes=%d-%d" % (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
-            if scenario == "earlier-resource":
+            if scenario in ("earlier-resource", "transition"):
                 expected_probes[(1, "bytes=0-")] = 2
-                expected_probes[(1, "bytes=%d-%d" %
-                                 (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
+                if scenario != "transition":
+                    expected_probes[(1, "bytes=%d-%d" %
+                                     (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
+        elif scenario == "transition":
+            expected_probes[(1, "bytes=0-")] = 1
+            expected_probes[(1, "bytes=%d-%d" %
+                             (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
         actual_probes = {}
         for item in probes:
             key = (item["resource"], item["range"])
             actual_probes[key] = actual_probes.get(key, 0) + 1
-            if item["if_range"] is not None or item.get("status") != 206:
+            held_transition = expectation == "transition" and item.get("resource") == 1 \
+                and item.get("header_gated") and item.get("planned_status") == 206
+            if item["if_range"] is not None or not (item.get("status") == 206 or held_transition):
                 raise AssertionError("Initializer probe used a validator or lacked 206")
         if actual_probes != expected_probes:
             raise AssertionError("Unexpected initializer probes in %s: %r != %r" %
                                  (label, actual_probes, expected_probes))
         heads = [item for item in requests if item["method"] == "HEAD"
                  and item["path"].rsplit("/", 1)[-1] in ("object", "object2")]
-        expected_heads = 2 if phase == "start" and scenario == "earlier-resource" \
+        expected_heads = 2 if phase == "start" and scenario in ("earlier-resource", "transition") \
             else int(phase == "start")
+        if scenario == "transition" and phase != "start":
+            expected_heads = 1
         if len(heads) != expected_heads or any(item.get("status") != 405 for item in heads):
             raise AssertionError("Unexpected HEAD/405 initializer fallback in " + label)
         if any(item["range"] != "bytes=0-" or item["if_range"] is not None for item in heads):
@@ -750,7 +789,7 @@ class Run:
         if len(downloads) > worker_cap:
             raise AssertionError("Too many media requests/workers/retries: " + repr(downloads))
         earlier_cap = FIXTURE_SIZE // (512 * 1024) \
-            if phase == "start" and scenario == "earlier-resource" else 0
+            if phase == "start" and scenario in ("earlier-resource", "transition") else 0
         if len(all_downloads) - len(downloads) > earlier_cap:
             raise AssertionError("Too many earlier-resource media requests")
         object_cap = worker_cap + earlier_cap + len(expected_probes) + expected_heads
@@ -769,7 +808,8 @@ class Run:
             if any(item["range"] is not None or item["if_range"] is not None
                    for item in downloads):
                 raise AssertionError("Full-only replacement sent Range/If-Range: " + repr(downloads))
-        if phase != "startReplacement" and loaded and not loaded.get("forceFullDownload"):
+        if phase != "startReplacement" and loaded and not loaded.get("forceFullDownload") \
+                and scenario != "transition":
             saved = loaded.get("checkpoint") or loaded
             blocks = saved.get("blocks") or []
             for request in downloads:
@@ -801,6 +841,13 @@ class Run:
             wanted = '"cold-' + scenario + '-' + str(epoch) + '"'
             if any(item["if_range"] != wanted for item in downloads):
                 raise AssertionError("Stable resume lost the persisted strong validator")
+        if expectation == "transition":
+            if downloads:
+                raise AssertionError("B workers started before the clean transition gate")
+            earlier_bytes = sum(item["bytes_sent"] for item in all_downloads
+                                if item.get("resource") == 0)
+            if earlier_bytes != FIXTURE_SIZE:
+                raise AssertionError("Transition did not completely transfer A exactly once")
         if scenario == "accounting" and expectation == "accounting":
             if sum(item["bytes_sent"] for item in downloads) != budget:
                 raise AssertionError("Accounting gate did not consume exactly its body budget")
@@ -812,7 +859,7 @@ class Run:
     def scenario(self, name, seed):
         payload = fixture(FIXTURE_SIZE, seed)
         self.peer.fixtures[(name, 0)] = payload
-        if name == "earlier-resource":
+        if name in ("earlier-resource", "transition"):
             second = fixture(FIXTURE_SIZE, seed + 1)
             self.peer.fixtures[(name, 1)] = second
             self.evidence.record("fixture", scenario=name, resource=1, seed=seed + 1,
@@ -820,6 +867,10 @@ class Run:
         self.evidence.record("fixture", scenario=name, seed=seed, size=len(payload),
                              sha256=hashlib.sha256(payload).hexdigest(),
                              formula="(i*31 + (i>>8)*17 + seed) & 255")
+        if name == "transition":
+            self.phase(name, seed, "start", "transition", 0, 0)
+            self.phase(name, seed, "assertComplete", "complete", 0, None, complete=True)
+            return
         if name == "accounting":
             (self.evidence.directory / "accounting.fixture.bin").write_bytes(payload)
             self.phase(name, seed, "start", "accounting", 0, ACCOUNTING_BUDGET)
