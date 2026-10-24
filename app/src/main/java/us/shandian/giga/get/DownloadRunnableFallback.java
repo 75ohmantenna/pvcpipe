@@ -65,7 +65,8 @@ public class DownloadRunnableFallback extends Thread {
 
         while (mMission.running) {
             try {
-                final long rangeStart = mMission.unknownLength || start < 1 ? -1 : start;
+                final long rangeStart = mMission.forceFullDownload || mMission.unknownLength
+                        || start < 1 ? -1 : start;
                 mConn = mMission.openConnection(false, rangeStart, -1);
                 if (mRetryCount == 0 && rangeStart == -1 && !mMission.forceFullDownload) {
                     // workaround: bypass android connection pool
@@ -75,7 +76,7 @@ public class DownloadRunnableFallback extends Thread {
                 final String sentIfRange = mConn.getRequestProperty("If-Range");
                 mMission.establishConnection(1, mConn);
                 final int status = mConn.getResponseCode();
-                if (mMission.forceFullDownload && rangeStart < 0 && status == 206) {
+                if (mMission.forceFullDownload && status == 206) {
                     throw new ValidatedRange.InvalidRangeException(
                             "Clean restart requires a full response, not an unsolicited range");
                 }
@@ -106,23 +107,7 @@ public class DownloadRunnableFallback extends Thread {
                     mMission.unknownLength = false;
                 } else if (status == 200) {
                     range = null;
-                    final long responseLength = Utility.getContentLength(mConn);
-                    if (responseLength == 0) {
-                        throw new IOException("Empty full response");
-                    }
-                    if (!mMission.unknownLength && mMission.length > 0
-                            && responseLength >= 0 && responseLength != mMission.length) {
-                        throw new IOException("Full response length changed while downloading");
-                    }
-                    if (responseLength >= 0) {
-                        mMission.length = responseLength;
-                        mMission.unknownLength = false;
-                    } else if (mMission.unknownLength || mMission.length < 1) {
-                        // An unknown-length mission counts downloaded bytes in length.
-                        // Retried full responses must start counting again from zero.
-                        mMission.length = 0;
-                        mMission.unknownLength = true;
-                    }
+                    updateFullResponseLength(Utility.getContentLength(mConn));
                     // A full response safely replaces a partial one only in this single-worker
                     // fallback mode. Drop any old tail before accepting its bytes.
                 } else {
@@ -132,6 +117,7 @@ public class DownloadRunnableFallback extends Thread {
                 final boolean restart = status == 200 || rangeStart < 0;
                 if (restart) {
                     mMission.done = mMission.offsets[mMission.current] - mMission.offsets[0];
+                    mMission.fallbackResumeOffset = 0;
                     start = 0;
                 }
                 if (status == 200) {
@@ -203,6 +189,26 @@ public class DownloadRunnableFallback extends Thread {
                     Log.e(TAG, "got exception, retrying...", e);
                 }
             }
+        }
+    }
+
+    private void updateFullResponseLength(final long responseLength) throws IOException {
+        if (responseLength == 0) {
+            throw new IOException("Empty full response");
+        }
+        if (!mMission.forceFullDownload && !mMission.unknownLength
+                && mMission.length > 0 && responseLength >= 0
+                && responseLength != mMission.length) {
+            throw new IOException("Full response length changed while downloading");
+        }
+        if (responseLength >= 0) {
+            mMission.length = responseLength;
+            mMission.unknownLength = false;
+        } else if (mMission.forceFullDownload || mMission.unknownLength || mMission.length < 1) {
+            // An unknown-length mission counts downloaded bytes in length.
+            // Retried full responses must start counting again from zero.
+            mMission.length = 0;
+            mMission.unknownLength = true;
         }
     }
 

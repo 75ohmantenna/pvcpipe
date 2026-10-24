@@ -75,15 +75,22 @@ A missing response validator can still be accepted when the same resource
 honors the sent `If-Range` condition
 ([section 13.1.5](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.5)).
 
-Normally **Start** resumes the saved mission. After an initialized mission fails
-range-integrity validation, Start instead waits for its previous initializer and
-workers to stop, discards the current resource's progress and identity, and uses
-one fallback worker. Its clean GET sends neither `Range` nor `If-Range`, and must
-receive a full response rather than an unsolicited 206. The fallback truncates
-the current resource before writing the replacement; completed earlier resources
-are retained. This is an explicit user retry, not an automatic restart loop.
-Transport retries retain the existing retry limit. A later pause/resume uses
-the replacement representation's identity and normal range checks.
+Normally **Start** resumes the saved mission. An initialized mission's
+range-integrity failure records a clean-restart requirement that later worker
+errors cannot erase. Start waits for its previous initializer and workers to
+stop, discards the current resource's progress and identity, and uses one
+fallback worker. Before replacing media bytes, it must save the cleared-progress
+checkpoint; a failed save stops the restart and leaves the old file untouched.
+Completed earlier resources are retained.
+
+This fallback stays full-response-only until the current resource finishes.
+Its GETs send neither `Range` nor `If-Range`, and an unsolicited 206 is rejected.
+Each accepted full response truncates the current resource before replacement.
+A transport retry or pause/resume fetches the whole current resource again,
+rather than trusting a partially written replacement or stale saved offset.
+This can lose partial progress on an unstable connection; ordinary direct and
+ranged missions keep their existing resume behavior. Transport retries retain
+the existing limit, and integrity errors do not create an automatic restart loop.
 
 Controlled API 26 service verification on 2026-10-24 reproduced the original
 rejection and repeated Start failure, then verified clean-restart completion
@@ -185,7 +192,8 @@ grants read access to that one file.
 `UtilityAtomicCheckpointTest` cover preparation, checkpoints and recovery.
 `DownloadRangeIntegrityTest` checks real local HTTP responses and file bytes,
 including redirect identity, range bounds, clean restarts after stopped writers,
-replacement of partial resources, and serialized clean-restart behavior.
+checkpoint-save failure, late errors, replacement offsets, and serialized
+full-response-only recovery.
 `DownloadManagerDeleteEntryTest` covers removing entries, and
 `FilenameUtilsTest` and `StoredFileNameContainmentTest` cover file names.
 
