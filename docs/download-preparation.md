@@ -62,6 +62,51 @@ unfinished downloads are not migrated.
 The media file, the checkpoint and the finished-downloads database are three
 separate things on disk. No transaction spans them.
 
+## Ranged response integrity and Start
+
+An HTTP range response must identify the requested byte interval and resource
+length, use identity encoding, and agree with its advertised content length.
+When a strong validator is available, `ResourceIdentity` binds it to both the
+requested URL and the final effective URL after redirects. Equal ETag text on
+different resources does not establish interchangeable bytes
+([RFC 9110, section 8.8.1](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.1)).
+Partial responses with changed destinations or validators are rejected before writing.
+A missing response validator can still be accepted when the same resource
+honors the sent `If-Range` condition
+([section 13.1.5](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.5)).
+
+Normally **Start** resumes the saved mission. An initialized mission's
+range-integrity failure records a clean-restart requirement that later worker
+errors cannot erase. Start waits for its previous initializer and workers to
+stop, discards the current resource's progress and identity, and uses one
+fallback worker. Before replacing media bytes, it must save the cleared-progress
+checkpoint; a failed save stops the restart and leaves the old file untouched.
+Completed earlier resources are retained.
+
+This fallback stays full-response-only until the current resource finishes or is reset.
+Its GETs send neither `Range` nor `If-Range`, and an unsolicited 206 is rejected.
+Each accepted full response truncates the current resource before replacement.
+A transport retry or pause/resume fetches the whole current resource again,
+rather than trusting a partially written replacement or stale saved offset.
+This can lose partial progress on an unstable connection; ordinary direct and
+ranged missions keep their existing resume behavior. Transport retries retain
+the existing limit, and integrity errors do not create an automatic restart loop.
+
+Controlled API 26 service verification on 2026-10-24 reproduced the original
+rejection and repeated Start failure, then verified clean-restart completion
+with exact bytes for both identical redirect content and different same-length
+content reusing an ETag. It also verified live pause/resume with readable
+checkpoints and pause-then-delete cancellation, not Android process-death replay.
+These are controlled HTTP peers, not evidence that the failed live YouTube
+destinations served equal bytes. The original smoke did not record their
+requested/effective URLs or validators.
+
+The controlled peers correctly ignored Range on HEAD
+([section 14.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-14.2)).
+Those fresh missions selected single-worker fallback; parallel range and
+partial-state integrity are separately covered by JVM HTTP fixtures. This does
+not establish correct parallel-capability detection for every host.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the
@@ -145,6 +190,10 @@ grants read access to that one file.
 `make ci` runs the unit tests: `DownloadPreparationTest`,
 `DownloadMissionLifecycleTest`, `DownloadManagerCheckpointTest` and
 `UtilityAtomicCheckpointTest` cover preparation, checkpoints and recovery.
+`DownloadRangeIntegrityTest` checks real local HTTP responses and file bytes,
+including redirect identity, range bounds, clean restarts after stopped writers,
+checkpoint-save failure, late errors, replacement offsets, and serialized
+full-response-only recovery.
 `DownloadManagerDeleteEntryTest` covers removing entries, and
 `FilenameUtilsTest` and `StoredFileNameContainmentTest` cover file names.
 

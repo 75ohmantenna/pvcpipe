@@ -151,6 +151,9 @@ public class DownloadMission extends Mission {
     /** Serialized with the partial bytes for the current resource; absent on older missions. */
     volatile ResourceIdentity resourceIdentity;
     private volatile boolean unverifiedCurrentBytes;
+    /** After an integrity failure, use full responses until the current resource finishes. */
+    boolean forceFullDownload;
+    private boolean rangeErrorRestartPending;
 
     private transient int finishCount;
     public transient volatile boolean running;
@@ -475,6 +478,8 @@ public class DownloadMission extends Mission {
             }
         }
 
+        rangeErrorRestartPending |= blocks != null
+                && err instanceof ValidatedRange.InvalidRangeException;
         errCode = code;
         errObject = err;
 
@@ -576,6 +581,11 @@ public class DownloadMission extends Mission {
             return;
         }
 
+        // Older checkpoints carry only errObject; new failures also retain a sticky marker
+        // so another worker's late HTTP error cannot cancel the required clean restart.
+        rangeErrorRestartPending |= blocks != null
+                && errObject instanceof ValidatedRange.InvalidRangeException;
+
         final Thread previousInitializer = init;
         final Thread[] previousWorkers = threads;
         boolean waiting = previousInitializer != null && previousInitializer.isAlive();
@@ -622,12 +632,29 @@ public class DownloadMission extends Mission {
 
     // Called under the mission monitor, after all previous workers have stopped.
     private void startDownload() {
-        if (reinitialize) {
+        if (rangeErrorRestartPending) {
+            // start() has joined every previous writer. Keep completed resources, but never
+            // resume questionable bytes or compare a fresh response with their old identity.
+            resetState(false, false, ERROR_NOTHING);
+            blocks = new int[0];
+            unknownLength = true;
+            forceFullDownload = true;
+            reinitialize = false;
+            if (metadata != null && !writeThisToFile()) {
+                // The previous checkpoint still describes the old bytes. Do not replace
+                // those bytes until a clean-restart checkpoint can be made durable.
+                checkpointReady = false;
+                notifyError(ERROR_FILE_CREATION,
+                        new IOException("Unable to save clean restart checkpoint"));
+                return;
+            }
+        } else if (reinitialize) {
             resetState(false, true, ERROR_NOTHING);
             reinitialize = false;
         }
         running = true;
         errCode = ERROR_NOTHING;
+        errObject = null;
 
         if (hasInvalidStorage()) {
             notifyError(ERROR_FILE_CREATION, null);
@@ -656,7 +683,7 @@ public class DownloadMission extends Mission {
         blockAcquired = new boolean[blocks.length];
 
         if (blocks.length < 1) {
-            threads = new Thread[]{new DownloadRunnableFallback(this)};
+            threads = new Thread[]{createFallbackWorker()};
             runAsync(1, threads[0]);
         } else {
             int remainingBlocks = 0;
@@ -785,6 +812,8 @@ public class DownloadMission extends Mission {
         blockAcquired = null;
         resourceIdentity = null;
         unverifiedCurrentBytes = false;
+        forceFullDownload = false;
+        rangeErrorRestartPending = false;
 
         if (rollback) {
             current = 0;
@@ -807,6 +836,10 @@ public class DownloadMission extends Mission {
 
     Thread createDownloadWorker(final int index) {
         return new DownloadRunnable(this, index);
+    }
+
+    Thread createFallbackWorker() {
+        return new DownloadRunnableFallback(this);
     }
 
     private void writeThisToFileAsync() {

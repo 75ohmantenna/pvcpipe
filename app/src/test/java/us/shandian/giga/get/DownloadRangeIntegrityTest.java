@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import us.shandian.giga.io.FileStream;
 import us.shandian.giga.service.DownloadManagerService;
+import us.shandian.giga.util.Utility;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -172,13 +173,16 @@ public class DownloadRangeIntegrityTest {
         private final Headers requestHeaders = new Headers();
         private final Headers responseHeaders = new Headers();
         private final String method;
+        private final String path;
 
         LocalExchange(final Socket socket) throws IOException {
             this.socket = socket;
             socket.setSoTimeout(5000);
             final BufferedReader reader = new BufferedReader(new InputStreamReader(
                     socket.getInputStream(), StandardCharsets.US_ASCII));
-            method = reader.readLine().split(" ", 2)[0];
+            final String[] request = reader.readLine().split(" ", 3);
+            method = request[0];
+            path = request[1];
             String line;
             while ((line = reader.readLine()) != null && !line.isEmpty()) {
                 final int colon = line.indexOf(':');
@@ -257,6 +261,18 @@ public class DownloadRangeIntegrityTest {
             @Override
             Thread createDownloadWorker(final int index) {
                 return new DownloadRunnable(this, index) {
+                    @Override
+                    public void run() {
+                        try (var logging = mockStatic(Log.class)) {
+                            super.run();
+                        }
+                    }
+                };
+            }
+
+            @Override
+            Thread createFallbackWorker() {
+                return new DownloadRunnableFallback(this) {
                     @Override
                     public void run() {
                         try (var logging = mockStatic(Log.class)) {
@@ -639,6 +655,23 @@ public class DownloadRangeIntegrityTest {
     }
 
     @Test
+    public void stableRedirectKeepsParallelRangesOnTheSameResource() throws Exception {
+        rule = (exchange, start, end) -> {
+            if ("/media".equals(exchange.path)) {
+                exchange.getResponseHeaders().set("Location", "/body");
+                exchange.sendResponseHeaders(302, 0);
+            } else {
+                sendVersionedRange(exchange, start, end, content, "\"v1\"");
+            }
+        };
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission mission = mission(terminal);
+        mission.threadCount = 3;
+        runAndAwait(mission, terminal);
+        assertCompleted(mission);
+    }
+
+    @Test
     public void strongValidatorSurvivesFailedWorkerAndResume() throws Exception {
         final AtomicInteger conditionalRequests = new AtomicInteger();
         rule = (exchange, start, end) -> {
@@ -929,6 +962,65 @@ public class DownloadRangeIntegrityTest {
     }
 
     @Test
+    public void replacementCheckpointCannotResumePastNewlyWrittenBytes() throws Exception {
+        final byte[] changed = content.clone();
+        for (int i = 0; i < changed.length; i++) {
+            changed[i] ^= 0x5a;
+        }
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission mission = mission(terminal);
+        final AtomicReference<Long> replacementOffset = new AtomicReference<>();
+        final AtomicReference<Exception> peerFailure = new AtomicReference<>();
+        mission.blocks = new int[0];
+        mission.unknownLength = true;
+        mission.maxRetry = 1;
+        mission.metadata = null;
+        rule = (exchange, start, end) -> {
+            exchange.getResponseHeaders().set("ETag",
+                    mediaRequests.get() == 1 ? "\"v1\"" : "\"v2\"");
+            exchange.sendResponseHeaders(200, content.length);
+            if (mediaRequests.get() == 1) {
+                exchange.getResponseBody().write(content, 0, 187);
+                return; // A transport failure, not a representation-completeness success.
+            }
+            exchange.getResponseBody().write(changed, 0, 100);
+            exchange.getResponseBody().flush();
+            try {
+                final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (System.nanoTime() < deadline) {
+                    synchronized (mission) {
+                        if (mission.done == 100) {
+                            replacementOffset.set(mission.fallbackResumeOffset);
+                            mission.pause();
+                            return;
+                        }
+                    }
+                    Thread.sleep(1);
+                }
+                throw new IOException("Replacement prefix was not accepted");
+            } catch (final Exception error) {
+                peerFailure.set(error);
+                throw new IOException(error);
+            }
+        };
+        try (var logging = mockStatic(Log.class)) {
+            mission.running = true;
+            new DownloadRunnableFallback(mission).run();
+        }
+        assertNull(peerFailure.get());
+        assertEquals(Long.valueOf(0), replacementOffset.get());
+        assertEquals(100, mission.done);
+        assertArrayEquals(Arrays.copyOf(changed, 100), Files.readAllBytes(target.toPath()));
+
+        rule = (exchange, start, end) ->
+                sendVersionedRange(exchange, start, end, changed, "\"v2\"");
+        runAndAwait(mission, terminal);
+        assertEquals(DownloadMission.ERROR_NOTHING, mission.errCode);
+        assertTrue(mission.isFinished());
+        assertArrayEquals(changed, Files.readAllBytes(target.toPath()));
+    }
+
+    @Test
     public void missionSerializationRetainsBoundIdentityAndLoadsUnboundState() throws Exception {
         rule = (exchange, start, end) ->
                 sendVersionedRange(exchange, start, end, content, "\"v1\"");
@@ -961,6 +1053,87 @@ public class DownloadRangeIntegrityTest {
             final DownloadMission unbound = (DownloadMission) input.readObject();
             assertTrue(unbound.resourceIdentity == null);
         }
+    }
+
+    @Test
+    public void restoredCleanRestartStillRequestsAFullRepresentation() throws Exception {
+        rule = (exchange, start, end) -> {
+            assertNull(exchange.getRequestHeaders().getFirst("Range"));
+            assertNull(exchange.getRequestHeaders().getFirst("If-Range"));
+            exchange.sendResponseHeaders(200, content.length);
+            exchange.getResponseBody().write(content);
+        };
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission template = mission(terminal);
+        final DownloadMission saved = new DownloadMission(template.urls, null, 'v', null);
+        saved.blocks = new int[0];
+        saved.length = content.length + 40;
+        saved.done = 100;
+        saved.fallbackResumeOffset = 187;
+        Files.write(target.toPath(), new byte[100]);
+        saved.forceFullDownload = true;
+        final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream output = new ObjectOutputStream(bytes)) {
+            output.writeObject(saved);
+        }
+        final DownloadMission restored;
+        try (ObjectInputStream input = new ObjectInputStream(
+                new ByteArrayInputStream(bytes.toByteArray()))) {
+            restored = (DownloadMission) input.readObject();
+        }
+        restored.storage = template.storage;
+        watchTerminal(restored, terminal);
+        runAndAwait(restored, terminal);
+        assertCompleted(restored);
+    }
+
+    @Test
+    public void cleanRestartRejectsUnsolicitedPartialResponseWithoutWritingOrRetrying()
+            throws Exception {
+        final byte[] previous = Arrays.copyOf(content, 187);
+        Files.write(target.toPath(), previous);
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission mission = mission(terminal);
+        mission.blocks = new int[0];
+        mission.unknownLength = true;
+        mission.forceFullDownload = true;
+        mission.maxRetry = 5;
+        runAndAwait(mission, terminal);
+        assertFailed(mission);
+        assertEquals(0, mission.done);
+        assertEquals(1, mediaRequests.get());
+        assertArrayEquals(previous, Files.readAllBytes(target.toPath()));
+    }
+
+    @Test
+    public void failedCleanRestartCheckpointLeavesPartialFileUntouched() throws Exception {
+        final byte[] previous = Arrays.copyOf(content, 187);
+        Files.write(target.toPath(), previous);
+        rule = (exchange, start, end) -> {
+            exchange.sendResponseHeaders(200, content.length);
+            exchange.getResponseBody().write(content);
+        };
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission mission = mission(terminal);
+        mission.blocks = new int[]{187, 0, 0};
+        mission.length = content.length;
+        mission.done = 187;
+        mission.errObject = new ValidatedRange.InvalidRangeException("Restart required");
+        mission.checkpointReady = true;
+        try (var logging = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class)) {
+            utility.when(() -> Utility.writeToFile(mission.metadata, mission)).thenReturn(false);
+            mission.start();
+            assertTrue(terminal.await(15, TimeUnit.SECONDS));
+            for (final Thread worker : mission.threads) {
+                worker.join(5000);
+            }
+        }
+        assertFailed(mission);
+        assertFalse(mission.running);
+        assertFalse(mission.checkpointReady);
+        assertEquals(DownloadMission.ERROR_FILE_CREATION, mission.errCode);
+        assertArrayEquals(previous, Files.readAllBytes(target.toPath()));
     }
 
     @Test
@@ -1107,6 +1280,141 @@ public class DownloadRangeIntegrityTest {
         runAndAwait(mission, terminal);
         assertCompleted(mission);
         assertEquals("\"v1\"", mission.resourceIdentity.condition);
+    }
+
+    @Test
+    public void oldUninitializedErrorDoesNotReplaceFreshRangeInitialization() throws Exception {
+        final CountDownLatch terminal = new CountDownLatch(1);
+        final DownloadMission mission = mission(terminal);
+        // A restored checkpoint can retain a failed probe, but no initialized blocks.
+        mission.errObject = new ValidatedRange.InvalidRangeException("Previous failed probe");
+        runAndAwait(mission, terminal);
+        assertCompleted(mission);
+    }
+
+    @Test
+    public void startAfterRedirectRejectionRestartsIdenticalBytesWithoutRanges() throws Exception {
+        assertRedirectRestart(false);
+    }
+
+    @Test
+    public void startAfterRedirectRejectionReplacesPartialBytesDespiteReusedEtag()
+            throws Exception {
+        assertRedirectRestart(true);
+    }
+
+    private void assertRedirectRestart(final boolean partial) throws Exception {
+        final byte[] replacement = content.clone();
+        if (partial) {
+            for (int i = 0; i < replacement.length; i++) {
+                replacement[i] ^= 0x5a;
+            }
+        }
+        final AtomicInteger fullRequests = new AtomicInteger();
+        rule = (exchange, start, end) -> {
+            if ("/media".equals(exchange.path)) {
+                exchange.getResponseHeaders().set("Location",
+                        "HEAD".equals(exchange.getRequestMethod()) ? "/probe" : "/body");
+                exchange.sendResponseHeaders(302, 0);
+            } else if (exchange.getRequestHeaders().getFirst("Range") == null
+                    && "GET".equals(exchange.getRequestMethod())) {
+                fullRequests.incrementAndGet();
+                exchange.getResponseHeaders().set("ETag", "\"same-tag\"");
+                exchange.sendResponseHeaders(200, replacement.length);
+                exchange.getResponseBody().write(replacement);
+            } else {
+                sendVersionedRange(exchange, start, end,
+                        "HEAD".equals(exchange.getRequestMethod()) ? content : replacement,
+                        "\"same-tag\"");
+            }
+        };
+        final CountDownLatch rejected = new CountDownLatch(1);
+        final DownloadMission mission = mission(rejected);
+        mission.threadCount = 3;
+        final byte[] saved = Arrays.copyOf(content, 123 + 187);
+        System.arraycopy(content, 0, saved, 123, 187);
+        if (partial) {
+            final HttpURLConnection probe = mission.openConnection(true, 1, 1);
+            probe.getResponseCode();
+            mission.resourceIdentity = ResourceIdentity.from(probe, mission.urls[0]);
+            probe.disconnect();
+            mission.urls = new String[]{"https://example.invalid/completed", mission.urls[0]};
+            mission.offsets = new long[]{0, 123};
+            mission.current = 1;
+            Files.write(target.toPath(), saved);
+            mission.blocks = new int[]{187, 0, 0};
+            mission.length = content.length;
+            mission.done = 123 + 187;
+        }
+        runAndAwait(mission, rejected);
+        assertFailed(mission);
+        assertTrue(mission.errObject instanceof ValidatedRange.InvalidRangeException);
+        assertEquals(partial ? 123 + 187 : 0, mission.done);
+        if (partial) {
+            assertArrayEquals(saved, Files.readAllBytes(target.toPath()));
+            // A second worker can report an HTTP status after the integrity error.
+            try (var logging = mockStatic(Log.class)) {
+                mission.notifyError(new DownloadMission.HttpError(202));
+            }
+        }
+
+        restartAfterLastWriter(mission);
+        assertTrue(mission.isFinished());
+        assertEquals(DownloadMission.ERROR_NOTHING, mission.errCode);
+        assertEquals(1, fullRequests.get());
+        final byte[] expected;
+        if (partial) {
+            expected = Arrays.copyOf(content, 123 + replacement.length);
+            System.arraycopy(replacement, 0, expected, 123, replacement.length);
+        } else {
+            expected = replacement;
+        }
+        assertArrayEquals(expected, Files.readAllBytes(target.toPath()));
+    }
+
+    private void restartAfterLastWriter(final DownloadMission mission) throws Exception {
+        final CountDownLatch restarted = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        final AtomicReference<Exception> failure = new AtomicReference<>();
+        final byte[] before = Files.readAllBytes(target.toPath());
+        final long previousDone = mission.done;
+        final Thread previous = new Thread(() -> {
+            while (release.getCount() > 0) {
+                try {
+                    release.await();
+                } catch (final InterruptedException ignored) {
+                    // Model a writer still finishing an I/O operation after interruption.
+                }
+            }
+            try {
+                Files.write(target.toPath(), new byte[40],
+                        java.nio.file.StandardOpenOption.APPEND);
+            } catch (final IOException error) {
+                failure.set(error);
+            }
+        });
+        mission.threads = new Thread[]{previous};
+        // JVM byte-I/O fixture, not Android AtomicFile checkpoint evidence.
+        mission.metadata = null;
+        watchTerminal(mission, restarted);
+        previous.start();
+        try (var logging = mockStatic(Log.class)) {
+            try {
+                mission.start();
+                assertFalse("Old writer owns the state until it stops", mission.running);
+                assertEquals(previousDone, mission.done);
+                assertArrayEquals(before, Files.readAllBytes(target.toPath()));
+            } finally {
+                release.countDown();
+            }
+            assertTrue(restarted.await(15, TimeUnit.SECONDS));
+            previous.join(5000);
+            for (final Thread worker : mission.threads) {
+                worker.join(5000);
+            }
+        }
+        assertNull(failure.get());
+        assertFalse(previous.isAlive());
     }
 
     @Test
