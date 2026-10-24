@@ -542,10 +542,19 @@ public class DownloadMission extends Mission {
                 Log.d(TAG, "onFinish: downloaded " + (current + 1) + "/" + urls.length);
             }
 
-            current++;
+            // The writer holds LOCK through ObjectOutputStream serialization, not the
+            // mission monitor. Publish the next index only with its clean resource state.
+            synchronized (LOCK) {
+                current++;
+                if (current < urls.length) {
+                    offsets[current] = offsets[current - 1] + length;
+                    resetState(false, false, ERROR_NOTHING);
+                }
+                // Keep the last resource's length/offsets at the post-processing boundary.
+            }
             if (current < urls.length) {
-                // prepare next sub-mission
-                offsets[current] = offsets[current - 1] + length;
+                // Persist and schedule only after the whole transition is visible.
+                writeThisToFile();
                 initializer();
                 return;
             }

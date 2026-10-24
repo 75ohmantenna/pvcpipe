@@ -46,10 +46,6 @@ public class DownloadInitializer extends Thread {
     @Override
     @SuppressWarnings("checkstyle:MethodLength")
     public void run() {
-        if (mMission.current > 0) {
-            mMission.resetState(false, true, DownloadMission.ERROR_NOTHING);
-        }
-
         int retryCount = 0;
         int httpCode = 204;
         boolean headRequest = true;

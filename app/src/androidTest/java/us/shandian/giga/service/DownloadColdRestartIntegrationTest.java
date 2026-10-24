@@ -114,6 +114,16 @@ public class DownloadColdRestartIntegrationTest {
                 loadedBlocks = blocks == null ? null : blocks.clone();
                 loadedResumeOffset = (long) field(pending, "fallbackResumeOffset");
                 assertFalse("Cold-loaded mission already running", pending.running);
+                if ("transition".equals(required("coldScenario"))) {
+                    assertTrue("Cold loader must retain a clean B resource before Start",
+                            cleanNextResource(pending));
+                    final DownloadMission saved = checkpoint(pending);
+                    assertNotNull("Clean transition checkpoint must survive SIGKILL", saved);
+                    assertTrue("Durable transition must remain clean before Start",
+                            cleanNextResource(saved));
+                    publish("coldLoaded", new JSONObject().put("loaded", loaded)
+                            .put("pid", Process.myPid()));
+                }
                 if ("accounting".equals(required("coldScenario"))
                         && "resume".equals(phase)) {
                     accountingBudget = fixtureSize() - resumableCurrentBytes(pending)
@@ -278,6 +288,12 @@ public class DownloadColdRestartIntegrationTest {
                             case "loaded":
                                 matches = true;
                                 break;
+                            case "transition":
+                                // The host holds B's own initializer query after A's aggregate
+                                // sizing query, before any B identity, length or blocks bind.
+                                matches = pending.running && cleanNextResource(pending)
+                                        && cleanNextResource(saved);
+                                break;
                             case "partial":
                                 matches = pending.running && saved.done > Math.max(base, loadedDone)
                                         && field(saved, "resourceIdentity") != null
@@ -332,6 +348,20 @@ public class DownloadColdRestartIntegrationTest {
             SystemClock.sleep(25);
         } while (SystemClock.elapsedRealtime() < deadline);
         throw new AssertionError("Timed out awaiting " + expectation + ": " + last);
+    }
+
+    private boolean cleanNextResource(final DownloadMission mission) throws Exception {
+        return mission.urls.length == 2 && mission.current == 1
+                && mission.offsets.length == 2 && mission.offsets[0] == 0
+                && mission.offsets[1] == fixtureSize() && mission.done == fixtureSize()
+                && mission.length == 0 && !mission.unknownLength
+                && mission.errCode == DownloadMission.ERROR_NOTHING && mission.errObject == null
+                && field(mission, "blocks") == null
+                && (long) field(mission, "fallbackResumeOffset") == 0
+                && field(mission, "resourceIdentity") == null
+                && !(boolean) field(mission, "unverifiedCurrentBytes")
+                && !(boolean) field(mission, "forceFullDownload")
+                && !(boolean) field(mission, "rangeErrorRestartPending");
     }
 
     private boolean advancedResumablePosition(final DownloadMission mission) throws Exception {
@@ -414,6 +444,7 @@ public class DownloadColdRestartIntegrationTest {
                 .put("length", mission.length).put("unknownLength", mission.unknownLength)
                 .put("forceFullDownload", field(mission, "forceFullDownload"))
                 .put("rangeErrorRestartPending", field(mission, "rangeErrorRestartPending"))
+                .put("unverifiedCurrentBytes", field(mission, "unverifiedCurrentBytes"))
                 .put("fallbackResumeOffset", field(mission, "fallbackResumeOffset"))
                 .put("offsets", new JSONArray(mission.offsets))
                 .put("blocks", field(mission, "blocks") == null ? JSONObject.NULL
