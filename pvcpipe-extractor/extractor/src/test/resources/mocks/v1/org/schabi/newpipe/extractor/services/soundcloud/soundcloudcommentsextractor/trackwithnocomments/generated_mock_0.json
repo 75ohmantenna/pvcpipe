@@ -32,7 +32,7 @@
         "enabledFeatures; dur\u003d4.684674; desc\u003d\"api-v2/enabledFeatures\", geoip; dur\u003d0.97542; desc\u003d\"geoip/geoip\", privacySettings; dur\u003d5.120645; desc\u003d\"api-v2/privacySettings\""
       ],
       "set-cookie": [
-        "sc_tracking_anonymous_id\u003d%22f0acfd7e-4998-435d-8e88-3e5d8a30b236%22; path\u003d/; expires\u003dThu, 13 Apr 2028 03:49:08 GMT; domain\u003d.soundcloud.com"
+        "sc_tracking_anonymous_id=SYNTHETIC_COOKIE; path=/; expires=Thu, 13 Apr 2028 03:49:08 GMT; domain=.soundcloud.com"
       ],
       "strict-transport-security": [
         "max-age\u003d63072000; includeSubdomains; preload"

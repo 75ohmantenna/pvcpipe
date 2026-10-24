@@ -77,9 +77,9 @@
         "ESF"
       ],
       "set-cookie": [
-        "__Secure-YENID\u003d16.YTE\u003dmz6BG1nbcEv9ASswF0Hwd5A3gtHz3jyMfQDf9w4e4ozr7LTXNFpwFNlzqszL90Z_1moGFtQFJtDbRODNoqIJwi1DfnNfF0XeG_g7o9Tw_wlB2VXXkKqcqAacAHw0fYp5TyI2WPk5Kzrl9csH852NvSoVfvXOkfI6ZRPDNth5iV_K3wkF8Oum-GkCAJv1wRs1hRWFcHdMgjtOJHiu380-o0c63c5VRcwt1t-0olmpwhRD2fh5xpimxdJMtmb_nuD0WRCcTE3ScqLecnUMdljipi7NIRiP8-h5-8YtfBZztCsWUnFkp8iA13vehkVEkQ5zN304Uu7oLMKsmfJEyUyWaA; expires\u003dWed, 07-Jul-2027 22:15:15 GMT; path\u003d/; domain\u003d.youtube.com; Secure; HttpOnly; SameSite\u003dlax",
-        "YSC\u003dGPltqHAzrVA; Domain\u003d.youtube.com; Path\u003d/; Secure; HttpOnly; SameSite\u003dnone",
-        "VISITOR_INFO1_LIVE\u003d; Domain\u003d.youtube.com; Expires\u003dMon, 11-Sep-2023 22:15:15 GMT; Path\u003d/; Secure; HttpOnly; SameSite\u003dnone"
+        "__Secure-YENID=SYNTHETIC_COOKIE; expires=Wed, 07-Jul-2027 22:15:15 GMT; path=/; domain=.youtube.com; Secure; HttpOnly; SameSite=lax",
+        "YSC=SYNTHETIC_COOKIE; Domain=.youtube.com; Path=/; Secure; HttpOnly; SameSite=none",
+        "VISITOR_INFO1_LIVE=SYNTHETIC_COOKIE; Domain=.youtube.com; Expires=Mon, 11-Sep-2023 22:15:15 GMT; Path=/; Secure; HttpOnly; SameSite=none"
       ],
       "strict-transport-security": [
         "max-age\u003d31536000"

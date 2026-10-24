@@ -8,6 +8,8 @@
   Checkstyle. Install both so Gradle can resolve the declared toolchains.
   The daemon JVM criteria in both builds select Java 25 even when the shell's
   `JAVA_HOME` points to another version. No automatic JDK download is configured.
+- Python 3 for the offline recorded-fixture privacy checks in `make ci`.
+  These checks use only the Python standard library.
 - Both Gradle wrappers download Gradle 9.8.2 and verify its SHA-256 checksum.
   A globally installed Gradle does not change the wrapper version. Initial builds
   also need access to the dependency repositories declared in the settings files.
@@ -49,7 +51,9 @@ publishing step. This repository declares no publication workflow.
 make ci                        # every check below, then both APKs
 ```
 
-`make ci` runs five serial Gradle invocations and stops at the first failure:
+`make ci` first runs the offline fixture-sanitizer tests and checks recorded
+fixtures for known captured identifiers. It then runs five serial Gradle
+invocations and stops at the first failure:
 static/build-logic checks, JVM tests, Android lint, the debug APK, then the release
 APK. Each invocation uses `--no-daemon` so compiler and lint memory is released
 between stages.
@@ -116,18 +120,15 @@ passwords on command lines. Run `./gradlew --no-daemon :app:assembleRelease` to
 build with the configured key, and verify the APK certificate before distributing
 it. Signing an APK does not publish it or make a Git tag a release.
 
-This laptop's dedicated key is `~/.local/share/pvcpipe-signing/release.p12`,
-alias `pvcpipe-release`. Its public certificate is `release-cert.pem` in that
-directory. The encrypted backup bundle is
-`~/.local/share/pvcpipe-signing/backups/pvcpipe-release-signing-2026-10-22.tar.gpg`;
-it contains the keystore, signing properties, public certificate and recovery
-instructions. Its separate decryption passphrase is in the private file
-`~/.config/pvcpipe/signing-backup-passphrase.txt`.
+Keep a private inventory of the keystore, alias, public certificate and encrypted
+backup location outside the public checkout. Store the backup's decryption
+passphrase separately from the encrypted bundle; do not publish machine-specific
+recovery paths or credential locations in project documentation.
 
 Copy the encrypted bundle to offline storage and save the decryption passphrase
-separately in a password manager. Both are needed for recovery; copies on this
-laptop alone do not protect against losing the laptop. A recovery round-trip was
-verified locally when the bundle was created. After restoring elsewhere, update
+separately in a password manager. Both are needed for recovery; copies on the
+same machine alone do not protect against losing it. A local recovery round-trip
+was verified on 2026-10-22. After restoring elsewhere, update
 `storeFile` to the restored absolute path and preserve the alias and passwords.
 Do not generate a new signing identity for existing installations: updates must
 retain their original signing key.

@@ -1,7 +1,7 @@
 {
   "request": {
     "httpMethod": "GET",
-    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/progressive?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ\u0026track_authorization\u003deyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJERSIsInN1YiI6IiIsInJpZCI6ImI0ZWZjMjBmLTY2MGQtNDhjMS1iMzNlLWZhZTBmYWIwODA3OCIsImlhdCI6MTc3MTYzNjEwMX0.EwHcS8NN4ooY6pm6HQDPJkLIT3NP62XsTp_nGIDpwaI",
+    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/progressive?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN",
     "headers": {
       "Accept-Language": [
         "en-GB, en;q\u003d0.9"
@@ -63,6 +63,6 @@
       ]
     },
     "responseBody": "{\"url\":\"https://cf-media.sndcdn.com/Cs8zhDOA53fb.128.mp3?Policy\u003deyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiKjovL2NmLW1lZGlhLnNuZGNkbi5jb20vQ3M4emhET0E1M2ZiLjEyOC5tcDMqIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzcxNjM2NDI0fX19XX0_\u0026Signature\u003dFBLZrLZtGgy9Kk4BFa7qoCZL3YzJFEMq~ZywmylDav10NGV8LIRT5nULQiMEtGHMq7lMwOVQQidtpaYx7mqKu8EyZi68kn7llUvrZjXyq5lSJo3EWFPUjtDOvLd7Qm1zFMvXg4N1IoVfcJj~pkOju1hqUUA0FJpFCaKXEsjj8k5YS5QmN2bXinSnqL80qXHtAscS-y-Ev82ANP4guAHawoz-GETZRKeD7gNJZ-kQM~~60sMfhs3A93LvrLLGHDNFC1RC8dtEP7Wo-V42My7j24Ua0a7~6UZ1Neb5O4Pty-LMytA4jsYRFL236ZaYeonYWXOhU8KfzRniecO7H~kYCw__\u0026Key-Pair-Id\u003dAPKAI6TU7MMXM5DG6EPQ\"}",
-    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/progressive?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ\u0026track_authorization\u003deyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJERSIsInN1YiI6IiIsInJpZCI6ImI0ZWZjMjBmLTY2MGQtNDhjMS1iMzNlLWZhZTBmYWIwODA3OCIsImlhdCI6MTc3MTYzNjEwMX0.EwHcS8NN4ooY6pm6HQDPJkLIT3NP62XsTp_nGIDpwaI"
+    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:2167944333/d999571e-4114-45c9-8bd0-0542ab7b5690/stream/progressive?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN"
   }
 }
