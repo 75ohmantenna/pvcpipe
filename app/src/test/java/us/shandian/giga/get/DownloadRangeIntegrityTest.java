@@ -20,6 +20,7 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
@@ -28,8 +29,11 @@ import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -64,6 +68,7 @@ public class DownloadRangeIntegrityTest {
     private File target;
     private final AtomicInteger mediaRequests = new AtomicInteger();
     private final AtomicInteger missions = new AtomicInteger();
+    private final List<RetryMission> retryMissions = new ArrayList<>();
     private final AtomicInteger refusedHeadRequests = new AtomicInteger();
     private ResponseRule rule;
     // When set, the server answers every HEAD request with this status and no length.
@@ -103,9 +108,24 @@ public class DownloadRangeIntegrityTest {
     }
 
     @After
-    public void tearDown() throws IOException {
-        server.close();
-        executor.shutdownNow();
+    public void tearDown() throws Exception {
+        try {
+            for (final RetryMission mission : retryMissions) {
+                mission.releaseReconnect.countDown();
+                mission.releaseExit.countDown();
+                try (var logging = mockStatic(Log.class)) {
+                    mission.pause();
+                }
+                mission.joinCreatedThreads();
+            }
+        } finally {
+            server.close();
+            executor.shutdownNow();
+            if (!retryMissions.isEmpty()) {
+                assertTrue("HTTP fixture threads leaked",
+                        executor.awaitTermination(5, TimeUnit.SECONDS));
+            }
+        }
     }
 
     private void handle(final LocalExchange exchange) throws IOException {
@@ -1434,6 +1454,492 @@ public class DownloadRangeIntegrityTest {
         mission.threadCount = 2;
         runAndAwait(mission, terminal);
         assertFailed(mission);
+    }
+
+    @Test
+    public void terminalReconnectPublishesPartialBlockBeforeWarmStart() throws Exception {
+        final RetryMission mission = retryMission(true, false);
+        startAtReconnect(mission);
+        assertRetryOwnsPartialBlock(mission);
+        mission.releaseReconnect.countDown();
+        awaitRetry(mission.terminal, "terminal reconnect failure");
+        mission.joinCreatedThreads();
+        assertEquals(503, mission.errCode);
+        assertPublishedPartialBlock(mission);
+
+        final CountDownLatch resumed = new CountDownLatch(1);
+        watchTerminal(mission, resumed);
+        runAndAwait(mission, resumed); // The same mission's real warm Start, not a new worker.
+        mission.joinCreatedThreads();
+        assertCompletedRetry(mission, 2);
+    }
+
+    @Test
+    public void successfulBodyRetryRetainsOwnershipAcrossReconnect() throws Exception {
+        final RetryMission mission = retryMission(false, false);
+        startAtReconnect(mission);
+        assertRetryOwnsPartialBlock(mission);
+        mission.releaseReconnect.countDown();
+        awaitRetry(mission.terminal, "successful body retry");
+        mission.joinCreatedThreads();
+        assertCompletedRetry(mission, 1);
+    }
+
+    @Test
+    public void pauseDuringReconnectJoinsOldWorkerBeforeWarmStart() throws Exception {
+        final RetryMission mission = retryMission(false, true);
+        startAtReconnect(mission);
+        assertRetryOwnsPartialBlock(mission);
+        try (var logging = mockStatic(Log.class)) {
+            mission.pause();
+        }
+        awaitRetry(mission.ownerCleanup, "paused owner published its partial block");
+        assertPublishedPartialBlock(mission);
+        final int oldWorkers = mission.workerCreations.get();
+        final int oldRequests = mediaRequests.get();
+        assertTrue("old owner is deliberately held after cleanup", mission.prefixOwner.isAlive());
+
+        try (var logging = mockStatic(Log.class)) {
+            mission.start();
+        }
+        assertFalse("Start must join the old owner before activating a new epoch",
+                mission.running);
+        assertEquals(oldWorkers, mission.workerCreations.get());
+        assertEquals(oldRequests, mediaRequests.get());
+        assertPublishedPartialBlock(mission);
+
+        mission.releaseExit.countDown();
+        mission.releaseReconnect.countDown();
+        awaitRetry(mission.terminal, "warm Start after paused owner exits");
+        mission.joinCreatedThreads();
+        assertCompletedRetry(mission, 2);
+    }
+
+    @Test
+    public void pauseAfterRangeDiscardCannotMarkTheDiscardedBlockComplete() throws Exception {
+        // Controlled connection/stream faults, real workers and file writes. A fully read body
+        // can still fail on close; its retry then receives 416 and discards that prefix.
+        final byte[] body = Arrays.copyOf(content, 16);
+        final HttpURLConnection first = bodyConnection(body, true);
+        final HttpURLConnection rejected = mock(HttpURLConnection.class);
+        when(rejected.getResponseCode()).thenReturn(416);
+        final HttpURLConnection resumed = bodyConnection(body, false);
+        final HttpURLConnection[] connections = {first, rejected, resumed};
+        final AtomicInteger attempts = new AtomicInteger();
+        final StoredFileHelper storage = mock(StoredFileHelper.class);
+        when(storage.existsAsFile()).thenReturn(true);
+        when(storage.canWrite()).thenReturn(true);
+        when(storage.getStream()).thenAnswer(ignored -> new FileStream(target));
+        final DownloadMission mission = new DownloadMission(
+                new String[]{"http://localhost/media"}, storage, 'v', null) {
+            @Override
+            HttpURLConnection openConnection(final boolean head, final long start,
+                                             final long end) {
+                return connections[attempts.getAndIncrement()];
+            }
+
+            @Override
+            synchronized void notifyProgress(final long delta) {
+                super.notifyProgress(delta);
+                if (delta < 0) {
+                    pause();
+                }
+            }
+
+            @Override
+            Thread createDownloadWorker(final int index) {
+                return new DownloadRunnable(this, index) {
+                    @Override
+                    public void run() {
+                        try (var logging = mockStatic(Log.class)) {
+                            super.run();
+                        }
+                    }
+                };
+            }
+        };
+        mission.length = body.length;
+        mission.maxRetry = 1;
+        mission.metadata = null;
+        replaceOwnership(mission, 0);
+        watchTerminal(mission, new CountDownLatch(1));
+        mission.running = true;
+        final Thread owner = mission.createDownloadWorker(0);
+        mission.threads = new Thread[]{owner};
+        owner.start();
+        owner.join(5000);
+        assertFalse("discarding owner must exit", owner.isAlive());
+        assertFalse(mission.running);
+        assertArrayEquals("discarded bytes are not a completed block",
+                new int[]{0}, mission.blocks);
+        assertFalse(acquiredBlocks(mission)[0]);
+        assertEquals(0, mission.done);
+
+        final CountDownLatch terminal = new CountDownLatch(1);
+        watchTerminal(mission, terminal);
+        runAndAwait(mission, terminal);
+        assertTrue("warm Start must transfer the discarded block, not falsely finish",
+                mission.isFinished());
+        assertEquals(body.length, mission.done);
+        assertArrayEquals(body, Files.readAllBytes(target.toPath()));
+        assertArrayEquals(new int[]{-1}, mission.blocks);
+        assertFalse(acquiredBlocks(mission)[0]);
+    }
+
+    private static HttpURLConnection bodyConnection(final byte[] body, final boolean failClose)
+            throws Exception {
+        final HttpURLConnection connection = mock(HttpURLConnection.class);
+        when(connection.getResponseCode()).thenReturn(206);
+        when(connection.getURL()).thenReturn(new URL("http://localhost/media"));
+        when(connection.getHeaderField("Content-Range")).thenReturn("bytes 0-15/16");
+        when(connection.getHeaderField("Content-Length")).thenReturn("16");
+        when(connection.getContentLengthLong()).thenReturn((long) body.length);
+        when(connection.getInputStream()).thenReturn(new ByteArrayInputStream(body) {
+            @Override
+            public void close() throws IOException {
+                if (failClose) {
+                    throw new IOException("Body close failed after all verified bytes");
+                }
+                super.close();
+            }
+        });
+        return connection;
+    }
+
+    @Test
+    public void terminalCheckpointPrecedesCleanupButLaterSaveIncludesPublishedPrefix()
+            throws Exception {
+        final RetryMission mission = retryMission(true, false);
+        startAtReconnect(mission);
+        // No asynchronous progress save is pending: attach metadata only once the workers
+        // are stationary, to isolate the real terminal save through the JVM adapter.
+        mission.metadata = folder.newFile("retry.meta");
+        mission.releaseReconnect.countDown();
+        awaitRetry(mission.terminal, "terminal checkpoint");
+        mission.joinCreatedThreads();
+        assertPublishedPartialBlock(mission);
+        assertTrue("capture the actual save performed by the failing owner",
+                mission.terminalCheckpoint != null);
+        final DownloadMission beforeCleanup = readRetryCheckpoint(mission.terminalCheckpoint);
+        assertArrayEquals(new int[]{0, -1, -1}, beforeCleanup.blocks);
+        assertEquals(content.length - DownloadMission.BLOCK_SIZE + 187L, beforeCleanup.done);
+        assertEquals(503, beforeCleanup.errCode);
+
+        assertTrue("explicit later checkpoint succeeds", mission.writeThisToFile());
+        final DownloadMission afterCleanup = readRetryCheckpoint(
+                Files.readAllBytes(mission.metadata.toPath()));
+        assertArrayEquals(new int[]{187, -1, -1}, afterCleanup.blocks);
+        assertEquals(beforeCleanup.done, afterCleanup.done);
+    }
+
+    @Test
+    public void releasedBlockCannotOverwriteCompletionOrReleaseItsNextOwner() throws Exception {
+        final DownloadMission mission = ownershipMission();
+        final DownloadMission.Block first = mission.acquireBlock();
+        mission.releaseBlock(first, 187);
+        final DownloadMission.Block next = mission.acquireBlock();
+        assertEquals(187, next.done);
+        mission.releaseBlock(first, -1);
+        assertEquals(187, mission.blocks[0]);
+        assertTrue(acquiredBlocks(mission)[0]);
+        mission.releaseBlock(next, -1);
+        mission.releaseBlock(next, 187);
+        assertEquals(-1, mission.blocks[0]);
+        assertFalse(acquiredBlocks(mission)[0]);
+        assertNull("a completed block cannot be acquired again", mission.acquireBlock());
+    }
+
+    @Test
+    public void staleBlockPublicationCannotTouchResetOrReplacementOwnership() throws Exception {
+        final DownloadMission mission = ownershipMission();
+        final DownloadMission.Block stale = mission.acquireBlock();
+        try (var logging = mockStatic(Log.class)) {
+            mission.resetState(false, false, DownloadMission.ERROR_NOTHING);
+        }
+        mission.releaseBlock(stale, 187);
+        assertNull(mission.blocks);
+        replaceOwnership(mission, 23);
+        final DownloadMission.Block replacement = mission.acquireBlock();
+        mission.releaseBlock(stale, -1);
+        assertEquals(23, mission.blocks[0]);
+        assertTrue(acquiredBlocks(mission)[0]);
+
+        // A new acquisition epoch must also reject a token for the same blocks array.
+        replaceAcquisitions(mission);
+        final DownloadMission.Block restarted = mission.acquireBlock();
+        mission.releaseBlock(replacement, -1);
+        assertEquals(23, mission.blocks[0]);
+        assertTrue(acquiredBlocks(mission)[0]);
+        mission.releaseBlock(restarted, -1);
+        assertEquals(-1, mission.blocks[0]);
+        assertFalse(acquiredBlocks(mission)[0]);
+    }
+
+    private DownloadMission ownershipMission() throws Exception {
+        final DownloadMission mission = mission(new CountDownLatch(1));
+        mission.metadata = null;
+        replaceOwnership(mission, 0);
+        return mission;
+    }
+
+    private static void replaceOwnership(final DownloadMission mission, final int done)
+            throws Exception {
+        mission.blocks = new int[]{done};
+        replaceAcquisitions(mission);
+    }
+
+    private static void replaceAcquisitions(final DownloadMission mission) throws Exception {
+        final Field field = DownloadMission.class.getDeclaredField("blockAcquired");
+        field.setAccessible(true);
+        field.set(mission, new boolean[1]);
+    }
+
+    private static boolean[] acquiredBlocks(final DownloadMission mission) throws Exception {
+        final Field field = DownloadMission.class.getDeclaredField("blockAcquired");
+        field.setAccessible(true);
+        return (boolean[]) field.get(mission);
+    }
+
+    private RetryMission retryMission(final boolean failReconnect, final boolean holdExit)
+            throws Exception {
+        final RetryMission mission = new RetryMission(new String[]{
+                "http://" + server.getInetAddress().getHostAddress() + ":"
+                        + server.getLocalPort() + "/media"}, holdExit);
+        retryMissions.add(mission);
+        final StoredFileHelper storage = mock(StoredFileHelper.class);
+        when(storage.existsAsFile()).thenReturn(true);
+        when(storage.canWrite()).thenReturn(true);
+        when(storage.getStream()).thenAnswer(ignored -> new FileStream(target));
+        mission.storage = storage;
+        mission.threadCount = 2;
+        mission.maxRetry = 1;
+        mission.metadata = null;
+        watchTerminal(mission, mission.terminal);
+        rule = (exchange, start, end) -> {
+            if ("HEAD".equals(exchange.getRequestMethod())) {
+                sendVersionedRange(exchange, start, end, content, "\"v1\"");
+            } else if (start == 0) {
+                if (mission.zeroRequests.incrementAndGet() == 1) {
+                    exchange.getResponseHeaders().set("ETag", "\"v1\"");
+                    sendRange(exchange, start, end, start, start + 186,
+                            "bytes " + start + "-" + end + "/" + content.length,
+                            end - start + 1);
+                } else {
+                    sendVersionedRange(exchange, start, end, content, "\"v1\"");
+                }
+            } else if (start == 187) {
+                mission.prefixRanges.add(exchange.getRequestHeaders().getFirst("Range"));
+                if (mission.prefixRanges.size() == 1) {
+                    awaitRetry(mission.otherExited, "other worker exits before reconnect response");
+                    mission.reconnectSeen.countDown();
+                    awaitRetry(mission.releaseReconnect, "release reconnect response");
+                    if (failReconnect) {
+                        exchange.sendResponseHeaders(503, 0);
+                        return;
+                    }
+                }
+                sendVersionedRange(exchange, start, end, content, "\"v1\"");
+            } else {
+                sendVersionedRange(exchange, start, end, content, "\"v1\"");
+            }
+        };
+        return mission;
+    }
+
+    private static void startAtReconnect(final RetryMission mission) throws Exception {
+        try (var logging = mockStatic(Log.class)) {
+            mission.start();
+        }
+        awaitRetry(mission.reconnectSeen, "187-byte body retry reaches gated reconnect");
+        mission.otherWorker.join(5000);
+        assertFalse("terminal response is held until the other worker actually exits",
+                mission.otherWorker.isAlive());
+    }
+
+    private void assertRetryOwnsPartialBlock(final RetryMission mission) throws Exception {
+        assertEquals(content.length - DownloadMission.BLOCK_SIZE + 187L, mission.done);
+        assertArrayEquals(new int[]{0, -1, -1}, mission.blocks);
+        assertTrue(acquiredBlocks(mission)[0]);
+        assertNull("another worker cannot acquire the retrying owner's block",
+                mission.acquireBlock());
+        assertArrayEquals(Arrays.copyOf(content, 187),
+                Arrays.copyOf(Files.readAllBytes(target.toPath()), 187));
+    }
+
+    private void assertPublishedPartialBlock(final RetryMission mission) throws Exception {
+        assertArrayEquals(new int[]{187, -1, -1}, mission.blocks);
+        assertArrayEquals(new boolean[]{false, false, false}, acquiredBlocks(mission));
+        assertEquals(content.length - DownloadMission.BLOCK_SIZE + 187L, mission.done);
+    }
+
+    private void assertCompletedRetry(final RetryMission mission, final int prefixRequests)
+            throws Exception {
+        assertCompleted(mission);
+        assertEquals("the already-counted prefix must never replay from zero",
+                1, mission.zeroRequests.get());
+        assertEquals(prefixRequests, mission.prefixRanges.size());
+        for (final String range : mission.prefixRanges) {
+            assertEquals("bytes=187-524287", range);
+        }
+        assertArrayEquals("terminal cleanup must not overwrite completed blocks",
+                new int[]{-1, -1, -1}, mission.blocks);
+        assertArrayEquals(new boolean[]{false, false, false}, acquiredBlocks(mission));
+    }
+
+    private static DownloadMission readRetryCheckpoint(final byte[] snapshot) throws Exception {
+        try (ObjectInputStream input = new ObjectInputStream(new ByteArrayInputStream(snapshot))) {
+            return (DownloadMission) input.readObject();
+        }
+    }
+
+    private static void awaitRetry(final CountDownLatch latch, final String description) {
+        try {
+            assertTrue("timed out: " + description, latch.await(15, TimeUnit.SECONDS));
+        } catch (final InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(description, error);
+        }
+    }
+
+    /** Scheduling and Android adapters only; all requests, byte writes and workers are real. */
+    private static final class RetryMission extends DownloadMission {
+        private static final long serialVersionUID = 1L;
+        private final transient CountDownLatch terminal = new CountDownLatch(1);
+        private final transient CountDownLatch reconnectSeen = new CountDownLatch(1);
+        private final transient CountDownLatch releaseReconnect = new CountDownLatch(1);
+        private final transient CountDownLatch otherExited = new CountDownLatch(1);
+        private final transient CountDownLatch ownerCleanup = new CountDownLatch(1);
+        private final transient CountDownLatch releaseExit = new CountDownLatch(1);
+        private final transient AtomicInteger workerCreations = new AtomicInteger();
+        private final transient AtomicInteger zeroRequests = new AtomicInteger();
+        private final transient List<String> prefixRanges =
+                Collections.synchronizedList(new ArrayList<>());
+        private final transient List<Thread> created =
+                Collections.synchronizedList(new ArrayList<>());
+        private final transient AtomicReference<Throwable> failure = new AtomicReference<>();
+        private final transient boolean holdExit;
+        private transient volatile Thread prefixOwner;
+        private transient volatile Thread otherWorker;
+        private transient volatile byte[] terminalCheckpoint;
+
+        RetryMission(final String[] urls, final boolean holdExit) {
+            super(urls, null, 'v', null);
+            this.holdExit = holdExit;
+        }
+
+        @Override
+        Block acquireBlock() {
+            final Block block = super.acquireBlock();
+            if (block != null && block.position == 0) {
+                prefixOwner = Thread.currentThread();
+            }
+            return block;
+        }
+
+        @Override
+        Thread createInitializer() {
+            final Thread initializer = new DownloadInitializer(this) {
+                @Override
+                public void run() {
+                    try (var logging = mockStatic(Log.class)) {
+                        super.run();
+                    } catch (final Throwable error) {
+                        failure.compareAndSet(null, error);
+                    }
+                }
+            };
+            created.add(initializer);
+            return initializer;
+        }
+
+        @Override
+        Thread createDownloadWorker(final int index) {
+            workerCreations.incrementAndGet();
+            final Thread worker = new DownloadRunnable(this, index) {
+                @Override
+                public void run() {
+                    try (var logging = mockStatic(Log.class)) {
+                        super.run();
+                    } catch (final Throwable error) {
+                        failure.compareAndSet(null, error);
+                    } finally {
+                        if (Thread.currentThread() != prefixOwner) {
+                            otherWorker = Thread.currentThread();
+                            otherExited.countDown();
+                        } else {
+                            ownerCleanup.countDown();
+                            if (holdExit && releaseExit.getCount() != 0) {
+                                // Interruption does not finish the simulated outstanding I/O.
+                                boolean interrupted = false;
+                                while (releaseExit.getCount() != 0) {
+                                    try {
+                                        releaseExit.await();
+                                    } catch (final InterruptedException ignored) {
+                                        interrupted = true;
+                                    }
+                                }
+                                if (interrupted) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            created.add(worker);
+            return worker;
+        }
+
+        @Override
+        boolean writeThisToFile() {
+            final Thread writer = Thread.currentThread();
+            // Production LOCK and real ObjectOutputStream are retained. Only Android's
+            // AtomicFile boundary and the nonserializable storage mock are adapted.
+            try (var utility = mockStatic(Utility.class)) {
+                utility.when(() -> Utility.writeToFile(any(File.class), any()))
+                        .thenAnswer(call -> {
+                            final File file = call.getArgument(0);
+                            try (ObjectOutputStream output = new ObjectOutputStream(
+                                    Files.newOutputStream(file.toPath())) {
+                                {
+                                    enableReplaceObject(true);
+                                }
+
+                                @Override
+                                protected Object replaceObject(final Object object) {
+                                    return object instanceof StoredFileHelper ? null : object;
+                                }
+                            }) {
+                                output.writeObject(call.getArgument(1));
+                            }
+                            if (writer == prefixOwner && errCode == 503
+                                    && terminalCheckpoint == null) {
+                                terminalCheckpoint = Files.readAllBytes(file.toPath());
+                            }
+                            return true;
+                        });
+                return super.writeThisToFile();
+            } catch (final Throwable error) {
+                failure.compareAndSet(null, error);
+                return false;
+            }
+        }
+
+        void joinCreatedThreads() throws Exception {
+            final Thread[] snapshot;
+            synchronized (created) {
+                snapshot = created.toArray(new Thread[0]);
+            }
+            for (final Thread thread : snapshot) {
+                if (thread != Thread.currentThread()) {
+                    thread.join(5000);
+                    assertFalse("fixture thread leaked: " + thread.getName(), thread.isAlive());
+                }
+            }
+            if (failure.get() != null) {
+                throw new AssertionError("background worker/checkpoint failed", failure.get());
+            }
+        }
     }
 
 }

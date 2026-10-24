@@ -238,6 +238,7 @@ public class DownloadMission extends Mission {
                     final Block block = new Block();
                     block.position = i;
                     block.done = blocks[i];
+                    block.acquisition = blockAcquired;
 
                     blockAcquired[i] = true;
                     return block;
@@ -249,16 +250,22 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Release an block.
+     * Release an owned block.
      *
-     * @param position the index of the block
-     * @param done     amount of bytes downloaded
+     * @param block    the owned block
+     * @param done     amount of bytes downloaded, or -1 for a completed block
      */
     @SuppressWarnings("checkstyle:HiddenField")
-    void releaseBlock(final int position, final int done) {
+    void releaseBlock(final Block block, final int done) {
         synchronized (LOCK) {
-            blockAcquired[position] = false;
-            blocks[position] = done;
+            // A reset or a new worker generation invalidates the old acquisition.
+            if (block.acquisition == null || block.acquisition != blockAcquired
+                    || !blockAcquired[block.position]) {
+                return;
+            }
+            blockAcquired[block.position] = false;
+            blocks[block.position] = done;
+            block.acquisition = null;
         }
     }
 
@@ -844,8 +851,10 @@ public class DownloadMission extends Mission {
         unknownLength = false;
         // Retain handles until their owners exit, including recovery resetting stale state.
         fallbackResumeOffset = 0;
-        blocks = null;
-        blockAcquired = null;
+        synchronized (LOCK) {
+            blocks = null;
+            blockAcquired = null;
+        }
         resourceIdentity = null;
         unverifiedCurrentBytes = false;
         forceFullDownload = false;
@@ -1207,6 +1216,7 @@ public class DownloadMission extends Mission {
     public static class Block {
         public int position;
         public int done;
+        private boolean[] acquisition;
     }
 
     @SuppressWarnings("checkstyle:FinalClass")

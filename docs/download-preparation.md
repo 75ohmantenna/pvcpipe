@@ -390,6 +390,171 @@ full-response-only/checkpoint-before-replacement recovery, PR #153's restored
 progress reconciliation and URL/validator/range/encoding checks are unchanged.
 The separately confirmed warm retry/block-release defect is not included.
 
+### Warm retry ownership correction, 2026-10-24
+
+The separately triaged warm retry defect was reproduced on unchanged master
+after PR #154 (`864905dc8`). Two ranged workers used `maxRetry=1`; block 0
+received 187 verified bytes before EOF, and its reconnect returned HTTP 503
+after the other worker exited. Retry exhaustion left `retry=true`. The old
+per-attempt cleanup therefore skipped publication/release even though its
+owner terminated. Actual warm Start retained the logical counter but requested
+the block again from zero.
+
+| State | Block positions | Block 0 acquired | Logical `done` | Exact output bytes |
+| --- | --- | --- | ---: | ---: |
+| Unchanged, after terminal worker exit | `[0,-1,-1]` | true | 524612 | Not complete |
+| Unchanged, after actual warm Start completes | `[-1,-1,-1]` | false | 1048900 | 1048713 |
+| Corrected, after terminal worker exit | `[187,-1,-1]` | false | 524612 | Not complete |
+| Corrected, after actual warm Start completes | `[-1,-1,-1]` | false | 1048713 | 1048713 |
+
+`DownloadRunnable` now has terminal cleanup independent of retry intent.
+A continuing retry retains its local block and acquisition; an ordinary
+release clears that local ownership, so terminal cleanup cannot overwrite its
+completed marker. A terminating owner publishes its verified position and
+releases its remaining acquisition before exit, including pause and reconnect
+failure. `DownloadMission.releaseBlock` accepts the acquired block, checks the
+identity of the acquisition array, and consumes its token on release. Reset or
+replacement worker state invalidates old tokens; a duplicate release cannot
+release a newly acquired owner or overwrite completed/replacement state.
+Reset clears the block/acquisition pair under the same existing `LOCK` used by
+release. Source inspection identified a UI recovery path that can request reset
+before Start joins an old terminating worker; the paired invalidation prevents
+half-invalidated release state. That particular race was not reproduced.
+No new allocation per acquisition, serialized field, lock, or callback under
+`LOCK` is added. Restart still joins old workers outside the mission monitor;
+the mission-monitor-then-`LOCK` ordering is unchanged.
+
+The corrected controlled JVM warm Start resumes with
+`Range: bytes=187-524287`, rather than replaying
+`Range: bytes=0-524287`. The successful body-retry control also retains its
+prefix and completes with exact bytes and logical progress.
+Evidence: `/tmp/pvcpipe-warm-fix` (unchanged baseline and corrected smoke).
+These are real loopback HTTP/file/worker results with Android adapters, not
+new visual UI evidence. The baseline excess was exactly 187 logical bytes;
+final file bytes were already correct before this correction.
+
+Seven durable additions in `DownloadRangeIntegrityTest` cover terminal reconnect
+failure followed by actual warm Start, successful retry ownership, pause during
+gated reconnect with Start held behind the old owner, duplicate release after
+reacquisition/completion, reset/replacement invalidation, checkpoint timing,
+and pause after a 416 discards a full body whose close failed.
+The desired terminal regression fails against preserved unchanged production
+(`187` expected, `0` observed) and passes corrected production. All 72 focused
+downloader JVM checks passed, including the existing transition, cold-progress,
+lifecycle, manager-checkpoint and atomic-checkpoint regressions.
+The checkpoint regression observes the failing owner's actual save before
+cleanup: block 0 is still `0` while `done=524612`. After exit, an explicit later
+save contains block 0 at `187` with the same logical counter. Its real Java
+serialization runs inside production `LOCK`; the Android AtomicFile boundary is
+adapted, so it is not a filesystem/power-loss durability test.
+
+A later adversarial smoke found an additional terminal cursor boundary: after
+a full body's close throws, reconnect can return 416 and discard that prefix.
+If pause ends the loop there, the old absolute cursor could incorrectly mark
+the discarded block complete with logical progress zero. The 416 discard now
+rewinds that cursor with `block.done` before clearing the retained position.
+A seventh durable regression uses controlled connection/body-close faults,
+real workers and file writes, then actual warm Start; unlike the original warm
+HTTP regressions, this focused fault adapter does not exercise a TCP peer.
+It fails the earlier correction (`0` expected, completed marker `-1` observed)
+and passes with the cursor correction, requiring the discarded bytes to transfer
+and count on warm Start.
+
+Publication at owner exit is an in-memory ownership guarantee, not a new
+checkpoint barrier. `notifyError`/pause can write a checkpoint before terminal
+cleanup; that earlier checkpoint need not contain the released position.
+Cold restoration still reconciles progress to saved positions. Only a
+successful later checkpoint taken after publication can establish that the
+retained position was serialized. This change does not indiscriminately run
+cold reconciliation during active or warm work, clamp UI progress, or alter
+PRs #151–154's full-response recovery, durable-cleared-checkpoint rule, cold
+reconciliation, atomic resource transition, or representation validation.
+
+The bounded `DownloadWarmRetryIntegrationTest` and
+`tools/download_warm_retry.py` exercise one real-service/manager warm Start on
+an explicitly acknowledged disposable API 26 AVD. Build both APKs separately;
+the launcher checks AVD/API identity, existing pending missions and processes,
+package IDs and both installed/candidate signing certificates before any
+`install -r`. It never uninstalls, clears app data, kills an Android process, or
+runs `connectedDebugAndroidTest`.
+
+While reconnect is gated, the test uses the existing queue-toggle API to remove
+this mission from automatic scheduling: HTTP 5xx normally stays queued and the
+service's error handler can immediately resume it. This leaves its worker
+running and its progress/acquisition untouched, so the later explicit manager
+Start is observable. The toggle schedules a normal checkpoint; snapshots are
+reported as observations, not a terminal-publication durability claim.
+
+Run only this targeted scenario:
+
+```sh
+./gradlew --no-daemon --no-continue :app:assembleDebug :app:assembleDebugAndroidTest
+python3 tools/download_warm_retry.py --serial '<owned-emulator>' \
+  --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable --install \
+  --artifacts '/tmp/<fresh-warm-evidence-directory>'
+```
+
+This disposable fixture retains its output and finished-history row and changes
+the fixture app's preferences to `maxRetry=1` and cross-network downloads off.
+It does not restore those preferences or remove test data automatically.
+
+The first validated targeted run passed on disposable `pvcpipe_warm26_20261024`
+(`emulator-5556`): `OK (1 test)`. Host observations found PID `3087` alive
+and unchanged before actual manager Start, after Start before resumed response
+bytes, and during final verification. Both original workers had exited before
+Start. The sole warm request was conditional
+`bytes=187-524287` with `If-Range: "warm-retry-stable"`, transferring
+524,101 worker-body bytes. Final logical progress, mission length and output
+length were all 1,048,713. The independent host SHA-256 matched the fixture:
+`03243f694e27a87a7f4b1fdab2e60ad09dc9c803f8348829b2996f4bd19d2bfc`.
+
+In that Android run, the pre-503 checkpoint observation had positions
+`[0,-1,0]`; the post-owner-exit/pre-Start observation had `[187,-1,-1]`.
+The latter does not identify which asynchronous writer saved it or establish
+that every error/pause checkpoint includes terminal publication. The staged
+JVM regression separately proves the earlier error save can still hold `0`.
+Evidence: `/tmp/pvcpipe-warm-fix/api26-final` (wire, PID observations,
+instrumentation, raw output, source/APK identities). No new UI result, process
+kill/cold-restoration campaign, API 37 or physical-device/receiver run is claimed.
+
+Preparation failures are retained separately: an initial signer-output parser
+mismatch stopped before installation/test, then the test observer encountered a
+published worker array before its entries were filled. The observer now waits
+for both entries. The failed fixture on the earlier disposable AVD was left
+untouched; the final run used a newly created empty API 26 AVD, seeded with
+verified debug app/test APKs. No existing installation/data was cleared or
+uninstalled; that evidence predates the later 416 cursor correction.
+
+The initial serial `make ci` passed: Checkstyle/Ktlint/dependency ordering, the full
+configured app/extractor JVM gates, debug lint, and debug/release assembly.
+After the 416 cursor correction, all 72 focused checks and both instrumentation
+APK builds passed again with Checkstyle. This remains bounded
+controlled-protocol/emulator evidence, not real-host or hardware scheduling.
+
+After the cursor correction, the same bounded API 26 scenario passed again on
+the same disposable AVD, without deleting prior fixtures or pending data:
+`/tmp/pvcpipe-warm-fix/api26-cursor-final`, `OK (1 test)`. PID `3303` was alive
+and unchanged across the actual manager Start and final byte verification.
+The sole warm range and its conditional validator, worker-body byte count,
+final logical progress/output length and fixture hash were unchanged.
+All recorded production/instrumentation/host source hashes match this corrected
+build; the earlier PID `3087` run is not used to verify the later cursor change.
+
+This repeat also exposed the checkpoint boundary on real Android: after both
+owners exited, live blocks were `[187,-1,-1]` with no acquisitions, but the
+observed saved checkpoint still had `[0,-1,-1]`, `done=524612`, error 503.
+Warm Start used the live `187`, not that checkpoint. The earlier pre-503 saved
+snapshot was `[0,0,0]` with `done=196795`. These observations independently
+confirm that exit publication is not an automatic terminal checkpoint barrier.
+No checkpoint rewrite, app restart, cold normalization or process kill was used
+to make this warm run pass.
+
+Final serial `make ci` was repeated after the cursor correction and passed all
+five configured gates again. Reports contain 1,037 app tests with no failures
+or skips and 403 extractor tests with no failures and one skip; Gradle reused
+up-to-date tasks where applicable. The 72 focused downloader checks were also
+run separately on the corrected source, not inferred from earlier results.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the
