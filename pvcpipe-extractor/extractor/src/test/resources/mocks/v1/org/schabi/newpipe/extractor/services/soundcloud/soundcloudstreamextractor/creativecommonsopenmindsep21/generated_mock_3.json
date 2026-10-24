@@ -1,7 +1,7 @@
 {
   "request": {
     "httpMethod": "GET",
-    "url": "https://api-v2.soundcloud.com/tracks/1356023209/related?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ",
+    "url": "https://api-v2.soundcloud.com/tracks/1356023209/related?client_id\u003d0123456789abcdef0123456789abcdef",
     "headers": {
       "Accept-Language": [
         "en-GB, en;q\u003d0.9"
@@ -63,6 +63,6 @@
       ]
     },
     "responseBody": "{\"collection\":[],\"query_urn\":\"soundcloud:similarsounds:5a0ec8a698a04443b4fcf3f62a226853\",\"variant\":\"sim_sounds_v3\"}",
-    "latestUrl": "https://api-v2.soundcloud.com/tracks/1356023209/related?client_id\u003dCkCiIyf14rHi27fhk7HxhPOzc85okfSJ"
+    "latestUrl": "https://api-v2.soundcloud.com/tracks/1356023209/related?client_id\u003d0123456789abcdef0123456789abcdef"
   }
 }

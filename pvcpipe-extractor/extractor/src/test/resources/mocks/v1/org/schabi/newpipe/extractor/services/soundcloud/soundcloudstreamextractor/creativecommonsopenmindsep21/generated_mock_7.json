@@ -1,7 +1,7 @@
 {
   "request": {
     "httpMethod": "GET",
-    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/a56a7211-bb51-4fe0-9a12-d421a15a6957/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN",
+    "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/a56a7211-bb51-4fe0-9a12-d421a15a6957/stream/hls?client_id=0123456789abcdef0123456789abcdef&track_authorization=SYNTHETIC_MEDIA_TOKEN",
     "headers": {
       "Accept-Language": [
         "en-GB, en;q\u003d0.9"
@@ -63,6 +63,6 @@
       ]
     },
     "responseBody": "{\"url\":\"https://cf-hls-opus-media.sndcdn.com/playlist/a56a7211-bb51-4fe0-9a12-d421a15a6957.64.opus/playlist.m3u8?Policy\u003deyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiKjovL2NmLWhscy1vcHVzLW1lZGlhLnNuZGNkbi5jb20vcGxheWxpc3QvYTU2YTcyMTEtYmI1MS00ZmUwLTlhMTItZDQyMWExNWE2OTU3LjY0Lm9wdXMvcGxheWxpc3QubTN1OCoiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3NzE2Mzc3MjR9fX1dfQ__\u0026Signature\u003dGm83LNen51-m5PtAlymESCke0rffC~C8qamZIxojaD1egrtN6yx1chwzvnt1psdUX2HKVyyLjA4p-e0Xusmf91w6QAWSxRFM7Ufx62CDerH6dXovM--2ude~xGdhKqRK7l6~PVGjXztZza0nXRXafSIli57pa9u0JAaE8dByPgGi3R754X1xipdfhC8hOs1-tKemKqhgdLqCbE1w~c~5lxucVGWmxHMc55htMvFsJXsbJkplXAUF2ZHiwhgncy29uPYWLgD6JjIvr-lDybrwgsu4EcdcahKQYSUWv2u2lVGJc0RN9Ah~M2tjpgXxn~nzBNxcBP0h4JmPFFun~LYTow__\u0026Key-Pair-Id\u003dAPKAI6TU7MMXM5DG6EPQ\"}",
-    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/a56a7211-bb51-4fe0-9a12-d421a15a6957/stream/hls?client_id=CkCiIyf14rHi27fhk7HxhPOzc85okfSJ&track_authorization=SYNTHETIC_MEDIA_TOKEN"
+    "latestUrl": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1356023209/a56a7211-bb51-4fe0-9a12-d421a15a6957/stream/hls?client_id=0123456789abcdef0123456789abcdef&track_authorization=SYNTHETIC_MEDIA_TOKEN"
   }
 }
