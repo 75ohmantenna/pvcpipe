@@ -8,9 +8,9 @@ already-running target process. Only the HTTP peer is controlled: instrumentatio
 starts the real service, obtains its real binder, and invokes manager.resumeMission.
 
 Example (after building; start the named disposable AVD separately if necessary):
-  python3 tools/download_warm_retry.py --serial emulator-5554 \
-      --disposable-avd-name pvcpipe_cold26_20261024 --allow-disposable \
-      --install --artifacts /tmp/pvcpipe-warm-fix/api26
+  python3 tools/download_warm_retry.py --serial '<owned-emulator>' \
+      --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable \
+      --install --artifacts '/tmp/<fresh-warm-evidence-directory>'
 
 --install is optional and only performs install -r after inspecting both installed
 packages, verifying their signing certificates against the candidate APKs, and

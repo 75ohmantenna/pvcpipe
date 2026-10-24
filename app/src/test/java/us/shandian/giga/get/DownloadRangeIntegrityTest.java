@@ -1516,6 +1516,97 @@ public class DownloadRangeIntegrityTest {
     }
 
     @Test
+    public void pauseAfterRangeDiscardCannotMarkTheDiscardedBlockComplete() throws Exception {
+        // Controlled connection/stream faults, real workers and file writes. A fully read body
+        // can still fail on close; its retry then receives 416 and discards that prefix.
+        final byte[] body = Arrays.copyOf(content, 16);
+        final HttpURLConnection first = bodyConnection(body, true);
+        final HttpURLConnection rejected = mock(HttpURLConnection.class);
+        when(rejected.getResponseCode()).thenReturn(416);
+        final HttpURLConnection resumed = bodyConnection(body, false);
+        final HttpURLConnection[] connections = {first, rejected, resumed};
+        final AtomicInteger attempts = new AtomicInteger();
+        final StoredFileHelper storage = mock(StoredFileHelper.class);
+        when(storage.existsAsFile()).thenReturn(true);
+        when(storage.canWrite()).thenReturn(true);
+        when(storage.getStream()).thenAnswer(ignored -> new FileStream(target));
+        final DownloadMission mission = new DownloadMission(
+                new String[]{"http://localhost/media"}, storage, 'v', null) {
+            @Override
+            HttpURLConnection openConnection(final boolean head, final long start,
+                                             final long end) {
+                return connections[attempts.getAndIncrement()];
+            }
+
+            @Override
+            synchronized void notifyProgress(final long delta) {
+                super.notifyProgress(delta);
+                if (delta < 0) {
+                    pause();
+                }
+            }
+
+            @Override
+            Thread createDownloadWorker(final int index) {
+                return new DownloadRunnable(this, index) {
+                    @Override
+                    public void run() {
+                        try (var logging = mockStatic(Log.class)) {
+                            super.run();
+                        }
+                    }
+                };
+            }
+        };
+        mission.length = body.length;
+        mission.maxRetry = 1;
+        mission.metadata = null;
+        replaceOwnership(mission, 0);
+        watchTerminal(mission, new CountDownLatch(1));
+        mission.running = true;
+        final Thread owner = mission.createDownloadWorker(0);
+        mission.threads = new Thread[]{owner};
+        owner.start();
+        owner.join(5000);
+        assertFalse("discarding owner must exit", owner.isAlive());
+        assertFalse(mission.running);
+        assertArrayEquals("discarded bytes are not a completed block",
+                new int[]{0}, mission.blocks);
+        assertFalse(acquiredBlocks(mission)[0]);
+        assertEquals(0, mission.done);
+
+        final CountDownLatch terminal = new CountDownLatch(1);
+        watchTerminal(mission, terminal);
+        runAndAwait(mission, terminal);
+        assertTrue("warm Start must transfer the discarded block, not falsely finish",
+                mission.isFinished());
+        assertEquals(body.length, mission.done);
+        assertArrayEquals(body, Files.readAllBytes(target.toPath()));
+        assertArrayEquals(new int[]{-1}, mission.blocks);
+        assertFalse(acquiredBlocks(mission)[0]);
+    }
+
+    private static HttpURLConnection bodyConnection(final byte[] body, final boolean failClose)
+            throws Exception {
+        final HttpURLConnection connection = mock(HttpURLConnection.class);
+        when(connection.getResponseCode()).thenReturn(206);
+        when(connection.getURL()).thenReturn(new URL("http://localhost/media"));
+        when(connection.getHeaderField("Content-Range")).thenReturn("bytes 0-15/16");
+        when(connection.getHeaderField("Content-Length")).thenReturn("16");
+        when(connection.getContentLengthLong()).thenReturn((long) body.length);
+        when(connection.getInputStream()).thenReturn(new ByteArrayInputStream(body) {
+            @Override
+            public void close() throws IOException {
+                if (failClose) {
+                    throw new IOException("Body close failed after all verified bytes");
+                }
+                super.close();
+            }
+        });
+        return connection;
+    }
+
+    @Test
     public void terminalCheckpointPrecedesCleanupButLaterSaveIncludesPublishedPrefix()
             throws Exception {
         final RetryMission mission = retryMission(true, false);

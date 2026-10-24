@@ -101,6 +101,7 @@ public class DownloadRunnable extends Thread {
                         if (block.done > 0) {
                             // try again from the start (of the block)
                             mMission.notifyProgress(-block.done);
+                            start -= block.done;
                             block.done = 0;
                             retry = true;
                             mConn.disconnect();
