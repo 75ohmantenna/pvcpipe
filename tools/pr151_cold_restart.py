@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import shlex
 import subprocess
 import sys
 import threading
@@ -322,11 +323,12 @@ class Adb:
 class Instrumentation:
     def __init__(self, adb, evidence, timeout, label, arguments):
         self.adb, self.evidence, self.timeout, self.label = adb, evidence, timeout, label
-        command = adb.prefix + ["shell", "am", "instrument", "-w", "-r",
-                                "-e", "class", TEST]
+        remote = ["am", "instrument", "-w", "-r", "-e", "class", TEST]
         for key, value in arguments.items():
-            command.extend(["-e", key, str(value)])
-        command.append(RUNNER)
+            remote.extend(["-e", key, str(value)])
+        remote.append(RUNNER)
+        # adb shell joins arguments before the device shell parses them.
+        command = adb.prefix + ["shell", shlex.join(remote)]
         self.process = subprocess.Popen(command, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.lines = queue.Queue()
