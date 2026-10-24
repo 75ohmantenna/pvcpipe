@@ -193,6 +193,7 @@ public class DownloadManager {
                 Log.w(TAG, "Unable to load pending checkpoint: " + checkpoint);
                 continue;
             }
+            mis.restoreProgress();
             mis.metadata = checkpoint;
             mis.checkpointReady = true;
 

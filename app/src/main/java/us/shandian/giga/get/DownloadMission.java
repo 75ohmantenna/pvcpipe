@@ -69,7 +69,9 @@ public class DownloadMission extends Mission {
     public String[] urls;
 
     /**
-     * Number of bytes downloaded and written.
+     * Logical bytes retained for this mission, including live writes during download.
+     * Cold restoration reconciles these with the saved resume positions before replay.
+     * Post-processing uses this counter for its own read progress.
      */
     public volatile long done;
 
@@ -196,6 +198,31 @@ public class DownloadMission extends Mission {
         if (DEBUG && psInstance == null && urls.length > 1) {
             Log.w(TAG, "mission created with multiple urls ¿missing post-processing algorithm?");
         }
+    }
+
+    /**
+     * Restores logical download progress from the positions that cold workers will resume.
+     * Must be called after deserialization, before publishing the mission or starting workers.
+     * A live checkpoint can count writes whose block or fallback position was not saved yet.
+     */
+    public void restoreProgress() {
+        if (current >= urls.length) {
+            // Download completion and post-processing have their own progress accounting.
+            return;
+        }
+        long retained = offsets[current] - offsets[0];
+        if (blocks != null) {
+            if (blocks.length == 0) {
+                retained += fallbackResumeOffset;
+            } else {
+                for (int index = 0; index < blocks.length; index++) {
+                    retained += blocks[index] < 0
+                            ? Math.min(BLOCK_SIZE, length - (long) index * BLOCK_SIZE)
+                            : blocks[index];
+                }
+            }
+        }
+        done = retained;
     }
 
     /**

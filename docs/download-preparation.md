@@ -210,6 +210,92 @@ the persisted timestamp before explicit Start. Failed-run missions were
 completed through the real service against their retained fixtures, not cleared
 or edited. These were harness corrections, not production integrity defects.
 
+### Cold-replay progress accounting correction, 2026-10-24
+
+Follow-up from master `5f196510e` (PR #152) confirmed the counter defect above
+using the real service/checkpoint loader on the same disposable API 26 emulator.
+This time the actual pending Downloads row was captured: **108.35%**, with
+`8.00 MB  8.67 MB/00:00  1.79 MB/s` in its accessible size/speed/ETA text.
+That is UI evidence, unlike PR #152's inferred display symptom. After tightening
+the initial server gate to cap each worker independently, a repeated pre-fix run
+displayed **109.33%**, with `8.00 MB  8.75 MB/00:00  1.26 MB/s`.
+The deterministic gated reproduction recorded this 8,388,608-byte sequence:
+
+| Boundary | `done` | Saved resumable bytes | Meaning |
+| --- | ---: | ---: | --- |
+| Live before SIGKILL | 786,432 | 0 | Two in-flight blocks, 393,216 bytes each. |
+| Actual saved checkpoint | 786,432 | 0 | All 16 saved block offsets were zero; fallback offset was zero. |
+| New process, before Start/body bytes | 786,432 | 0 | The real loader retained credit for work it would replay. |
+| Replay held 4,096 bytes before completion | 9,170,944 | — | 8,384,512 newly accepted bytes added to the stale 786,432. |
+
+The server logged all sixteen block requests from `bytes=0-524287` through
+`bytes=7864320-8388607`; the final response was held after 520,192 bytes.
+The completed output still matched every fixture byte. Evidence, including raw
+checkpoint files, process IDs, wire events, output and UI captures:
+`/tmp/pvcpipe-accounting-gated-before` (first run:
+`/tmp/pvcpipe-accounting-before-fix`).
+
+The accounting contract follows the consumers in `MissionAdapter`: percentage,
+completed size, speed samples and ETA derive from `done`. It is logical progress,
+not network traffic. Network bytes can exceed file length across probes, retries
+and replay. Saved resumable progress is the completed-earlier-resource baseline
+plus saved block positions (including partial blocks), or the fallback offset;
+it can lag live writes. Checkpoints here do not establish power-loss durability.
+
+`DownloadManager` now calls `DownloadMission.restoreProgress` immediately after
+loading a checkpoint, before publishing or scheduling it. The counter is rebuilt
+from those resume positions, excluding reserved leading space and counting a
+completed short final block at its actual length. Uninitialized resources retain
+only completed earlier resources. Finished downloads and post-processing progress
+are not rewritten. Raw checkpoint inspection still reports its original counter.
+The final fixed gated run saved 736,930 with no resumable blocks, cold-loaded zero,
+then counted 8,384,512 at the held replay boundary. Its actual Downloads row showed
+**99.95%** and `8.00 MB  8.00 MB/00:01  1.49 MB/s`.
+Counter and raw-checkpoint assertions, screenshot/XML and exact output:
+`/tmp/pvcpipe-accounting-gated-after`. Both capped runs produced the same fixture
+SHA-256, `3b36e67585c5064882afa167dd905c30f474f15eaf828b340b2b365ca3eddcc6`.
+
+This correction deliberately permits progress to decrease when uncheckpointed
+work must be replayed. It changes neither live worker accounting nor warm
+pause/resume and retry paths. No percentage clamp, new persistence format,
+range/validator/URL/encoding relaxation, or full-only recovery change is involved.
+PR #151's checkpoint-before-replacement rule remains intact.
+
+The focused `accounting` scenario uses two ranged workers and a total initial
+768 KiB budget, capped at 384 KiB per response so neither block can complete
+before death. The second process first publishes its loaded/pre-body state, then
+receives exactly the saved replay plan minus 4 KiB. Optional UI capture waits for
+the unique fixture row's current percentage, not an arbitrary sleep. The third
+process completes and checks the exact fixture. To run only this reproduction
+after building/installing both APKs as above:
+
+```sh
+python3 tools/pr151_cold_restart.py --serial '<owned-emulator>' \
+  --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable \
+  --scenario accounting --ui-hold-seconds 20
+```
+
+The observer records both buggy and corrected outcomes in `accounting.json`;
+its generic PASS means the controlled experiment/integrity checks completed,
+not that the logical counter matched. Inspect `counterMatchesReplay` and
+`loadedOvercount` separately. The six focused desired-behavior JVM regressions
+and the 52 existing affected checks passed. A selected fixed API 26 run covered
+accounting, ordinary aligned recovery, full-only replacement and earlier-resource
+preservation in 16 process phases, not a repeat of the historical 25-phase run.
+All four outputs matched their fixtures (three 8 MiB, one 16 MiB).
+Evidence: `/tmp/pvcpipe-accounting-after-fix`. That 16-phase run predates the
+per-response cap; the two `accounting-gated-*` runs exercised the final cap.
+These runs came from the uncommitted tree, with source hashes and APK identity
+recorded separately. The final fixed gated run's production, instrumentation and
+host-source hashes match the committed correction. Final serial `make ci` passed (static
+checks, full app/extractor JVM suites, lint and debug/release assembly).
+
+Instrumentation drives real service/binder calls and opens the real Downloads
+activity for capture; it does not automate user gestures. Transport retries remain
+disabled in the controlled integration; retry coverage is JVM-only. No user
+installation/data was cleared or uninstalled. API 37, physical receivers/devices,
+SAF/live sources and interrupted AtomicFile commits remain outside this evidence.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the
@@ -293,6 +379,9 @@ grants read access to that one file.
 `make ci` runs the unit tests: `DownloadPreparationTest`,
 `DownloadMissionLifecycleTest`, `DownloadManagerCheckpointTest` and
 `UtilityAtomicCheckpointTest` cover preparation, checkpoints and recovery.
+`DownloadMissionProgressTest` checks restoration of logical progress, valid
+partial positions, earlier resources/reserved space, short final blocks and
+unchanged post-processing progress.
 `DownloadRangeIntegrityTest` checks real local HTTP responses and file bytes,
 including redirect identity, range bounds, clean restarts after stopped writers,
 checkpoint-save failure, late errors, replacement offsets, and serialized

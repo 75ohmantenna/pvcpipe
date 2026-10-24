@@ -15,6 +15,12 @@ results, process-death evidence and a final summary. A failed assertion exits 1.
 Local app/test APK hashes must match the installed base APKs. Working-tree HEAD,
 dirty status and source hashes are recorded separately, not asserted to be the
 source of either APK. Existing pending missions are refused, never removed.
+
+Select --scenario accounting for the ordinary ranged counter replay: a 768KiB
+body gate, SIGKILL, actual manager load, then all replay bytes except 4KiB.
+--ui-hold-seconds 3 additionally opens the real Downloads screen at that final
+pending gate and captures its screenshot and accessibility hierarchy. Counter
+classification is reported separately; a full-looking bar is not UI text proof.
 """
 
 import argparse
@@ -32,15 +38,18 @@ import sys
 import threading
 import time
 import urllib.parse
+import xml.etree.ElementTree as ET
 
 
 PACKAGE = "org.seventyfiveohmantenna.pvcpipe.debug"
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 TEST = "us.shandian.giga.service.DownloadColdRestartIntegrationTest#runPhase"
 SCENARIOS = ("stable", "replacement-bytes", "replacement-before-bytes",
-             "unsolicited206", "earlier-resource")
+             "unsolicited206", "earlier-resource", "accounting")
 FIXTURE_SIZE = 8 * 1024 * 1024
 PARTIAL_BUDGET = 2 * 1024 * 1024
+ACCOUNTING_BUDGET = 768 * 1024
+ACCOUNTING_HOLD = 4096
 LAST_MODIFIED = "Wed, 21 Oct 2015 07:28:00 GMT"
 
 
@@ -75,20 +84,30 @@ class PeerState:
         self.policy = "normal"
         self.budget = 0
         self.hold_headers = False
+        self.per_request_cap = None
         self.phase = ""
         self.requests = []
         self.fixtures = {}
         self.closed = False
 
-    def configure(self, scenario, phase, epoch, budget, policy="normal", hold_headers=False):
+    def configure(self, scenario, phase, epoch, budget, policy="normal", hold_headers=False,
+                  per_request_cap=None):
         with self.condition:
             self.generation += 1
             self.scenario, self.phase, self.epoch = scenario, phase, epoch
             self.budget, self.policy = budget, policy
             self.hold_headers = hold_headers
+            self.per_request_cap = per_request_cap
             self.condition.notify_all()
         self.evidence.record("gate", scenario=scenario, phase=phase, epoch=epoch,
-                             budget=budget, policy=policy, hold_headers=hold_headers)
+                             budget=budget, policy=policy, hold_headers=hold_headers,
+                             per_request_cap=per_request_cap)
+
+    def release(self, budget):
+        with self.condition:
+            self.budget = budget
+            self.condition.notify_all()
+        self.evidence.record("body-budget-release", budget=budget, phase=self.phase)
 
     def stop(self):
         with self.condition:
@@ -113,7 +132,7 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
         self.connection.settimeout(state.timeout)
         path = urllib.parse.urlsplit(self.path).path
         with state.condition:
-            generation, scenario, phase, epoch, policy = \
+            generation, scenario, phase, epoch, policy, per_request_cap = \
                 self.server.accepted_context[self.connection]
             request = dict(id=len(state.requests) + 1, scenario=scenario,
                            phase=phase, method=self.command, path=path,
@@ -223,7 +242,8 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
             position = start
             while position <= end:
                 with state.condition:
-                    while gated and state.budget == 0 and not state.closed \
+                    while gated and (state.budget == 0 or (per_request_cap is not None
+                            and position - start >= per_request_cap)) and not state.closed \
                             and generation == state.generation:
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
@@ -234,6 +254,8 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
                         return
                     count = min(64 * 1024, end - position + 1)
                     if gated:
+                        if per_request_cap is not None:
+                            count = min(count, per_request_cap - (position - start))
                         if state.budget is not None:
                             count = min(count, state.budget)
                             state.budget -= count
@@ -266,7 +288,7 @@ class PeerServer(http.server.ThreadingHTTPServer):
         with self.state.condition:
             self.accepted_context[connection] = (
                 self.state.generation, self.state.scenario, self.state.phase,
-                self.state.epoch, self.state.policy)
+                self.state.epoch, self.state.policy, self.state.per_request_cap)
         return connection, address
 
     def close_request(self, request):
@@ -367,7 +389,7 @@ class Instrumentation:
             self.lines.put(None)
             self.output.close()
 
-    def result(self):
+    def result(self, key="coldResult"):
         deadline = time.monotonic() + self.timeout
         while True:
             remaining = deadline - time.monotonic()
@@ -379,7 +401,7 @@ class Instrumentation:
                 raise TimeoutError("No phase result: " + self.label) from None
             if line is None:
                 raise AssertionError("Instrumentation ended without coldResult: " + self.label)
-            marker = "coldResult="
+            marker = key + "="
             if marker in line:
                 result = json.loads(line.split(marker, 1)[1])
                 self.evidence.record("checkpoint-result", label=self.label, result=result)
@@ -423,8 +445,11 @@ class Run:
         label = "%02d-%s-%s-%s" % (self.counter, scenario, phase, expectation)
         if self.adb.pids():
             raise AssertionError("A prior target process is still running before " + label)
-        self.peer.configure(scenario, label, epoch, budget, policy,
-                            hold_headers=expectation == "cleared")
+        accounting_resume = scenario == "accounting" and phase == "resume"
+        self.peer.configure(scenario, label, epoch, 0 if accounting_resume else budget, policy,
+                            hold_headers=expectation == "cleared",
+                            per_request_cap=ACCOUNTING_BUDGET // 2
+                            if scenario == "accounting" and phase == "start" else None)
         arguments = dict(coldPhase=phase, coldExpectation=expectation,
                          coldScenario=scenario,
                          coldUrl="http://127.0.0.1:%d/%s/media" % (self.port, scenario),
@@ -443,8 +468,27 @@ class Run:
         if scenario == "earlier-resource":
             arguments["coldUrl2"] = arguments["coldUrl"].replace("/media", "/media2")
             arguments["coldCurrent"] = 1
+        if scenario == "accounting":
+            arguments["coldByteBudget"] = budget if budget is not None else 0
+            arguments["coldRemainingHold"] = ACCOUNTING_HOLD
+            if accounting_resume and self.args.ui_hold_seconds:
+                arguments["coldShowUi"] = "true"
         self.active = Instrumentation(self.adb, self.evidence, self.args.timeout,
                                       label, arguments)
+        if accounting_resume:
+            before = self.active.result("coldResumed")
+            self.active_pid = int(before["pid"])
+            budget = before["byteBudget"]
+            loaded = before["loaded"]
+            expected = FIXTURE_SIZE - loaded["resumableCurrentBytes"] - ACCOUNTING_HOLD
+            if budget != expected or budget <= 0:
+                raise AssertionError("Accounting replay budget differs from saved resume plan")
+            self.evidence.record("accounting-before-bytes", label=label, **before)
+            if self.args.ui_hold_seconds:
+                ready = before["beforeBytes"]
+                self.capture_ui(label + "-before-bytes", ready["done"] * 100 / ready["length"],
+                                arguments["coldName"])
+            self.peer.release(budget)
         result = self.active.result()
         pid = int(result["pid"])
         self.active_pid = pid
@@ -457,12 +501,38 @@ class Run:
         # Driver assertions establish checkpoint semantics; the host independently
         # establishes wire semantics and actual cold process death.
         self.assert_wire(label, scenario, phase, expectation, epoch, budget, result)
+        if scenario == "accounting":
+            if not complete:
+                self.output_digest(arguments["coldName"], label + "-before-death")
+            if accounting_resume:
+                loaded = result["loaded"]
+                replay_done = loaded["resumableTotalBytes"] + budget
+                accounting = dict(label=label, before=self.results[-1]["result"],
+                                  loaded=loaded, persisted=result.get("checkpoint"),
+                                  resumedBeforeBytes=before["beforeBytes"],
+                                  loadedOvercount=loaded["done"]
+                                  - loaded["resumableTotalBytes"],
+                                  live=result, expectedLogicalDone=replay_done,
+                                  observedDone=result["done"],
+                                  overcount=result["done"] - replay_done,
+                                  counterMatchesReplay=result["done"] == replay_done,
+                                  pendingAbove100=result["done"] > result["length"],
+                                  remainingWireBytes=ACCOUNTING_HOLD,
+                                  uiEvidence="See screenshot/XML; counter is not UI proof")
+                self.evidence.record("accounting-comparison", **accounting)
+                (self.evidence.directory / "accounting.json").write_text(
+                    json.dumps(accounting, indent=2) + "\n")
+                if self.args.ui_hold_seconds:
+                    self.capture_ui(label, result["done"] * 100 / result["length"],
+                                    arguments["coldName"])
         if complete:
             self.active.finish(killed=False)
         else:
             self.adb.kill(pid)
             self.active.finish(killed=True)
             self.previous_pid = pid
+            if scenario == "accounting":
+                self.capture_checkpoint(result["timestamp"], label)
         # Repeat every wire assertion after exit: late retries/workers must not
         # escape the pre-kill snapshot. Shutdown performs one final joined audit.
         self.assert_wire(label, scenario, phase, expectation, epoch, budget, result,
@@ -491,6 +561,71 @@ class Run:
                                  expectation=expectation, epoch=epoch, budget=budget,
                                  pid=pid, result=result))
         return result
+
+    def capture_checkpoint(self, timestamp, label):
+        recoverable = False
+        for suffix in ("", ".bak", ".new"):
+            remote = "files/pending_downloads/" + str(timestamp) + suffix
+            completed = subprocess.run(
+                self.adb.prefix + ["exec-out", "run-as", PACKAGE, "cat", remote],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=self.args.timeout)
+            if completed.returncode:
+                self.evidence.record("checkpoint-file-absent", label=label, path=remote,
+                                     error=completed.stderr.decode(errors="replace"))
+                continue
+            local = label + ".checkpoint" + suffix
+            recoverable |= suffix in ("", ".bak")
+            (self.evidence.directory / local).write_bytes(completed.stdout)
+            self.evidence.record("checkpoint-file", label=label, remote=remote, local=local,
+                                 size=len(completed.stdout),
+                                 sha256=hashlib.sha256(completed.stdout).hexdigest())
+        if not recoverable:
+            raise RuntimeError("Killed process left no readable primary/backup checkpoint")
+
+    def capture_ui(self, label, expected_percent, name):
+        # Wait for observable row text, not an arbitrary crash timer. Every body
+        # stays held at the same byte boundary throughout these UI-only polls.
+        deadline = time.monotonic() + self.args.ui_hold_seconds
+        texts = []
+        while True:
+            self.adb.run("shell", "uiautomator", "dump", "/sdcard/cold-accounting.xml")
+            completed = subprocess.run(
+                self.adb.prefix + ["exec-out", "cat", "/sdcard/cold-accounting.xml"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=self.args.timeout)
+            if completed.returncode:
+                raise RuntimeError("Cannot capture actual Downloads hierarchy: " +
+                                   completed.stderr.decode(errors="replace"))
+            xml = completed.stdout
+            root = ET.fromstring(xml)
+            texts = [node.get("text", "") for node in root.iter("node")]
+            percentages = []
+            for row in root.iter("node"):
+                if row.get("resource-id") != PACKAGE + ":id/item_bkg":
+                    continue
+                if any(node.get("resource-id") == PACKAGE + ":id/item_name"
+                       and node.get("text") == name + ".bin" for node in row.iter("node")):
+                    percentages.extend(node.get("text", "") for node in row.iter("node")
+                                       if node.get("resource-id") == PACKAGE + ":id/item_status")
+            values = [float(value.replace(",", ".")) for text in percentages
+                      for value in re.findall(r"(\d+(?:[.,]\d+)?)\s*%", text)]
+            if any(abs(value - expected_percent) <= 0.0051 for value in values):
+                break
+            if time.monotonic() >= deadline:
+                raise AssertionError("Actual Downloads row/current percentage not visible: " +
+                                     repr(texts))
+            threading.Event().wait(0.1)
+        (self.evidence.directory / (label + ".ui.xml")).write_bytes(xml)
+        screenshot = subprocess.run(self.adb.prefix + ["exec-out", "screencap", "-p"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    timeout=self.args.timeout)
+        if screenshot.returncode:
+            raise RuntimeError("Cannot capture actual Downloads screenshot: " +
+                               screenshot.stderr.decode(errors="replace"))
+        (self.evidence.directory / (label + ".ui.png")).write_bytes(screenshot.stdout)
+        self.evidence.record("ui-capture", label=label, visibleText=texts,
+                             percentageText=percentages, screenshot=label + ".ui.png",
+                             hierarchy=label + ".ui.xml",
+                             attribution="Actual Downloads activity text, not inferred from counter")
 
     def output_digest(self, name, label):
         command = self.adb.prefix + ["exec-out", "run-as", PACKAGE, "cat",
@@ -536,6 +671,8 @@ class Run:
                                        any(item.get("header_gated") for item in downloads))
                 if expectation in ("partial", "clearedPartial"):
                     ready = ready and any(item["bytes_sent"] > 0 for item in downloads)
+                if expectation == "accounting":
+                    ready = ready and sum(item["bytes_sent"] for item in downloads) == budget
                 if ready or final:
                     break
                 remaining = deadline - time.monotonic()
@@ -664,6 +801,13 @@ class Run:
             wanted = '"cold-' + scenario + '-' + str(epoch) + '"'
             if any(item["if_range"] != wanted for item in downloads):
                 raise AssertionError("Stable resume lost the persisted strong validator")
+        if scenario == "accounting" and expectation == "accounting":
+            if sum(item["bytes_sent"] for item in downloads) != budget:
+                raise AssertionError("Accounting gate did not consume exactly its body budget")
+            if result["done"] != result["resumedDone"] + budget:
+                raise AssertionError("Live counter delta differs from controlled body bytes")
+            if len(downloads) < 2:
+                raise AssertionError("Accounting case did not exercise two ranged workers")
 
     def scenario(self, name, seed):
         payload = fixture(FIXTURE_SIZE, seed)
@@ -676,6 +820,12 @@ class Run:
         self.evidence.record("fixture", scenario=name, seed=seed, size=len(payload),
                              sha256=hashlib.sha256(payload).hexdigest(),
                              formula="(i*31 + (i>>8)*17 + seed) & 255")
+        if name == "accounting":
+            (self.evidence.directory / "accounting.fixture.bin").write_bytes(payload)
+            self.phase(name, seed, "start", "accounting", 0, ACCOUNTING_BUDGET)
+            self.phase(name, seed, "resume", "accounting", 0, None)
+            self.phase(name, seed, "assertComplete", "complete", 0, None, complete=True)
+            return
         self.phase(name, seed, "start", "partial", 0, PARTIAL_BUDGET)
         if name == "stable":
             for _ in range(self.args.cold_restarts):
@@ -807,6 +957,8 @@ def arguments():
                         help="Additional stable partial cold starts (1 or 2)")
     parser.add_argument("--timeout", type=float, default=120,
                         help="Bound for each checkpoint/instrumentation/server gate")
+    parser.add_argument("--ui-hold-seconds", type=float, default=0,
+                        help="Wait up to this many seconds for accounting Downloads UI text/capture")
     parser.add_argument("--artifacts", type=Path,
                         help="New output directory (must not already exist)")
     args = parser.parse_args()
@@ -814,6 +966,8 @@ def arguments():
         parser.error("--cold-restarts must be 1 or 2 so partial fixture bytes remain")
     if args.timeout < 10:
         parser.error("--timeout must be at least 10 seconds")
+    if not 0 <= args.ui_hold_seconds <= args.timeout / 2:
+        parser.error("--ui-hold-seconds must be between 0 and half --timeout")
     if not args.serial.startswith("emulator-"):
         parser.error("--serial must select an emulator transport")
     return args
