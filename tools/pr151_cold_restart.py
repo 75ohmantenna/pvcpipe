@@ -413,6 +413,8 @@ class Run:
                          coldFixtureSize=FIXTURE_SIZE, coldFixtureSeed=seed,
                          coldThreads=2,
                          coldHoldSeconds=int(self.args.timeout + 30))
+        if phase != "start":
+            arguments["coldTimestamp"] = self.results[-1]["result"]["timestamp"]
         if fresh_below_loaded:
             arguments["coldFreshBelowLoaded"] = "true"
         if policy == "unsolicited206":

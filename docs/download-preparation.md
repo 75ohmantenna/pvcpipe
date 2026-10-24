@@ -186,6 +186,15 @@ also passed, followed by serial `make ci` (static checks, app/extractor tests,
 lint and debug/release assembly, reusing unchanged outputs where reported).
 Instrumentation remains separate from that repository gate.
 
+Complete-PR review identified a stale-loaded-checkpoint crash gate and a wire
+audit that stopped before process exit. The corrected fixture requires fresh
+replacement checkpoints and audits joined handlers. Subsequent fixture runs
+also exposed adb argument quoting and a lookup-triggered auto-resume race:
+`getIterator()` enables connectivity scheduling, so cold pending lookup now uses
+the persisted timestamp before explicit Start. Failed-run missions were
+completed through the real service against their retained fixtures, not cleared
+or edited. These were harness corrections, not production integrity defects.
+
 ## File names
 
 A download name is one path component. Titles come from uploaders and the

@@ -170,6 +170,17 @@ public class DownloadColdRestartIntegrationTest {
     private Mission findMission() throws Exception {
         final Mission[] found = new Mission[1];
         onMain(() -> {
+            if (arguments.containsKey("coldTimestamp")) {
+                // getIterator() enables connectivity-driven scheduling. Locate a cold-loaded
+                // pending mission without enabling that side effect before explicit Start.
+                found[0] = binder.getDownloadManager().findPendingMission(
+                        Long.parseLong(required("coldTimestamp")));
+                if (found[0] != null) {
+                    assertEquals("Cold timestamp belongs to another output",
+                            Uri.fromFile(output), found[0].storage.getUri());
+                    return;
+                }
+            }
             final DownloadManager.MissionIterator iterator =
                     binder.getDownloadManager().getIterator();
             for (int index = 0; index < iterator.getOldListSize(); index++) {
