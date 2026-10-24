@@ -134,11 +134,18 @@ No checkpoint is edited, no restored mission is injected, and no pause,
 force-stop, data-clear or orderly shutdown precedes a crash. Checkpoints are
 observed under the production writer lock. The HTTP peer deliberately refuses
 HEAD with 405, exercising GET probes rather than incorrectly honoring Range on
-HEAD. Its hostile changed-validator 206 is intentional.
+HEAD. A `bytes=0-` probe without `If-Range` receives a valid one-byte 206;
+the final-ten-byte capability probe receives its requested interval. The host
+asserts their expected counts and requires zero probes after initialized cold
+restoration. Its hostile changed-validator 206 is intentional.
 
 The Android phase checks every completed byte. The host independently pulls and
 hashes output, compares request ranges with the loaded checkpoint, rejects
-overlapping media requests, and requires one full-only request per phase.
+overlapping media requests, and requires one full-only request per phase. Wire
+assertions run again after confirmed process exit to include late requests.
+Full-mode resumes with saved partial progress require a newly persisted count
+below the loaded count, using a smaller server budget, rather than accepting the
+checkpoint just loaded. Earlier-resource re-fetches are explicitly forbidden.
 Rejected and incomplete transfers remain pending. Uncheckpointed/in-flight block
 work can be fetched again: progress counters are not evidence that a byte interval
 was durably checkpointed, nor is replay itself corruption. Full-only mode
@@ -147,10 +154,11 @@ intentionally discards partial replacement progress on the next transfer.
 There are no manager, storage, checkpoint, worker or HTTP-client mocks in this
 integration. The controlled HTTP origin replaces a real media host; instrumentation
 drives service/binder APIs, not DownloadActivity UI gestures. These results do not
-cover live hosts, SAF providers, parallel device scheduling, an interrupted
+cover live hosts, SAF providers, other Android versions, an interrupted
 AtomicFile commit, power loss, or filesystem durability. API 37 and physical
-receiver testing remain blocked and were not attempted. The earlier JVM tests
-still use Android/manager/storage doubles as described by their fixtures.
+receiver testing remain blocked/outside scope; no physical device was tested.
+The earlier JVM tests still use Android/manager/storage doubles as described by
+their fixtures.
 
 Build and explicitly install both APKs on a disposable emulator, then run:
 
@@ -163,10 +171,12 @@ python3 tools/pr151_cold_restart.py --serial '<owned-emulator>' \
   --disposable-avd-name '<exact-owned-AVD-name>' --allow-disposable
 ```
 
-The host requires an initially stopped target process and checks the AVD name,
-emulator property and API level before proceeding. It leaves generated mission
-files and finished history in that disposable AVD for inspection; it removes only
-its ADB reverse mapping and stops its own HTTP server. JSONL wire/process events,
+The host requires an initially stopped target process and no pending checkpoints,
+and checks the AVD name, emulator property and API level before proceeding.
+It records Git/source provenance, APK digests matched against installed APKs,
+and installed package version/update metadata. It leaves generated mission files
+and finished history in that disposable AVD for inspection; it removes only its
+ADB reverse mapping and stops its own HTTP server. JSONL wire/process events,
 phase checkpoints, raw instrumentation output, pulled bytes and `summary.json`
 are retained under the printed `/tmp/pvcpipe-cold-*` directory. Do not use the
 uninstalling Gradle connected-test task on a user's installation.
@@ -271,8 +281,11 @@ instrumentation tests and need a device. Before running any instrumentation
 on a phone that has the app installed, read
 [local-playlist-mutations.md](local-playlist-mutations.md).
 
-These tests cover controlled preparation and persistence scenarios, not
-every host's media URLs, Android process-death timing or live HLS expiration.
+`DownloadColdRestartIntegrationTest` and `tools/pr151_cold_restart.py` separately
+exercise the controlled SIGKILL/cold-restoration boundaries above. Compilation
+and execution of this instrumentation are not part of `make ci`. These tests do
+not cover every host's media URLs, every Android process-death boundary or live
+HLS expiration.
 
 [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) records dated phone checks
 of download pause/resume behavior and media checksums.

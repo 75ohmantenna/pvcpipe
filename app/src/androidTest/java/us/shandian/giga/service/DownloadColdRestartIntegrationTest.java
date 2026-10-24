@@ -114,11 +114,11 @@ public class DownloadColdRestartIntegrationTest {
                     onMain(() ->
                             binder.getDownloadManager().resumeMission(pending));
                 } else {
-                    assertEquals("Unknown phase", "observe", phase);
+                    fail("Unknown phase " + phase);
                 }
             } else {
                 assertTrue("Only terminal phases may find finished history",
-                        "assertComplete".equals(phase) || "observe".equals(phase));
+                        "assertComplete".equals(phase));
             }
         }
 
@@ -232,7 +232,8 @@ public class DownloadColdRestartIntegrationTest {
                                         && resumablePosition(saved);
                                 break;
                             case "rejected":
-                                matches = integrityRejected(pending) && integrityRejected(saved);
+                                matches = integrityRejected(pending) && integrityRejected(saved)
+                                        && rejectionMessageMatches(pending, saved);
                                 break;
                             case "cleared":
                                 matches = pending.running && forceFull && saved.done == base
@@ -241,7 +242,14 @@ public class DownloadColdRestartIntegrationTest {
                                         && field(saved, "resourceIdentity") == null;
                                 break;
                             case "clearedPartial":
-                                matches = pending.running && forceFull && saved.done > base;
+                                // A loaded full-mode checkpoint already has progress. The host
+                                // caps this response below that progress so only a newly persisted
+                                // replacement checkpoint can satisfy the cold-resume gate.
+                                matches = pending.running && pending.done > base
+                                        && forceFull && saved.done > base
+                                        && (!Boolean.parseBoolean(arguments.getString(
+                                                "coldFreshBelowLoaded", "false"))
+                                        || saved.done < loadedDone);
                                 break;
                             case "complete":
                                 matches = false;
@@ -250,7 +258,8 @@ public class DownloadColdRestartIntegrationTest {
                                 throw new AssertionError("Unknown expectation " + expectation);
                         }
                         if (matches) {
-                            return last.put("checkpoint", pendingSnapshot(saved));
+                            return pendingSnapshot(pending).put("checkpoint",
+                                    pendingSnapshot(saved));
                         }
                     }
                     if (!pending.running && pending.errCode != DownloadMission.ERROR_NOTHING
@@ -281,9 +290,21 @@ public class DownloadColdRestartIntegrationTest {
         return false;
     }
 
-    private static boolean integrityRejected(final DownloadMission mission) {
-        return mission != null && !mission.running && mission.errObject != null
-                && "InvalidRangeException".equals(mission.errObject.getClass().getSimpleName());
+    private static boolean integrityRejected(final DownloadMission mission) throws Exception {
+        // A late error from another worker may replace errObject, but not this sticky marker.
+        return mission != null && !mission.running
+                && (boolean) field(mission, "rangeErrorRestartPending");
+    }
+
+    private boolean rejectionMessageMatches(final DownloadMission pending,
+                                            final DownloadMission saved) throws Exception {
+        final String expected = arguments.getString("coldErrorContains");
+        return expected == null || ((boolean) field(saved, "forceFullDownload")
+                && pending.errObject != null && saved.errObject != null
+                && pending.errObject.getMessage() != null
+                && saved.errObject.getMessage() != null
+                && pending.errObject.getMessage().contains(expected)
+                && saved.errObject.getMessage().contains(expected));
     }
 
     private static DownloadMission checkpoint(final DownloadMission mission) throws Exception {
@@ -296,8 +317,8 @@ public class DownloadColdRestartIntegrationTest {
 
     private static JSONObject snapshot(final Mission mission) throws Exception {
         if (mission instanceof DownloadMission pending) {
-            final JSONObject result = pendingSnapshot(pending);
             final DownloadMission saved = checkpoint(pending);
+            final JSONObject result = pendingSnapshot(pending);
             return result.put("checkpoint",
                     saved == null ? JSONObject.NULL : pendingSnapshot(saved));
         }
@@ -312,13 +333,16 @@ public class DownloadColdRestartIntegrationTest {
                 .put("done", mission.done).put("current", mission.current)
                 .put("length", mission.length).put("unknownLength", mission.unknownLength)
                 .put("forceFullDownload", field(mission, "forceFullDownload"))
+                .put("rangeErrorRestartPending", field(mission, "rangeErrorRestartPending"))
                 .put("fallbackResumeOffset", field(mission, "fallbackResumeOffset"))
                 .put("offsets", new JSONArray(mission.offsets))
                 .put("blocks", field(mission, "blocks") == null ? JSONObject.NULL
                         : new JSONArray(field(mission, "blocks")))
                 .put("errCode", mission.errCode)
                 .put("errObject", mission.errObject == null ? JSONObject.NULL
-                        : mission.errObject.getClass().getSimpleName());
+                        : mission.errObject.getClass().getSimpleName())
+                .put("errMessage", mission.errObject == null ? JSONObject.NULL
+                        : mission.errObject.getMessage());
         return result.put("identity", identity == null ? JSONObject.NULL : new JSONObject()
                 .put("requestUrl", field(identity, "requestUrl"))
                 .put("effectiveUrl", field(identity, "effectiveUrl"))

@@ -12,6 +12,9 @@ Example:
 
 Artifacts include every HTTP request/response, instrumentation output, checkpoint
 results, process-death evidence and a final summary. A failed assertion exits 1.
+Local app/test APK hashes must match the installed base APKs. Working-tree HEAD,
+dirty status and source hashes are recorded separately, not asserted to be the
+source of either APK. Existing pending missions are refused, never removed.
 """
 
 import argparse
@@ -165,8 +168,10 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
                 start = int(match.group(1))
                 end = min(int(match.group(2)), end) if match.group(2) else end
                 if request["range"] == "bytes=0-" and request["if_range"] is None:
-                    # The initializer wants headers, not a full body. A valid
-                    # short range avoids blocking its close/drain on our gate.
+                    # Deliberately satisfy only the first byte of this open
+                    # range. A 206 may be shorter than the requested interval;
+                    # Content-Range still supplies the real total. This keeps
+                    # the initializer's GET probe close/drain outside our gate.
                     end = 0
                 if start > end:
                     self.send_response(416)
@@ -239,12 +244,17 @@ class PeerHandler(http.server.BaseHTTPRequestHandler):
             request["disconnect"] = str(error)
         finally:
             self.close_connection = True
+            with state.condition:
+                request["ended"] = True
+                state.condition.notify_all()
             state.evidence.record("http-request-end", **request)
 
 
 class PeerServer(http.server.ThreadingHTTPServer):
-    daemon_threads = True
-    block_on_close = False
+    # Join accepted handlers at final shutdown before auditing the final request
+    # set, including connections buffered around the last process death.
+    daemon_threads = False
+    block_on_close = True
 
 
 class Adb:
@@ -382,10 +392,12 @@ class Run:
         self.previous_pid = None
         self.active = None
         self.results = []
+        self.active_pid = None
+        self.rejected_digest = None
         self.run_id = str(time.time_ns())
 
     def phase(self, scenario, seed, phase, expectation, epoch, budget,
-              policy="normal", complete=False):
+              policy="normal", complete=False, fresh_below_loaded=False):
         self.counter += 1
         label = "%02d-%s-%s-%s" % (self.counter, scenario, phase, expectation)
         if self.adb.pids():
@@ -399,6 +411,10 @@ class Run:
                          coldFixtureSize=FIXTURE_SIZE, coldFixtureSeed=seed,
                          coldThreads=2,
                          coldHoldSeconds=int(self.args.timeout + 30))
+        if fresh_below_loaded:
+            arguments["coldFreshBelowLoaded"] = "true"
+        if policy == "unsolicited206":
+            arguments["coldErrorContains"] = "Clean restart requires a full response"
         if epoch > 0:
             arguments["coldReplacementSeed"] = seed + 97
         if scenario == "earlier-resource":
@@ -408,6 +424,7 @@ class Run:
                                       label, arguments)
         result = self.active.result()
         pid = int(result["pid"])
+        self.active_pid = pid
         if self.previous_pid is not None and pid == self.previous_pid:
             raise AssertionError("Cold phase reused the killed PID: " + str(pid))
         if not complete and pid not in self.adb.pids():
@@ -416,13 +433,17 @@ class Run:
                              previous_pid=self.previous_pid)
         # Driver assertions establish checkpoint semantics; the host independently
         # establishes wire semantics and actual cold process death.
-        self.assert_wire(label, phase, expectation, epoch, result)
+        self.assert_wire(label, scenario, phase, expectation, epoch, budget, result)
         if complete:
             self.active.finish(killed=False)
         else:
             self.adb.kill(pid)
             self.active.finish(killed=True)
             self.previous_pid = pid
+        # Repeat every wire assertion after exit: late retries/workers must not
+        # escape the pre-kill snapshot. Shutdown performs one final joined audit.
+        self.assert_wire(label, scenario, phase, expectation, epoch, budget, result,
+                         final=True)
         if complete:
             self.assert_output(scenario, arguments["coldName"], label)
         if expectation == "rejected":
@@ -442,7 +463,10 @@ class Run:
             if after != self.rejected_digest:
                 raise AssertionError("Cleared checkpoint changed bytes before response acceptance")
         self.active = None
-        self.results.append(dict(label=label, pid=pid, result=result))
+        self.active_pid = None
+        self.results.append(dict(label=label, scenario=scenario, phase=phase,
+                                 expectation=expectation, epoch=epoch, budget=budget,
+                                 pid=pid, result=result))
         return result
 
     def output_digest(self, name, label):
@@ -469,32 +493,113 @@ class Run:
         if actual != expected:
             raise AssertionError("Independent final output mismatch: %r != %r" % (actual, expected))
 
-    def assert_wire(self, label, phase, expectation, epoch, result):
+    def assert_wire(self, label, scenario, phase, expectation, epoch, budget, result,
+                    final=False):
         deadline = time.monotonic() + self.args.timeout
         with self.peer.condition:
             while True:
-                downloads = [dict(item) for item in self.peer.requests
-                             if item["phase"] == label and item["method"] == "GET"
-                             and item["path"].rsplit("/", 1)[-1] in ("object", "object2")
-                             and "start" in item and item["end"] - item["start"] + 1 > 10
-                             and (self.peer.scenario != "earlier-resource"
-                                  or item.get("resource") == 1)]
-                ready = downloads and (expectation != "cleared"
-                                       or any(item.get("header_gated") for item in downloads))
-                if ready:
+                requests = [dict(item) for item in self.peer.requests
+                            if item["phase"] == label]
+                objects = [item for item in requests
+                           if item["method"] == "GET"
+                           and item["path"].rsplit("/", 1)[-1] in ("object", "object2")]
+                probes = [item for item in objects if "start" in item
+                          and item["end"] - item["start"] + 1 <= 10]
+                all_downloads = [item for item in objects if "start" in item
+                                 and item["end"] - item["start"] + 1 > 10]
+                downloads = [item for item in all_downloads
+                             if scenario != "earlier-resource" or item.get("resource") == 1]
+                ready = downloads and (expectation != "cleared" or
+                                       any(item.get("header_gated") for item in downloads))
+                if expectation in ("partial", "clearedPartial"):
+                    ready = ready and any(item["bytes_sent"] > 0 for item in downloads)
+                if ready or final:
                     break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise AssertionError("No expected actual media GET/gate in phase " + label)
                 self.peer.condition.wait(min(remaining, 0.05))
+        if not ready:
+            raise AssertionError("Missing expected media GET/byte/header gate in " + label)
+        if any(item["scenario"] != scenario for item in requests):
+            raise AssertionError("Phase mixed requests from another scenario")
+        if any(item["accept_encoding"] != "identity" for item in requests):
+            raise AssertionError("Request did not require identity encoding")
+        for item in requests:
+            suffix = item["path"].rsplit("/", 1)[-1]
+            if item["path"] != "/" + scenario + "/" + suffix \
+                    or suffix not in ("media", "media2", "object", "object2") \
+                    or item["method"] not in ("GET", "HEAD"):
+                raise AssertionError("Unexpected phase request: " + repr(item))
+            if "status" not in item:
+                continue  # An accepted handler may still be parsing this request.
+            if suffix in ("media", "media2"):
+                expected_status = 302
+            elif item["method"] == "HEAD":
+                expected_status = 405
+            else:
+                unsolicited = scenario == "unsolicited206" and expectation == "rejected" \
+                    and (result.get("loaded") or {}).get("forceFullDownload")
+                expected_status = 206 if item["range"] is not None or unsolicited else 200
+            if item["status"] != expected_status:
+                raise AssertionError("Unexpected phase HTTP response: " + repr(item))
+        if scenario == "earlier-resource" and phase != "start" and any(
+                item["path"].rsplit("/", 1)[-1] in ("media", "object") for item in requests):
+            raise AssertionError("Cold restore re-requested the completed earlier resource")
+
+        # Initializer 0 queries every URL, then probes the last ten bytes of
+        # resource 0. Initializer 1 queries resource 1 again and probes its tail.
+        # Each initializer first attempts HEAD; the server's real 405 switches
+        # that initializer to GET. Initialized cold restores run no initializer.
+        expected_probes = {}
+        if phase == "start":
+            expected_probes[(0, "bytes=0-")] = 1
+            expected_probes[(0, "bytes=%d-%d" % (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
+            if scenario == "earlier-resource":
+                expected_probes[(1, "bytes=0-")] = 2
+                expected_probes[(1, "bytes=%d-%d" %
+                                 (FIXTURE_SIZE - 10, FIXTURE_SIZE))] = 1
+        actual_probes = {}
+        for item in probes:
+            key = (item["resource"], item["range"])
+            actual_probes[key] = actual_probes.get(key, 0) + 1
+            if item["if_range"] is not None or item.get("status") != 206:
+                raise AssertionError("Initializer probe used a validator or lacked 206")
+        if actual_probes != expected_probes:
+            raise AssertionError("Unexpected initializer probes in %s: %r != %r" %
+                                 (label, actual_probes, expected_probes))
+        heads = [item for item in requests if item["method"] == "HEAD"
+                 and item["path"].rsplit("/", 1)[-1] in ("object", "object2")]
+        expected_heads = 2 if phase == "start" and scenario == "earlier-resource" \
+            else int(phase == "start")
+        if len(heads) != expected_heads or any(item.get("status") != 405 for item in heads):
+            raise AssertionError("Unexpected HEAD/405 initializer fallback in " + label)
+        if any(item["range"] != "bytes=0-" or item["if_range"] is not None for item in heads):
+            raise AssertionError("HEAD initializer query carried unexpected Range/If-Range")
+
         loaded = result.get("loaded") or {}
-        intervals = sorted((item["start"], item["end"]) for item in downloads)
-        if any(right[0] <= left[1] for left, right in zip(intervals, intervals[1:])):
-            raise AssertionError("Duplicate or overlapping media workers: " + repr(downloads))
-        if any(item["accept_encoding"] != "identity" for item in downloads):
-            raise AssertionError("Media request did not require identity encoding")
-        if phase == "startReplacement" or expectation in ("cleared", "clearedPartial") \
-                or loaded.get("forceFullDownload"):
+        full_only = phase == "startReplacement" or expectation in ("cleared", "clearedPartial") \
+            or loaded.get("forceFullDownload")
+        worker_cap = 1 if full_only else FIXTURE_SIZE // (512 * 1024)
+        if not full_only and budget is not None:
+            worker_cap = min(worker_cap, (budget + 512 * 1024 - 1) // (512 * 1024) + 2)
+        if len(downloads) > worker_cap:
+            raise AssertionError("Too many media requests/workers/retries: " + repr(downloads))
+        earlier_cap = FIXTURE_SIZE // (512 * 1024) \
+            if phase == "start" and scenario == "earlier-resource" else 0
+        if len(all_downloads) - len(downloads) > earlier_cap:
+            raise AssertionError("Too many earlier-resource media requests")
+        object_cap = worker_cap + earlier_cap + len(expected_probes) + expected_heads
+        # Two identical resource-1 queries are expected in the multi-resource start.
+        object_cap += sum(expected_probes.values()) - len(expected_probes)
+        if len(requests) > 2 * object_cap:
+            raise AssertionError("Phase exceeded its bounded request/redirect count")
+        for resource in (0, 1):
+            intervals = sorted((item["start"], item["end"]) for item in all_downloads
+                               if item["resource"] == resource)
+            if any(right[0] <= left[1] for left, right in zip(intervals, intervals[1:])):
+                raise AssertionError("Duplicate or overlapping media workers: " + repr(all_downloads))
+        if full_only:
             if len(downloads) != 1:
                 raise AssertionError("Full-only recovery created duplicate workers or retries")
             if any(item["range"] is not None or item["if_range"] is not None
@@ -529,7 +634,7 @@ class Run:
                 and not any(item["bytes_sent"] > 0 for item in downloads):
             raise AssertionError("Partial checkpoint was reported before peer sent bytes")
         if phase == "resume" and expectation == "partial":
-            wanted = '"cold-' + self.peer.scenario + '-' + str(epoch) + '"'
+            wanted = '"cold-' + scenario + '-' + str(epoch) + '"'
             if any(item["if_range"] != wanted for item in downloads):
                 raise AssertionError("Stable resume lost the persisted strong validator")
 
@@ -568,11 +673,89 @@ class Run:
             return
         expectation = "clearedPartial" if name == "replacement-bytes" else "cleared"
         budget = PARTIAL_BUDGET if name == "replacement-bytes" else 0
-        self.phase(name, seed, "startReplacement", expectation, 1, budget)
-        # Full-only state must survive the actual process death, not merely an
-        # orderly pause/restart of the in-memory mission.
-        self.phase(name, seed, "resume", "clearedPartial", 1, PARTIAL_BUDGET)
+        previous = self.phase(name, seed, "startReplacement", expectation, 1, budget)
+        # The saved checkpoint may advance before SIGKILL, but cannot regress:
+        # maxRetry=0. Spend less than its observed current-resource progress so
+        # the driver's base < saved.done < loadedDone gate proves fresh bytes.
+        saved = previous["checkpoint"]
+        base = saved["offsets"][saved["current"]] - saved["offsets"][0]
+        progress = saved["done"] - base
+        fresh_below_loaded = progress > 0
+        resume_budget = max(1, progress // 2) if fresh_below_loaded else PARTIAL_BUDGET
+        if fresh_below_loaded and resume_budget >= progress:
+            raise AssertionError("Saved full-only progress is too small for a fresh byte gate")
+        self.phase(name, seed, "resume", "clearedPartial", 1, resume_budget,
+                   fresh_below_loaded=fresh_below_loaded)
         self.phase(name, seed, "assertComplete", "complete", 1, None, complete=True)
+
+
+def record_provenance(args, evidence, adb):
+    """Record observed artifacts/source separately; hashes do not prove a build."""
+    root = Path(__file__).resolve().parents[1]
+
+    def git(*arguments):
+        completed = subprocess.run(["git", "-C", str(root), *arguments],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   timeout=args.timeout, check=True)
+        return completed.stdout.decode("utf-8", errors="surrogateescape")
+
+    head = git("rev-parse", "HEAD").strip()
+    status = git("status", "--porcelain=v1", "--untracked-files=all")
+    changed = git("diff", "--name-only", "-z", "HEAD").split("\0")
+    untracked = git("ls-files", "--others", "--exclude-standard", "-z").split("\0")
+    sources = git("ls-files", "-z", "--", "app/src/main/java/us/shandian/giga",
+                  "app/src/androidTest/java/us/shandian/giga/service",
+                  "tools/pr151_cold_restart.py", "app/build.gradle.kts",
+                  "build.gradle.kts", "settings.gradle.kts", "gradle.properties",
+                  "gradle/libs.versions.toml", "gradle/wrapper").split("\0")
+    hashes = {}
+    for name in sorted(set(changed + untracked + sources) - {""}):
+        path = root / name
+        if path.is_file():
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            hashes[name] = digest.hexdigest()
+        else:
+            hashes[name] = None
+    evidence.record("source-provenance", head=head, dirty=bool(status), status=status,
+                    file_sha256=hashes,
+                    attribution="Observed working tree; APK/source build relationship not inferred")
+    packages = []
+    for package, local in ((PACKAGE, args.app_apk), (PACKAGE + ".test", args.test_apk)):
+        local = local.resolve(strict=True)
+        digest = hashlib.sha256()
+        with local.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        local_sha256 = digest.hexdigest()
+        paths = adb.run("shell", "pm", "path", package).splitlines()
+        bases = [line[len("package:"):] for line in paths
+                 if line.startswith("package:") and line.endswith("/base.apk")]
+        if len(bases) != 1:
+            raise RuntimeError("Cannot identify installed base APK for " + package)
+        installed = adb.run("shell", "sha256sum", bases[0]).split()
+        if len(installed) != 2 or not re.fullmatch(r"[0-9a-f]{64}", installed[0]) \
+                or installed[1] != bases[0]:
+            raise RuntimeError("Cannot hash installed base APK for " + package)
+        metadata = adb.run("shell", "dumpsys", "package", package)
+        fields = {}
+        for key in ("versionCode", "versionName", "firstInstallTime", "lastUpdateTime"):
+            match = re.search(r"(?m)^\s*" + key + r"=(.+)$", metadata)
+            if not match:
+                raise RuntimeError("Missing installed package metadata " + key + ": " + package)
+            fields[key] = match.group(1).strip()
+        artifact = dict(package=package, local_apk=str(local), local_sha256=local_sha256,
+                        installed_base=bases[0], installed_sha256=installed[0],
+                        installed_paths=paths, metadata=fields)
+        evidence.record("apk-provenance", **artifact)
+        if local_sha256 != installed[0]:
+            raise AssertionError("Installed base APK differs from local APK: " + package)
+        packages.append(artifact)
+    return dict(head=head, dirty=bool(status), status=status,
+                file_sha256=hashes, packages=packages,
+                attribution="Observed working tree; APK/source build relationship not inferred")
 
 
 def arguments():
@@ -584,6 +767,13 @@ def arguments():
     parser.add_argument("--allow-disposable", action="store_true", required=True,
                         help="Acknowledge that this named API26 AVD is disposable")
     parser.add_argument("--adb", default=os.environ.get("ADB", "adb"))
+    parser.add_argument("--app-apk", type=Path,
+                        default=Path("app/build/outputs/apk/debug/app-debug.apk"),
+                        help="Local app APK that must match the installed base APK")
+    parser.add_argument("--test-apk", type=Path,
+                        default=Path("app/build/outputs/apk/androidTest/debug/"
+                                     "app-debug-androidTest.apk"),
+                        help="Local test APK that must match the installed base APK")
     parser.add_argument("--scenario", choices=SCENARIOS, action="append",
                         help="Repeat to select scenarios (default: all)")
     parser.add_argument("--cold-restarts", type=int, default=2,
@@ -613,11 +803,20 @@ def main():
     run = None
     port = None
     success = False
+    provenance = None
+    failure = None
     try:
         adb.require_disposable(args.disposable_avd_name)
         # Refuse to kill an unrelated already-running app process on entry.
         if adb.pids():
             raise RuntimeError("Target app is already running; close it on the disposable AVD first")
+        pending = adb.run("shell", "run-as " + PACKAGE + " sh -c "
+                          "'if [ -e files/pending_downloads ]; then "
+                          "ls -A files/pending_downloads; fi'")
+        evidence.record("pending-preflight", entries=pending)
+        if pending:
+            raise RuntimeError("Refusing nonempty pending_downloads; existing missions are preserved")
+        provenance = record_provenance(args, evidence, adb)
         server = PeerServer(("127.0.0.1", 0), PeerHandler)
         server.state = state
         port = server.server_address[1]
@@ -634,30 +833,55 @@ def main():
             run.scenario(name, 41 + index * 13)
         if run.results and adb.pids():
             adb.kill(run.results[-1]["pid"])
+        state.stop()
+        server.shutdown()
+        server.server_close()
+        server = None
+        labels = {item["label"] for item in run.results}
+        if any(not item.get("ended") or "status" not in item or item["phase"] not in labels
+               for item in state.requests):
+            raise AssertionError("Final wire audit found an unfinished or unassigned request")
+        for item in run.results:
+            run.assert_wire(item["label"], item["scenario"], item["phase"],
+                            item["expectation"], item["epoch"], item["budget"],
+                            item["result"], final=True)
+        evidence.record("final-wire-audit", phases=len(run.results),
+                        requests=len(state.requests), handlers_joined=True)
         success = True
-    except (AssertionError, RuntimeError, TimeoutError, OSError,
-            subprocess.SubprocessError, ValueError, KeyError) as error:
+    except Exception as error:
+        failure = repr(error)
         evidence.record("failure", error=repr(error))
         print("FAIL:", error, file=sys.stderr)
     finally:
         if run and run.active:
-            # Failure cleanup is SIGKILL, never pause, force-stop or data-clear.
+            # Kill only an explicitly reported owned PID, never an unknown app
+            # process discovered during failure cleanup.
             with contextlib.suppress(Exception):
                 pids = adb.pids()
-                if len(pids) == 1:
-                    adb.kill(next(iter(pids)))
+                if run.active_pid is not None and pids == {run.active_pid}:
+                    adb.kill(run.active_pid)
+                elif pids:
+                    evidence.record("cleanup-left-process", pids=sorted(pids),
+                                    reported_pid=run.active_pid)
             with contextlib.suppress(Exception):
                 run.active.finish(killed=True)
         state.stop()
         if server:
-            server.shutdown()
-            server.server_close()
+            try:
+                server.shutdown()
+                server.server_close()
+            except Exception as error:
+                success = False
+                failure = repr(error)
+                evidence.record("failure", error=repr(error), stage="server-cleanup")
+                print("FAIL:", error, file=sys.stderr)
         if port is not None:
             with contextlib.suppress(Exception):
                 adb.run("reverse", "--remove", "tcp:" + str(port))
         summary = dict(success=success, serial=args.serial,
                        avd=args.disposable_avd_name, scenarios=args.scenario or list(SCENARIOS),
-                       phases=run.results if run else [])
+                       phases=run.results if run else [],
+                       provenance=provenance, failure=failure)
         (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         evidence.record("finished", success=success)
         evidence.stream.close()
