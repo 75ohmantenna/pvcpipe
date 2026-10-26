@@ -20,6 +20,9 @@ bin/
 .vscode/
 *.code-workspace
 
+# Machine-local language-server paths and project import configuration
+.omp/lsp.json
+
 # Android release signing material must stay outside version control.
 *.jks
 *.keystore

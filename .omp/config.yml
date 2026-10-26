@@ -1,0 +1,4 @@
+astGrep:
+  enabled: true
+task:
+  enableLsp: true

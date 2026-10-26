@@ -44,6 +44,54 @@ substitutes it for the app's `com.github.75ohmantenna:pvcpipe-extractor`
 dependency. Extractor changes are included in the next app build without a
 publishing step. This repository declares no publication workflow.
 
+## OMP code intelligence
+
+Start OMP from the repository root. `.omp/config.yml` enables structural
+search for Java/Kotlin code patterns and language-server access for delegated
+agents. Automatic formatting and post-edit diagnostics are not enabled by this
+project configuration; Checkstyle and ktlint remain the formatting authorities.
+
+Language servers are installed per user, not bundled with the app. Put
+machine-specific executable paths, JDK paths and workspace import options in
+`.omp/lsp.json` (gitignored), then use OMP's LSP `reload` action with `file: "*"`
+after changing that file or installing a server. Import the root Gradle build,
+not just `app/`, so the bundled extractor is included.
+
+For Java, JDT LS needs a server JVM supporting its release. Gradle build/import
+uses the pinned JDK 25, while the app and extractor compile with JDK 21.
+AGP 9 is not compatible with JDT LS's legacy Android importer. Configure
+`java.import.gradle.arguments` with `--init-script` followed by the absolute
+path to `.omp/android.init.gradle`, and disable
+`java.jdt.ls.androidSupport.enabled` so the two importers do not compete.
+Keep Gradle import enabled.
+
+The adapter imports the debug variant's real SDK, dependency classpath, source
+roots and composite project edges. It extracts AAR class JARs and removes only
+JPMS descriptors from Android-specific analysis-cache copies: Android's boot
+classpath is non-modular, while desktop module detection otherwise makes JDT
+require a missing `java.base`. Original dependency archives are unchanged.
+The adapter follows the Android variant's Java language level and does not
+compile app code. Java analysis of Kotlin classes, generated sources and resource
+classes (`R.jar`) reuses existing build outputs; refresh them with a normal debug
+build after relevant edits. AAR analysis caches are keyed by archive contents so
+replacing an archive cannot retain stale classes. This is not a replacement for
+`make ci`.
+JDT LS is not a Kotlin source-navigation provider; Java calls into compiled
+Kotlin classes can lack a go-to-definition target even when Java-to-Java and
+app-to-extractor navigation work. Use the Kotlin server for Kotlin source.
+
+JetBrains Kotlin language-server preview builds expire. If startup reports an
+expired build, update from the [official releases](https://github.com/Kotlin/kotlin-lsp/releases)
+and verify the download checksum. A successful `--help` invocation does not
+prove that the server can initialize. Verify an actual cross-file definition
+lookup after Gradle import and indexing finish; a same-file lookup alone does
+not establish that dependencies or other modules were imported.
+
+Use the standalone Kotlin distribution for this integration; do not assume that
+the separately licensed commercial Java/Kotlin editor extension has the same
+terms. Do not activate a trial or bypass a license check to make an agent's
+language-server requests work.
+
 ## Commands
 
 ```sh

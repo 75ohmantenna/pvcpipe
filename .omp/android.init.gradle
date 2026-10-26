@@ -1,0 +1,179 @@
+import org.gradle.api.Action
+import org.gradle.plugins.ide.eclipse.model.Library
+import org.gradle.plugins.ide.eclipse.model.SourceFolder
+
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+// Android's boot classpath is non-modular. JDT otherwise sees dependency JPMS
+// descriptors and requires a desktop java.base module instead of android.jar's
+// java.lang.Object. Remove only those descriptors from LSP-local cache copies;
+// every API/implementation class and the original source attachment is retained.
+def androidClasspathJar = { File archive ->
+    if (!archive.isFile() || !archive.name.endsWith('.jar')) {
+        return archive
+    }
+    new ZipFile(archive).withCloseable { zip ->
+        def isDescriptor = { String name ->
+            name == 'module-info.class' || name ==~ 'META-INF/versions/[0-9]+/module-info.class'
+        }
+        if (!zip.entries().any { isDescriptor(it.name) }) {
+            return archive
+        }
+        def identity = MessageDigest.getInstance('SHA-256').digest(
+            (archive.absolutePath + ':' + archive.length() + ':' + archive.lastModified()).getBytes('UTF-8')
+        ).encodeHex().toString()
+        def cache = new File(System.getProperty('user.home'), '.cache/jdtls/android-classpath/' + identity)
+        def output = new File(cache, archive.name)
+        if (!output.isFile()) {
+            cache.mkdirs()
+            def temporary = File.createTempFile('classpath-', '.jar', cache)
+            try {
+                new ZipOutputStream(Files.newOutputStream(temporary.toPath())).withCloseable { target ->
+                    zip.entries().each { member ->
+                        if (!isDescriptor(member.name)) {
+                            target.putNextEntry(new ZipEntry(member.name))
+                            if (!member.isDirectory()) {
+                                zip.getInputStream(member).withCloseable { input -> input.transferTo(target) }
+                            }
+                            target.closeEntry()
+                        }
+                    }
+                }
+                Files.move(temporary.toPath(), output.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                temporary.delete()
+            }
+        }
+        return output
+    }
+}
+
+// Import Android's actual debug model into Buildship without changing the build's
+// DSL, resolving declarable configurations, or scheduling compilation tasks.
+allprojects { project ->
+    ['com.android.application', 'com.android.library'].each { pluginId ->
+        project.plugins.withId(pluginId) {
+            project.plugins.apply('eclipse')
+            def components = project.extensions.getByName('androidComponents')
+            def selectedVariant = project.findProperty('jdtls.android.variant') ?: 'debug'
+            components.onVariants(components.selector().all(), { variant ->
+                if (variant.name != selectedVariant) {
+                    return
+                }
+                def eclipse = project.extensions.getByName('eclipse')
+                eclipse.project.natures.add('org.eclipse.jdt.core.javanature')
+                eclipse.classpath.plusConfigurations.add(variant.compileConfiguration)
+                eclipse.classpath.downloadSources = true
+                def compileOptions = project.extensions.getByName('android').compileOptions
+                eclipse.jdt.sourceCompatibility = compileOptions.sourceCompatibility
+                eclipse.jdt.targetCompatibility = compileOptions.targetCompatibility
+                eclipse.classpath.file.whenMerged { classpath ->
+                    def references = eclipse.classpath.fileReferenceFactory
+                    classpath.entries.removeAll { entry ->
+                        entry.kind == 'con' && entry.path.startsWith('org.eclipse.jdt.launching.JRE_CONTAINER')
+                    }
+                    def sourceDirectories = []
+                    [variant.sources.java, variant.sources.kotlin].findAll { it != null }.each { sources ->
+                        sourceDirectories.addAll(sources.all.get().collect { it.asFile })
+                    }
+                    sourceDirectories.unique().findAll { it.isDirectory() }.each { directory ->
+                        def path = project.relativePath(directory)
+                        if (!classpath.entries.any { it.kind == 'src' && it.path == path }) {
+                            classpath.entries.add(new SourceFolder(path, 'bin/main'))
+                        }
+                    }
+                    components.sdkComponents.bootClasspath.get().each { androidFile ->
+                        def library = new Library(references.fromFile(androidFile.asFile))
+                        def sdk = components.sdkComponents.sdkDirectory.get().asFile
+                        def sources = new File(sdk, 'sources/' + androidFile.asFile.parentFile.name)
+                        if (sources.isDirectory()) {
+                            library.sourcePath = references.fromFile(sources)
+                        }
+                        classpath.entries.add(library)
+                    }
+                    // AGP 9's built-in Kotlin compiler is not handled by JDT LS's
+                    // Kotlin/JVM-only hook. Reuse its actual output, never run it.
+                    def kotlinTask = project.tasks.findByName('compile' + variant.name.capitalize() + 'Kotlin')
+                    if (kotlinTask != null && kotlinTask.hasProperty('destinationDirectory')) {
+                        def output = kotlinTask.destinationDirectory.get().asFile
+                        if (output.isDirectory()) {
+                            def library = new Library(references.fromFile(output))
+                            def source = sourceDirectories.find { it.isDirectory() && !it.toPath().startsWith(project.layout.buildDirectory.get().asFile.toPath()) }
+                            if (source != null) {
+                                library.sourcePath = references.fromFile(source)
+                            }
+                            classpath.entries.add(library)
+                        }
+                    }
+                    // Generated classes such as the app's R.jar are supplied to
+                    // javac separately from the dependency configuration. Reuse
+                    // existing outputs without scheduling resource generation.
+                    def buildDirectory = project.layout.buildDirectory.get().asFile.toPath()
+                    def javaTask = project.tasks.named('compile' + variant.name.capitalize() + 'JavaWithJavac').get()
+                    javaTask.classpath.files.findAll {
+                        it.exists() && it.toPath().startsWith(buildDirectory)
+                    }.each { output ->
+                        if (!classpath.entries.any { it.kind == 'lib' && it.path == output.absolutePath }) {
+                            classpath.entries.add(new Library(references.fromFile(output)))
+                        }
+                    }
+                    // Eclipse needs class JARs, not Android archive containers.
+                    // Keep Gradle's resolved source attachment and project edges.
+                    def entries = []
+                    classpath.entries.each { entry ->
+                        if (!(entry instanceof Library) || !entry.path.endsWith('.aar')) {
+                            entries.add(entry)
+                            return
+                        }
+                        def archive = new File(entry.path)
+                        def identity = MessageDigest.getInstance('SHA-256').digest(archive.bytes).encodeHex().toString()
+                        def cache = new File(System.getProperty('user.home'), '.cache/jdtls/android-aar/' + identity)
+                        cache.mkdirs()
+                        new ZipFile(archive).withCloseable { zip ->
+                            zip.entries().each { member ->
+                                if (member.name == 'classes.jar' || (member.name.startsWith('libs/') && member.name.endsWith('.jar'))) {
+                                    def output = new File(cache, member.name.replace('/', '-'))
+                                    if (!output.isFile()) {
+                                        def temporary = File.createTempFile('classes-', '.jar', cache)
+                                        try {
+                                            zip.getInputStream(member).withCloseable { input -> Files.copy(input, temporary.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+                                            Files.move(temporary.toPath(), output.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                                        } finally {
+                                            temporary.delete()
+                                        }
+                                    }
+                                    def library = new Library(references.fromFile(output))
+                                    library.sourcePath = entry.sourcePath
+                                    entries.add(library)
+                                }
+                            }
+                        }
+                    }
+                    classpath.entries = entries.collect { entry ->
+                        if (!(entry instanceof Library)) {
+                            return entry
+                        }
+                        def original = new File(entry.path)
+                        def compatible = androidClasspathJar(original)
+                        if (compatible == original) {
+                            return entry
+                        }
+                        def library = new Library(references.fromFile(compatible))
+                        library.sourcePath = entry.sourcePath
+                        library.javadocPath = entry.javadocPath
+                        library.moduleVersion = entry.moduleVersion
+                        library.exported = entry.exported
+                        library.accessRules = entry.accessRules
+                        library.entryAttributes.putAll(entry.entryAttributes)
+                        return library
+                    }
+                }
+            } as Action)
+        }
+    }
+}
