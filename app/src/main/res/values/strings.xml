@@ -776,8 +776,8 @@
     <string name="settings_category_exoplayer_summary">Manage ExoPlayer settings. Restart the player for changes to take effect</string>
     <string name="use_exoplayer_decoder_fallback_title">Use ExoPlayer\'s decoder fallback feature</string>
     <string name="use_exoplayer_decoder_fallback_summary">If decoder initialization fails, try lower-priority decoders. Playback performance may be worse than with the primary decoder</string>
-    <string name="always_use_exoplayer_set_output_surface_workaround_title">Always use ExoPlayer\'s video output surface workaround</string>
-    <string name="always_use_exoplayer_set_output_surface_workaround_summary">When the video surface changes, release and recreate the video codec instead of setting its surface directly. ExoPlayer already uses this workaround on some affected devices. This setting only affects Android 6 and later\n\nIt may prevent playback errors when switching video players or entering fullscreen</string>
+    <string name="always_use_exoplayer_set_output_surface_workaround_title">Force video surface workaround</string>
+    <string name="always_use_exoplayer_set_output_surface_workaround_summary">Enable only if entering fullscreen or switching players causes video playback errors. ExoPlayer already applies this workaround automatically on known affected devices.\n\nMay make transitions less smooth. Restart the player for changes to take effect</string>
     <string name="audio_track_name">%1$s %2$s</string>
     <string name="audio_track_type_original">original</string>
     <string name="audio_track_type_dubbed">dubbed</string>
