@@ -165,10 +165,8 @@ class AboutActivity : AppCompatActivity() {
             if (BuildConfig.DEBUG) {
                 addAll(
                     listOf(
-                        SoftwareComponent("Apache Commons CLI", "2001 - 2009", "The Apache Software Foundation", "https://commons.apache.org/proper/commons-cli/", StandardLicenses.APACHE2, noticeFilename = "third_party/commons_cli_notice.txt"),
                         SoftwareComponent("Curtains", "", "Square, Inc.", "https://github.com/square/curtains", StandardLicenses.APACHE2),
-                        SoftwareComponent("LeakCanary", "2015 - 2019", "Square, Inc.", "https://github.com/square/leakcanary", StandardLicenses.APACHE2),
-                        SoftwareComponent("Stetho", "", "Facebook, Inc. and its affiliates", "https://github.com/facebook/stetho", StandardLicenses.MIT)
+                        SoftwareComponent("LeakCanary", "2015 - 2019", "Square, Inc.", "https://github.com/square/leakcanary", StandardLicenses.APACHE2)
                     )
                 )
             }

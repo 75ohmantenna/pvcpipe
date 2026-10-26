@@ -44,6 +44,42 @@ substitutes it for the app's `com.github.75ohmantenna:pvcpipe-extractor`
 dependency. Extractor changes are included in the next app build without a
 publishing step. This repository declares no publication workflow.
 
+## Debug inspection
+
+Run the debug variant (`org.seventyfiveohmantenna.pvcpipe.debug`) on a
+disposable emulator when investigating network traffic or private app data.
+In Android Studio, open **View > Tool Windows > App Inspection**, then select
+that emulator and the debug app process.
+
+Project import needs a Studio version that supports the AGP version pinned in
+the version catalog. Studio Quail 1 (2026.1.1 Patch 2) rejects this project's
+AGP 9.4.1 during sync. For an older IDE, build with `./gradlew :app:assembleDebug`
+and use [File > Profile or Debug APK](https://developer.android.com/studio/debug/apk-debugger)
+to open `app/build/outputs/apk/debug/app-debug.apk` as a separate APK project.
+This avoids Gradle project import; verify inspector attachment separately.
+
+- [Network Inspector](https://developer.android.com/studio/debug/network-profiler)
+  displays supported HTTP requests, headers, bodies and timing. Trigger a search
+  or open a stream to generate extractor traffic. Android Studio documents
+  OkHttp and HttpsURLConnection support; verify capture with the installed Studio
+  version and this app's OkHttp version. Native sockets, FCast protocol traffic,
+  WebView traffic and other network stacks are not covered by that promise.
+- [Database Inspector](https://developer.android.com/studio/inspect/database)
+  opens the app's Room/SQLite databases on API 26 and newer. Prefer read-only
+  queries; use disposable data when testing mutations.
+- [Layout Inspector](https://developer.android.com/studio/debug/layout-inspector)
+  inspects the running view hierarchy. Device Explorer or
+  `adb -s <serial> shell run-as org.seventyfiveohmantenna.pvcpipe.debug ls`
+  can inspect the debug app's private files, including shared-preference XML.
+  Do not edit preferences behind the running app's caches.
+
+Stetho's Chrome DevTools bridge and `dumpapp` commands have been removed.
+These Studio and adb workflows replace individual inspection tasks; there is
+no embedded HTTP recorder or on-device inspection UI. Captured headers, bodies
+and private files can contain cookies or account data; use disposable accounts
+and sanitize evidence before sharing it. LeakCanary and the debug preferences
+for heap dumping and disposed Rx exceptions remain available.
+
 ## OMP code intelligence
 
 Start OMP from the repository root. `.omp/config.yml` enables structural

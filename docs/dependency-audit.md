@@ -283,3 +283,58 @@ inside license dialogs. The JSON records dependency versions, primary sources,
 artifact fingerprints and the limits of the inventory; it does not constitute
 a recursive inventory of native SDK dependencies. No device installation or
 instrumentation was performed for this follow-up.
+
+## Follow-up: Stetho removal — 2026-10-26
+
+Debug builds now inherit `App.getDownloader()` rather than installing Stetho's
+network interceptor. The shared downloader initialization, saved cookies,
+LeakCanary configuration and disposed-Rx-exception preference remain in place.
+The [building guide](building.md#debug-inspection) describes Android Studio and
+adb inspection workflows; no replacement recorder library was added.
+
+Before/after Gradle runtime dependency reports remove exactly
+`com.facebook.stetho:stetho:1.6.0`,
+`com.facebook.stetho:stetho-okhttp3:1.6.0` and
+`commons-cli:commons-cli:1.2` from debug, with no added modules. The release
+runtime module set and versions are unchanged. About no longer credits Stetho
+or Commons CLI, and the dedicated Commons CLI NOTICE asset is removed. Shared
+license assets remain. Earlier audit inventories and fingerprints above and in
+`license-audit.json` describe their original builds, before this removal.
+
+Validation for this change: the fixture sanitizer's 12 tests pass and all 685
+recorded fixtures are clean. Build logic, Checkstyle, ktlint, dependency ordering
+and Android lint pass. All 1,039 app JVM tests pass; the extractor's offline task
+is up to date (its retained report has 604 cases, three skipped, no failures).
+The current About source contains 52 component rows; all 15 referenced
+license/NOTICE assets exist. These source and JVM checks do not establish
+Android Studio inspector compatibility or receiver/hardware behavior.
+
+Runtime checks used the changed debug APK (version 0.2.4, code 1000204) on a
+new disposable x86_64 API 26 emulator. Startup, the live feed, search results and
+thumbnails worked. Opening Blender's "Big Buck Bunny" reached player ready
+state, advanced playback position and rendered video frames. About > Licenses
+opened. An individual license dialog could not be verified: this AOSP image
+reported no usable WebView provider, and constructing its WebView terminated
+the app with `MissingWebViewPackageException`. This is an environment limitation,
+not a passing license-dialog check; license HTML formatting is covered only by
+the JVM tests here.
+
+Android Studio Quail 1, 2026.1.1 Patch 2 (build
+261.23567.138.2611.15646644), rejected Gradle import because its supported AGP
+maximum is 9.2.1, below this project's 9.4.1. Importing the built debug APK with
+**File > Profile or Debug APK**, waiting for indexing and selecting the emulator's
+main debug process allowed inspection without changing the project toolchain.
+With OkHttp 5.4.0, Network Inspector showed an actual YouTube search POST with
+HTTP 200, response headers and a 53.9 KB JSON body, plus successful thumbnail
+requests. Database Inspector opened `newpipe.db` and displayed the three
+disposable search-history rows. These are observed Studio/emulator results,
+not a guarantee for other IDE versions, network stacks or real hardware.
+The connected physical device and its installations were not modified.
+
+The full `make ci` gate passed, including debug and minified release assembly.
+Both APKs omit Stetho/Commons CLI class descriptors and About labels, omit the
+obsolete NOTICE, and contain byte-for-byte copies of all 15 remaining referenced
+license/NOTICE assets. Their manifests retain `DebugApp` for debug and `App` for
+release. The SHA-256 fingerprints for these tested artifacts are recorded in the
+Stetho follow-up in `license-audit.json`. The disposable emulator and the Studio
+session used for inspection were stopped after testing.

@@ -4536,5 +4536,45 @@
       "debug": "431ccf11093de40467e6627d2aa03c603194de725ec0d94012108fa197e33828",
       "release": "bb3234bbdf63b4d7f5610c0aa73f8af91977ab1d527facb7660666fdb5aa5624"
     }
+  },
+  "stetho_removal_follow_up": {
+    "reviewed_on": "2026-10-26",
+    "historical_inventory": "The original components, artifact hashes, counts, notice hashes and validation records above describe their dated builds before this removal; they are preserved as evidence, not the current About inventory.",
+    "removed_runtime_artifacts": [
+      "com.facebook.stetho:stetho:1.6.0",
+      "com.facebook.stetho:stetho-okhttp3:1.6.0",
+      "commons-cli:commons-cli:1.2"
+    ],
+    "removed_about_components": [
+      "Stetho",
+      "Apache Commons CLI"
+    ],
+    "removed_notice_asset": "third_party/commons_cli_notice.txt",
+    "dependency_evidence": "Before/after debugRuntimeClasspath reports remove exactly these three module coordinates, add none, and leave the releaseRuntimeClasspath module set and versions unchanged. No replacement library was added.",
+    "shared_license_assets": "Retained; other components still use the MIT and Apache 2.0 texts.",
+    "current_about_components": 52,
+    "current_release_components": 50,
+    "current_debug_only_components": [
+      "Curtains",
+      "LeakCanary"
+    ],
+    "checks_passed": [
+      "make ci: fixture sanitizer tests and 685 clean fixtures; build logic, style/order checks, app JVM tests, extractor offline task, lint, debug assembly and minified release assembly.",
+      "All 1039 app JVM tests passed. The extractor offline task was up to date; its retained report has 604 cases, three skipped, zero failures.",
+      "All 15 remaining referenced license/NOTICE assets in both APKs match source bytes.",
+      "Both APKs omit Stetho/Commons CLI class descriptors, About labels and the dedicated Commons CLI NOTICE. Manifests retain DebugApp for debug and App for release."
+    ],
+    "runtime_validation": {
+      "environment": "Disposable x86_64 API 26 emulator; changed debug APK version 0.2.4, code 1000204; Android Studio Quail 1, 2026.1.1 Patch 2, build 261.23567.138.2611.15646644.",
+      "app_smoke": "Startup, live feed, search results, thumbnails and About > Licenses list worked. Big Buck Bunny reached player ready state, advanced playback position and rendered video frames.",
+      "network_inspector": "Using the imported APK project and OkHttp 5.4.0, inspected an actual YouTube search POST with HTTP 200, response headers and a 53.9 KB JSON body, plus successful thumbnail requests.",
+      "database_inspector": "Opened newpipe.db and displayed three disposable search-history rows without editing them.",
+      "limitations": "Gradle import in this Studio version rejects AGP 9.4.1 (supported maximum 9.2.1); used File > Profile or Debug APK instead. The individual license dialog terminated the app because the emulator had no usable WebView provider (MissingWebViewPackageException); this dialog check did not pass. No real device/receiver validation is claimed.",
+      "cleanup": "Stopped the disposable emulator and inspection Studio session. The connected physical device and its installations were not modified."
+    },
+    "apk_sha256": {
+      "debug": "9c1b12faa9dc48481a50b8afbec88b4d5c225070ba552f55cda1cbde92c555e6",
+      "release": "bd14d75b61aaeb411a8d5d084cae9f9884556cc9a3eebd2e6a39dc88608603a2"
+    }
   }
 }
