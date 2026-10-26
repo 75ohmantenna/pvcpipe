@@ -12,16 +12,17 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.android.exoplayer2.PlaybackParameters;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.ui.PlayerView;
+import androidx.media3.common.PlaybackParameters;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
 import org.schabi.newpipe.player.LocalPlayer;
 import org.schabi.newpipe.player.LocalPlayerListener;
 import org.schabi.newpipe.player.helper.PlaybackParameterDialog;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.util.SponsorBlockSegment;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class LocalPlayerActivity extends AppCompatActivity implements Player.Listener,
         LocalPlayerListener, PlaybackParameterDialog.Callback {
     private LocalPlayer localPlayer;
@@ -62,9 +63,7 @@ public class LocalPlayerActivity extends AppCompatActivity implements Player.Lis
 
         boolean skipSilence = false;
 
-        if (localPlayer.getExoPlayer().getAudioComponent() != null) {
-            skipSilence = localPlayer.getExoPlayer().getAudioComponent().getSkipSilenceEnabled();
-        }
+        skipSilence = localPlayer.getExoPlayer().getSkipSilenceEnabled();
         PlaybackParameterDialog.newInstance(playbackParameters.speed, playbackParameters.pitch,
                 skipSilence, this)
                 .show(getSupportFragmentManager(), TAG);
@@ -91,32 +90,32 @@ public class LocalPlayerActivity extends AppCompatActivity implements Player.Lis
     }
 
     @Override
-    public void onBlocked(final SimpleExoPlayer player) {
+    public void onBlocked(final ExoPlayer player) {
 
     }
 
     @Override
-    public void onPlaying(final SimpleExoPlayer player) {
+    public void onPlaying(final ExoPlayer player) {
         setKeepScreenOn(true);
     }
 
     @Override
-    public void onBuffering(final SimpleExoPlayer player) {
+    public void onBuffering(final ExoPlayer player) {
         setKeepScreenOn(true);
     }
 
     @Override
-    public void onPaused(final SimpleExoPlayer player) {
+    public void onPaused(final ExoPlayer player) {
         setKeepScreenOn(false);
     }
 
     @Override
-    public void onPausedSeek(final SimpleExoPlayer player) {
+    public void onPausedSeek(final ExoPlayer player) {
 
     }
 
     @Override
-    public void onCompleted(final SimpleExoPlayer player) {
+    public void onCompleted(final ExoPlayer player) {
         setKeepScreenOn(false);
     }
 

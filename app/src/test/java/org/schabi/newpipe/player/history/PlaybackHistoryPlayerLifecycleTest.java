@@ -19,9 +19,9 @@ import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.junit.After;
 import org.junit.Before;
@@ -47,6 +47,7 @@ import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 
 /** Checks accepted history writes through the actual player shutdown path. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlaybackHistoryPlayerLifecycleTest {
     private MockedStatic<Uri> uris;
     private MockedStatic<TextUtils> text;

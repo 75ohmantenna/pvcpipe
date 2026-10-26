@@ -10,8 +10,8 @@ import static org.junit.Assert.assertNotEquals;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
+import androidx.media3.common.C;
+import androidx.media3.exoplayer.dash.manifest.DashManifestParser;
 
 import org.junit.Test;
 
@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 
 /** Checks this app's ExoPlayer DASH parser, not an installed receiver's androidx.media3 parser. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class CastDashReceiverCompatibilityTest {
     @Test
     public void pairedTracksParseWithDistinctAdaptationIdsAndRetainTheirIndexes() throws Exception {

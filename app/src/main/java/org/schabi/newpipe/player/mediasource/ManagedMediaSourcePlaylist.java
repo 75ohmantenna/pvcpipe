@@ -5,11 +5,12 @@ import android.os.Handler;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
-import com.google.android.exoplayer2.source.ShuffleOrder;
+import androidx.media3.exoplayer.source.ConcatenatingMediaSource;
+import androidx.media3.exoplayer.source.ShuffleOrder;
 
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class ManagedMediaSourcePlaylist {
     @NonNull
     private final ConcatenatingMediaSource internalSource;

@@ -1,32 +1,33 @@
 package org.schabi.newpipe.player.error;
 
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_NO_PERMISSION;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_UNSPECIFIED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_TIMEOUT;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_UNSPECIFIED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_NO_PERMISSION;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED;
 
 import androidx.annotation.NonNull;
 
-import com.google.android.exoplayer2.PlaybackException;
+import androidx.media3.common.PlaybackException;
 
 /**
- * Sorts the errors {@link com.google.android.exoplayer2.ExoPlayer ExoPlayer} reports by how the
+ * Sorts the errors {@link androidx.media3.exoplayer.ExoPlayer ExoPlayer} reports by how the
  * player recovers from them.
  * <p>
  * It only reads the error code, so it can be tested without a player.
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlaybackErrors {
 
     /** What the player does about an error. */

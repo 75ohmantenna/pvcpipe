@@ -1,34 +1,5 @@
 package org.schabi.newpipe.player;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.net.Uri;
-import android.util.Log;
-import android.widget.Toast;
-
-import androidx.preference.PreferenceManager;
-
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.PlaybackParameters;
-import com.google.android.exoplayer2.SeekParameters;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-
-import org.schabi.newpipe.DownloaderImpl;
-import org.schabi.newpipe.R;
-import org.schabi.newpipe.player.helper.PlayerHelper;
-import org.schabi.newpipe.util.SponsorBlockSegment;
-import org.schabi.newpipe.util.SponsorBlockSettings;
-import org.schabi.newpipe.util.SponsorBlockPlaybackController;
-
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.disposables.SerialDisposable;
-
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.schabi.newpipe.player.Player.STATE_BLOCKED;
 import static org.schabi.newpipe.player.Player.STATE_BUFFERING;
@@ -37,13 +8,42 @@ import static org.schabi.newpipe.player.Player.STATE_PAUSED;
 import static org.schabi.newpipe.player.Player.STATE_PAUSED_SEEK;
 import static org.schabi.newpipe.player.Player.STATE_PLAYING;
 
-public class LocalPlayer implements com.google.android.exoplayer2.Player.Listener {
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.util.Log;
+import android.widget.Toast;
+
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackParameters;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.SeekParameters;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.preference.PreferenceManager;
+
+import org.schabi.newpipe.DownloaderImpl;
+import org.schabi.newpipe.R;
+import org.schabi.newpipe.player.helper.PlayerHelper;
+import org.schabi.newpipe.util.SponsorBlockPlaybackController;
+import org.schabi.newpipe.util.SponsorBlockSegment;
+import org.schabi.newpipe.util.SponsorBlockSettings;
+
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.disposables.SerialDisposable;
+
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+public class LocalPlayer implements androidx.media3.common.Player.Listener {
     private static final String TAG = "LocalPlayer";
     private static final int PROGRESS_LOOP_INTERVAL_MILLIS = 500;
 
     private final Context context;
     private final SharedPreferences mPrefs;
-    private SimpleExoPlayer simpleExoPlayer;
+    private ExoPlayer simpleExoPlayer;
     private SerialDisposable progressUpdateReactor;
     private SponsorBlockSegment[] sponsorBlockSegments;
     private final SponsorBlockPlaybackController sponsorBlockPlayback =
@@ -60,8 +60,9 @@ public class LocalPlayer implements com.google.android.exoplayer2.Player.Listene
         sponsorBlockPlayback.reset();
         this.progressUpdateReactor = new SerialDisposable();
 
-        simpleExoPlayer = new SimpleExoPlayer
+        simpleExoPlayer = new ExoPlayer
                 .Builder(context)
+                .setLoadControl(new org.schabi.newpipe.player.helper.LoadController())
                 .build();
         simpleExoPlayer.addListener(this);
         simpleExoPlayer.setSeekParameters(PlayerHelper.getSeekParameters(context));
@@ -75,9 +76,7 @@ public class LocalPlayer implements com.google.android.exoplayer2.Player.Listene
                 R.string.playback_pitch_key), playbackParameters.pitch);
 
         boolean defaultSkipSilence = false;
-        if (simpleExoPlayer.getAudioComponent() != null) {
-            defaultSkipSilence = simpleExoPlayer.getAudioComponent().getSkipSilenceEnabled();
-        }
+        defaultSkipSilence = simpleExoPlayer.getSkipSilenceEnabled();
 
         final boolean skipSilence = mPrefs.getBoolean(context.getString(
                 R.string.playback_skip_silence_key), defaultSkipSilence);
@@ -100,14 +99,16 @@ public class LocalPlayer implements com.google.android.exoplayer2.Player.Listene
                 .build();
 
         final MediaSource videoSource = new ProgressiveMediaSource
-                .Factory(new DefaultDataSourceFactory(context, DownloaderImpl.USER_AGENT))
+                .Factory(new DefaultDataSource.Factory(context,
+                        new androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                                .setUserAgent(DownloaderImpl.USER_AGENT)))
                 .createMediaSource(mediaItem);
 
         simpleExoPlayer.addMediaSource(videoSource);
         simpleExoPlayer.prepare();
     }
 
-    public SimpleExoPlayer getExoPlayer() {
+    public ExoPlayer getExoPlayer() {
         return this.simpleExoPlayer;
     }
 
@@ -137,22 +138,20 @@ public class LocalPlayer implements com.google.android.exoplayer2.Player.Listene
         simpleExoPlayer.setPlaybackParameters(
                 new PlaybackParameters(roundedSpeed, roundedPitch));
 
-        if (simpleExoPlayer.getAudioComponent() != null) {
-            simpleExoPlayer.getAudioComponent().setSkipSilenceEnabled(skipSilence);
-        }
+        simpleExoPlayer.setSkipSilenceEnabled(skipSilence);
     }
 
     @Override
     public void onPlayerStateChanged(final boolean playWhenReady, final int playbackState) {
         switch (playbackState) {
-            case com.google.android.exoplayer2.Player.STATE_IDLE:
+            case androidx.media3.common.Player.STATE_IDLE:
                 break;
-            case com.google.android.exoplayer2.Player.STATE_BUFFERING:
+            case androidx.media3.common.Player.STATE_BUFFERING:
                 break;
-            case com.google.android.exoplayer2.Player.STATE_READY:
+            case androidx.media3.common.Player.STATE_READY:
                 changeState(playWhenReady ? STATE_PLAYING : STATE_PAUSED);
                 break;
-            case com.google.android.exoplayer2.Player.STATE_ENDED:
+            case androidx.media3.common.Player.STATE_ENDED:
                 changeState(STATE_COMPLETED);
                 break;
         }

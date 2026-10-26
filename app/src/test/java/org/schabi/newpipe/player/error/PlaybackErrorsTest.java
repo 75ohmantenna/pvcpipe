@@ -6,12 +6,13 @@ import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.RESTART_AT
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.SHUT_DOWN;
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.SKIP_STREAM;
 
-import com.google.android.exoplayer2.PlaybackException;
+import androidx.media3.common.PlaybackException;
 
 import org.junit.Test;
 
 import java.util.List;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlaybackErrorsTest {
 
     @Test

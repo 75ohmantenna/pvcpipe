@@ -15,12 +15,11 @@ import android.media.audiofx.AudioEffect
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
-import androidx.media.AudioManagerCompat
+import androidx.media3.common.Timeline
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.Timeline
-import com.google.android.exoplayer2.analytics.AnalyticsListener
 import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,6 +30,7 @@ import org.junit.Test
 import org.schabi.newpipe.R
 
 /** Uses real ExoPlayer, preferences and Android animations without loading media. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackAudioIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var application: Context
@@ -106,7 +106,7 @@ class PlaybackAudioIntegrationTest {
         val manager = context.getSystemService(AudioManager::class.java)
         assertEquals(manager.getStreamVolume(AudioManager.STREAM_MUSIC), audio.systemVolume)
         assertEquals(
-            AudioManagerCompat.getStreamMaxVolume(manager, AudioManager.STREAM_MUSIC),
+            manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
             audio.maxSystemVolume
         )
     }
@@ -154,13 +154,15 @@ class PlaybackAudioIntegrationTest {
         val eventTime = AnalyticsListener.EventTime(
             0, Timeline.EMPTY, 0, null, 0, Timeline.EMPTY, 0, null, 0, 0
         )
+        // Media3 can report its generated session ID before this controlled callback.
+        val initialCount = broadcasts.size
         environment.onAudioSessionIdChanged(eventTime, 37)
         val expectedClosingSession = player.audioSessionId
         disposeAudio()
-        assertEquals(2, broadcasts.size)
-        assertSessionIntent(broadcasts[0], AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION, 37)
+        assertEquals(initialCount + 2, broadcasts.size)
+        assertSessionIntent(broadcasts[initialCount], AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION, 37)
         assertSessionIntent(
-            broadcasts[1],
+            broadcasts[initialCount + 1],
             AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION,
             expectedClosingSession
         )
@@ -168,7 +170,7 @@ class PlaybackAudioIntegrationTest {
 
     @Test
     fun unavailableInternalGetterFallsBackWithoutChangingRawMuteDetection() = onMain {
-        replaceCommandAvailability(com.google.android.exoplayer2.Player.COMMAND_GET_VOLUME) { false }
+        replaceCommandAvailability(androidx.media3.common.Player.COMMAND_GET_VOLUME) { false }
         assertEquals(1f, audio.internalVolume, 0f)
         assertFalse(audio.isMuted)
         audio.onPlaybackEvent(PlaybackAudio.Event.TOGGLE_MUTE)
@@ -179,7 +181,7 @@ class PlaybackAudioIntegrationTest {
     @Test
     fun unavailableSetterKeepsActualVolumeAndItsRestoreValue() = onMain {
         var setterAvailable = false
-        replaceCommandAvailability(com.google.android.exoplayer2.Player.COMMAND_SET_VOLUME) {
+        replaceCommandAvailability(androidx.media3.common.Player.COMMAND_SET_VOLUME) {
             setterAvailable
         }
         audio.internalVolume = 0.35f

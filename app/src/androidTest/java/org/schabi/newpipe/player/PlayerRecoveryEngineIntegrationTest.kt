@@ -9,16 +9,14 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.net.Uri
-import android.support.v4.media.session.MediaSessionCompat
+import androidx.media3.common.Player as EnginePlayer
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.Player as EnginePlayer
-import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
-import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
-import com.google.android.exoplayer2.upstream.cache.SimpleCache
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.subjects.SingleSubject
 import java.io.File
@@ -62,6 +60,7 @@ import org.schabi.newpipe.player.ui.PlayerUiList
  * Quality changes exercise the production recovery/reload path on audio, not video resolution.
  */
 @RunWith(AndroidJUnit4::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerRecoveryEngineIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var application: Context
@@ -76,7 +75,6 @@ class PlayerRecoveryEngineIntegrationTest {
     private var cacheInstalled = false
     private lateinit var history: PlaybackHistory
     private var player: Player? = null
-    private var session: MediaSessionCompat? = null
     private var queue: PlayQueue? = null
 
     @Before
@@ -119,9 +117,7 @@ class PlayerRecoveryEngineIntegrationTest {
             ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
                 .apply { isAccessible = true }
                 .invoke(service, context)
-            val mediaSession = MediaSessionCompat(context, "recovery-$id")
-            session = mediaSession
-            player = Player(service, mediaSession, MediaSessionConnector(mediaSession)).also {
+            player = Player(service).also {
                 // UIs have not been initialized: do not start notifications or bind a service.
                 Player::class.java.getDeclaredField("UIs").apply { isAccessible = true }
                     .set(it, PlayerUiList())
@@ -137,7 +133,7 @@ class PlayerRecoveryEngineIntegrationTest {
                     player?.destroy()
                 } finally {
                     try {
-                        session?.release()
+                        // This fixture does not create a system session.
                     } finally {
                         queue?.dispose()
                     }

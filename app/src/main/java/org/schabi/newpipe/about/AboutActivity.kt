@@ -122,7 +122,7 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("commonmark-java", "2015 - 2016", "Atlassian Pty Ltd", "https://github.com/commonmark/commonmark-java", StandardLicenses.BSD2),
             SoftwareComponent("EventBus", "2012 - 2020", "Markus Junginger, greenrobot", "https://greenrobot.org/eventbus", StandardLicenses.APACHE2),
             SoftwareComponent("Error Prone Annotations", "", "The Error Prone Authors", "https://github.com/google/error-prone", StandardLicenses.APACHE2),
-            SoftwareComponent("ExoPlayer", "2014 - 2023", "The Android Open Source Project", "https://github.com/google/ExoPlayer", StandardLicenses.APACHE2),
+            SoftwareComponent("AndroidX Media3", "2014 - 2026", "The Android Open Source Project", "https://github.com/androidx/media", StandardLicenses.APACHE2),
             SoftwareComponent("FCast sender SDK", "2023", "FUTO", "https://github.com/futo-org/fcast", StandardLicenses.MIT),
             SoftwareComponent("GigaGet", "2014", "Peter Cai", "https://github.com/PaperAirplane-Dev-Team/GigaGet", StandardLicenses.GPL3),
             SoftwareComponent("FFmpeg", "", "FFmpeg developers", "https://ffmpeg.org/", StandardLicenses.LGPL21),

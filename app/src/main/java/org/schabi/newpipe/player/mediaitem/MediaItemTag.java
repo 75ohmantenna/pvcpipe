@@ -2,10 +2,10 @@ package org.schabi.newpipe.player.mediaitem;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.MediaItem.RequestMetadata;
-import com.google.android.exoplayer2.MediaMetadata;
-import com.google.android.exoplayer2.Player;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaItem.RequestMetadata;
+import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.Player;
 
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -26,6 +26,7 @@ import androidx.annotation.Nullable;
  * which is encapsulated in a {@link MediaItem} and delivered via ExoPlayer's
  * {@link Player.Listener} on event triggers to the downstream users.
  **/
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface MediaItemTag {
 
     List<Exception> getErrors();

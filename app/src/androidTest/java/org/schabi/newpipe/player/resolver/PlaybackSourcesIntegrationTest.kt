@@ -8,14 +8,14 @@ package org.schabi.newpipe.player.resolver
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.TransferListener
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.test.core.app.ApplicationProvider
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.MergingMediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.source.hls.HlsMediaSource
-import com.google.android.exoplayer2.upstream.DataSource
-import com.google.android.exoplayer2.upstream.DataSpec
-import com.google.android.exoplayer2.upstream.TransferListener
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After
@@ -39,6 +39,7 @@ import org.schabi.newpipe.player.mediasource.LoadedMediaSource
 import org.schabi.newpipe.player.playqueue.PlayQueueItem
 
 /** Constructs real ExoPlayer sources without preparing them or opening network connections. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackSourcesIntegrationTest {
     private val transfers = AtomicInteger()
     private lateinit var application: Context

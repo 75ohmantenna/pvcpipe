@@ -7,7 +7,7 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.stream.AudioStream;
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Selects playback sources and owns the settings and policy shared by player modes. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlaybackSources {
     @NonNull
     private final Environment environment;

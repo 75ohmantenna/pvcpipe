@@ -1,9 +1,9 @@
 package org.schabi.newpipe.fragments.detail;
 
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_DECODING_FAILED;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
-import static com.google.android.exoplayer2.PlaybackException.ERROR_CODE_UNSPECIFIED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED;
 
 import android.content.Context;
 import android.util.Log;
@@ -19,9 +19,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.PlaybackException;
+import androidx.media3.common.C;
+import androidx.media3.exoplayer.ExoPlaybackException;
+import androidx.media3.common.PlaybackException;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.ListRadioIconItemBinding;
@@ -36,6 +36,7 @@ import java.util.function.Supplier;
 /**
  * Outsourced logic for crashing the player in the {@link VideoDetailFragment}.
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class VideoDetailPlayerCrasher {
 
     private static final String TAG = "VideoDetPlayerCrasher";

@@ -30,10 +30,10 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Timeline;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.junit.After;
 import org.junit.Before;
@@ -74,6 +74,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 
 /** Controlled engine/Android/SDK boundaries kept separate from cast behavior assertions. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public abstract class CastPlaybackTestFixture {
     protected final AtomicLong now = new AtomicLong(1000);
     private MockedStatic<SystemClock> clock;
@@ -223,7 +224,7 @@ public abstract class CastPlaybackTestFixture {
         void deliver(final MediaItem item) {
             when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
             player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
+                    mock(androidx.media3.common.Player.Events.class));
         }
 
         void deliverRemoval(final MediaItem previous, final MediaItem item) {
@@ -232,11 +233,11 @@ public abstract class CastPlaybackTestFixture {
             final PlaybackHistory history = (PlaybackHistory) getPlayerField("playbackHistory");
             doCallRealMethod().when(history).onDiscontinuity(any(), any());
             player.onPositionDiscontinuity(
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 0, previous, null, 0, 120000, 120000, -1, -1),
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 0, item, null, 0, 10000, 10000, -1, -1),
-                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+                    androidx.media3.common.Player.DISCONTINUITY_REASON_REMOVE);
             deliver(item);
         }
 
@@ -364,11 +365,11 @@ public abstract class CastPlaybackTestFixture {
             final PlaybackHistory history = (PlaybackHistory) getPlayerField("playbackHistory");
             doCallRealMethod().when(history).onDiscontinuity(any(), any());
             player.onPositionDiscontinuity(
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 0, null, null, 0, 120000, 120000, -1, -1),
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 1, next, null, 0, 10000, 10000, -1, -1),
-                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION);
+                    androidx.media3.common.Player.DISCONTINUITY_REASON_AUTO_TRANSITION);
             assertSame(second, queue.getItem());
         }
 
@@ -381,7 +382,7 @@ public abstract class CastPlaybackTestFixture {
                     .setUri(tag.getStreamUrl()).setTag(tag).build();
             when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(item);
             player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
+                    mock(androidx.media3.common.Player.Events.class));
         }
 
         void deliverFailure(final PlayQueueItem item) {
@@ -392,7 +393,7 @@ public abstract class CastPlaybackTestFixture {
             final MediaItem failedItem = failed.getMediaItem();
             when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(failedItem);
             player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
+                    mock(androidx.media3.common.Player.Events.class));
             assertSame(MediaItemTag.from(failedItem).orElseThrow(), player.getCurrentMetadata());
             assertSame(failed, player.getCurrentMetadata()
                     .getMaybeExtras(FailedMediaSource.class).orElseThrow());

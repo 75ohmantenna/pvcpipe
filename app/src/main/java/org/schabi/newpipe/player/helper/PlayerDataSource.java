@@ -6,21 +6,26 @@ import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-
-import com.google.android.exoplayer2.database.StandaloneDatabaseProvider;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.source.SingleSampleMediaSource;
-import com.google.android.exoplayer2.source.dash.DashMediaSource;
-import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
-import com.google.android.exoplayer2.source.hls.HlsMediaSource;
-import com.google.android.exoplayer2.source.hls.playlist.DefaultHlsPlaylistTracker;
-import com.google.android.exoplayer2.upstream.DataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSource;
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
-import com.google.android.exoplayer2.upstream.ResolvingDataSource;
-import com.google.android.exoplayer2.upstream.TransferListener;
-import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
-import com.google.android.exoplayer2.upstream.cache.SimpleCache;
+import androidx.media3.common.Format;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
+import androidx.media3.database.StandaloneDatabaseProvider;
+import androidx.media3.datasource.DataSource;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.ResolvingDataSource;
+import androidx.media3.datasource.TransferListener;
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor;
+import androidx.media3.datasource.cache.SimpleCache;
+import androidx.media3.exoplayer.dash.DashMediaSource;
+import androidx.media3.exoplayer.dash.DefaultDashChunkSource;
+import androidx.media3.exoplayer.hls.HlsMediaSource;
+import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistTracker;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.extractor.Extractor;
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
+import androidx.media3.extractor.text.SubtitleExtractor;
 
 import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeOtfDashManifestCreator;
@@ -32,6 +37,7 @@ import org.schabi.newpipe.player.datasource.YoutubeHttpDataSource;
 import java.io.File;
 import java.util.Map;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerDataSource {
     public static final String TAG = PlayerDataSource.class.getSimpleName();
 
@@ -57,7 +63,7 @@ public class PlayerDataSource {
 
     /**
      * The {@link SimpleCache} instance which will be used to build
-     * {@link com.google.android.exoplayer2.upstream.cache.CacheDataSource}s instances (with
+     * {@link androidx.media3.datasource.cache.CacheDataSource}s instances (with
      * {@link CacheFactory}).
      */
     private static SimpleCache cache;
@@ -112,10 +118,11 @@ public class PlayerDataSource {
         return new HlsMediaSource.Factory(cachelessDataSourceFactory)
                 .setAllowChunklessPreparation(true)
                 .setPlaylistTrackerFactory((dataSourceFactory, loadErrorHandlingPolicy,
-                                            playlistParserFactory) ->
+                                            playlistParserFactory, cmcdConfiguration,
+                                            executorSupplier) ->
                         new DefaultHlsPlaylistTracker(dataSourceFactory, loadErrorHandlingPolicy,
-                                playlistParserFactory,
-                                PLAYLIST_STUCK_TARGET_DURATION_COEFFICIENT));
+                                playlistParserFactory, cmcdConfiguration,
+                                PLAYLIST_STUCK_TARGET_DURATION_COEFFICIENT, executorSupplier));
     }
 
     public DashMediaSource.Factory getLiveDashMediaSourceFactory() {
@@ -155,8 +162,26 @@ public class PlayerDataSource {
                 .setContinueLoadingCheckIntervalBytes(progressiveLoadIntervalBytes);
     }
 
-    public SingleSampleMediaSource.Factory getSingleSampleMediaSourceFactory() {
-        return new SingleSampleMediaSource.Factory(cacheDataSourceFactory);
+    @Nullable
+    public MediaSource createSubtitleSource(final MediaItem.SubtitleConfiguration configuration) {
+        // The extractor calls SubRip text/srt; Media3's parser expects application/x-subrip.
+        final Format format = new Format.Builder()
+                .setSampleMimeType("text/srt".equals(configuration.mimeType)
+                        ? MimeTypes.APPLICATION_SUBRIP : configuration.mimeType)
+                .setLanguage(configuration.language)
+                .setSelectionFlags(configuration.selectionFlags)
+                .setRoleFlags(configuration.roleFlags)
+                .setLabel(configuration.label)
+                .setId(configuration.id)
+                .build();
+        final DefaultSubtitleParserFactory parsers = new DefaultSubtitleParserFactory();
+        if (!parsers.supportsFormat(format)) {
+            return null;
+        }
+        // SingleSampleMediaSource requires legacy renderer decoding, disabled in Media3.
+        return new ProgressiveMediaSource.Factory(cacheDataSourceFactory,
+                () -> new Extractor[] {new SubtitleExtractor(parsers.create(format), format)})
+                .createMediaSource(MediaItem.fromUri(configuration.uri));
     }
     //endregion
 

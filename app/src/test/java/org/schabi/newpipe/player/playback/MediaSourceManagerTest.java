@@ -27,9 +27,9 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.source.ConcatenatingMediaSource;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.junit.After;
 import org.junit.Before;
@@ -67,6 +67,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 
 /** Real queue, manager, loaded sources and ExoPlayer playlist; no decoder or network. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class MediaSourceManagerTest {
     private final TestScheduler mainThread = new TestScheduler();
     private final PlaybackListener listener = mock(PlaybackListener.class);

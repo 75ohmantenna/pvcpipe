@@ -1,12 +1,13 @@
 package org.schabi.newpipe.player;
 
-import com.google.android.exoplayer2.SimpleExoPlayer;
+import androidx.media3.exoplayer.ExoPlayer;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface LocalPlayerListener {
-    void onBlocked(SimpleExoPlayer player);
-    void onPlaying(SimpleExoPlayer player);
-    void onBuffering(SimpleExoPlayer player);
-    void onPaused(SimpleExoPlayer player);
-    void onPausedSeek(SimpleExoPlayer player);
-    void onCompleted(SimpleExoPlayer player);
+    void onBlocked(ExoPlayer player);
+    void onPlaying(ExoPlayer player);
+    void onBuffering(ExoPlayer player);
+    void onPaused(ExoPlayer player);
+    void onPausedSeek(ExoPlayer player);
+    void onCompleted(ExoPlayer player);
 }

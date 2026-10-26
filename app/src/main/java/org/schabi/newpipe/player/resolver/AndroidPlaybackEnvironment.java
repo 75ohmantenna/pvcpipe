@@ -1,6 +1,5 @@
 package org.schabi.newpipe.player.resolver;
 
-import static com.google.android.exoplayer2.C.TIME_UNSET;
 import static org.schabi.newpipe.util.ListHelper.getFilteredAudioStreams;
 import static org.schabi.newpipe.util.ListHelper.getPlayableStreams;
 import static org.schabi.newpipe.util.ListHelper.getUrlStreams;
@@ -12,10 +11,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.MergingMediaSource;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.MergingMediaSource;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.stream.AudioStream;
@@ -33,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Production adapter for Android preferences and ExoPlayer source construction. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 final class AndroidPlaybackEnvironment implements PlaybackSources.Environment {
     private static final String TAG = PlaybackSources.class.getSimpleName();
     @NonNull
@@ -106,8 +106,10 @@ final class AndroidPlaybackEnvironment implements PlaybackSources.Environment {
                                     .setRoleFlags(role)
                                     .setLanguage(PlayerHelper.captionLanguageOf(context, subtitle))
                                     .build();
-                    sources.add(dataSource.getSingleSampleMediaSourceFactory()
-                            .createMediaSource(configuration, TIME_UNSET));
+                    final MediaSource source = dataSource.createSubtitleSource(configuration);
+                    if (source != null) {
+                        sources.add(source);
+                    }
                 }
             }
         }

@@ -4,11 +4,12 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.SurfaceView;
 
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
+import androidx.media3.ui.AspectRatioFrameLayout;
 
-import static com.google.android.exoplayer2.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT;
-import static com.google.android.exoplayer2.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM;
+import static androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT;
+import static androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class ExpandableSurfaceView extends SurfaceView {
     private int resizeMode = RESIZE_MODE_FIT;
     private int baseHeight = 0;
