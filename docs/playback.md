@@ -11,7 +11,7 @@ define the detailed rules.
 picks the streams for each player mode and says whether switching video on or
 off needs a new source (`requiresReload`).
 [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java)
-supplies the preferences and builds the ExoPlayer sources.
+supplies the preferences and builds the Media3 ExoPlayer sources.
 [`PlaybackResolver`](../app/src/main/java/org/schabi/newpipe/player/resolver/PlaybackResolver.java)
 builds sources for each supported delivery method and its manifests. Service
 extractors supply stream types and media URLs; the resolver does not discover
@@ -25,6 +25,46 @@ A video source whose tag does not say how it was chosen is rebuilt; audio
 stream types do not need rebuilding merely to toggle video. Preloading the
 queue, expiring loaded items and managing the timeline belong to
 `MediaSourceManager`, not here.
+
+## Media3 sessions and service
+
+The app uses AndroidX Media3 ExoPlayer and one `MediaLibrarySession` hosted by
+`PlayerService`. The separate downloaded-file player also uses Media3. The
+service's `PvcSessionPlayer` exposes PVCPipe's playback policies to controllers;
+it does not give system controllers a second independently managed engine
+playlist. Next/previous, selection, seeks, repeat, shuffle and speed route through
+the application player, including active FCast playback. A floating queue window
+contains at most ten items. Receiver-only changes and local engine events both
+invalidate session state. While a newly selected occurrence is not synchronized,
+the session presents its pending recovery instead of the previous source's clock.
+
+Binding a browser creates an idle session without starting the decoder or a
+foreground notification. `SessionLibraryCallback` serves the existing bookmarks,
+history and search catalog with Media3 results and pagination. Browser media IDs
+retain their previous format. `PackageValidator` retains the existing caller checks;
+Media3's trusted system/notification controllers can also connect. Browser
+preparation is asynchronous, canceled by replacement or shutdown, and checked
+again when its authenticated service-start intent arrives. Arbitrary URI/search
+playback and automatic post-reboot playback resumption remain unsupported.
+
+`NotificationUtil` is the Media3 notification provider. `PlayerService` owns
+notification posting and foreground transitions, overriding Media3's default
+notification lifecycle to retain the app's minimize, task-removal and active-cast
+policies. The existing channel, notification ID, artwork settings and two custom
+action preference keys remain. Android 13+ receives metadata and custom actions
+from the session; older versions receive explicit notification actions. The
+hardware-button ignore preference applies to media-button events independently
+of transport/custom commands. Internal start tokens and the UID-checked local
+binder remain separate from public controller commands.
+
+The managed-source playlist retains Media3's `ConcatenatingMediaSource` and its
+completion callbacks. Migrating to the newer engine playlist API is a separate
+change because the current recovery/synchronization policy depends on those
+completion boundaries. Cache directory/keys and the cache database name are
+unchanged. See the [dated migration record](media3-migration.md) for verification,
+the API 26/27 framework-browser defect and outstanding hardware checks. Older
+ExoPlayer observations below retain their
+original version and evidence limits.
 
 ## FCast video casting
 
