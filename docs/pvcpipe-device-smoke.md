@@ -1186,3 +1186,103 @@ After stopping the emulator, `make ci` passed all five serial stages
 (static/build-logic checks, app JVM/offline extractor tests, lint, debug and
 release APK assembly), with unchanged outputs reused where Gradle reported
 them up to date. This repository gate is not API 37 runtime validation.
+
+## Bounded physical FCast preflight after PR #151, 2026-10-24
+
+Assessed current `master`, `3d573fc7cb538b94273b9d3cc9d95912b7603a56`
+(merge of PR #151). **No application or physical-receiver scenario executed.**
+This is new equipment/preflight evidence, not verification of this head's
+playback corrections. Existing `.gitignore`, `docs/building.md` and `.omp/`
+changes were left untouched.
+
+### Equipment and artifact identity
+
+- `adb devices -l` returned no devices; `adb mdns services` returned no
+  endpoints. No phone model, Android version, installed package or installed
+  signer could be inspected today. The earlier Pixel 6a/API 37 identity is
+  historical, not a current hardware observation.
+- The approved project receiver remains the historically recorded
+  `FCast-Amazon-AFTKM`, Android Receiver `2.1.5-playstore`. Its current
+  availability/version is unknown. A bounded
+  `avahi-browse --resolve --terminate _fcast._tcp` failed with
+  `Failed to create client object: Daemon not running`; this is a host discovery
+  limitation, not evidence that the receiver is offline. No arbitrary receiver
+  was selected, no address guessed, and no receiver commands sent.
+- Negotiated protocol and observed own-source echo capability: **unobserved**.
+  Neither is inferred from the historical receiver version.
+- Existing `app/build/outputs/apk/debug/app-debug.apk`: SHA-256
+  `9a753c1db9e055c2d868ff5b368e9d705bd9e05b6c65c2fe587c21b03ed983ba`.
+  AAPT reports `org.seventyfiveohmantenna.pvcpipe.debug`, `0.2.4`, code
+  `1000204`, minimum API 26, target API 37, debuggable. `apksigner verify`
+  succeeded; certificate SHA-256:
+  `305d1c0bac2bfae4f1ff572c2a5653a3686dcf2615d72a0984110aaebb36b070`.
+  This fingerprints an existing artifact; correspondence to the assessed head
+  is **not established**. It was not installed or rebuilt.
+
+### Executable checklist once hardware is available
+
+Prerequisites: an authorized, ADB-reachable physical phone on the approved
+receiver's network; the project Fire Stick running FCast Receiver (or a
+user-identified test receiver); and an observer able to see its display and
+hear its speakers. A second approved receiver is required only for D.
+Use a disposable debug installation/profile, not an assumed-disposable existing
+debug database. Do not proceed with data-changing steps until isolation is known.
+
+1. Select the explicit physical serial from `adb devices -l`; record
+   `adb -s "$SERIAL" shell getprop ro.product.model`,
+   `adb -s "$SERIAL" shell getprop ro.build.version.release` and
+   `adb -s "$SERIAL" shell getprop ro.build.version.sdk`.
+   Inspect `adb -s "$SERIAL" shell pm list packages` and
+   `adb -s "$SERIAL" shell dumpsys package "$PACKAGE"`.
+   For an existing debug package, obtain its base APK path with
+   `adb -s "$SERIAL" shell pm path "$PACKAGE"`, pull that exact path to a private
+   directory and compare its `apksigner verify --print-certs` certificate with
+   the candidate. Build the intended clean head in a separate worktree/output
+   location if correspondence is unknown. Only after package/signing and
+   disposable-data checks may `adb -s "$SERIAL" install -r "$APK"` be used.
+   Never uninstall, clear data, replace databases or invoke connected tests.
+2. Read the approved receiver's About/version screen and identify its physical
+   output. Connect through the normal cast picker or its verified receiver link.
+   Retain TLS/fingerprint and source-integrity checks. Record negotiated protocol
+   only if observable; record source-echo capability only from actual matching
+   own-load observations. Otherwise leave each unknown.
+3. Choose one short public primary source, record its public page identity and
+   selected tracks, and use only disposable history/queue data. Use a comparison
+   source only to separate decode/source failure. Do not save signed media URLs.
+4. Execute A–F below in order. Record times and settled sender/receiver positions;
+   sample the paused clock twice at least five seconds apart. Capture scoped
+   logs/screenshots privately, redact before sharing, and ask the observer:
+   “Did the receiver show the intended picture and produce audible sound?
+   Did it remain silent/still when paused, and stop on disconnect/switch?”
+   Keep picture/audio unverified until an explicit observation is received.
+
+| Scenario | Exact actions and expected behavior | Actual / status / evidence |
+| --- | --- | --- |
+| A — Paused startup | Pause locally, connect and load paused; observe startup/buffering through settled state. Receiver must not autoplay; sender remains paused with a frozen clock. | **BLOCKED** before launch: no attached phone; no playback evidence. |
+| B — Playback/seeking | Play and confirm picture plus sound; pause; seek to a nonzero point then zero while paused; resume and repeat seeks while playing. Compare settled sender clock/state with receiver output and position. | **BLOCKED** before launch; no picture/audio or timing observations. |
+| C — Source/occurrences | Where supported, change quality/audio paused and playing; use next/previous, remove the selected queue item, and enqueue distinct occurrences of the same public URL. During visible preparation issue pause/seek; verify selected occurrence, intended start and pending controls, with no obsolete-source handoff. Mark unsupported or unobservable timing subcases separately. | **BLOCKED** before launch; no source/codec conclusions. |
+| D — Receiver switching | With two approved receivers, switch paused then playing while setting a pending seek and supported speed. Verify old output stops and new output/source/position/controls match latest intent. | **BLOCKED**; no reachable phone and no second approved receiver established. |
+| E — Disconnect/local return | Test Disconnect and Play on this device separately during established playback and visible preparation/replacement. Verify receiver stops; Disconnect leaves local paused, Play on this device plays locally at attributable position or selected pending recovery. | **BLOCKED** before launch; no stopping/local-return observations. |
+| F — History/resume | In disposable data, obtain nonzero attributable receiver progress, note application PID, close/destroy Player using normal UI without force-stop, confirm PID retained, then reopen and inspect resume. Independently inspect a consistent read-only snapshot of the disposable database if safely obtainable; never overwrite it. | **BLOCKED** before launch; neither UI resume nor persisted state verified. |
+
+If preparation completes too quickly to exercise pending controls, record that
+boundary as unexercised rather than claiming a pass. On no-echo peers, old/new
+progress ambiguity remains; apparent timing is not source ownership proof.
+For F, UI resume and independently inspected persisted state are separate results;
+do not substitute sender controls, protocol acknowledgements or HTTP success.
+
+### Classification and evidence
+
+Confirmed application defects: **none established**. Source/codec or receiver
+limitations: **not tested**. Environment/access blockers: no ADB phone endpoint,
+and host Avahi daemon unavailable. Timing hypotheses: none generated.
+The exact missing prerequisite is an accessible, isolated physical phone paired
+with the approved receiver and a picture/audio observer; receiver availability
+must still be established. No API 37 retry, emulator substitution, instrumentation,
+installation, data mutation, process-death test or optional audit was performed.
+
+Local preflight output/identity notes:
+`/tmp/pvcpipe-fcast-20261024/preflight.txt` (temporary, outside version control).
+No screenshots or receiver logs exist for this pass. No code candidate or
+confirmed defect exists, so CI and complete-PR review were not repeated;
+no branch, commit, PR or merge was created for this record.
