@@ -39,6 +39,7 @@ guides and implementation for current behavior.
 | [local-playlist-mutations.md](local-playlist-mutations.md) | The uninstalling instrumentation run and the procedure for testing an existing installation |
 | [service-protocol-observations.md](service-protocol-observations.md) | Protocol observations, implementation provenance and controlled extraction follow-ups, October 2026 |
 | [dependency-audit.md](dependency-audit.md) | Dependency roles, compatibility decisions, toolchain and checksum verification, October 2026 |
+| [license-audit.json](license-audit.json) | About license entries, dependency/source evidence, copyright corrections and bundled notices, 2026-10-26 |
 | [documentation-alignment.md](documentation-alignment.md) | Documentation/comment audit coverage, unresolved discrepancies and proposed UI-text follow-ups, 2026-10-23 |
 
 Detailed local evidence cited by temporary paths in these dated records was

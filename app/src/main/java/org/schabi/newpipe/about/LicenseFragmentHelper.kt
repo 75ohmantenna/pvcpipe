@@ -2,23 +2,43 @@ package org.schabi.newpipe.about
 
 import android.content.Context
 import java.io.IOException
+import org.jsoup.nodes.Entities
 import org.schabi.newpipe.R
 import org.schabi.newpipe.util.ThemeHelper
 
 /**
  * @param context the context to use
- * @param license the license
+ * @param softwareComponent the component whose copyright and license are displayed
  * @return String which contains a HTML formatted license page
  * styled according to the context's theme
  */
-fun getFormattedLicense(context: Context, license: License): String {
+fun getFormattedLicense(context: Context, softwareComponent: SoftwareComponent): String {
+    val license = softwareComponent.license
     try {
-        return context.assets.open(license.filename).bufferedReader().use { it.readText() }
+        val licenseHtml = context.assets.open(license.filename).bufferedReader().use { it.readText() }
+        val notice = softwareComponent.noticeFilename?.let { filename ->
+            context.assets.open(filename).bufferedReader().use { it.readText() }
+        }
+        return formatLicenseHtml(licenseHtml, softwareComponent, notice)
             // split the HTML file and insert the stylesheet into the HEAD of the file
             .replace("</head>", "<style>${getLicenseStylesheet(context)}</style></head>")
     } catch (e: IOException) {
         throw IllegalArgumentException("Could not get license file: ${license.filename}", e)
     }
+}
+
+/** Keep the actual component credit with the license, including in MIT and BSD dialogs. */
+internal fun formatLicenseHtml(
+    licenseHtml: String,
+    softwareComponent: SoftwareComponent,
+    notice: String? = null
+): String {
+    val copyright = listOf(softwareComponent.years, softwareComponent.copyrightOwner)
+        .filter { it.isNotBlank() }.joinToString(" ")
+    val credit = "<h2>${Entities.escape(softwareComponent.name)}</h2>" +
+        "<p>Copyright © ${Entities.escape(copyright)}</p>"
+    val noticeHtml = notice?.let { "<pre>${Entities.escape(it)}</pre>" }.orEmpty()
+    return licenseHtml.replaceFirst("<body>", "<body>$credit$noticeHtml")
 }
 
 /**

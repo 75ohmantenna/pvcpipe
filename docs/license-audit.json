@@ -1,0 +1,4540 @@
+{
+  "audited_on": "2026-10-26",
+  "baseline_commit": "41da4ff1e",
+  "scope": "Every About > Licenses entry, resolved release/debug runtime artifacts, incorporated source, core library desugaring, and the FFmpeg binary used by the converter.",
+  "method": [
+    "Resolved both runtime classpaths and coreLibraryDesugaring offline with Gradle; inspected cached exact-version binary/source archives and POMs.",
+    "Verified license/NOTICE files at version tags or incorporated-source commits where available; listed primary upstream sources per entry.",
+    "Individual source copyright headers can have different dates and owners; the family summary does not replace those original notices.",
+    "No automatic extension of years to 2026; no dates inferred from an inceptionYear, release date, repository creation date or license-document copyright.",
+    "Debug-only rows are excluded from release. Presence in a runtime graph is conservative attribution evidence and does not prove every class survives release shrinking."
+  ],
+  "limitations": [
+    "This is an audit of the About list and the Java/Android dependency graph, not a complete recursive SBOM or source-offer/relinking compliance audit of Rust crates inside the FCast native SDK, FFmpeg internals, JDK internals or every other library implementation.",
+    "Source-only upstream project-family credits summarize retained code and contributors; per-file notices in the source remain authoritative."
+  ],
+  "removed": [
+    {
+      "name": "Accompanist",
+      "reason": "Absent from resolved release and debug runtime classpaths and retained source; no remaining third-party use found."
+    },
+    {
+      "name": "Android-State",
+      "reason": "Absent from resolved release and debug runtime classpaths and retained source; no remaining third-party use found."
+    },
+    {
+      "name": "Bridge",
+      "reason": "Absent from resolved release and debug runtime classpaths and retained source; no remaining third-party use found."
+    },
+    {
+      "name": "JetBrains Compose Multiplatform",
+      "reason": "Absent from resolved release and debug runtime classpaths and retained source; no remaining third-party use found."
+    }
+  ],
+  "components": [
+    {
+      "name": "ACRA",
+      "years": "2013",
+      "copyright_owner": "Kevin Gaudin",
+      "license": "APACHE2",
+      "project_url": "https://github.com/ACRA/acra",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "ch.acra:acra-core:5.13.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/ACRA/acra/acra-5.13.1/LICENSE",
+        "https://raw.githubusercontent.com/ACRA/acra/acra-5.13.1/NOTICE"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/ACRA/acra/acra-5.13.1/NOTICE",
+          "copyright_lines": [
+            "Copyright (c) 2013 Kevin Gaudin"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (c) 2016",
+        "Copyright (c) 2017",
+        "Copyright (c) 2017 the ACRA team",
+        "Copyright (c) 2018",
+        "Copyright (c) 2018 the ACRA team",
+        "Copyright (c) 2019",
+        "Copyright (c) 2020",
+        "Copyright (c) 2021",
+        "Copyright (c) 2023",
+        "Copyright 2010 Emmanuel Astier & Kevin Gaudin",
+        "Copyright 2010 Emmanuel Astier &amp; Kevin Gaudin",
+        "Copyright 2010 Kevin Gaudin",
+        "Copyright 2012 Kevin Gaudin",
+        "Copyright 2016",
+        "Copyright 2017"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "notice_asset": "third_party/acra_notice.txt",
+      "published_metadata": [
+        {
+          "artifact": "ch.acra:acra-core:5.13.1",
+          "pom": "acra-core-5.13.1.pom",
+          "declared_licenses": [
+            "Apache-2.0"
+          ],
+          "published_developers": [
+            "Kevin Gaudin",
+            "William Ferguson",
+            "Lukas Morawietz"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Android Universal Music Player",
+      "years": "2018",
+      "copyright_owner": "Google Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/android/uamp",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/org/schabi/newpipe/player/mediabrowser/PackageValidator.kt (header and pinned upstream source link; MediaBrowserImpl uses the validator)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/android/uamp/main/LICENSE",
+        "https://github.com/android/uamp/blob/329a21b63c247e9bd35f6858d4fc0e448fa38603/common/src/main/java/com/example/android/uamp/media/PackageValidator.kt"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/android/uamp/main/LICENSE",
+          "copyright_lines": [
+            "Copyright 2014 The Android Open Source Project"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "AndroidX",
+      "years": "2006 - 2025",
+      "copyright_owner": "The Android Open Source Project",
+      "license": "APACHE2",
+      "project_url": "https://developer.android.com/jetpack",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "androidx.activity:activity-ktx:1.8.2",
+        "androidx.activity:activity:1.8.2",
+        "androidx.annotation:annotation-experimental:1.5.0",
+        "androidx.annotation:annotation-jvm:1.10.0",
+        "androidx.appcompat:appcompat-resources:1.7.1",
+        "androidx.appcompat:appcompat:1.7.1",
+        "androidx.arch.core:core-common:2.2.0",
+        "androidx.arch.core:core-runtime:2.2.0",
+        "androidx.cardview:cardview:1.0.0",
+        "androidx.collection:collection-jvm:1.5.0",
+        "androidx.collection:collection-ktx:1.5.0",
+        "androidx.concurrent:concurrent-futures-ktx:1.1.0",
+        "androidx.concurrent:concurrent-futures:1.1.0",
+        "androidx.constraintlayout:constraintlayout-core:1.1.1",
+        "androidx.constraintlayout:constraintlayout:2.2.1",
+        "androidx.coordinatorlayout:coordinatorlayout:1.1.0",
+        "androidx.core:core-ktx:1.17.0",
+        "androidx.core:core-viewtree:1.0.0",
+        "androidx.core:core:1.17.0",
+        "androidx.cursoradapter:cursoradapter:1.0.0",
+        "androidx.customview:customview-poolingcontainer:1.0.0",
+        "androidx.customview:customview:1.1.0",
+        "androidx.databinding:viewbinding:9.4.1",
+        "androidx.documentfile:documentfile:1.1.0",
+        "androidx.drawerlayout:drawerlayout:1.1.1",
+        "androidx.dynamicanimation:dynamicanimation:1.0.0",
+        "androidx.emoji2:emoji2-views-helper:1.4.0",
+        "androidx.emoji2:emoji2:1.4.0",
+        "androidx.exifinterface:exifinterface:1.4.2",
+        "androidx.fragment:fragment-ktx:1.8.9",
+        "androidx.fragment:fragment:1.8.9",
+        "androidx.interpolator:interpolator:1.0.0",
+        "androidx.legacy:legacy-support-core-utils:1.0.0",
+        "androidx.lifecycle:lifecycle-common-jvm:2.9.4",
+        "androidx.lifecycle:lifecycle-extensions:2.2.0",
+        "androidx.lifecycle:lifecycle-livedata-core-ktx:2.9.4",
+        "androidx.lifecycle:lifecycle-livedata-core:2.9.4",
+        "androidx.lifecycle:lifecycle-livedata-ktx:2.9.4",
+        "androidx.lifecycle:lifecycle-livedata:2.9.4",
+        "androidx.lifecycle:lifecycle-process:2.9.4",
+        "androidx.lifecycle:lifecycle-runtime-android:2.9.4",
+        "androidx.lifecycle:lifecycle-runtime-ktx-android:2.9.4",
+        "androidx.lifecycle:lifecycle-runtime:2.9.4",
+        "androidx.lifecycle:lifecycle-service:2.9.4",
+        "androidx.lifecycle:lifecycle-viewmodel-android:2.9.4",
+        "androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4",
+        "androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.9.4",
+        "androidx.lifecycle:lifecycle-viewmodel:2.9.4",
+        "androidx.loader:loader:1.0.0",
+        "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0",
+        "androidx.media:media:1.7.1",
+        "androidx.preference:preference:1.2.1",
+        "androidx.print:print:1.0.0",
+        "androidx.profileinstaller:profileinstaller:1.4.1",
+        "androidx.recyclerview:recyclerview:1.4.0",
+        "androidx.resourceinspection:resourceinspection-annotation:1.0.1",
+        "androidx.room:room-common-jvm:2.8.5",
+        "androidx.room:room-ktx:2.8.5",
+        "androidx.room:room-runtime-android:2.8.5",
+        "androidx.room:room-rxjava3:2.8.5",
+        "androidx.savedstate:savedstate-android:1.3.3",
+        "androidx.savedstate:savedstate-ktx:1.3.3",
+        "androidx.slidingpanelayout:slidingpanelayout:1.2.0",
+        "androidx.sqlite:sqlite-android:2.6.2",
+        "androidx.sqlite:sqlite-framework-android:2.6.2",
+        "androidx.startup:startup-runtime:1.2.0",
+        "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0",
+        "androidx.tracing:tracing-ktx:1.2.0",
+        "androidx.tracing:tracing:1.2.0",
+        "androidx.transition:transition:1.4.1",
+        "androidx.vectordrawable:vectordrawable-animated:1.1.0",
+        "androidx.vectordrawable:vectordrawable:1.1.0",
+        "androidx.versionedparcelable:versionedparcelable:1.1.1",
+        "androidx.viewpager2:viewpager2:1.1.0",
+        "androidx.viewpager:viewpager:1.0.0",
+        "androidx.webkit:webkit:1.14.0",
+        "androidx.window:window:1.0.0",
+        "androidx.work:work-runtime:2.10.5",
+        "androidx.work:work-rxjava3:2.10.5"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [
+        {
+          "artifact": "androidx.annotation:annotation-experimental:1.5.0",
+          "path": "annotation-experimental-1.5.0.aar!META-INF/androidx/annotation/annotation-experimental/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.annotation:annotation-jvm:1.10.0",
+          "path": "annotation-jvm-1.10.0.jar!META-INF/androidx/annotation/annotation/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.collection:collection-jvm:1.5.0",
+          "path": "collection-jvm-1.5.0.jar!META-INF/androidx/collection/collection/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.collection:collection-jvm:1.5.0",
+          "path": "collection-jvm-1.5.0-sources.jar!META-INF/androidx/collection/collection/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.collection:collection-ktx:1.5.0",
+          "path": "collection-ktx-1.5.0.jar!META-INF/androidx/collection/collection-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.collection:collection-ktx:1.5.0",
+          "path": "collection-ktx-1.5.0-sources.jar!META-INF/androidx/collection/collection-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.constraintlayout:constraintlayout-core:1.1.1",
+          "path": "constraintlayout-core-1.1.1.jar!META-INF/androidx/constraintlayout/constraintlayout-core/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.constraintlayout:constraintlayout:2.2.1",
+          "path": "constraintlayout-2.2.1.aar!META-INF/androidx/constraintlayout/constraintlayout/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.constraintlayout:constraintlayout:2.2.1",
+          "path": "constraintlayout-2.2.1-sources.jar!META-INF/androidx/constraintlayout/constraintlayout/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core-ktx:1.17.0",
+          "path": "core-ktx-1.17.0.aar!META-INF/androidx/core/core-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core-ktx:1.17.0",
+          "path": "core-ktx-1.17.0-sources.jar!META-INF/androidx/core/core-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core-viewtree:1.0.0",
+          "path": "core-viewtree-1.0.0.aar!META-INF/androidx/core/core-viewtree/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core-viewtree:1.0.0",
+          "path": "core-viewtree-1.0.0-sources.jar!META-INF/androidx/core/core-viewtree/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core:1.17.0",
+          "path": "core-1.17.0.aar!META-INF/androidx/core/core/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.core:core:1.17.0",
+          "path": "core-1.17.0-sources.jar!META-INF/androidx/core/core/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.documentfile:documentfile:1.1.0",
+          "path": "documentfile-1.1.0.aar!META-INF/androidx/documentfile/documentfile/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.documentfile:documentfile:1.1.0",
+          "path": "documentfile-1.1.0-sources.jar!META-INF/androidx/documentfile/documentfile/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.exifinterface:exifinterface:1.4.2",
+          "path": "exifinterface-1.4.2.aar!META-INF/androidx/exifinterface/exifinterface/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-common-jvm:2.9.4",
+          "path": "lifecycle-common-jvm-2.9.4.jar!META-INF/androidx/lifecycle/lifecycle-common/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-common-jvm:2.9.4",
+          "path": "lifecycle-common-jvm-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-common/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-core-ktx:2.9.4",
+          "path": "lifecycle-livedata-core-ktx-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-livedata-core-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-core-ktx:2.9.4",
+          "path": "lifecycle-livedata-core-ktx-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-livedata-core-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-core:2.9.4",
+          "path": "lifecycle-livedata-core-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-livedata-core/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-core:2.9.4",
+          "path": "lifecycle-livedata-core-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-livedata-core/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-ktx:2.9.4",
+          "path": "lifecycle-livedata-ktx-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-livedata-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata-ktx:2.9.4",
+          "path": "lifecycle-livedata-ktx-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-livedata-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata:2.9.4",
+          "path": "lifecycle-livedata-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-livedata/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-livedata:2.9.4",
+          "path": "lifecycle-livedata-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-livedata/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-process:2.9.4",
+          "path": "lifecycle-process-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-process/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-runtime-android:2.9.4",
+          "path": "lifecycle-runtime-release.aar!META-INF/androidx/lifecycle/lifecycle-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-runtime-android:2.9.4",
+          "path": "lifecycle-runtime-android-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-runtime-ktx-android:2.9.4",
+          "path": "lifecycle-runtime-ktx.aar!META-INF/androidx/lifecycle/lifecycle-runtime-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-runtime-ktx-android:2.9.4",
+          "path": "lifecycle-runtime-ktx-android-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-runtime-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-runtime:2.9.4",
+          "path": "lifecycle-runtime-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-service:2.9.4",
+          "path": "lifecycle-service-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-service/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-android:2.9.4",
+          "path": "lifecycle-viewmodel-release.aar!META-INF/androidx/lifecycle/lifecycle-viewmodel/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-android:2.9.4",
+          "path": "lifecycle-viewmodel-android-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-viewmodel/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4",
+          "path": "lifecycle-viewmodel-ktx-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-viewmodel-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4",
+          "path": "lifecycle-viewmodel-ktx-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-viewmodel-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.9.4",
+          "path": "lifecycle-viewmodel-savedstate-release.aar!META-INF/androidx/lifecycle/lifecycle-viewmodel-savedstate/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.9.4",
+          "path": "lifecycle-viewmodel-savedstate-android-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-viewmodel-savedstate/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel:2.9.4",
+          "path": "lifecycle-viewmodel-2.9.4.aar!META-INF/androidx/lifecycle/lifecycle-viewmodel/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.lifecycle:lifecycle-viewmodel:2.9.4",
+          "path": "lifecycle-viewmodel-2.9.4-sources.jar!META-INF/androidx/lifecycle/lifecycle-viewmodel/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.profileinstaller:profileinstaller:1.4.1",
+          "path": "profileinstaller-1.4.1.aar!META-INF/androidx/profileinstaller/profileinstaller/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.recyclerview:recyclerview:1.4.0",
+          "path": "recyclerview-1.4.0.aar!META-INF/androidx/recyclerview/recyclerview/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.recyclerview:recyclerview:1.4.0",
+          "path": "recyclerview-1.4.0-sources.jar!META-INF/androidx/recyclerview/recyclerview/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-common-jvm:2.8.5",
+          "path": "room-common-jvm-2.8.5.jar!META-INF/androidx/room/room-common/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-common-jvm:2.8.5",
+          "path": "room-common-jvm-2.8.5-sources.jar!META-INF/androidx/room/room-common/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-ktx:2.8.5",
+          "path": "room-ktx-2.8.5.aar!META-INF/androidx/room/room-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-runtime-android:2.8.5",
+          "path": "room-runtime.aar!META-INF/androidx/room/room-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-runtime-android:2.8.5",
+          "path": "room-runtime-android-2.8.5-sources.jar!META-INF/androidx/room/room-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-rxjava3:2.8.5",
+          "path": "room-rxjava3-2.8.5.aar!META-INF/androidx/room/room-rxjava3/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.room:room-rxjava3:2.8.5",
+          "path": "room-rxjava3-2.8.5-sources.jar!META-INF/androidx/room/room-rxjava3/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.savedstate:savedstate-android:1.3.3",
+          "path": "savedstate-release.aar!META-INF/androidx/savedstate/savedstate/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.savedstate:savedstate-android:1.3.3",
+          "path": "savedstate-android-1.3.3-sources.jar!META-INF/androidx/savedstate/savedstate/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.savedstate:savedstate-ktx:1.3.3",
+          "path": "savedstate-ktx-1.3.3.aar!META-INF/androidx/savedstate/savedstate-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.savedstate:savedstate-ktx:1.3.3",
+          "path": "savedstate-ktx-1.3.3-sources.jar!META-INF/androidx/savedstate/savedstate-ktx/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-android:2.6.2",
+          "path": "sqlite.aar!META-INF/androidx/sqlite/sqlite/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-android:2.6.2",
+          "path": "sqlite-android-2.6.2-sources.jar!META-INF/androidx/sqlite/sqlite/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-framework-android:2.6.2",
+          "path": "sqlite-framework.aar!META-INF/androidx/sqlite/sqlite-framework/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-framework-android:2.6.2",
+          "path": "sqlite-framework-android-2.6.2-sources.jar!META-INF/androidx/sqlite/sqlite-framework/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.startup:startup-runtime:1.2.0",
+          "path": "startup-runtime-1.2.0.aar!META-INF/androidx/startup/startup-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0",
+          "path": "swiperefreshlayout-1.2.0.aar!META-INF/androidx/swiperefreshlayout/swiperefreshlayout/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0",
+          "path": "swiperefreshlayout-1.2.0-sources.jar!META-INF/androidx/swiperefreshlayout/swiperefreshlayout/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.webkit:webkit:1.14.0",
+          "path": "webkit-1.14.0.aar!META-INF/androidx/webkit/webkit/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.webkit:webkit:1.14.0",
+          "path": "webkit-1.14.0-sources.jar!META-INF/androidx/webkit/webkit/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.work:work-runtime:2.10.5",
+          "path": "work-runtime-2.10.5.aar!META-INF/androidx/work/work-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.work:work-runtime:2.10.5",
+          "path": "work-runtime-2.10.5-sources.jar!META-INF/androidx/work/work-runtime/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.work:work-rxjava3:2.10.5",
+          "path": "work-rxjava3-2.10.5.aar!META-INF/androidx/work/work-rxjava3/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "androidx.work:work-rxjava3:2.10.5",
+          "path": "work-rxjava3-2.10.5-sources.jar!META-INF/androidx/work/work-rxjava3/LICENSE.txt",
+          "copyright_lines": []
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (C) 2006 The Android Open Source Project",
+        "Copyright (C) 2009 The Android Open Source Project",
+        "Copyright (C) 2010 The Android Open Source Project",
+        "Copyright (C) 2011 The Android Open Source Project",
+        "Copyright (C) 2012 The Android Open Source Project",
+        "Copyright (C) 2013 The Android Open Source Project",
+        "Copyright (C) 2014 The Android Open Source Project",
+        "Copyright (C) 2015 Google Inc.",
+        "Copyright (C) 2015 The Android Open Source Project",
+        "Copyright (C) 2016 The Android Open Source Project",
+        "Copyright (C) 2017 The Android Open Source Project",
+        "Copyright (C) 2018 The Android Open Source Project",
+        "Copyright (C) 2019 The Android Open Source Project",
+        "Copyright (C) 2020 The Android Open Source Project",
+        "Copyright (C) 2021 The Android Open Source Project",
+        "Copyright (C) 2022 The Android Open Source Project",
+        "Copyright (C) 2023 The Android Open Source Project",
+        "Copyright (C) 2024 The Android Open Source Project",
+        "Copyright 2014, The Android Open Source Project",
+        "Copyright 2015 The Android Open Source Project",
+        "Copyright 2016 The Android Open Source Project",
+        "Copyright 2017 The Android Open Source Project",
+        "Copyright 2018 The Android Open Source Project",
+        "Copyright 2018 The Chromium Authors",
+        "Copyright 2019 The Android Open Source Project",
+        "Copyright 2019 The Chromium Authors",
+        "Copyright 2020 The Android Open Source Project",
+        "Copyright 2020 The Chromium Authors",
+        "Copyright 2021 The Android Open Source Project",
+        "Copyright 2022 The Android Open Source Project",
+        "Copyright 2022 The Chromium Authors",
+        "Copyright 2023 The Android Open Source Project",
+        "Copyright 2023 The Chromium Authors",
+        "Copyright 2024 The Android Open Source Project",
+        "Copyright 2024 The Chromium Authors",
+        "Copyright 2025 The Android Open Source Project",
+        "Copyright 2025 The Chromium Authors"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "androidx.annotation:annotation-experimental:1.5.0",
+          "pom": "annotation-experimental-1.5.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.annotation:annotation-jvm:1.10.0",
+          "pom": "annotation-jvm-1.10.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.arch.core:core-common:2.2.0",
+          "pom": "core-common-2.2.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.arch.core:core-runtime:2.2.0",
+          "pom": "core-runtime-2.2.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.cardview:cardview:1.0.0",
+          "pom": "cardview-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.collection:collection-jvm:1.5.0",
+          "pom": "collection-jvm-1.5.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.concurrent:concurrent-futures-ktx:1.1.0",
+          "pom": "concurrent-futures-ktx-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.concurrent:concurrent-futures:1.1.0",
+          "pom": "concurrent-futures-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.coordinatorlayout:coordinatorlayout:1.1.0",
+          "pom": "coordinatorlayout-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.core:core-viewtree:1.0.0",
+          "pom": "core-viewtree-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.cursoradapter:cursoradapter:1.0.0",
+          "pom": "cursoradapter-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.customview:customview-poolingcontainer:1.0.0",
+          "pom": "customview-poolingcontainer-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.customview:customview:1.1.0",
+          "pom": "customview-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.databinding:viewbinding:9.4.1",
+          "pom": "viewbinding-9.4.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": []
+        },
+        {
+          "artifact": "androidx.documentfile:documentfile:1.1.0",
+          "pom": "documentfile-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.drawerlayout:drawerlayout:1.1.1",
+          "pom": "drawerlayout-1.1.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.dynamicanimation:dynamicanimation:1.0.0",
+          "pom": "dynamicanimation-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.emoji2:emoji2-views-helper:1.4.0",
+          "pom": "emoji2-views-helper-1.4.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.emoji2:emoji2:1.4.0",
+          "pom": "emoji2-1.4.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.exifinterface:exifinterface:1.4.2",
+          "pom": "exifinterface-1.4.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.interpolator:interpolator:1.0.0",
+          "pom": "interpolator-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.legacy:legacy-support-core-utils:1.0.0",
+          "pom": "legacy-support-core-utils-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.loader:loader:1.0.0",
+          "pom": "loader-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0",
+          "pom": "localbroadcastmanager-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.media:media:1.7.1",
+          "pom": "media-1.7.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.preference:preference:1.2.1",
+          "pom": "preference-1.2.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.print:print:1.0.0",
+          "pom": "print-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.profileinstaller:profileinstaller:1.4.1",
+          "pom": "profileinstaller-1.4.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.recyclerview:recyclerview:1.4.0",
+          "pom": "recyclerview-1.4.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.resourceinspection:resourceinspection-annotation:1.0.1",
+          "pom": "resourceinspection-annotation-1.0.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.room:room-common-jvm:2.8.5",
+          "pom": "room-common-jvm-2.8.5.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.room:room-ktx:2.8.5",
+          "pom": "room-ktx-2.8.5.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.room:room-runtime-android:2.8.5",
+          "pom": "room-runtime-android-2.8.5.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.room:room-rxjava3:2.8.5",
+          "pom": "room-rxjava3-2.8.5.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.slidingpanelayout:slidingpanelayout:1.2.0",
+          "pom": "slidingpanelayout-1.2.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-android:2.6.2",
+          "pom": "sqlite-android-2.6.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.sqlite:sqlite-framework-android:2.6.2",
+          "pom": "sqlite-framework-android-2.6.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.startup:startup-runtime:1.2.0",
+          "pom": "startup-runtime-1.2.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0",
+          "pom": "swiperefreshlayout-1.2.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.vectordrawable:vectordrawable-animated:1.1.0",
+          "pom": "vectordrawable-animated-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.vectordrawable:vectordrawable:1.1.0",
+          "pom": "vectordrawable-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.versionedparcelable:versionedparcelable:1.1.1",
+          "pom": "versionedparcelable-1.1.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.viewpager2:viewpager2:1.1.0",
+          "pom": "viewpager2-1.1.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "androidx.viewpager:viewpager:1.0.0",
+          "pom": "viewpager-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apache Commons CLI",
+      "years": "2001 - 2009",
+      "copyright_owner": "The Apache Software Foundation",
+      "license": "APACHE2",
+      "project_url": "https://commons.apache.org/proper/commons-cli/",
+      "scope": "debug",
+      "runtime_artifacts": [
+        "commons-cli:commons-cli:1.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [
+        {
+          "artifact": "commons-cli:commons-cli:1.2",
+          "path": "commons-cli-1.2.jar!META-INF/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "commons-cli:commons-cli:1.2",
+          "path": "commons-cli-1.2.jar!META-INF/NOTICE.txt",
+          "copyright_lines": [
+            "Copyright 2001-2009 The Apache Software Foundation"
+          ]
+        },
+        {
+          "artifact": "commons-cli:commons-cli:1.2",
+          "path": "commons-cli-1.2-sources.jar!META-INF/LICENSE.txt",
+          "copyright_lines": []
+        },
+        {
+          "artifact": "commons-cli:commons-cli:1.2",
+          "path": "commons-cli-1.2-sources.jar!META-INF/NOTICE.txt",
+          "copyright_lines": [
+            "Copyright 2001-2009 The Apache Software Foundation"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "notice_asset": "third_party/commons_cli_notice.txt",
+      "published_metadata": [
+        {
+          "artifact": "commons-cli:commons-cli:1.2",
+          "pom": "commons-cli-1.2.pom",
+          "declared_licenses": [],
+          "published_developers": [
+            "James Strachan",
+            "Bob McWhirter",
+            "John Keyes",
+            "Rob Oxspring"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Apache Commons Text",
+      "years": "2014 - 2020",
+      "copyright_owner": "The Apache Software Foundation",
+      "license": "APACHE2",
+      "project_url": "https://commons.apache.org/proper/commons-text/",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/org/apache/commons/text/similarity/FuzzyScore.java (incorporated source; header pins 8cfdafc)",
+        "app/src/main/java/org/schabi/newpipe/settings/preferencesearch (uses FuzzyScore)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/apache/commons-text/8cfdafc/NOTICE.txt",
+        "https://raw.githubusercontent.com/apache/commons-text/8cfdafc/LICENSE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/apache/commons-text/8cfdafc/NOTICE.txt",
+          "copyright_lines": [
+            "Copyright 2014-2020 The Apache Software Foundation"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "notice_asset": "third_party/commons_text_notice.txt"
+    },
+    {
+      "name": "BravePipe",
+      "years": "",
+      "copyright_owner": "evermind-zz and BravePipe contributors",
+      "license": "GPL3",
+      "project_url": "https://github.com/bravepipeproject/BravePipe",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/org/schabi/newpipe/pvc",
+        "pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/search/filter (evermind-zz source headers)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/bravepipeproject/BravePipe/master/LICENSE",
+        "https://raw.githubusercontent.com/bravepipeproject/BravePipe/master/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/bravepipeproject/BravePipe/master/LICENSE",
+          "copyright_lines": [
+            "11 of the WIPO copyright treaty adopted on 20 December 1996, or"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "challengeFloatsAway",
+      "years": "",
+      "copyright_owner": "evermind-zz",
+      "license": "GPL3",
+      "project_url": "https://github.com/evermind-zz/challengeFloatsAway",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.evermind-zz:challengeFloatsAway:1.1.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/evermind-zz/challengeFloatsAway/1.1.1/LICENSE",
+        "https://raw.githubusercontent.com/evermind-zz/challengeFloatsAway/1.1.1/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/evermind-zz/challengeFloatsAway/1.1.1/LICENSE",
+          "copyright_lines": [
+            "11 of the WIPO copyright treaty adopted on 20 December 1996, or"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "Checker Framework",
+      "years": "2004 - present",
+      "copyright_owner": "The Checker Framework developers",
+      "license": "MIT",
+      "project_url": "https://github.com/typetools/checker-framework",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.checkerframework:checker-qual:3.33.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/typetools/checker-framework/checker-framework-3.33.0/checker-qual/LICENSE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "org.checkerframework:checker-qual:3.33.0",
+          "path": "checker-qual-3.33.0.jar!META-INF/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright 2004-present by the Checker Framework developers"
+          ]
+        },
+        {
+          "source": "https://raw.githubusercontent.com/typetools/checker-framework/checker-framework-3.33.0/checker-qual/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright 2004-present by the Checker Framework developers"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "org.checkerframework:checker-qual:3.33.0",
+          "pom": "checker-qual-3.33.0.pom",
+          "declared_licenses": [
+            "The MIT License"
+          ],
+          "published_developers": [
+            "Michael Ernst",
+            "Suzanne Millstein"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cloudflare-Bypass",
+      "years": "2024",
+      "copyright_owner": "Xavier Alexander Torres Calderón",
+      "license": "MIT",
+      "project_url": "https://github.com/evermind-zz/Cloudflare-Bypass",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.evermind-zz:Cloudflare-Bypass:c4264c53e3"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/evermind-zz/Cloudflare-Bypass/c4264c53e3/LICENSE",
+        "https://raw.githubusercontent.com/evermind-zz/Cloudflare-Bypass/c4264c53e3/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/evermind-zz/Cloudflare-Bypass/c4264c53e3/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2024 Xavier Alexander Torres Calderón"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "Coil",
+      "years": "2025",
+      "copyright_owner": "Coil Contributors",
+      "license": "APACHE2",
+      "project_url": "https://coil-kt.github.io/coil/",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "io.coil-kt.coil3:coil-android:3.4.0",
+        "io.coil-kt.coil3:coil-core-android:3.4.0",
+        "io.coil-kt.coil3:coil-network-core-android:3.4.0",
+        "io.coil-kt.coil3:coil-network-okhttp-android:3.4.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/coil-kt/coil/3.4.0/LICENSE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/coil-kt/coil/3.4.0/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright 2025 Coil Contributors"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (C) 2011 The Android Open Source Project",
+        "Copyright (c) 2022 Square, Inc."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "commonmark-java",
+      "years": "2015 - 2016",
+      "copyright_owner": "Atlassian Pty Ltd",
+      "license": "BSD2",
+      "project_url": "https://github.com/commonmark/commonmark-java",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.atlassian.commonmark:commonmark:0.13.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/commonmark/commonmark-java/commonmark-parent-0.13.0/LICENSE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "com.atlassian.commonmark:commonmark:0.13.0",
+          "path": "commonmark-0.13.0.jar!META-INF/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright (c) 2015-2016, Atlassian Pty Ltd"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "Curtains",
+      "years": "",
+      "copyright_owner": "Square, Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/square/curtains",
+      "scope": "debug",
+      "runtime_artifacts": [
+        "com.squareup.curtains:curtains:1.2.4"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/square/curtains/v1.2.4/LICENSE.md",
+        "https://raw.githubusercontent.com/square/curtains/v1.2.4/curtains/src/main/java/curtains/Curtains.kt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "com.squareup.curtains:curtains:1.2.4",
+          "pom": "curtains-1.2.4.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desugar_jdk_libs",
+      "years": "",
+      "copyright_owner": "Oracle, Google and OpenJDK contributors",
+      "license": "GPL2_CLASSPATH",
+      "project_url": "https://github.com/google/desugar_jdk_libs",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.android.tools:desugar_jdk_libs_configuration_nio:2.1.5",
+        "com.android.tools:desugar_jdk_libs_nio:2.1.5"
+      ],
+      "usage_evidence": [
+        "app/build.gradle.kts (coreLibraryDesugaring)",
+        "gradle/libs.versions.toml (desugar_jdk_libs_nio:2.1.5)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/desugar_jdk_libs/master/LICENSE",
+        "https://raw.githubusercontent.com/google/desugar_jdk_libs/master/ASSEMBLY_EXCEPTION",
+        "https://raw.githubusercontent.com/google/desugar_jdk_libs/master/jdk11/src/java.base/share/classes/java/util/Objects.java",
+        "https://dl.google.com/dl/android/maven2/com/android/tools/desugar_jdk_libs_nio/2.1.5/desugar_jdk_libs_nio-2.1.5.pom"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "com.android.tools:desugar_jdk_libs_configuration_nio:2.1.5",
+          "path": "desugar_jdk_libs_configuration_nio-2.1.5.jar!LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2016, the R8 project authors."
+          ]
+        },
+        {
+          "source": "https://raw.githubusercontent.com/google/desugar_jdk_libs/master/jdk11/src/java.base/share/classes/java/util/Objects.java",
+          "copyright_lines": [
+            "Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved."
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "Error Prone Annotations",
+      "years": "",
+      "copyright_owner": "The Error Prone Authors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/google/error-prone",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.errorprone:error_prone_annotations:2.18.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/error-prone/v2.18.0/COPYING",
+        "https://raw.githubusercontent.com/google/error-prone/v2.18.0/annotations/src/main/java/com/google/errorprone/annotations/CheckReturnValue.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/google/error-prone/v2.18.0/annotations/src/main/java/com/google/errorprone/annotations/CheckReturnValue.java",
+          "copyright_lines": [
+            "Copyright 2017 The Error Prone Authors."
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.errorprone:error_prone_annotations:2.18.0",
+          "pom": "error_prone_annotations-2.18.0.pom",
+          "declared_licenses": [
+            "Apache 2.0"
+          ],
+          "published_developers": []
+        }
+      ]
+    },
+    {
+      "name": "EventBus",
+      "years": "2012 - 2020",
+      "copyright_owner": "Markus Junginger, greenrobot",
+      "license": "APACHE2",
+      "project_url": "https://greenrobot.org/eventbus",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.greenrobot:eventbus-java:3.3.1",
+        "org.greenrobot:eventbus:3.3.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/greenrobot/EventBus/V3.3.1/LICENSE",
+        "https://raw.githubusercontent.com/greenrobot/EventBus/V3.3.1/EventBus/src/org/greenrobot/eventbus/EventBus.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/greenrobot/EventBus/V3.3.1/EventBus/src/org/greenrobot/eventbus/EventBus.java",
+          "copyright_lines": [
+            "Copyright (C) 2012-2020 Markus Junginger, greenrobot (http://greenrobot.org)"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "ExoPlayer",
+      "years": "2014 - 2023",
+      "copyright_owner": "The Android Open Source Project",
+      "license": "APACHE2",
+      "project_url": "https://github.com/google/ExoPlayer",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.android.exoplayer:exoplayer-common:2.19.1",
+        "com.google.android.exoplayer:exoplayer-container:2.19.1",
+        "com.google.android.exoplayer:exoplayer-core:2.19.1",
+        "com.google.android.exoplayer:exoplayer-dash:2.19.1",
+        "com.google.android.exoplayer:exoplayer-database:2.19.1",
+        "com.google.android.exoplayer:exoplayer-datasource:2.19.1",
+        "com.google.android.exoplayer:exoplayer-decoder:2.19.1",
+        "com.google.android.exoplayer:exoplayer-extractor:2.19.1",
+        "com.google.android.exoplayer:exoplayer-hls:2.19.1",
+        "com.google.android.exoplayer:exoplayer-ui:2.19.1",
+        "com.google.android.exoplayer:extension-mediasession:2.19.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/ExoPlayer/r2.19.1/LICENSE",
+        "https://raw.githubusercontent.com/google/ExoPlayer/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/ExoPlayer.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/google/ExoPlayer/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/ExoPlayer.java",
+          "copyright_lines": [
+            "Copyright (C) 2016 The Android Open Source Project"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (C) 2010 Bill Cox, Sonic Library",
+        "Copyright (C) 2014 The Android Open Source Project",
+        "Copyright (C) 2016 The Android Open Source Project",
+        "Copyright (C) 2017 The Android Open Source Project",
+        "Copyright (C) 2018 The Android Open Source Project",
+        "Copyright (C) 2019 The Android Open Source Project",
+        "Copyright (C) 2020 The Android Open Source Project",
+        "Copyright (C) 2021 The Android Open Source Project",
+        "Copyright (C) 2022 The Android Open Source Project",
+        "Copyright (C) 2023 The Android Open Source Project",
+        "Copyright 2017 The Android Open Source Project",
+        "Copyright 2019 The Android Open Source Project",
+        "Copyright 2020 The Android Open Source Project",
+        "Copyright 2021 The Android Open Source Project",
+        "Copyright 2022 The Android Open Source Project",
+        "Copyright 2023 The Android Open Source Project"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-common:2.19.1",
+          "pom": "exoplayer-common-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-container:2.19.1",
+          "pom": "exoplayer-container-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-core:2.19.1",
+          "pom": "exoplayer-core-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-dash:2.19.1",
+          "pom": "exoplayer-dash-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-database:2.19.1",
+          "pom": "exoplayer-database-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-datasource:2.19.1",
+          "pom": "exoplayer-datasource-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-decoder:2.19.1",
+          "pom": "exoplayer-decoder-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-extractor:2.19.1",
+          "pom": "exoplayer-extractor-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-hls:2.19.1",
+          "pom": "exoplayer-hls-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:exoplayer-ui:2.19.1",
+          "pom": "exoplayer-ui-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        },
+        {
+          "artifact": "com.google.android.exoplayer:extension-mediasession:2.19.1",
+          "pom": "extension-mediasession-2.19.1.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FCast sender SDK",
+      "years": "2023",
+      "copyright_owner": "FUTO",
+      "license": "MIT",
+      "project_url": "https://github.com/futo-org/fcast",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.fcast:sender-sdk:0.6.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/futo-org/fcast/master/LICENSE",
+        "https://raw.githubusercontent.com/futo-org/fcast/master/Cargo.toml",
+        "https://raw.githubusercontent.com/futo-org/fcast/master/Cargo.lock",
+        "https://raw.githubusercontent.com/futo-org/fcast/master/sdk/sender/fcast-sender-sdk/Cargo.toml",
+        "https://raw.githubusercontent.com/futo-org/fcast/android-sender-sdk-v0.6.1/LICENSE"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/futo-org/fcast/master/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2023 FUTO"
+          ]
+        },
+        {
+          "source": "https://raw.githubusercontent.com/futo-org/fcast/android-sender-sdk-v0.6.1/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2023 FUTO"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "FFmpeg",
+      "years": "",
+      "copyright_owner": "FFmpeg developers",
+      "license": "LGPL21",
+      "project_url": "https://ffmpeg.org/",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/us/shandian/giga/postprocessing/PvcFromHlsRemuxer.java (RunFFmpeg.execute)",
+        "jni/*/libffmpeg.so in com.github.75ohmantenna:slimhls-converter:7e7f373dbf"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1.2/LICENSE.md",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1.2/COPYING.LGPLv2.1",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1.2/fftools/ffmpeg.c",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090/LICENSE.md",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090/COPYING.LGPLv2.1",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090/fftools/ffmpeg.c",
+        "https://raw.githubusercontent.com/FFmpeg/FFmpeg/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090/RELEASE"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1.2/fftools/ffmpeg.c",
+          "copyright_lines": [
+            "Copyright (c) 2000-2003 Fabrice Bellard"
+          ]
+        },
+        {
+          "source": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090/fftools/ffmpeg.c",
+          "copyright_lines": [
+            "Copyright (c) 2000-2003 Fabrice Bellard"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "GigaGet",
+      "years": "2014",
+      "copyright_owner": "Peter Cai",
+      "license": "GPL3",
+      "project_url": "https://github.com/PaperAirplane-Dev-Team/GigaGet",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/us/shandian/giga (incorporated downloader source)",
+        "https://github.com/PaperAirplane-Dev-Team/GigaGet (README copyright 2014 Peter Cai)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/PaperAirplane-Dev-Team/GigaGet/master/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/PaperAirplane-Dev-Team/GigaGet/master/README.md",
+          "copyright_lines": [
+            "Copyright (C) 2014 Peter Cai"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "Google Auto",
+      "years": "",
+      "copyright_owner": "Google LLC",
+      "license": "APACHE2",
+      "project_url": "https://github.com/google/auto",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.auto.service:auto-service-annotations:1.1.1",
+        "com.google.auto.service:auto-service:1.1.1",
+        "com.google.auto:auto-common:1.2.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/auto/auto-service-1.1.1/LICENSE"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright 2008 Google LLC"
+      ],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.auto:auto-common:1.2.1",
+          "pom": "auto-common-1.2.1.pom",
+          "declared_licenses": [
+            "Apache 2.0"
+          ],
+          "published_developers": []
+        }
+      ]
+    },
+    {
+      "name": "Groupie",
+      "years": "2016",
+      "copyright_owner": "Lisa Wray",
+      "license": "MIT",
+      "project_url": "https://github.com/lisawray/groupie",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.lisawray.groupie:groupie-viewbinding:2.10.1",
+        "com.github.lisawray.groupie:groupie:2.10.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/lisawray/groupie/2.10.1/LICENSE.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/lisawray/groupie/2.10.1/LICENSE.md",
+          "copyright_lines": [
+            "Copyright (c) 2016"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.github.lisawray.groupie:groupie:2.10.1",
+          "pom": "groupie-2.10.1.pom",
+          "declared_licenses": [
+            "MIT License"
+          ],
+          "published_developers": [
+            "Lisa Wray"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guava",
+      "years": "",
+      "copyright_owner": "The Guava Authors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/google/guava",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.guava:failureaccess:1.0.1",
+        "com.google.guava:guava:32.0.1-jre",
+        "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/guava/v32.0.1/guava/src/com/google/common/base/Preconditions.java"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "com.google.guava:guava:32.0.1-jre",
+          "path": "guava-32.0.1-jre.jar!META-INF/LICENSE",
+          "copyright_lines": []
+        },
+        {
+          "source": "https://raw.githubusercontent.com/google/guava/v32.0.1/guava/src/com/google/common/base/Preconditions.java",
+          "copyright_lines": [
+            "Copyright (C) 2007 The Guava Authors"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (C) 2018 The Guava Authors"
+      ],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "HlsDownloader",
+      "years": "",
+      "copyright_owner": "evermind-zz",
+      "license": "GPL3",
+      "project_url": "https://github.com/evermind-zz/HlsDownloader",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.evermind-zz:hlsdownloader:1.0.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/evermind-zz/HlsDownloader/1.0.0/LICENSE",
+        "https://raw.githubusercontent.com/evermind-zz/HlsDownloader/1.0.0/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/evermind-zz/HlsDownloader/1.0.0/LICENSE",
+          "copyright_lines": [
+            "11 of the WIPO copyright treaty adopted on 20 December 1996, or"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "J2ObjC Annotations",
+      "years": "2012",
+      "copyright_owner": "Google Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/google/j2objc",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.j2objc:j2objc-annotations:2.8"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/google/j2objc/2.8/LICENSE",
+        "https://raw.githubusercontent.com/google/j2objc/2.8/annotations/src/main/java/com/google/j2objc/annotations/Weak.java",
+        "https://raw.githubusercontent.com/google/j2objc/2.8/annotations/src/main/java/com/google/j2objc/annotations/ReflectionSupport.java",
+        "https://repo.maven.apache.org/maven2/com/google/j2objc/j2objc-annotations/2.8/j2objc-annotations-2.8-sources.jar"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/google/j2objc/2.8/annotations/src/main/java/com/google/j2objc/annotations/Weak.java",
+          "copyright_lines": [
+            "Copyright 2012 Google Inc. All Rights Reserved."
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright 2012 Google Inc. All Rights Reserved. (two source files; exact-version sources archive checked)"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.j2objc:j2objc-annotations:2.8",
+          "pom": "j2objc-annotations-2.8.pom",
+          "declared_licenses": [
+            "Apache License, Version 2.0"
+          ],
+          "published_developers": []
+        }
+      ]
+    },
+    {
+      "name": "Java Native Access",
+      "years": "",
+      "copyright_owner": "JNA contributors",
+      "license": "JNA",
+      "project_url": "https://github.com/java-native-access/jna",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "net.java.dev.jna:jna:5.13.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/java-native-access/jna/5.13.0/LICENSE",
+        "https://raw.githubusercontent.com/java-native-access/jna/5.13.0/LGPL2.1",
+        "https://raw.githubusercontent.com/java-native-access/jna/5.13.0/AL2.0",
+        "https://raw.githubusercontent.com/java-native-access/jna/5.13.0/native/libffi/LICENSE"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "net.java.dev.jna:jna:5.13.0",
+          "path": "classes.jar!META-INF/LICENSE",
+          "copyright_lines": []
+        },
+        {
+          "source": "https://raw.githubusercontent.com/java-native-access/jna/5.13.0/native/libffi/LICENSE",
+          "copyright_lines": [
+            "libffi - Copyright (c) 1996-2022  Anthony Green, Red Hat, Inc and others."
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "JetBrains Java Annotations",
+      "years": "2000 - 2021",
+      "copyright_owner": "JetBrains s.r.o.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/JetBrains/java-annotations",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains:annotations:23.0.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/LICENSE.txt",
+        "https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/common/src/main/java/org/jetbrains/annotations/NotNull.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright 2000-2016 JetBrains s.r.o."
+          ]
+        },
+        {
+          "source": "https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/common/src/main/java/org/jetbrains/annotations/NotNull.java",
+          "copyright_lines": [
+            "Copyright 2000-2021 JetBrains s.r.o."
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright 2000-2020 JetBrains s.r.o.",
+        "Copyright 2000-2021 JetBrains s.r.o."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "org.jetbrains:annotations:23.0.0",
+          "pom": "annotations-23.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "JetBrains Team"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Jsoup",
+      "years": "2009 - 2026",
+      "copyright_owner": "Jonathan Hedley",
+      "license": "MIT",
+      "project_url": "https://github.com/jhy/jsoup",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jsoup:jsoup:1.22.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [
+        {
+          "artifact": "org.jsoup:jsoup:1.22.2",
+          "path": "jsoup-1.22.2.jar!META-INF/jsoup/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2009-2026 Jonathan Hedley <https://jsoup.org/>"
+          ]
+        },
+        {
+          "artifact": "org.jsoup:jsoup:1.22.2",
+          "path": "jsoup-1.22.2-sources.jar!META-INF/jsoup/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2009-2026 Jonathan Hedley <https://jsoup.org/>"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "JSpecify",
+      "years": "2018 - 2022",
+      "copyright_owner": "The JSpecify Authors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/jspecify/jspecify",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jspecify:jspecify:1.0.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/jspecify/jspecify/v1.0.0/LICENSE",
+        "https://raw.githubusercontent.com/jspecify/jspecify/v1.0.0/src/main/java/org/jspecify/annotations/Nullable.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/jspecify/jspecify/v1.0.0/src/main/java/org/jspecify/annotations/Nullable.java",
+          "copyright_lines": [
+            "Copyright 2018-2020 The JSpecify Authors."
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright 2018-2020 The JSpecify Authors.",
+        "Copyright 2022 The JSpecify Authors."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "org.jspecify:jspecify:1.0.0",
+          "pom": "jspecify-1.0.0.pom",
+          "declared_licenses": [
+            "The Apache License, Version 2.0"
+          ],
+          "published_developers": [
+            "Kevin Bourrillion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JSR-305",
+      "years": "",
+      "copyright_owner": "FindBugs contributors and Brian Goetz",
+      "license": "JSR305",
+      "project_url": "https://github.com/findbugsproject/findbugs",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.code.findbugs:jsr305:3.0.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://repo.maven.apache.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2-sources.jar",
+        "https://creativecommons.org/licenses/by/2.5/legalcode",
+        "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-2.5.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (c) 2005 Brian Goetz"
+      ],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.code.findbugs:jsr305:3.0.2",
+          "pom": "jsr305-3.0.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": []
+        }
+      ]
+    },
+    {
+      "name": "Kotlin",
+      "years": "2010 - 2026",
+      "copyright_owner": "JetBrains s.r.o. and Kotlin Programming Language contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/JetBrains/kotlin",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains.kotlin:kotlin-parcelize-runtime:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.21"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (c) 2007-present, Stephen Colebourne & Michael Nascimento Santos",
+        "Copyright 2007 Google Inc.",
+        "Copyright 2010-2015 JetBrains s.r.o.",
+        "Copyright 2010-2016 JetBrains s.r.o.",
+        "Copyright 2010-2017 JetBrains s.r.o.",
+        "Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license",
+        "Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2011 The Guava Authors"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "org.jetbrains.kotlin:kotlin-parcelize-runtime:2.4.21",
+          "pom": "kotlin-parcelize-runtime-2.4.21.pom",
+          "declared_licenses": [
+            "Apache-2.0"
+          ],
+          "published_developers": [
+            "Kotlin Team"
+          ]
+        },
+        {
+          "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+          "pom": "kotlin-stdlib-2.4.21.pom",
+          "declared_licenses": [
+            "Apache-2.0"
+          ],
+          "published_developers": [
+            "Kotlin Team"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kotlinx.coroutines",
+      "years": "2000 - 2020",
+      "copyright_owner": "JetBrains s.r.o. and Kotlin Programming Language contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/Kotlin/kotlinx.coroutines",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.2",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-rx3:1.10.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/Kotlin/kotlinx.coroutines/1.10.2/LICENSE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/Kotlin/kotlinx.coroutines/1.10.2/LICENSE.txt",
+          "copyright_lines": [
+            "Copyright 2000-2020 JetBrains s.r.o. and Kotlin Programming Language contributors."
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "kotlinx.datetime",
+      "years": "2019 - 2024",
+      "copyright_owner": "JetBrains s.r.o. and contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/Kotlin/kotlinx-datetime",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.6.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/Kotlin/kotlinx-datetime/v0.6.1/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright 2019-2020 JetBrains s.r.o.",
+        "Copyright 2019-2021 JetBrains s.r.o.",
+        "Copyright 2019-2022 JetBrains s.r.o. and contributors.",
+        "Copyright 2019-2023 JetBrains s.r.o.",
+        "Copyright 2019-2023 JetBrains s.r.o. and contributors.",
+        "Copyright 2019-2024 JetBrains s.r.o. and contributors.",
+        "Copyright 2023 JetBrains s.r.o. and contributors."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "kotlinx.io",
+      "years": "",
+      "copyright_owner": "JetBrains and Kotlin contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/Kotlin/kotlinx-io",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.2.1",
+        "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.2.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/Kotlin/kotlinx-io/0.2.1/LICENSE"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "kotlinx.serialization",
+      "years": "2017 - 2025",
+      "copyright_owner": "JetBrains s.r.o. and contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/Kotlin/kotlinx.serialization",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.10.0",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.10.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/Kotlin/kotlinx.serialization/v1.10.0/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright 2017-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2017-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2017-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2017-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2017-2023 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2017-2024 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.",
+        "Copyright 2025-2025 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "LeakCanary",
+      "years": "2015 - 2019",
+      "copyright_owner": "Square, Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/square/leakcanary",
+      "scope": "debug",
+      "runtime_artifacts": [
+        "com.squareup.leakcanary:leakcanary-android-core:2.14",
+        "com.squareup.leakcanary:leakcanary-android-utils:2.14",
+        "com.squareup.leakcanary:leakcanary-object-watcher-android-androidx:2.14",
+        "com.squareup.leakcanary:leakcanary-object-watcher-android-core:2.14",
+        "com.squareup.leakcanary:leakcanary-object-watcher-android-support-fragments:2.14",
+        "com.squareup.leakcanary:leakcanary-object-watcher-android:2.14",
+        "com.squareup.leakcanary:leakcanary-object-watcher:2.14",
+        "com.squareup.leakcanary:plumber-android-core:2.14",
+        "com.squareup.leakcanary:plumber-android:2.14",
+        "com.squareup.leakcanary:shark-android:2.14",
+        "com.squareup.leakcanary:shark-graph:2.14",
+        "com.squareup.leakcanary:shark-hprof:2.14",
+        "com.squareup.leakcanary:shark-log:2.14",
+        "com.squareup.leakcanary:shark:2.14"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/square/leakcanary/v2.14/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (C) 2008 The Android Open Source Project",
+        "Copyright (C) 2011 Google Inc.",
+        "Copyright (C) 2013 The Android Open Source Project",
+        "Copyright (C) 2015 Square, Inc.",
+        "Copyright (C) 2016 Square, Inc.",
+        "Copyright (C) 2018 Square, Inc.",
+        "Copyright (C) 2019 Square, Inc.",
+        "Copyright 2010-2013, Carrot Search s.c., Boznicza 11/56, Poznan, Poland"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-android-core:2.14",
+          "pom": "leakcanary-android-core-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-android-utils:2.14",
+          "pom": "leakcanary-android-utils-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-androidx:2.14",
+          "pom": "leakcanary-object-watcher-android-androidx-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-core:2.14",
+          "pom": "leakcanary-object-watcher-android-core-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-support-fragments:2.14",
+          "pom": "leakcanary-object-watcher-android-support-fragments-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android:2.14",
+          "pom": "leakcanary-object-watcher-android-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:leakcanary-object-watcher:2.14",
+          "pom": "leakcanary-object-watcher-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:plumber-android-core:2.14",
+          "pom": "plumber-android-core-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:plumber-android:2.14",
+          "pom": "plumber-android-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:shark-android:2.14",
+          "pom": "shark-android-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:shark-graph:2.14",
+          "pom": "shark-graph-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:shark-hprof:2.14",
+          "pom": "shark-hprof-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:shark-log:2.14",
+          "pom": "shark-log-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        },
+        {
+          "artifact": "com.squareup.leakcanary:shark:2.14",
+          "pom": "shark-2.14.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Square, Inc."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LogcatToolkit",
+      "years": "",
+      "copyright_owner": "evermind-zz and kyze8439690",
+      "license": "APACHE2",
+      "project_url": "https://github.com/evermind-zz/logcat-toolkit",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.evermind-zz:logcat-toolkit:1.0.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/evermind-zz/logcat-toolkit/1.0.0/LICENSE",
+        "https://raw.githubusercontent.com/evermind-zz/logcat-toolkit/1.0.0/README.md",
+        "https://raw.githubusercontent.com/evermind-zz/logcat-toolkit/1.0.0/src/main/java/com/github/logviewer/LogcatActivity.kt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "Markwon",
+      "years": "",
+      "copyright_owner": "Dimitry Ivanov",
+      "license": "APACHE2",
+      "project_url": "https://github.com/noties/Markwon",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "io.noties.markwon:core:4.6.2",
+        "io.noties.markwon:linkify:4.6.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/noties/Markwon/v4.6.2/LICENSE"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "io.noties.markwon:core:4.6.2",
+          "pom": "core-4.6.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Dimitry Ivanov"
+          ]
+        },
+        {
+          "artifact": "io.noties.markwon:linkify:4.6.2",
+          "pom": "linkify-4.6.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Dimitry Ivanov"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Material Components for Android",
+      "years": "2014 - 2023",
+      "copyright_owner": "The Android Open Source Project",
+      "license": "APACHE2",
+      "project_url": "https://github.com/material-components/material-components-android",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.android.material:material:1.11.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/material-components/material-components-android/1.11.0/LICENSE",
+        "https://raw.githubusercontent.com/material-components/material-components-android/1.11.0/lib/java/com/google/android/material/button/MaterialButton.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/material-components/material-components-android/1.11.0/lib/java/com/google/android/material/button/MaterialButton.java",
+          "copyright_lines": [
+            "Copyright (C) 2017 The Android Open Source Project"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (C) 2014 The Android Open Source Project",
+        "Copyright (C) 2015 The Android Open Source Project",
+        "Copyright (C) 2016 The Android Open Source Project",
+        "Copyright (C) 2017 The Android Open Source Project",
+        "Copyright (C) 2018 The Android Open Source Project",
+        "Copyright (C) 2019 The Android Open Source Project",
+        "Copyright (C) 2020 The Android Open Source Project",
+        "Copyright (C) 2021 The Android Open Source Project",
+        "Copyright (C) 2022 The Android Open Source Project",
+        "Copyright (C) 2023 The Android Open Source Project",
+        "Copyright 2017 The Android Open Source Project",
+        "Copyright 2018 The Android Open Source Project",
+        "Copyright 2019 The Android Open Source Project",
+        "Copyright 2020 The Android Open Source Project",
+        "Copyright 2022 The Android Open Source Project",
+        "Copyright 2023 The Android Open Source Project"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.google.android.material:material:1.11.0",
+          "pom": "material-1.11.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "The Android Open Source Project"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nanojson",
+      "years": "2011",
+      "copyright_owner": "The nanojson Authors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/TeamNewPipe/nanojson",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/TeamNewPipe/nanojson/e9d656ddb49a412a5a0a5d5ef20ca7ef09549996/src/main/java/com/grack/nanojson/JsonParser.java"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/TeamNewPipe/nanojson/e9d656ddb49a412a5a0a5d5ef20ca7ef09549996/src/main/java/com/grack/nanojson/JsonParser.java",
+          "copyright_lines": [
+            "Copyright 2011 The nanojson Authors"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright 2011 The nanojson Authors"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "NewPipe",
+      "years": "2015 - 2026",
+      "copyright_owner": "NewPipe contributors",
+      "license": "GPL3",
+      "project_url": "https://github.com/TeamNewPipe/NewPipe",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/org/schabi/newpipe (incorporated app source; individual NewPipe/Christian Schabesberger copyright headers, 2015–2026)"
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "OkHttp",
+      "years": "2012 - 2025",
+      "copyright_owner": "Square, Inc.",
+      "license": "APACHE2",
+      "project_url": "https://square.github.io/okhttp/",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.squareup.okhttp3:okhttp-android:5.4.0",
+        "com.squareup.okhttp3:okhttp-java-net-cookiejar:5.4.0",
+        "com.squareup.okhttp3:okhttp-urlconnection:5.4.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/square/okhttp/parent-5.4.0/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (C) 2010 The Android Open Source Project",
+        "Copyright (C) 2011 The Android Open Source Project",
+        "Copyright (C) 2012 Square, Inc.",
+        "Copyright (C) 2012 The Android Open Source Project",
+        "Copyright (C) 2013 Square, Inc.",
+        "Copyright (C) 2014 Square, Inc.",
+        "Copyright (C) 2015 Square, Inc.",
+        "Copyright (C) 2016 Square, Inc.",
+        "Copyright (C) 2017 Square, Inc.",
+        "Copyright (C) 2018 Square, Inc.",
+        "Copyright (C) 2019 Square, Inc.",
+        "Copyright (C) 2020 Square, Inc.",
+        "Copyright (C) 2021 Square, Inc.",
+        "Copyright (C) 2022 Block, Inc.",
+        "Copyright (C) 2022 Square, Inc.",
+        "Copyright (C) 2023 Block, Inc.",
+        "Copyright (C) 2023 Square, Inc.",
+        "Copyright (C) 2024 Block, Inc.",
+        "Copyright (C) 2024 Square, Inc.",
+        "Copyright (C) 2025 Block, Inc.",
+        "Copyright (C) 2025 Square, Inc.",
+        "Copyright (c) 2022 Square, Inc.",
+        "Copyright (c) 2025 Block, Inc.",
+        "Copyright 2013 Twitter, Inc."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "Okio",
+      "years": "2014 - 2025",
+      "copyright_owner": "Square, Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/square/okio",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.squareup.okio:okio-jvm:3.17.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (C) 2014 Square, Inc.",
+        "Copyright (C) 2015 Square, Inc.",
+        "Copyright (C) 2016 Square, Inc.",
+        "Copyright (C) 2017 Square, Inc.",
+        "Copyright (C) 2018 Square, Inc.",
+        "Copyright (C) 2019 Square, Inc.",
+        "Copyright (C) 2020 Square, Inc.",
+        "Copyright (C) 2020 Square, Inc. and others.",
+        "Copyright (C) 2021 Square, Inc.",
+        "Copyright (C) 2023 Square, Inc.",
+        "Copyright (C) 2024 Square, Inc.",
+        "Copyright (C) 2025 Square, Inc.",
+        "Copyright 2014 Square Inc."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "PrettyTime",
+      "years": "2012 - 2022",
+      "copyright_owner": "Lincoln Baxter, III and contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/ocpsoft/prettytime",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.ocpsoft.prettytime:prettytime:5.0.8.Final"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/ocpsoft/prettytime/5.0.8.Final/LICENSE"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright 2012 <a href=\"mailto:lincolnbaxter@gmail.com\">Lincoln Baxter, III</a>",
+        "Copyright 2013 Martin Kouba",
+        "Copyright 2015 Michal Ursíny & Stefan Kostelny",
+        "Copyright 2022 <a href=\"mailto:lincolnbaxter@gmail.com\">Lincoln Baxter, III</a>"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "ProcessPhoenix",
+      "years": "2014",
+      "copyright_owner": "Jake Wharton",
+      "license": "APACHE2",
+      "project_url": "https://github.com/JakeWharton/ProcessPhoenix",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.jakewharton:process-phoenix:3.0.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/JakeWharton/ProcessPhoenix/3.0.0/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (C) 2014 Jake Wharton"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.jakewharton:process-phoenix:3.0.0",
+          "pom": "process-phoenix-3.0.0.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "Jake Wharton"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Protocol Buffers",
+      "years": "2008",
+      "copyright_owner": "Google Inc.",
+      "license": "BSD3",
+      "project_url": "https://github.com/protocolbuffers/protobuf",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.google.protobuf:protobuf-javalite:4.36.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/protocolbuffers/protobuf/v36.2/LICENSE"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/protocolbuffers/protobuf/v36.2/LICENSE",
+          "copyright_lines": [
+            "Copyright 2008 Google Inc.  All rights reserved."
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright 2008 Google Inc.  All rights reserved.",
+        "Copyright 2026 Google Inc.  All rights reserved."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "PVCPipe Extractor",
+      "years": "",
+      "copyright_owner": "NewPipe and PVCPipe Extractor contributors",
+      "license": "GPL3",
+      "project_url": "https://github.com/75ohmantenna/pvcpipe/tree/master/pvcpipe-extractor",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "NewPipeExtractor:extractor:0.2.4"
+      ],
+      "usage_evidence": [
+        "settings.gradle.kts (composite-build substitution)",
+        "pvcpipe-extractor/LICENSE",
+        "pvcpipe-extractor/extractor/src/main/java"
+      ],
+      "upstream_sources": [],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "Reactive Streams",
+      "years": "2014",
+      "copyright_owner": "Reactive Streams",
+      "license": "MIT0",
+      "project_url": "https://github.com/reactive-streams/reactive-streams-jvm",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.reactivestreams:reactive-streams:1.0.4"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/v1.0.4/LICENSE",
+        "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/v1.0.4/README.md"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/v1.0.4/LICENSE",
+          "copyright_lines": [
+            "Copyright 2014 Reactive Streams"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Exact copyright notice in the v1.0.4 LICENSE: Copyright 2014 Reactive Streams.",
+      "published_metadata": [
+        {
+          "artifact": "org.reactivestreams:reactive-streams:1.0.4",
+          "pom": "reactive-streams-1.0.4.pom",
+          "declared_licenses": [
+            "MIT-0"
+          ],
+          "published_developers": [
+            "Reactive Streams SIG"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rhino",
+      "years": "",
+      "copyright_owner": "Mozilla and Rhino contributors",
+      "license": "RHINO",
+      "project_url": "https://github.com/mozilla/rhino",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "org.mozilla:rhino:1.8.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/mozilla/rhino/Rhino1_8_1_Release/LICENSE.txt",
+        "https://raw.githubusercontent.com/mozilla/rhino/Rhino1_8_1_Release/NOTICE.txt"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/mozilla/rhino/Rhino1_8_1_Release/NOTICE.txt",
+          "copyright_lines": [
+            "Copyright 2010-2015 the V8 project authors. All rights reserved.",
+            "Copyright 2018-2020 Raffaello Giulietti"
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "<p>Copyright (c) 1991, 2000, 2001 by Lucent Technologies.",
+        "<p>Copyright 2018-2020 Raffaello Giulietti",
+        "Copyright 2011 the V8 project authors. All rights reserved.",
+        "Copyright 2018-2020 Raffaello Giulietti"
+      ],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "org.mozilla:rhino:1.8.1",
+          "pom": "rhino-1.8.1.pom",
+          "declared_licenses": [
+            "Mozilla Public License, Version 2.0"
+          ],
+          "published_developers": [
+            "Greg Brail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RxAndroid",
+      "years": "",
+      "copyright_owner": "The RxAndroid authors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/ReactiveX/RxAndroid",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "io.reactivex.rxjava3:rxandroid:3.0.2"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/ReactiveX/RxAndroid/3.0.2/LICENSE",
+        "https://raw.githubusercontent.com/ReactiveX/RxAndroid/3.0.2/rxandroid/src/main/java/io/reactivex/rxjava3/android/schedulers/AndroidSchedulers.java"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "io.reactivex.rxjava3:rxandroid:3.0.2",
+          "pom": "rxandroid-3.0.2.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "ReactiveX"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RxJava",
+      "years": "2016 - present",
+      "copyright_owner": "RxJava Contributors",
+      "license": "APACHE2",
+      "project_url": "https://github.com/ReactiveX/RxJava",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "io.reactivex.rxjava3:rxjava:3.1.12"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/ReactiveX/RxJava/v3.1.12/LICENSE",
+        "https://raw.githubusercontent.com/ReactiveX/RxJava/v3.1.12/COPYRIGHT"
+      ],
+      "artifact_notices": [
+        {
+          "artifact": "io.reactivex.rxjava3:rxjava:3.1.12",
+          "path": "rxjava-3.1.12.jar!META-INF/COPYRIGHT",
+          "copyright_lines": [
+            "Copyright (c) 2016-present, RxJava Contributors."
+          ]
+        },
+        {
+          "artifact": "io.reactivex.rxjava3:rxjava:3.1.12",
+          "path": "rxjava-3.1.12.jar!META-INF/LICENSE",
+          "copyright_lines": []
+        },
+        {
+          "source": "https://raw.githubusercontent.com/ReactiveX/RxJava/v3.1.12/COPYRIGHT",
+          "copyright_lines": [
+            "Copyright (c) 2016-present, RxJava Contributors."
+          ]
+        }
+      ],
+      "source_header_credits": [
+        "Copyright (c) 2016-present, RxJava Contributors.",
+        "Copyright 2016-2019 David Karnok"
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "io.reactivex.rxjava3:rxjava:3.1.12",
+          "pom": "rxjava-3.1.12.pom",
+          "declared_licenses": [
+            "The Apache Software License, Version 2.0"
+          ],
+          "published_developers": [
+            "David Karnok"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SearchPreference",
+      "years": "2018",
+      "copyright_owner": "ByteHamster",
+      "license": "MIT",
+      "project_url": "https://github.com/ByteHamster/SearchPreference",
+      "scope": "release and debug",
+      "runtime_artifacts": [],
+      "usage_evidence": [
+        "app/src/main/java/org/schabi/newpipe/settings/preferencesearch/package-info.java (explicit attribution of incorporated code)"
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/ByteHamster/SearchPreference/master/LICENSE"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/ByteHamster/SearchPreference/master/LICENSE",
+          "copyright_lines": [
+            "Copyright (c) 2018 ByteHamster"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year."
+    },
+    {
+      "name": "slimhls-converter",
+      "years": "",
+      "copyright_owner": "evermind-zz and PVCPipe contributors",
+      "license": "GPL3",
+      "project_url": "https://github.com/75ohmantenna/slimhls-converter/tree/7e7f373dbf",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.github.75ohmantenna:slimhls-converter:7e7f373dbf"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/75ohmantenna/slimhls-converter/7e7f373dbf/LICENSE",
+        "https://raw.githubusercontent.com/75ohmantenna/slimhls-converter/7e7f373dbf/README.md",
+        "https://raw.githubusercontent.com/75ohmantenna/slimhls-converter/7e7f373dbf/slimhls-converter/src/main/cpp/CMakeLists.txt",
+        "https://raw.githubusercontent.com/75ohmantenna/slimhls-converter/7e7f373dbf/slimhls-converter/build.gradle"
+      ],
+      "artifact_notices": [
+        {
+          "source": "https://raw.githubusercontent.com/75ohmantenna/slimhls-converter/7e7f373dbf/LICENSE",
+          "copyright_lines": [
+            "11 of the WIPO copyright treaty adopted on 20 December 1996, or"
+          ]
+        }
+      ],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates."
+    },
+    {
+      "name": "Stetho",
+      "years": "",
+      "copyright_owner": "Facebook, Inc. and its affiliates",
+      "license": "MIT",
+      "project_url": "https://github.com/facebook/stetho",
+      "scope": "debug",
+      "runtime_artifacts": [
+        "com.facebook.stetho:stetho-okhttp3:1.6.0",
+        "com.facebook.stetho:stetho:1.6.0"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/facebook/stetho/v1.6.0/LICENSE"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [],
+      "date_basis": "No project-wide copyright date established for this resolved version; retain the upstream author/contributor credit and omit guessed dates.",
+      "published_metadata": [
+        {
+          "artifact": "com.facebook.stetho:stetho-okhttp3:1.6.0",
+          "pom": "stetho-okhttp3-1.6.0.pom",
+          "declared_licenses": [
+            "MIT License"
+          ],
+          "published_developers": [
+            "Facebook"
+          ]
+        },
+        {
+          "artifact": "com.facebook.stetho:stetho:1.6.0",
+          "pom": "stetho-1.6.0.pom",
+          "declared_licenses": [
+            "MIT License"
+          ],
+          "published_developers": [
+            "Facebook"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wire",
+      "years": "2013 - 2024",
+      "copyright_owner": "Square, Inc.",
+      "license": "APACHE2",
+      "project_url": "https://github.com/square/wire",
+      "scope": "release and debug",
+      "runtime_artifacts": [
+        "com.squareup.wire:wire-runtime-jvm:5.5.1"
+      ],
+      "usage_evidence": [
+        "Resolved runtime artifacts listed below; transitive dependencies are retained even without direct app imports."
+      ],
+      "upstream_sources": [
+        "https://raw.githubusercontent.com/square/wire/5.5.1/LICENSE.txt"
+      ],
+      "artifact_notices": [],
+      "source_header_credits": [
+        "Copyright (C) 2013 Square, Inc.",
+        "Copyright (C) 2015 Square, Inc.",
+        "Copyright (C) 2016 Square, Inc.",
+        "Copyright (C) 2019 Square, Inc.",
+        "Copyright (C) 2020 Square, Inc.",
+        "Copyright (C) 2021 Square, Inc.",
+        "Copyright (C) 2024 Square, Inc.",
+        "Copyright (c) 2016, the R8 project authors.",
+        "Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.",
+        "Copyright 2013 Google Inc.  All rights reserved."
+      ],
+      "date_basis": "Upstream notice or copyright headers in the resolved/incorporated version; ranges summarize the dated headers, not the current calendar year.",
+      "published_metadata": [
+        {
+          "artifact": "com.squareup.wire:wire-runtime-jvm:5.5.1",
+          "pom": "wire-runtime-jvm-5.5.1.pom",
+          "declared_licenses": [
+            "Apache-2.0"
+          ],
+          "published_developers": [
+            "CashApp"
+          ]
+        }
+      ]
+    }
+  ],
+  "resolved_artifacts": [
+    {
+      "artifact": "NewPipeExtractor:extractor:0.2.4",
+      "sha256": "b41ea9d6df98e62f8c868147a2228c91f32c0fed6d15e7afd7831b22884e1dac",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.activity:activity-ktx:1.8.2",
+      "sha256": "5c78283d1956b14b22cf6ad70c712a73aa084116b7535526176c3b85e6a9205a",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.activity:activity:1.8.2",
+      "sha256": "ecc119262530a6e2f9f373207e472d476306bed3d4b216fe61b1ea42e3bef688",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.annotation:annotation-experimental:1.5.0",
+      "sha256": "02b0a4256618f85386c92e5cec166dc7f300820888a290227a3c0c65b82cbb36",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.annotation:annotation-jvm:1.10.0",
+      "sha256": "ddd072ddbb553178e205517ce777b2f05aa9e412982d9ecb4eedc74f1212f697",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.appcompat:appcompat-resources:1.7.1",
+      "sha256": "8e2db31224ca53b108c784da2b361959062716d416b210cfef3d5a3828306df0",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.appcompat:appcompat:1.7.1",
+      "sha256": "2ad334a323b28046e89b738c77d184cb3dcca32a551ab048851b2fda23a3ba26",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.arch.core:core-common:2.2.0",
+      "sha256": "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.arch.core:core-runtime:2.2.0",
+      "sha256": "a1be5e0caa2b07623862af6ae21b3ab0718123245184d0e30dea81b53f990a47",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.cardview:cardview:1.0.0",
+      "sha256": "1193c04c22a3d6b5946dae9f4e8c59d6adde6a71b6bd5d87fb99d82dda1afec7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.collection:collection-jvm:1.5.0",
+      "sha256": "70b35924e4babcdffa37d0e575ee039c56a2d97123342624c48b603233704341",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.collection:collection-ktx:1.5.0",
+      "sha256": "939b4a8697640e77d83e4e8b4c4a9d18f8130198c5961194af8dd9db9dc7c353",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.concurrent:concurrent-futures-ktx:1.1.0",
+      "sha256": "1968bf52039e38636aa6f114cd17d7256919d1e8997417716fef9d1da1f24d85",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.concurrent:concurrent-futures:1.1.0",
+      "sha256": "0ce067c514a0d1049d1bebdf709e344ed3266fe9744275682937cdcb13334e9e",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.constraintlayout:constraintlayout-core:1.1.1",
+      "sha256": "3c2054328328831eb6e69b4014f6ef9faa117fd4b811929f3a91d3db375f2c02",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.constraintlayout:constraintlayout:2.2.1",
+      "sha256": "30f8d79b782d283a90f0b6f7369169d9cf560091537fdd6056d1daa9f3033763",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.coordinatorlayout:coordinatorlayout:1.1.0",
+      "sha256": "44a9e30abf56af1025c52a0af506fee9c4131aa55efda52f9fd9451211c5e8cb",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.core:core-ktx:1.17.0",
+      "sha256": "4d23190b8623b8abb3c5247a0a7727eca347062d026335c427a09e82711b15f8",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.core:core-viewtree:1.0.0",
+      "sha256": "dc1b678d58ebcf2bfa1587be68ff826694ce3d221251b9ef30d4d4b36297e6de",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.core:core:1.17.0",
+      "sha256": "e1bd22bbcf5cee3a992dedb7d2d3c3b31c9f761c01e56d00ea443c8aaa981182",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.cursoradapter:cursoradapter:1.0.0",
+      "sha256": "a81c8fe78815fa47df5b749deb52727ad11f9397da58b16017f4eb2c11e28564",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.customview:customview-poolingcontainer:1.0.0",
+      "sha256": "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.customview:customview:1.1.0",
+      "sha256": "01f76ab043770a97b054046f9815717b82ce0355c02967d16c61981359dc189a",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.databinding:viewbinding:9.4.1",
+      "sha256": "5f865fb5c450766ac841019909ab773cf1be67e332e46c6f12f9b5438d818104",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.documentfile:documentfile:1.1.0",
+      "sha256": "684e0ffcb21a660c939d1bb814521f42c4bd74816f4a117291fe6a101cf3a822",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.drawerlayout:drawerlayout:1.1.1",
+      "sha256": "2c5f0dca378eb78ca2c4403f9889c77daa3059302260f26a07fe9f63c08926fe",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.dynamicanimation:dynamicanimation:1.0.0",
+      "sha256": "ce005162c229bf308d2d5b12fb6cad0874069cbbeaccee63a8193bd08d40de04",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.emoji2:emoji2-views-helper:1.4.0",
+      "sha256": "ed5d3ed772a5fbf0d570f7526f585cd61a180e60f9372584c328a68e2cff3375",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.emoji2:emoji2:1.4.0",
+      "sha256": "433febd3434a45667176c76a64f3f205ca6335a6b544c5b5d57f25a38a375242",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.exifinterface:exifinterface:1.4.2",
+      "sha256": "6bb2b68682a2023c55f35f941444ffea0157947b061e4fd7606ba935e2e77425",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.fragment:fragment-ktx:1.8.9",
+      "sha256": "078ad5877b04f4bf7350198579d81f9c8796fa20e46b4ade3f231a370456c5ad",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.fragment:fragment:1.8.9",
+      "sha256": "12de5b89ab6641c1d8da82b63dc816652622b06d2781b949b6fbd2dff9fac492",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.interpolator:interpolator:1.0.0",
+      "sha256": "33193135a64fe21fa2c35eec6688f1a76e512606c0fc83dc1b689e37add7732a",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.legacy:legacy-support-core-utils:1.0.0",
+      "sha256": "a7edcf01d5b52b3034073027bc4775b78a4764bb6202bb91d61c829add8dd1c7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-common-jvm:2.9.4",
+      "sha256": "37d89b2101f074ac6c260917dabb185607645ee200aa3018c7c5bde70edcf184",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-extensions:2.2.0",
+      "sha256": "648c8de1d10b025d524a2e46ac994fc3f6bf186826c09ec1a62d250bf1b877ae",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-livedata-core-ktx:2.9.4",
+      "sha256": "f55b7a8d433e9b8163154ccaa42fa2be55c70cd1ede5eeea521a4b4b884dd4fe",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-livedata-core:2.9.4",
+      "sha256": "ea866f0c379d1f92837994010ab5ac0a5d5499dbab521efc71b3bc2b497d6ba4",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-livedata-ktx:2.9.4",
+      "sha256": "a7fe5ceaf1a20d6049b85ac834ac13179158dbd79be26ee4ee05f364d8d895b6",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-livedata:2.9.4",
+      "sha256": "f240c2c94a96d4a5eae5d379c2a8589d426a33b989d83ae9f0e01f69502c0181",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-process:2.9.4",
+      "sha256": "4784b8d083c211e076d9115bfa1737f7e0f62b553e801cf50caa4400e34a95d6",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-runtime-android:2.9.4",
+      "sha256": "86f16a1330eb23600ba90d0334b3e1db38d3a30c8b1efcd92ca21aa85afa8173",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-runtime-ktx-android:2.9.4",
+      "sha256": "970199c9ed1ac13d620aa8de7f8abbc28ce80653c3ce328d0ac2f15272b56e1b",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-runtime:2.9.4",
+      "sha256": "142b8d22e93e4a6f3871901493c26e2bdfe1d5da1f88f2d8031d46ec6b6cc12b",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-service:2.9.4",
+      "sha256": "674155d592d5de18175ef0727442f7827a86cf8fe68d9927ba6a4140b69a5bc9",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-viewmodel-android:2.9.4",
+      "sha256": "4b236b2e504db5ca5d09334fef05aa8cdc31ee35a433c3aa4d0420efa9613332",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4",
+      "sha256": "b7d58bb86bb8e2ccc607d1f8570e714810f7cfb3feba37d375ff1646383435a1",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.9.4",
+      "sha256": "079441c43fa3ff8ea7a02df3b12eec483c3e57583f832cfaff663750527c1421",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.lifecycle:lifecycle-viewmodel:2.9.4",
+      "sha256": "cab404b05d5faed209104a2aef14c0cbb316ab9fabe4a8f037b043e5d2f43435",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.loader:loader:1.0.0",
+      "sha256": "11f735cb3b55c458d470bed9e25254375b518b4b1bad6926783a7026db0f5025",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0",
+      "sha256": "a22b94a77789f3b34becd24082231300524011ccc83f026142c49ad60131379b",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.media:media:1.7.1",
+      "sha256": "9d6c80106032a09eedec78c440b4a410b530a5ea0d8bd3a726acc8569a5cdfca",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.preference:preference:1.2.1",
+      "sha256": "40ca8adfdb7effb61facb39bd9ca2e2f3a40d106743b0cd6dc9e21e8bedd4f85",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.print:print:1.0.0",
+      "sha256": "1d5c7f3135a1bba661fc373fd72e11eb0a4adbb3396787826dd8e4190d5d9edd",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.profileinstaller:profileinstaller:1.4.1",
+      "sha256": "b519f9317ded1e2c1c2993038c0692e30da326ca99097d9331ff2d3a5861a428",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.recyclerview:recyclerview:1.4.0",
+      "sha256": "0f32ccaffcda74c3f87f0b4cfe6ae78e8aa4eb3ad7dda4f2edf06eedc947a5cf",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.resourceinspection:resourceinspection-annotation:1.0.1",
+      "sha256": "8cff870ec6fb31db48a52f4a792335b4bf8de07e03bd37823181526433ccd5cb",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.room:room-common-jvm:2.8.5",
+      "sha256": "dc7b4e1a75a790f29c97afd5516b8bf8002d9b6e83e295bc569b33566f3b1ec0",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.room:room-ktx:2.8.5",
+      "sha256": "9eddc00f8a23a169b7fbbcec72600f3580e15c92fc4fcdbf48fae6ee69247033",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.room:room-runtime-android:2.8.5",
+      "sha256": "ab6f951f6e7b63ed419eaf740b34dbe51560532f78289fd9c5dadabf46401dba",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.room:room-rxjava3:2.8.5",
+      "sha256": "5128868622518c41a944c8f3e78485590f1c36ec02cac5e6e817ff02d6bb9c26",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.savedstate:savedstate-android:1.3.3",
+      "sha256": "3d40baf742e6bdc90ada4650502e1d08c55cb5d8c045870d2c7c6d89f237d064",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.savedstate:savedstate-ktx:1.3.3",
+      "sha256": "c4df27ba3fef3674da4c5cae64f43ff251f8f9b7507c6597e95a5b7f64860c6c",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.slidingpanelayout:slidingpanelayout:1.2.0",
+      "sha256": "5f53339be2a4f90a9abea3571dd59e70a8a49e7f15dd82974a3898b4652e8714",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.sqlite:sqlite-android:2.6.2",
+      "sha256": "514f8de4f7bdba2fa8d748d2b22fdcdfb623bd3770a667bf0adc0ad259f03ed2",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.sqlite:sqlite-framework-android:2.6.2",
+      "sha256": "b19125c7fff34222e0f380361fc179ab214e4d82e1a50b0c068ca26c851a6231",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.startup:startup-runtime:1.2.0",
+      "sha256": "f51d361d17b30b09cfb9e2aebf301d113f99437cbf462a066092795fb60eddd2",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.swiperefreshlayout:swiperefreshlayout:1.2.0",
+      "sha256": "1de8aee6173d2ca251a1126fe18d4ca7d5c0dbc7a80fb9e6ff74a3ba5e9c9b92",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.tracing:tracing-ktx:1.2.0",
+      "sha256": "c33f9cbd931e6190ca38aa09bf8a7a8a19391d4b0fb7a7605a6b59f2d42580d1",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.tracing:tracing:1.2.0",
+      "sha256": "6faa90390d1fdbf0adb9a99bf99de67b94c6c6f35aea9510593a9d17973736a2",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.transition:transition:1.4.1",
+      "sha256": "36d28d9ec33a8c64313842bce99c95736da5b27a6b3a513639050de82f075726",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.vectordrawable:vectordrawable-animated:1.1.0",
+      "sha256": "76da2c502371d9c38054df5e2b248d00da87809ed058f3363eae87ce5e2403f8",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.vectordrawable:vectordrawable:1.1.0",
+      "sha256": "46fd633ac01b49b7fcabc263bf098c5a8b9e9a69774d234edcca04fb02df8e26",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.versionedparcelable:versionedparcelable:1.1.1",
+      "sha256": "57e8d93260d18d5b9007c9eed3c64ad159de90c8609ebfc74a347cbd514535a4",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.viewpager2:viewpager2:1.1.0",
+      "sha256": "1934b5eff05c46215896b75bac065a7b63b13e3f0c8deacc0a9d54b207d9f53d",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.viewpager:viewpager:1.0.0",
+      "sha256": "147af4e14a1984010d8f155e5e19d781f03c1d70dfed02a8e0d18428b8fc8682",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.webkit:webkit:1.14.0",
+      "sha256": "265604786ea1c9679e3f860f7f13072375c141f46db9092ed8ef5ecd599a516d",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.window:window:1.0.0",
+      "sha256": "3212985be4127373ca4d0ea7f8b81a250ae2105e924f7940105d067a0f9ac130",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.work:work-runtime:2.10.5",
+      "sha256": "6c72e877bfed9fa8382b13856af9bf2086b886210f4c6ed5810880831bc85bc7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "androidx.work:work-rxjava3:2.10.5",
+      "sha256": "d9c527f08aa00dcaeb83a64b375c6d1bf210d4c744901623320e6842420b0ffd",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "ch.acra:acra-core:5.13.1",
+      "sha256": "185b3f476536c5f98fa55bfa5d7f18b7720ca719b1e2ed0f0da072dc34c0ed6c",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.android.tools:desugar_jdk_libs_configuration_nio:2.1.5",
+      "sha256": "7db51661cd07d1fd5cf12769a75ba201910624bb3801c09363dd3cb28e31c51b",
+      "configurations": [
+        "coreLibraryDesugaring"
+      ]
+    },
+    {
+      "artifact": "com.android.tools:desugar_jdk_libs_nio:2.1.5",
+      "sha256": "d8044befae095781b9a80bf1faa92edc30382d75d437476784c1bf991598a976",
+      "configurations": [
+        "coreLibraryDesugaring"
+      ]
+    },
+    {
+      "artifact": "com.atlassian.commonmark:commonmark:0.13.0",
+      "sha256": "fd38aecef680649894ffd7b434e10081fc609e260c63e16c4323a3eaa2a9f096",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.facebook.stetho:stetho-okhttp3:1.6.0",
+      "sha256": "dfdaf3feeca85d226f694c77c3af4966ff18548795327b749be77f5cb8d14643",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.facebook.stetho:stetho:1.6.0",
+      "sha256": "4455e9b74aac1a593979a69885df61f2548f6fd7fc2f1ef6b22e41570f4c27b6",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.75ohmantenna:slimhls-converter:7e7f373dbf",
+      "sha256": "1ea205c289effc445acacaa1fa00f2e564c001e9ccc155e5201168065b13e01a",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996",
+      "sha256": "d495881a322b3c72e5d43284afd7d7021520028ca8b7c6ba861e3fd8d90614d5",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.evermind-zz:Cloudflare-Bypass:c4264c53e3",
+      "sha256": "13eb3573fc895000fb9c1fc867bcf53451c7221c685b53d59dd577336b7851ef",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.evermind-zz:challengeFloatsAway:1.1.1",
+      "sha256": "677ec0b9ddb688cf89c749747f4201526118cd18caa164dbb624a5acf2e51629",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.evermind-zz:hlsdownloader:1.0.0",
+      "sha256": "f000422b880c503a3f18a01334bf0e0880d37ff311de5fca98f7438ff0f4acbe",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.evermind-zz:logcat-toolkit:1.0.0",
+      "sha256": "4ca9d2f66e0939e2209c6225c03d34e83da85038090f994c3f44a224181194a6",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.lisawray.groupie:groupie-viewbinding:2.10.1",
+      "sha256": "eed4f9ec979678c3849db1d8aa6e1ae127b8260c350142ae1840c9eb864e7a4e",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.github.lisawray.groupie:groupie:2.10.1",
+      "sha256": "5157fe316e3cd5613982963dc71b9e424a990c5452ada51d5a7de77eda0be4b7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-common:2.19.1",
+      "sha256": "5cc09569ce52810722c979ab73b1820167db88e1bb1cbaaab8b8650c70f35f41",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-container:2.19.1",
+      "sha256": "0a1264dfd494ddc3db0c40b5187bcce7b7c2f959de97162a99a65123a6e679ea",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-core:2.19.1",
+      "sha256": "e89b76f0d496d10cef1b5ee0d7606052875fd23a56ae64a8083b3a614f2a530d",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-dash:2.19.1",
+      "sha256": "777cc16b1f751e56b0c42a215fbd9057c308fbfaa2dbb6f39e0dc96d3183a83f",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-database:2.19.1",
+      "sha256": "9f3feb1e7f17c8727fcf55a3cc89354a02eae2d62e9ba437dd1c34d60e953337",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-datasource:2.19.1",
+      "sha256": "d26a3cbf2a6fca428ef95d944c0a03e3f8c447096c27d5cf53f21d3bb5eef005",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-decoder:2.19.1",
+      "sha256": "be361785dcfb5f96edda6cdfe64d415d3d44d76f255e8f7c269507894a7744cf",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-extractor:2.19.1",
+      "sha256": "a2d344aad193cb4ecdaf2f94e23797d2cca794ead559290729891b0512b0a659",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-hls:2.19.1",
+      "sha256": "e922c1bf2762abaf1fe738518fb2243bbb23cd26354ed2c5e3fcd6bc916793aa",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:exoplayer-ui:2.19.1",
+      "sha256": "c3585b04364a4ff964590aa125367cb316ee148aaa8e0960aca994d1ea0905c5",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.exoplayer:extension-mediasession:2.19.1",
+      "sha256": "ab79876e5827450f898123691f0ffd77388997c0357e191331b2ac47c7649692",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.android.material:material:1.11.0",
+      "sha256": "8eaf7f399ee094dc13495c36e7d4ef471ea7ef8a399e4d79c96b50fd4f82450c",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.auto.service:auto-service-annotations:1.1.1",
+      "sha256": "16a76dd00a2650568447f5d6e3a9e2c809d9a42367d56b45215cfb89731f4d24",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.auto.service:auto-service:1.1.1",
+      "sha256": "1f48f451503e623daba7d9ed368cca0f81e1e3815653a4560113e12c0129ebd5",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.auto:auto-common:1.2.1",
+      "sha256": "f43f29fe2a6ebaf04b2598cdeec32a4e346d49a9404e990f5fc19c19f3a28d0e",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.code.findbugs:jsr305:3.0.2",
+      "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.errorprone:error_prone_annotations:2.18.0",
+      "sha256": "9e6814cb71816988a4fd1b07a993a8f21bb7058d522c162b1de849e19bea54ae",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.guava:failureaccess:1.0.1",
+      "sha256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.guava:guava:32.0.1-jre",
+      "sha256": "bd7fa227591fb8509677d0d1122cf95158f3b8a9f45653f58281d879f6dc48c5",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava",
+      "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.j2objc:j2objc-annotations:2.8",
+      "sha256": "f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.google.protobuf:protobuf-javalite:4.36.2",
+      "sha256": "8f4f93d08cb37130ecb0bc69d376d7d27c36ff04ddb1bb27430b06caa9fa062e",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.jakewharton:process-phoenix:3.0.0",
+      "sha256": "ff18e68bb76f92338d2a72b854bcc47e978d9a483b548875a84cfba9e2f7a6c7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.curtains:curtains:1.2.4",
+      "sha256": "7f53e22dad8df994cec6867943c6a757190d412c6a30bcc091d44d8cde15fa54",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-android-core:2.14",
+      "sha256": "204f16eb8620ec4aefa35b122afe977ace60d35f56376c07a3921cf9aa92127c",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-android-utils:2.14",
+      "sha256": "a7f3288ad5099b0cfdb465f87547631986611c4796f08f07c7defad89749c607",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-androidx:2.14",
+      "sha256": "d853a58f6f9bdbf574893f56cc9dabbde03ef55ae998d9be57b573fdb2289edb",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-core:2.14",
+      "sha256": "4a1b32588657ba960c09df1bff04c78872bde038565552da8bc148d69ae41cf2",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android-support-fragments:2.14",
+      "sha256": "32ef945b5a63c43772290867191a85030743f9401b83641d7a29a5c81b8fbb88",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-object-watcher-android:2.14",
+      "sha256": "a5fa2035838b9b91dbe9e75e30285dbc3c7285d25c6bcd0d359c4c35584d18b6",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:leakcanary-object-watcher:2.14",
+      "sha256": "575a046bcc362916fa6f106373f393bacf5578f13640419a464b4c81d89e646e",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:plumber-android-core:2.14",
+      "sha256": "eb595ab5d7e4b1e9d9f8a7a654e8aed42e2cdec6a6ec69acfdc6d8f3b08967a6",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:plumber-android:2.14",
+      "sha256": "deccc6849f6b84788f4fdbce5cc05c3d5a029aa365902cbb28426a21e3cdf7ac",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:shark-android:2.14",
+      "sha256": "b79dfb05903e69018d598bb4da4f41e0f7732a585cb66a0a5ffb5b89d2076c72",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:shark-graph:2.14",
+      "sha256": "7596fc9caea47e95f6001f57098b66c64beaa968c1354ab6c0aa98dee901681b",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:shark-hprof:2.14",
+      "sha256": "8f19f11585b0fb34fb8cac021504208ed1c73dfe8cb1f69b2bdb0437bb1191fa",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:shark-log:2.14",
+      "sha256": "ba1011ae450664f7e8e37c5b6e5e01660b11456ddca8960b5cbe6df0e3f99926",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.leakcanary:shark:2.14",
+      "sha256": "ffadb874b3a4d4d0033afd302e37b26ade2b63d6e23f9bcd568f727304845f01",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.okhttp3:okhttp-android:5.4.0",
+      "sha256": "0e9cbf6c7c373a5f0b0cde7f773185eb69b485faa19f76bcfab3310badbda901",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.okhttp3:okhttp-java-net-cookiejar:5.4.0",
+      "sha256": "39e9358709ed73b568a9c4f5b1b2e4eba77e7ac0d371ad6c12318152ba764855",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.okhttp3:okhttp-urlconnection:5.4.0",
+      "sha256": "bfa5095ca3143988de0fc9103581b72e0659307da48fa58cfb44a7ce092f0514",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.okio:okio-jvm:3.17.0",
+      "sha256": "3b13dcc3e1573047c2d507fc4f7fcb0bb0cbcd9d395da21d20e09406e2cd6a73",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "com.squareup.wire:wire-runtime-jvm:5.5.1",
+      "sha256": "c99b73cfdd7b3767adf0b02f0d0716f65fbdbe3da6f3719de44eb0e50462bc4e",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "commons-cli:commons-cli:1.2",
+      "sha256": "e7cd8951956d349b568b7ccfd4f5b2529a8c113e67c32b028f52ffda371259d9",
+      "configurations": [
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.coil-kt.coil3:coil-android:3.4.0",
+      "sha256": "d93e5ad9dbb07d701802cdd28633be8977549aa48d6276728e87ffa7df49b0a3",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.coil-kt.coil3:coil-core-android:3.4.0",
+      "sha256": "0b704b01a8338bf95cf8364497671f57fdbf127786c3041590a2c33582036084",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.coil-kt.coil3:coil-network-core-android:3.4.0",
+      "sha256": "2a453b4b11a0ee986b4af37f5c7b17e1d97ead9c62caa5b8eeaffabeccdb8a59",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.coil-kt.coil3:coil-network-okhttp-android:3.4.0",
+      "sha256": "9fd5791c34031d101bec95f44ba6e9e074c9f3da4fb5e5c132c260f7f8b1cb77",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.noties.markwon:core:4.6.2",
+      "sha256": "29e4c1de9aefa3d3c7f8a7948ba24c3696adc34b29e3d7d106eb35e8fa2c85fd",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.noties.markwon:linkify:4.6.2",
+      "sha256": "e70bb1893bb6a2516775e8ce42a30e5e94aba0913cd179d8e5b87eb5ee89cf5c",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.reactivex.rxjava3:rxandroid:3.0.2",
+      "sha256": "18fc3d5a89e83df8b7cd4a5a4eb42a9ee525ce6477e1302794b3449f1d75cb02",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "io.reactivex.rxjava3:rxjava:3.1.12",
+      "sha256": "1808a433ef55dcc2965523e512ab914a5d0d727228a2683ed7559d7cccf44e37",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "net.java.dev.jna:jna:5.13.0",
+      "sha256": "3a03daf5a7212201c3a9b44f734dfc9babb3addcb5cbfa639f9f535e887925c0",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.checkerframework:checker-qual:3.33.0",
+      "sha256": "e316255bbfcd9fe50d165314b85abb2b33cb2a66a93c491db648e498a82c2de1",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.fcast:sender-sdk:0.6.1",
+      "sha256": "0063bdfd1f6222114d4e977528fde0ad874d0eb85a0675e6fce80158944238f8",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.greenrobot:eventbus-java:3.3.1",
+      "sha256": "85f642378a25d5e41a69f8ba6cfb2fbe674e406b5437403e9f955f793d6cd991",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.greenrobot:eventbus:3.3.1",
+      "sha256": "c9385f4a570f8b2ef6f8f752690077ed538c358fd4755032ab80501755838f11",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlin:kotlin-parcelize-runtime:2.4.21",
+      "sha256": "3f7612b7f2a659f0ec5204f533266c08e03e7888a112943d92fd740faefea133",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22",
+      "sha256": "055f5cb24287fa106100995a7b47ab92126b81e832e875f5fa2cf0bd55693d0b",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22",
+      "sha256": "4198b0eaf090a4f25b6f7e5a59581f4314ba8c9f6cd1d13ee9d348e65ed8f707",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+      "sha256": "bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2",
+      "sha256": "e713f1f874244115a07571065cffa0f24f5e78300e9720fea16de3af1d75fd41",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2",
+      "sha256": "5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.2",
+      "sha256": "12a7bd4fb4e6a1a5a55f9a32ce4beffda543036cf14fd10a077285381a9dfafe",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-coroutines-rx3:1.10.2",
+      "sha256": "dea9cbccf078dd464291ecfa576a30d83d3a2aec7d63f7d867581617fd90cea7",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.6.1",
+      "sha256": "bc94b0fcb4464742f02cf54a3e8db9e7b141a1a052ca8ddaf662a60affa21530",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.2.1",
+      "sha256": "1d80df55ae069d2c7c2edf108fefc55d2fcaa5692cc821692fbbd4dd71bcc303",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.2.1",
+      "sha256": "67d5dbb5d63d8e8a60e219ad1553503abebc88ee39c4f66a8f993a9dca0d1333",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.10.0",
+      "sha256": "14d6f27ce28f61ebc4a516d562f911b7bc01cfbe5397fb884c45ea0db044c635",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.10.0",
+      "sha256": "af1e3e1e8ee3176468e1ec729df853b2066071de94a84c412ad9fa135cb37f3a",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jetbrains:annotations:23.0.0",
+      "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jsoup:jsoup:1.22.2",
+      "sha256": "596785996d3c6df16f544c232d10a9a1d88783b2a4740cf5251cb616f2be704d",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.jspecify:jspecify:1.0.0",
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.mozilla:rhino:1.8.1",
+      "sha256": "98a06d42bdd69da15bf9c2a7812b4cfe648ca9e64fe8baaeb502a32b0ed2c8ac",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.ocpsoft.prettytime:prettytime:5.0.8.Final",
+      "sha256": "cd87e3c89dba0fbd516605afbe3ca98ef7c55499577848f6aeb19e9d37513724",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    },
+    {
+      "artifact": "org.reactivestreams:reactive-streams:1.0.4",
+      "sha256": "f75ca597789b3dac58f61857b9ac2e1034a68fa672db35055a8fb4509e325f28",
+      "configurations": [
+        "releaseRuntimeClasspath",
+        "debugRuntimeClasspath"
+      ]
+    }
+  ],
+  "native_ffmpeg": {
+    "wrapper": "com.github.75ohmantenna:slimhls-converter:7e7f373dbf",
+    "source_commit": "b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090",
+    "build_source": "https://github.com/75ohmantenna/slimhls-converter/blob/7e7f373dbf/slimhls-converter/build.gradle",
+    "license": "LGPL-2.1-or-later",
+    "evidence": "Inspected shipped x86_64 ELF strings and pinned CMake configure flags: no --enable-gpl, --enable-version3 or --enable-nonfree; autodetection and zlib disabled. Wrapper GPLv3 is separately credited."
+  },
+  "validation": {
+    "runtime_modules_covered": 170,
+    "components": 54,
+    "release_components": 50,
+    "debug_only_components": [
+      "Apache Commons CLI",
+      "Curtains",
+      "LeakCanary",
+      "Stetho"
+    ],
+    "unmapped_runtime_artifacts": [],
+    "formatting_tests": "2 passed: component attribution, preserved notices, HTML escaping and absent copyright year.",
+    "inventory_checks": "All 54 rows reference existing license/NOTICE assets; all 170 resolved module versions mapped; debug-only modules verified absent from release runtime graph.",
+    "checks_passed": [
+      ":app:runKtlint",
+      ":app:runCheckstyle",
+      ":app:testDebugUnitTest --tests org.schabi.newpipe.about.LicenseFormattingTest (2 tests, zero failures)",
+      ":app:lintDebug",
+      ":app:assembleDebug",
+      ":app:assembleRelease",
+      "Every revised license and original NOTICE asset in both APKs matches the source bytes.",
+      "git diff --check"
+    ],
+    "apk_sha256": {
+      "debug": "4e0c8bb90480aaa878dcad9ea95c3b024f72cf76a896b3f21554db1c3c4c0007",
+      "release": "939b9c89d5b1c2a1a7741632565fc2330125443f9cbadcbf0066c8bf100df064"
+    },
+    "device_execution": "No installation, instrumentation or app-data mutation during this audit. HTML formatting exercised in JVM tests; APK asset packaging inspected locally.",
+    "artifact_context": "These APK fingerprints record the initial license audit, before the video surface setting text and adversarial-review correction. They do not identify later builds."
+  },
+  "bundled_notice_assets": {
+    "lgpl_2_1.html": "26b9a8966e56bbc01b914e3d0782079991e865158a1e1e9f362159dac9ea874b",
+    "gpl_2_classpath.html": "92d71a34383684b709bae541dcd868ea1eb029583f1c5e79d4063a09e32af9f9",
+    "jna.html": "278a43dca54a93b3867e601224394c3a5d5fe72a0218385d002f8be2f962a244",
+    "rhino.html": "9b7c5c6d6cc71d772b1fc9d3a2012162fe1746dc88a810c3742a3d1049d0b2ff",
+    "jsr305.html": "ed924c0f7626c1374589a4c646c7961cd5f236d889c6ce15469919c25e434077",
+    "acra_notice.txt": "4d86f7cf8cb8973c534060f4f6bbc0dcc2d8d758838ed048e450e94bb30a35be",
+    "commons_text_notice.txt": "9ad4ec6b60a0d6ffa269c116fd117ce41d67c31fc301c8a2cba309f1d72cfde3",
+    "commons_cli_notice.txt": "ef0d671115935e29fbde70011340bb8b8854bc269b551b96742b7654db03f381"
+  },
+  "review_follow_up": {
+    "reviewed_on": "2026-10-26",
+    "fixes": [
+      "Restore the exact 2014 Reactive Streams copyright credit from the v1.0.4 LICENSE; the original no-project-wide-date rationale was incorrect.",
+      "Normalize trailing whitespace in the Rhino HTML notice without changing its wording."
+    ],
+    "inventory_checks": [
+      "All 54 About rows match the audit component records and reference existing license/NOTICE assets.",
+      "All cached external artifact hashes match the recorded fingerprints; the extractor is the local composite project.",
+      "New bundled license text preserves the inspected upstream originals; all bundled notice hashes match the inventory."
+    ],
+    "device_execution": "No installation, instrumentation or device-data mutation during review.",
+    "checks_passed": [
+      "Fixture sanitizer: 12 tests; 685 recorded fixtures checked, no identifiers requiring review.",
+      "Build logic: 3 tests passed; app: 1039 tests passed, including 2 LicenseFormattingTest cases; extractor forkCiTest: 604 tests, 3 skipped, zero failures.",
+      "Checkstyle, ktlint, dependency order and Android lint passed.",
+      "OMP Eclipse import: Java 21, generated R.jar, valid library paths and extractor reference verified; 96 content-keyed AAR cache copies matched source archives.",
+      "Staged git diff --check passed, including new notice assets.",
+      "make ci passed, including debug and release APK builds. Refreshed assembleDebug after the final notice whitespace cleanup.",
+      "All 16 license/NOTICE assets in both APKs match source bytes. Four exact debug-only About labels are absent from release DEX string tables."
+    ],
+    "apk_sha256": {
+      "debug": "431ccf11093de40467e6627d2aa03c603194de725ec0d94012108fa197e33828",
+      "release": "bb3234bbdf63b4d7f5610c0aa73f8af91977ab1d527facb7660666fdb5aa5624"
+    }
+  }
+}

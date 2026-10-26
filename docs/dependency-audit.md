@@ -265,3 +265,21 @@ and the explicit unsupported-ID contract. minSdk26 and toolchain versions stay f
 - The smoke's temporary device APKs/runner/files were removed. There was no
   modification of an installed app or its private data. Exact reviewed head and
   external review disposition are recorded on the PR, outside tracked artifacts.
+
+## Follow-up: About license inventory — 2026-10-26
+
+The earlier general statement that all About notices remain is superseded by
+the version-specific inventory in [license-audit.json](license-audit.json).
+Accompanist, Android-State, Livefront Bridge and JetBrains Compose Multiplatform
+have no remaining runtime or incorporated-source use. Commons CLI, Curtains,
+LeakCanary and Stetho are debug-only; release now omits their rows. Incorporated
+Commons Text, SearchPreference, UAMP and GigaGet code still warrants attribution.
+
+The audit corrects copyright holders and dates from exact-version notices and
+source headers, includes FFmpeg and core-library desugaring, and preserves JNA's
+libffi notice, Rhino's additional BSD/MIT notices and JSR-305's CC BY 2.5 source
+attribution. It also fixes the generic MIT text and includes component credits
+inside license dialogs. The JSON records dependency versions, primary sources,
+artifact fingerprints and the limits of the inventory; it does not constitute
+a recursive inventory of native SDK dependencies. No device installation or
+instrumentation was performed for this follow-up.

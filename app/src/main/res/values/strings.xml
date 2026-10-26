@@ -354,6 +354,7 @@
     <string name="title_activity_about">About PVCPipe</string>
     <string name="title_licenses">Third-party licenses</string>
     <string name="copyright">© %1$s by %2$s under %3$s</string>
+    <string name="copyright_without_year">© %1$s under %2$s</string>
     <string name="tab_about">About \u0026 FAQ</string>
     <string name="tab_licenses">Licenses</string>
     <string name="app_description">Libre lightweight streaming on Android.</string>

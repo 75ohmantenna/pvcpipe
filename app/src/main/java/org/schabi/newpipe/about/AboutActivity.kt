@@ -105,65 +105,73 @@ class AboutActivity : AppCompatActivity() {
         /**
          * Third-party project families found on the release and debug runtime classpaths, plus
          * projects from which source code has been incorporated. Multiple artifacts from one
-         * project (for example AndroidX or LeakCanary) are represented by one entry.
+         * project (for example AndroidX or LeakCanary) are represented by one entry. Copyright
+         * dates come from the resolved version's notices/source headers, never the current year.
+         * An empty date means no project-wide copyright date was established for this version.
+         * Evidence and exact artifact versions: docs/license-audit.json (2026-10-26).
          */
         private val SOFTWARE_COMPONENTS = arrayListOf(
-            SoftwareComponent("ACRA", "2013", "Kevin Gaudin", "https://github.com/ACRA/acra", StandardLicenses.APACHE2),
-            SoftwareComponent("Accompanist", "2020 - 2024", "Google LLC", "https://github.com/google/accompanist", StandardLicenses.APACHE2),
-            SoftwareComponent("Android-State", "2018", "Evernote", "https://github.com/Evernote/android-state", StandardLicenses.EPL1),
-            SoftwareComponent("AndroidX", "2005 - 2026", "The Android Open Source Project", "https://developer.android.com/jetpack", StandardLicenses.APACHE2),
+            SoftwareComponent("ACRA", "2013", "Kevin Gaudin", "https://github.com/ACRA/acra", StandardLicenses.APACHE2, noticeFilename = "third_party/acra_notice.txt"),
+            SoftwareComponent("AndroidX", "2006 - 2025", "The Android Open Source Project", "https://developer.android.com/jetpack", StandardLicenses.APACHE2),
             SoftwareComponent("Android Universal Music Player", "2018", "Google Inc.", "https://github.com/android/uamp", StandardLicenses.APACHE2),
-            SoftwareComponent("Apache Commons CLI", "2002 - 2026", "The Apache Software Foundation", "https://commons.apache.org/proper/commons-cli/", StandardLicenses.APACHE2),
-            SoftwareComponent("Apache Commons Text", "2014 - 2026", "The Apache Software Foundation", "https://commons.apache.org/proper/commons-text/", StandardLicenses.APACHE2),
-            SoftwareComponent("BravePipe", "2021 - 2026", "evermind-zz and BravePipe contributors", "https://github.com/bravepipeproject/BravePipe", StandardLicenses.GPL3),
-            SoftwareComponent("Bridge", "2021", "Livefront", "https://github.com/livefront/bridge", StandardLicenses.APACHE2),
-            SoftwareComponent("Checker Framework", "2007 - 2026", "The Checker Framework developers", "https://github.com/typetools/checker-framework", StandardLicenses.MIT),
+            SoftwareComponent("Apache Commons Text", "2014 - 2020", "The Apache Software Foundation", "https://commons.apache.org/proper/commons-text/", StandardLicenses.APACHE2, noticeFilename = "third_party/commons_text_notice.txt"),
+            SoftwareComponent("BravePipe", "", "evermind-zz and BravePipe contributors", "https://github.com/bravepipeproject/BravePipe", StandardLicenses.GPL3),
+            SoftwareComponent("Checker Framework", "2004 - present", "The Checker Framework developers", "https://github.com/typetools/checker-framework", StandardLicenses.MIT),
             SoftwareComponent("Cloudflare-Bypass", "2024", "Xavier Alexander Torres Calderón", "https://github.com/evermind-zz/Cloudflare-Bypass", StandardLicenses.MIT),
-            SoftwareComponent("Coil", "2023", "Coil Contributors", "https://coil-kt.github.io/coil/", StandardLicenses.APACHE2),
-            SoftwareComponent("commonmark-java", "2015", "Robin Stocker", "https://github.com/commonmark/commonmark-java", StandardLicenses.BSD2),
-            SoftwareComponent("Curtains", "2020 - 2026", "Square, Inc.", "https://github.com/square/curtains", StandardLicenses.APACHE2),
-            SoftwareComponent("EventBus", "2012 - 2016", "Markus Junginger", "https://greenrobot.org/eventbus", StandardLicenses.APACHE2),
-            SoftwareComponent("Error Prone Annotations", "2012 - 2026", "Google Inc.", "https://github.com/google/error-prone", StandardLicenses.APACHE2),
-            SoftwareComponent("ExoPlayer", "2014 - 2020", "Google, Inc.", "https://github.com/google/ExoPlayer", StandardLicenses.APACHE2),
+            SoftwareComponent("Coil", "2025", "Coil Contributors", "https://coil-kt.github.io/coil/", StandardLicenses.APACHE2),
+            SoftwareComponent("commonmark-java", "2015 - 2016", "Atlassian Pty Ltd", "https://github.com/commonmark/commonmark-java", StandardLicenses.BSD2),
+            SoftwareComponent("EventBus", "2012 - 2020", "Markus Junginger, greenrobot", "https://greenrobot.org/eventbus", StandardLicenses.APACHE2),
+            SoftwareComponent("Error Prone Annotations", "", "The Error Prone Authors", "https://github.com/google/error-prone", StandardLicenses.APACHE2),
+            SoftwareComponent("ExoPlayer", "2014 - 2023", "The Android Open Source Project", "https://github.com/google/ExoPlayer", StandardLicenses.APACHE2),
             SoftwareComponent("FCast sender SDK", "2023", "FUTO", "https://github.com/futo-org/fcast", StandardLicenses.MIT),
-            SoftwareComponent("GigaGet", "2014 - 2015", "Peter Cai", "https://github.com/PaperAirplane-Dev-Team/GigaGet", StandardLicenses.GPL3),
-            SoftwareComponent("Google Auto", "2013 - 2026", "Google Inc.", "https://github.com/google/auto", StandardLicenses.APACHE2),
-            SoftwareComponent("Guava", "2010 - 2026", "Google Inc.", "https://github.com/google/guava", StandardLicenses.APACHE2),
+            SoftwareComponent("GigaGet", "2014", "Peter Cai", "https://github.com/PaperAirplane-Dev-Team/GigaGet", StandardLicenses.GPL3),
+            SoftwareComponent("FFmpeg", "", "FFmpeg developers", "https://ffmpeg.org/", StandardLicenses.LGPL21),
+            SoftwareComponent("Google Auto", "", "Google LLC", "https://github.com/google/auto", StandardLicenses.APACHE2),
+            SoftwareComponent("Guava", "", "The Guava Authors", "https://github.com/google/guava", StandardLicenses.APACHE2),
             SoftwareComponent("Groupie", "2016", "Lisa Wray", "https://github.com/lisawray/groupie", StandardLicenses.MIT),
-            SoftwareComponent("HlsDownloader", "2025", "evermind-zz", "https://github.com/evermind-zz/HlsDownloader", StandardLicenses.GPL3),
-            SoftwareComponent("J2ObjC Annotations", "2012 - 2026", "Google Inc.", "https://github.com/google/j2objc", StandardLicenses.APACHE2),
-            SoftwareComponent("Java Native Access", "", "JNA contributors", "https://github.com/java-native-access/jna", StandardLicenses.APACHE2),
-            SoftwareComponent("JetBrains Compose Multiplatform", "2020 - 2026", "JetBrains and Compose Multiplatform contributors", "https://github.com/JetBrains/compose-multiplatform", StandardLicenses.APACHE2),
-            SoftwareComponent("JetBrains Java Annotations", "2000 - 2026", "JetBrains", "https://github.com/JetBrains/java-annotations", StandardLicenses.APACHE2),
-            SoftwareComponent("Jsoup", "2009 - 2020", "Jonathan Hedley", "https://github.com/jhy/jsoup", StandardLicenses.MIT),
-            SoftwareComponent("JSpecify", "2017 - 2026", "JSpecify contributors", "https://github.com/jspecify/jspecify", StandardLicenses.APACHE2),
-            SoftwareComponent("Kotlin", "2010 - 2026", "JetBrains and Kotlin contributors", "https://github.com/JetBrains/kotlin", StandardLicenses.APACHE2),
-            SoftwareComponent("kotlinx.coroutines", "2016 - 2026", "JetBrains and Kotlin contributors", "https://github.com/Kotlin/kotlinx.coroutines", StandardLicenses.APACHE2),
-            SoftwareComponent("kotlinx.datetime", "2019 - 2026", "JetBrains and Kotlin contributors", "https://github.com/Kotlin/kotlinx-datetime", StandardLicenses.APACHE2),
-            SoftwareComponent("kotlinx.io", "2021 - 2026", "JetBrains and Kotlin contributors", "https://github.com/Kotlin/kotlinx-io", StandardLicenses.APACHE2),
-            SoftwareComponent("kotlinx.serialization", "2017 - 2026", "JetBrains and Kotlin contributors", "https://github.com/Kotlin/kotlinx.serialization", StandardLicenses.APACHE2),
-            SoftwareComponent("LeakCanary", "2015 - 2026", "Square, Inc.", "https://github.com/square/leakcanary", StandardLicenses.APACHE2),
-            SoftwareComponent("LogcatToolkit", "2017 - 2026", "evermind-zz and kyze8439690", "https://github.com/evermind-zz/logcat-toolkit", StandardLicenses.APACHE2),
-            SoftwareComponent("Markwon", "2019", "Dimitry Ivanov", "https://github.com/noties/Markwon", StandardLicenses.APACHE2),
-            SoftwareComponent("Material Components for Android", "2016 - 2020", "Google, Inc.", "https://github.com/material-components/material-components-android", StandardLicenses.APACHE2),
+            SoftwareComponent("HlsDownloader", "", "evermind-zz", "https://github.com/evermind-zz/HlsDownloader", StandardLicenses.GPL3),
+            SoftwareComponent("J2ObjC Annotations", "2012", "Google Inc.", "https://github.com/google/j2objc", StandardLicenses.APACHE2),
+            SoftwareComponent("Java Native Access", "", "JNA contributors", "https://github.com/java-native-access/jna", StandardLicenses.JNA),
+            SoftwareComponent("JetBrains Java Annotations", "2000 - 2021", "JetBrains s.r.o.", "https://github.com/JetBrains/java-annotations", StandardLicenses.APACHE2),
+            SoftwareComponent("Jsoup", "2009 - 2026", "Jonathan Hedley", "https://github.com/jhy/jsoup", StandardLicenses.MIT),
+            SoftwareComponent("JSpecify", "2018 - 2022", "The JSpecify Authors", "https://github.com/jspecify/jspecify", StandardLicenses.APACHE2),
+            SoftwareComponent("Kotlin", "2010 - 2026", "JetBrains s.r.o. and Kotlin Programming Language contributors", "https://github.com/JetBrains/kotlin", StandardLicenses.APACHE2),
+            SoftwareComponent("kotlinx.coroutines", "2000 - 2020", "JetBrains s.r.o. and Kotlin Programming Language contributors", "https://github.com/Kotlin/kotlinx.coroutines", StandardLicenses.APACHE2),
+            SoftwareComponent("kotlinx.datetime", "2019 - 2024", "JetBrains s.r.o. and contributors", "https://github.com/Kotlin/kotlinx-datetime", StandardLicenses.APACHE2),
+            SoftwareComponent("kotlinx.io", "", "JetBrains and Kotlin contributors", "https://github.com/Kotlin/kotlinx-io", StandardLicenses.APACHE2),
+            SoftwareComponent("kotlinx.serialization", "2017 - 2025", "JetBrains s.r.o. and contributors", "https://github.com/Kotlin/kotlinx.serialization", StandardLicenses.APACHE2),
+            SoftwareComponent("LogcatToolkit", "", "evermind-zz and kyze8439690", "https://github.com/evermind-zz/logcat-toolkit", StandardLicenses.APACHE2),
+            SoftwareComponent("Markwon", "", "Dimitry Ivanov", "https://github.com/noties/Markwon", StandardLicenses.APACHE2),
+            SoftwareComponent("Material Components for Android", "2014 - 2023", "The Android Open Source Project", "https://github.com/material-components/material-components-android", StandardLicenses.APACHE2),
             SoftwareComponent("nanojson", "2011", "The nanojson Authors", "https://github.com/TeamNewPipe/nanojson", StandardLicenses.APACHE2),
-            SoftwareComponent("NewPipe", "2014 - 2026", "NewPipe contributors", "https://github.com/TeamNewPipe/NewPipe", StandardLicenses.GPL3),
-            SoftwareComponent("OkHttp", "2019", "Square, Inc.", "https://square.github.io/okhttp/", StandardLicenses.APACHE2),
-            SoftwareComponent("Okio", "2013 - 2026", "Square, Inc.", "https://github.com/square/okio", StandardLicenses.APACHE2),
-            SoftwareComponent("PrettyTime", "2012 - 2020", "Lincoln Baxter, III", "https://github.com/ocpsoft/prettytime", StandardLicenses.APACHE2),
-            SoftwareComponent("ProcessPhoenix", "2015", "Jake Wharton", "https://github.com/JakeWharton/ProcessPhoenix", StandardLicenses.APACHE2),
+            SoftwareComponent("NewPipe", "2015 - 2026", "NewPipe contributors", "https://github.com/TeamNewPipe/NewPipe", StandardLicenses.GPL3),
+            SoftwareComponent("OkHttp", "2012 - 2025", "Square, Inc.", "https://square.github.io/okhttp/", StandardLicenses.APACHE2),
+            SoftwareComponent("Okio", "2014 - 2025", "Square, Inc.", "https://github.com/square/okio", StandardLicenses.APACHE2),
+            SoftwareComponent("PrettyTime", "2012 - 2022", "Lincoln Baxter, III and contributors", "https://github.com/ocpsoft/prettytime", StandardLicenses.APACHE2),
+            SoftwareComponent("ProcessPhoenix", "2014", "Jake Wharton", "https://github.com/JakeWharton/ProcessPhoenix", StandardLicenses.APACHE2),
             SoftwareComponent("Protocol Buffers", "2008", "Google Inc.", "https://github.com/protocolbuffers/protobuf", StandardLicenses.BSD3),
-            SoftwareComponent("PVCPipe Extractor", "2017 - 2026", "NewPipe and PVCPipe Extractor contributors", "https://github.com/75ohmantenna/pvcpipe/tree/master/pvcpipe-extractor", StandardLicenses.GPL3),
-            SoftwareComponent("Reactive Streams", "2014 - 2026", "Reactive Streams contributors", "https://github.com/reactive-streams/reactive-streams-jvm", StandardLicenses.MIT0),
-            SoftwareComponent("Rhino", "1997 - 2026", "Mozilla and Rhino contributors", "https://github.com/mozilla/rhino", StandardLicenses.MPL2),
-            SoftwareComponent("RxAndroid", "2015", "The RxAndroid authors", "https://github.com/ReactiveX/RxAndroid", StandardLicenses.APACHE2),
-            SoftwareComponent("RxJava", "2016 - 2020", "RxJava Contributors", "https://github.com/ReactiveX/RxJava", StandardLicenses.APACHE2),
+            SoftwareComponent("PVCPipe Extractor", "", "NewPipe and PVCPipe Extractor contributors", "https://github.com/75ohmantenna/pvcpipe/tree/master/pvcpipe-extractor", StandardLicenses.GPL3),
+            SoftwareComponent("Reactive Streams", "2014", "Reactive Streams", "https://github.com/reactive-streams/reactive-streams-jvm", StandardLicenses.MIT0),
+            SoftwareComponent("Rhino", "", "Mozilla and Rhino contributors", "https://github.com/mozilla/rhino", StandardLicenses.RHINO),
+            SoftwareComponent("RxAndroid", "", "The RxAndroid authors", "https://github.com/ReactiveX/RxAndroid", StandardLicenses.APACHE2),
+            SoftwareComponent("RxJava", "2016 - present", "RxJava Contributors", "https://github.com/ReactiveX/RxJava", StandardLicenses.APACHE2),
             SoftwareComponent("SearchPreference", "2018", "ByteHamster", "https://github.com/ByteHamster/SearchPreference", StandardLicenses.MIT),
-            SoftwareComponent("JSR-305", "2007 - 2015", "FindBugs contributors", "https://github.com/findbugsproject/findbugs", StandardLicenses.APACHE2),
-            SoftwareComponent("slimhls-converter", "2025", "evermind-zz", "https://github.com/evermind-zz/slimhls-converter", StandardLicenses.GPL3),
-            SoftwareComponent("Stetho", "2015 - 2026", "Facebook, Inc.", "https://github.com/facebook/stetho", StandardLicenses.MIT),
-            SoftwareComponent("Wire", "2013 - 2026", "Square, Inc.", "https://github.com/square/wire", StandardLicenses.APACHE2),
-            SoftwareComponent("challengeFloatsAway", "2026", "evermind-zz", "https://github.com/evermind-zz/challengeFloatsAway", StandardLicenses.GPL3)
-        )
+            SoftwareComponent("JSR-305", "", "FindBugs contributors and Brian Goetz", "https://github.com/findbugsproject/findbugs", StandardLicenses.JSR305),
+            SoftwareComponent("slimhls-converter", "", "evermind-zz and PVCPipe contributors", "https://github.com/75ohmantenna/slimhls-converter/tree/7e7f373dbf", StandardLicenses.GPL3),
+            SoftwareComponent("Wire", "2013 - 2024", "Square, Inc.", "https://github.com/square/wire", StandardLicenses.APACHE2),
+            SoftwareComponent("challengeFloatsAway", "", "evermind-zz", "https://github.com/evermind-zz/challengeFloatsAway", StandardLicenses.GPL3),
+            SoftwareComponent("desugar_jdk_libs", "", "Oracle, Google and OpenJDK contributors", "https://github.com/google/desugar_jdk_libs", StandardLicenses.GPL2_CLASSPATH)
+        ).apply {
+            if (BuildConfig.DEBUG) {
+                addAll(
+                    listOf(
+                        SoftwareComponent("Apache Commons CLI", "2001 - 2009", "The Apache Software Foundation", "https://commons.apache.org/proper/commons-cli/", StandardLicenses.APACHE2, noticeFilename = "third_party/commons_cli_notice.txt"),
+                        SoftwareComponent("Curtains", "", "Square, Inc.", "https://github.com/square/curtains", StandardLicenses.APACHE2),
+                        SoftwareComponent("LeakCanary", "2015 - 2019", "Square, Inc.", "https://github.com/square/leakcanary", StandardLicenses.APACHE2),
+                        SoftwareComponent("Stetho", "", "Facebook, Inc. and its affiliates", "https://github.com/facebook/stetho", StandardLicenses.MIT)
+                    )
+                )
+            }
+        }
     }
 }

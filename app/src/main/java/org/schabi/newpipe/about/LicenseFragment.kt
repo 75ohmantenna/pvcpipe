@@ -59,12 +59,20 @@ class LicenseFragment : Fragment() {
             val componentBinding = ItemSoftwareComponentBinding
                 .inflate(inflater, container, false)
             componentBinding.name.text = component.name
-            componentBinding.copyright.text = getString(
-                R.string.copyright,
-                component.years,
-                component.copyrightOwner,
-                component.license.abbreviation
-            )
+            componentBinding.copyright.text = if (component.years.isBlank()) {
+                getString(
+                    R.string.copyright_without_year,
+                    component.copyrightOwner,
+                    component.license.abbreviation
+                )
+            } else {
+                getString(
+                    R.string.copyright,
+                    component.years,
+                    component.copyrightOwner,
+                    component.license.abbreviation
+                )
+            }
             val root: View = componentBinding.root
             root.tag = component
             root.setOnClickListener {
@@ -92,7 +100,7 @@ class LicenseFragment : Fragment() {
         } else {
             val context = requireContext()
             activeSoftwareComponent = softwareComponent
-            Observable.fromCallable { getFormattedLicense(context, softwareComponent.license) }
+            Observable.fromCallable { getFormattedLicense(context, softwareComponent) }
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { formattedLicense ->

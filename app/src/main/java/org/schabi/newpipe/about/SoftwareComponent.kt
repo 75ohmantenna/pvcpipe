@@ -13,5 +13,6 @@ constructor(
     val copyrightOwner: String,
     val link: String,
     val license: License,
-    val version: String? = null
+    val version: String? = null,
+    val noticeFilename: String? = null
 ) : Parcelable, Serializable
