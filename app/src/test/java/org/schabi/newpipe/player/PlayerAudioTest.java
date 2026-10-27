@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 import android.content.Context;
 import android.util.Log;
 
-import com.google.android.exoplayer2.ExoPlayer;
+import androidx.media3.exoplayer.ExoPlayer;
 
 import org.junit.Test;
 import org.mockito.InOrder;
@@ -32,6 +32,7 @@ import java.lang.reflect.Field;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.SerialDisposable;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerAudioTest {
     @Test
     public void replayRequestsAudioBeforeChangingQueueAndPlaying() throws Exception {

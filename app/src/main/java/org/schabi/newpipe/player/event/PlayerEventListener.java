@@ -1,10 +1,11 @@
 package org.schabi.newpipe.player.event;
 
-import com.google.android.exoplayer2.PlaybackParameters;
+import androidx.media3.common.PlaybackParameters;
 
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface PlayerEventListener {
     void onQueueUpdate(PlayQueue queue);
     void onPlaybackUpdate(int state, int repeatMode, boolean shuffled,

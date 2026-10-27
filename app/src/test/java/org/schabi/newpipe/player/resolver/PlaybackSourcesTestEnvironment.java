@@ -5,8 +5,8 @@ import static org.mockito.Mockito.when;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.stream.AudioStream;
@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Scripts preference decisions and ExoPlayer construction, retaining real selection logic. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environment {
     final List<Stream> streams = new ArrayList<>();
     final List<MediaItemTag> streamTags = new ArrayList<>();

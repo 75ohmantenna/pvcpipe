@@ -3,11 +3,12 @@ package org.schabi.newpipe.player.playback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface PlaybackListener {
     /**
      * Called to check if the currently playing stream is approaching the end of its playback.

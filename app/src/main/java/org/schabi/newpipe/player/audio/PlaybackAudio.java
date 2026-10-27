@@ -2,11 +2,12 @@ package org.schabi.newpipe.player.audio;
 
 import android.content.Context;
 
-import com.google.android.exoplayer2.ExoPlayer;
+import androidx.media3.exoplayer.ExoPlayer;
 
 import java.util.function.Consumer;
 
 /** Owns playback audio policy; callers never save volume or coordinate focus themselves. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlaybackAudio {
     private static final float DUCK_VOLUME = 0.2f;
     private final Environment environment;

@@ -1,6 +1,6 @@
 package org.schabi.newpipe.player.mediaitem;
 
-import com.google.android.exoplayer2.MediaItem;
+import androidx.media3.common.MediaItem;
 
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
  * is available and may provide the {@link Quality} of video stream used in
  * the {@link MediaItem}.
  **/
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class StreamInfoTag implements MediaItemTag {
     @NonNull
     private final StreamInfo streamInfo;

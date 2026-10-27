@@ -42,8 +42,8 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.exoplayer2.ui.SubtitleView;
-import com.google.android.exoplayer2.video.VideoSize;
+import androidx.media3.ui.SubtitleView;
+import androidx.media3.common.VideoSize;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.PlayerBinding;
@@ -81,6 +81,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutChangeListener {
     private static final String TAG = MainPlayerUi.class.getSimpleName();
 

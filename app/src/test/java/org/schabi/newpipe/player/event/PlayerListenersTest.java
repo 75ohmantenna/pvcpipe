@@ -5,8 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 
-import com.google.android.exoplayer2.PlaybackException;
-import com.google.android.exoplayer2.PlaybackParameters;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.PlaybackParameters;
 
 import org.junit.Test;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -15,6 +15,7 @@ import org.schabi.newpipe.player.playqueue.PlayQueue;
 import java.util.ArrayList;
 import java.util.List;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerListenersTest {
     private final List<String> events = new ArrayList<>();
     private final PlayerListeners listeners = new PlayerListeners();

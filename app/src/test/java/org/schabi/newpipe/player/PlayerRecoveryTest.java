@@ -31,12 +31,12 @@ import android.util.Log;
 
 import androidx.preference.PreferenceManager;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.analytics.PlayerId;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.SinglePeriodTimeline;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Timeline;
+import androidx.media3.exoplayer.analytics.PlayerId;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.SinglePeriodTimeline;
 
 import org.junit.After;
 import org.junit.Before;
@@ -90,6 +90,7 @@ import io.reactivex.rxjava3.subjects.CompletableSubject;
  * not the wrapper's pre-preparation getMediaItem(). PlaybackHistory and its Android environment
  * are real too: only preferences and the database-facing record manager are mocked.
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerRecoveryTest {
     private static final long PLAYING_POSITION = 45_000L;
     private static final long CONTENT_POSITION = 31_000L;
@@ -203,7 +204,7 @@ public class PlayerRecoveryTest {
         setField("listeners", mock(PlayerListeners.class));
         doNothing().when(player).startProgressLoop();
         doAnswer(call -> false).when(player).isProgressLoopRunning();
-        doAnswer(call -> com.google.android.exoplayer2.PlaybackParameters.DEFAULT)
+        doAnswer(call -> androidx.media3.common.PlaybackParameters.DEFAULT)
                 .when(player).getPlaybackParameters();
         final PlayQueueItem selected = new PlayQueueItem(stream);
         queue.append(List.of(selected));
@@ -215,13 +216,13 @@ public class PlayerRecoveryTest {
             // Real receiver/UI state delivery can replace the manager's blocked display state.
             player.onCastingStateChanged(Player.STATE_PAUSED);
         }
-        final var oldEnginePosition = new com.google.android.exoplayer2.Player.PositionInfo(
+        final var oldEnginePosition = new androidx.media3.common.Player.PositionInfo(
                 null, 0, exoPlayer.getCurrentMediaItem(), null, 0,
                 PLAYING_POSITION, PLAYING_POSITION, -1, -1);
         doAnswer(call -> {
             // ExoPlayer reports this synchronously while installing a replacement playlist.
             player.onPositionDiscontinuity(oldEnginePosition, oldEnginePosition,
-                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+                    androidx.media3.common.Player.DISCONTINUITY_REASON_REMOVE);
             return null;
         }).when(exoPlayer).setMediaSource(any(MediaSource.class), anyBoolean());
 
@@ -232,7 +233,7 @@ public class PlayerRecoveryTest {
         verify(exoPlayer).prepare();
         // Outside installation, a genuine engine REMOVE must still navigate normally.
         player.onPositionDiscontinuity(oldEnginePosition, oldEnginePosition,
-                com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE);
+                androidx.media3.common.Player.DISCONTINUITY_REASON_REMOVE);
         assertEquals(0, queue.getIndex());
     }
 
@@ -635,7 +636,7 @@ public class PlayerRecoveryTest {
         verifyNoInteractions(records.constructed().get(0));
 
         // Deliver the real aggregate callback, rather than manufacturing an accepted Snapshot.
-        player.onEvents(exoPlayer, mock(com.google.android.exoplayer2.Player.Events.class));
+        player.onEvents(exoPlayer, mock(androidx.media3.common.Player.Events.class));
         assertSame(stream, player.getCurrentStreamInfo().orElse(null));
         verify(casting).onSourceChanged();
         // New metadata legitimately counts B as viewed; progress must also name B, never A.
@@ -685,12 +686,12 @@ public class PlayerRecoveryTest {
             when(exoPlayer.getCurrentPosition()).thenReturn(position);
             when(exoPlayer.getContentPosition()).thenReturn(position);
             player.onPositionDiscontinuity(
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 0, previousSource, null, 0,
                             PLAYING_POSITION, CONTENT_POSITION, -1, -1),
-                    new com.google.android.exoplayer2.Player.PositionInfo(
+                    new androidx.media3.common.Player.PositionInfo(
                             null, 0, selectedSource, null, 0, position, position, -1, -1),
-                    com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK);
+                    androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK);
             return null;
         }).when(exoPlayer).seekTo(0, SELECTED_RECOVERY);
 
@@ -703,7 +704,7 @@ public class PlayerRecoveryTest {
         assertEquals(PlayQueueItem.RECOVERY_UNSET, selected.getRecoveryPosition());
         verifyNoInteractions(records.constructed().get(0));
 
-        player.onEvents(exoPlayer, mock(com.google.android.exoplayer2.Player.Events.class));
+        player.onEvents(exoPlayer, mock(androidx.media3.common.Player.Events.class));
         player.saveStreamProgressState();
         verify(records.constructed().get(0)).onViewed(stream);
 
@@ -1038,7 +1039,8 @@ public class PlayerRecoveryTest {
                     MockedConstruction<Handler> handlers = mockConstruction(Handler.class)) {
                 final Looper looper = mock(Looper.class);
                 loopers.when(Looper::myLooper).thenReturn(looper);
-                source.prepareSource(caller, null, PlayerId.UNSET);
+                source.prepareSource(caller, PlayerId.UNSET,
+                        mock(androidx.media3.exoplayer.upstream.BandwidthMeter.class));
                 try {
                     assertEquals(0, callbacks.get());
                     source.publishChildTimeline(childTimeline);

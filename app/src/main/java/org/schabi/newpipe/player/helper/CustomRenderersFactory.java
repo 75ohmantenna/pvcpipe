@@ -3,15 +3,14 @@ package org.schabi.newpipe.player.helper;
 import android.content.Context;
 import android.os.Handler;
 
-import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.Renderer;
-import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
-import com.google.android.exoplayer2.video.VideoRendererEventListener;
+import androidx.media3.exoplayer.Renderer;
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
+import androidx.media3.exoplayer.video.VideoRendererEventListener;
 
 import java.util.ArrayList;
 
 /**
- * A {@link DefaultRenderersFactory} which only uses {@link CustomMediaCodecVideoRenderer} as an
+ * A {@link PlaybackRenderersFactory} which only uses {@link CustomMediaCodecVideoRenderer} as an
  * implementation of video codec renders.
  *
  * <p>
@@ -20,7 +19,8 @@ import java.util.ArrayList;
  * changed in the case an extension is shipped with the app, such as the AV1 one.
  * </p>
  */
-public final class CustomRenderersFactory extends DefaultRenderersFactory {
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+public final class CustomRenderersFactory extends PlaybackRenderersFactory {
 
     public CustomRenderersFactory(final Context context) {
         super(context);

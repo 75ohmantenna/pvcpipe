@@ -1,180 +1,137 @@
 package org.schabi.newpipe.player.notification;
 
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
-import static androidx.media.app.NotificationCompat.MediaStyle;
 import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_CLOSE;
 
-import android.annotation.SuppressLint;
 import android.app.Notification;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
-import android.util.Log;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.PendingIntentCompat;
-import androidx.core.app.ServiceCompat;
+import androidx.core.graphics.drawable.IconCompat;
+import androidx.media3.common.Player;
+import androidx.media3.session.CommandButton;
+import androidx.media3.session.MediaNotification;
+import androidx.media3.session.MediaSession;
+import androidx.media3.session.MediaStyleNotificationHelper.MediaStyle;
+
+import com.google.common.collect.ImmutableList;
 
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
-import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.PlayerIntentType;
 import org.schabi.newpipe.player.PlayerService;
-import org.schabi.newpipe.player.mediasession.MediaSessionPlayerUi;
 import org.schabi.newpipe.util.NavigationHelper;
 
-import java.util.Objects;
-import java.util.Optional;
+/** Builds the service's single media notification without owning foreground state. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+public final class NotificationUtil implements MediaNotification.Provider {
+    public static final int NOTIFICATION_ID = 123789;
+    private final PlayerService service;
 
-/**
- * This is a utility class for player notifications.
- */
-public final class NotificationUtil {
-    private static final String TAG = NotificationUtil.class.getSimpleName();
-    private static final boolean DEBUG = Player.DEBUG;
-    private static final int NOTIFICATION_ID = 123789;
-
-    private NotificationManagerCompat notificationManager;
-    private NotificationCompat.Builder notificationBuilder;
-
-    private final Player player;
-
-    public NotificationUtil(final Player player) {
-        this.player = player;
+    public NotificationUtil(final PlayerService service) {
+        this.service = service;
     }
 
-
-    /////////////////////////////////////////////////////
-    // NOTIFICATION
-    /////////////////////////////////////////////////////
-
-    /**
-     * Creates the notification if it does not exist already and recreates it if forceRecreate is
-     * true. Updates the notification with the data in the player.
-     * @param forceRecreate whether to force the recreation of the notification even if it already
-     *                      exists
-     */
-    public synchronized void createNotificationIfNeededAndUpdate(final boolean forceRecreate) {
-        if (forceRecreate || notificationBuilder == null) {
-            notificationBuilder = createNotification();
-        }
-        updateNotification();
-        if (notificationManager.areNotificationsEnabled()) {
-            notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
-        }
+    @Override
+    public MediaNotification createNotification(final MediaSession session,
+            final ImmutableList<CommandButton> buttons,
+            final MediaNotification.ActionFactory actions,
+            final MediaNotification.Provider.Callback callback) {
+        return new MediaNotification(NOTIFICATION_ID, buildNotification(session, actions, buttons));
     }
 
-    public synchronized void updateThumbnail() {
-        if (notificationBuilder != null) {
-            if (DEBUG) {
-                Log.d(TAG, "updateThumbnail() called with thumbnail = [" + Integer.toHexString(
-                        Optional.ofNullable(player.getThumbnail()).map(Objects::hashCode).orElse(0))
-                        + "], title = [" + player.getVideoTitle() + "]");
+    public Notification buildNotification(final MediaSession session,
+            final MediaNotification.ActionFactory actions,
+            final ImmutableList<CommandButton> buttons) {
+        final var player = service.getPlayer();
+        final var builder = setupNotificationBuilder(service)
+                .setStyle(new MediaStyle(session));
+        if (player != null) {
+            builder.setColorized(player.getPrefs().getBoolean(
+                    service.getString(R.string.notification_colorize_key), true));
+            builder.setContentTitle(player.getVideoTitle()).setContentText(player.getUploaderName())
+                    .setTicker(player.getVideoTitle())
+                    .setContentIntent(contentIntent(player));
+            setLargeIcon(builder, player);
+            if (actions == null) {
+                for (final int action : new int[] {NotificationConstants.PREVIOUS,
+                        NotificationConstants.PLAY_PAUSE, NotificationConstants.NEXT}) {
+                    final NotificationActionData data = NotificationActionData
+                            .fromNotificationActionEnum(player, action);
+                    builder.addAction(data.icon(), data.name(), PendingIntentCompat.getBroadcast(
+                            service, NOTIFICATION_ID, new Intent(data.action())
+                                    .setPackage(service.getPackageName()),
+                            FLAG_UPDATE_CURRENT, false));
+                }
+                for (final CommandButton button : buttons) {
+                    builder.addAction(button.iconResId, button.displayName,
+                            PendingIntentCompat.getBroadcast(service, NOTIFICATION_ID,
+                                    new Intent(button.sessionCommand.customAction)
+                                            .setPackage(service.getPackageName()),
+                                    FLAG_UPDATE_CURRENT, false));
+                }
+                builder.setStyle(new MediaStyle(session).setShowActionsInCompactView(0, 1, 2));
+            } else {
+                builder.addAction(actions.createMediaAction(session,
+                        IconCompat.createWithResource(service, R.drawable.ic_previous),
+                        service.getString(R.string.previous_stream),
+                        Player.COMMAND_SEEK_TO_PREVIOUS));
+                builder.addAction(actions.createMediaAction(session,
+                        IconCompat.createWithResource(service, player.getPlayWhenReady()
+                                ? R.drawable.ic_pause : R.drawable.ic_play_arrow),
+                        service.getString(player.getPlayWhenReady()
+                                ? R.string.pause : R.string.play),
+                        Player.COMMAND_PLAY_PAUSE));
+                builder.addAction(actions.createMediaAction(session,
+                        IconCompat.createWithResource(service, R.drawable.ic_next),
+                        service.getString(R.string.next_stream),
+                        Player.COMMAND_SEEK_TO_NEXT));
+                for (final CommandButton button : buttons) {
+                    builder.addAction(actions.createCustomActionFromCustomCommandButton(
+                            session, button));
+                }
             }
-
-            setLargeIcon(notificationBuilder);
-            if (notificationManager.areNotificationsEnabled()) {
-                notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
-            }
         }
+        return builder.build();
     }
 
-    private synchronized NotificationCompat.Builder createNotification() {
-        if (DEBUG) {
-            Log.d(TAG, "createNotification()");
-        }
-        notificationManager = NotificationManagerCompat.from(player.getContext());
-
-        // Notification actions are supplied by the media session.
-        final MediaStyle mediaStyle = new MediaStyle();
-        player.UIs()
-                .get(MediaSessionPlayerUi.class)
-                .flatMap(MediaSessionPlayerUi::getSessionToken)
-                .ifPresent(mediaStyle::setMediaSession);
-
-        // setup notification builder
-        final var builder = setupNotificationBuilder(player.getContext(), mediaStyle)
-                .setColorized(player.getPrefs().getBoolean(
-                        player.getContext().getString(R.string.notification_colorize_key), true));
-
-        // set the initial value for the video thumbnail, updatable with updateNotificationThumbnail
-        setLargeIcon(builder);
-
-        return builder;
+    public PendingIntent contentIntent(final org.schabi.newpipe.player.Player player) {
+        return PendingIntentCompat.getActivity(service, NOTIFICATION_ID,
+                getIntentForNotification(player), FLAG_UPDATE_CURRENT, false);
     }
 
-    /**
-     * Updates the notification content from the player.
-     */
-    private synchronized void updateNotification() {
-        if (DEBUG) {
-            Log.d(TAG, "updateNotification()");
-        }
-
-        // also update content intent, in case the user switched players
-        notificationBuilder.setContentIntent(PendingIntentCompat.getActivity(player.getContext(),
-                NOTIFICATION_ID, getIntentForNotification(), FLAG_UPDATE_CURRENT, false));
-        notificationBuilder.setContentTitle(player.getVideoTitle());
-        notificationBuilder.setContentText(player.getUploaderName());
-        notificationBuilder.setTicker(player.getVideoTitle());
+    @Override
+    public boolean handleCustomCommand(final MediaSession session, final String action,
+                                        final Bundle extras) {
+        return service.dispatchSessionAction(action);
     }
 
-
-    public static void startForegroundWithDummyNotification(final PlayerService service) {
-        final var builder = setupNotificationBuilder(service, new MediaStyle());
-        startForeground(service, builder.build());
+    @Override
+    public NotificationChannelInfo getNotificationChannelInfo() {
+        return new NotificationChannelInfo(service.getString(R.string.notification_channel_id),
+                service.getString(R.string.app_name));
     }
 
-    public void createNotificationAndStartForeground() {
-        if (notificationBuilder == null) {
-            notificationBuilder = createNotification();
-        }
-        updateNotification();
-        startForeground(player.getService(), notificationBuilder.build());
-    }
-
-    public void cancelNotificationAndStopForeground() {
-        ServiceCompat.stopForeground(player.getService(), ServiceCompat.STOP_FOREGROUND_REMOVE);
-
-        if (notificationManager != null) {
-            notificationManager.cancel(NOTIFICATION_ID);
-        }
-        notificationManager = null;
-        notificationBuilder = null;
-    }
-
-
-    /////////////////////////////////////////////////////
-    // STATIC FUNCTIONS IN COMMON BETWEEN DUMMY AND REAL NOTIFICATION
-    /////////////////////////////////////////////////////
-
-    private static NotificationCompat.Builder setupNotificationBuilder(final Context context,
-                                                                       final MediaStyle style) {
+    private static NotificationCompat.Builder setupNotificationBuilder(final Context context) {
         return new NotificationCompat.Builder(context,
                 context.getString(R.string.notification_channel_id))
-                .setStyle(style)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-                .setShowWhen(false)
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT).setShowWhen(false)
                 .setSmallIcon(R.drawable.ic_newpipe_triangle_white)
                 .setColor(context.getColor(R.color.dark_background_color))
-                .setDeleteIntent(PendingIntentCompat.getBroadcast(context,
-                        NOTIFICATION_ID, new Intent(ACTION_CLOSE), FLAG_UPDATE_CURRENT, false));
+                .setDeleteIntent(PendingIntentCompat.getBroadcast(context, NOTIFICATION_ID,
+                        new Intent(ACTION_CLOSE).setPackage(context.getPackageName()),
+                        FLAG_UPDATE_CURRENT, false));
     }
 
-    @SuppressLint("InlinedApi") // ServiceCompat safely handles this inlined type on older APIs.
-    private static void startForeground(final PlayerService service,
-                                        final Notification notification) {
-        ServiceCompat.startForeground(service, NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-    }
-
-
-    private Intent getIntentForNotification() {
+    private Intent getIntentForNotification(final org.schabi.newpipe.player.Player player) {
         if (player.audioPlayerSelected() || player.popupPlayerSelected()) {
             // Means we play in popup or audio only. Let's show the play queue
             return NavigationHelper.getPlayQueueActivityIntent(player.getContext());
@@ -183,7 +140,7 @@ public final class NotificationUtil {
             final Intent intent = NavigationHelper.getPlayerIntent(
                     player.getContext(), MainActivity.class, null,
                     PlayerIntentType.AllOthers);
-            intent.putExtra(Player.RESUME_PLAYBACK, true);
+            intent.putExtra(org.schabi.newpipe.player.Player.RESUME_PLAYBACK, true);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setAction(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -192,11 +149,8 @@ public final class NotificationUtil {
     }
 
 
-    /////////////////////////////////////////////////////
-    // BITMAP
-    /////////////////////////////////////////////////////
-
-    private void setLargeIcon(final NotificationCompat.Builder builder) {
+    private void setLargeIcon(final NotificationCompat.Builder builder,
+                              final org.schabi.newpipe.player.Player player) {
         final boolean showThumbnail = player.getPrefs().getBoolean(
                 player.getContext().getString(R.string.show_thumbnail_key), true);
         final Bitmap thumbnail = player.getThumbnail();

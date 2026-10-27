@@ -19,14 +19,14 @@ import androidx.annotation.NonNull;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.PlaybackException;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSource;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.datasource.DefaultDataSource;
 
 import org.junit.After;
 import org.junit.Before;
@@ -63,6 +63,7 @@ import io.reactivex.rxjava3.core.Single;
 
 /** Real prepared ExoPlayer playlists, with local PCM media and no extractor/network requests. */
 @RunWith(AndroidJUnit4.class)
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PreparedMediaSourceManagerIntegrationTest implements PlaybackListener {
     private static final long WAIT_SECONDS = 30;
     private final List<String> trace = new ArrayList<>();

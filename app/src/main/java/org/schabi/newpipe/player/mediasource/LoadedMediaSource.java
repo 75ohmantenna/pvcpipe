@@ -3,15 +3,16 @@ package org.schabi.newpipe.player.mediasource;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.source.ForwardingTimeline;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.WrappingMediaSource;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Timeline;
+import androidx.media3.exoplayer.source.ForwardingTimeline;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.WrappingMediaSource;
 
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class LoadedMediaSource extends WrappingMediaSource implements ManagedMediaSource {
     private final PlayQueueItem stream;
     private final MediaItem mediaItem;

@@ -2,8 +2,8 @@ package org.schabi.newpipe.player.cast;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.upstream.DataSpec;
-import com.google.android.exoplayer2.upstream.HttpDataSource;
+import androidx.media3.datasource.DataSpec;
+import androidx.media3.datasource.HttpDataSource;
 
 import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.player.datasource.YoutubeHttpDataSource;
@@ -44,6 +44,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /** Per-load capability URLs, not a general-purpose LAN forward proxy. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 final class CastMediaServer implements Closeable, CastManifest.Urls {
     private static final int MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
     private static final int MAX_ROUTES = 8192;

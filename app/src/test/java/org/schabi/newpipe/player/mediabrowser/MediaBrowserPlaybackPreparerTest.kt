@@ -2,9 +2,9 @@ package org.schabi.newpipe.player.mediabrowser
 
 import android.content.Context
 import android.net.Uri
-import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.media3.session.SessionError
 import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins
 import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.core.Scheduler
@@ -32,6 +32,7 @@ import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.player.playqueue.PlayQueue
 import org.schabi.newpipe.util.NavigationHelper
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MediaBrowserPlaybackPreparerTest {
     private val context = mock(Context::class.java)
     private val database = mock(AppDatabase::class.java)
@@ -87,14 +88,10 @@ class MediaBrowserPlaybackPreparerTest {
         `when`(uri.pathSegments).thenReturn(path)
         `when`(uri.getQueryParameter(ID_URL)).thenReturn(url)
         `when`(Uri.parse(mediaId)).thenReturn(uri)
-        val preparer = MediaBrowserPlaybackPreparer(
-            context,
-            { _, code -> errors.add(code) },
-            {},
-            {}
+        MediaBrowserPlaybackPreparer(context).resolve(mediaId).subscribe(
+            { started.add(it.index) },
+            { errors.add(SessionError.ERROR_UNKNOWN) }
         )
-        preparer.onPrepareFromMediaId(mediaId, true, null)
-        preparer.dispose()
     }
 
     private fun playlistOf(size: Int) {
@@ -129,7 +126,7 @@ class MediaBrowserPlaybackPreparerTest {
     fun anIndexPastTheEndOfThePlaylistReportsAPlaybackError() {
         playlistOf(2)
         prepare("local-stale", listOf(ID_BOOKMARKS, ID_LOCAL, "1", "2"))
-        assertEquals(listOf(PlaybackStateCompat.ERROR_CODE_APP_ERROR), errors)
+        assertEquals(listOf(SessionError.ERROR_UNKNOWN), errors)
         assertEquals(emptyList<Int>(), started)
     }
 
@@ -139,21 +136,17 @@ class MediaBrowserPlaybackPreparerTest {
         prepare("overflow", listOf(ID_BOOKMARKS, ID_LOCAL, "99999999999999999999", "0"))
         prepare("service", listOf(ID_INFO_ITEM, ID_STREAM, "2147483648"), "https://youtu.be/x")
         prepare("history", listOf(ID_HISTORY, "x"))
-        assertEquals(List(4) { PlaybackStateCompat.ERROR_CODE_APP_ERROR }, errors)
+        assertEquals(List(4) { SessionError.ERROR_UNKNOWN }, errors)
         assertEquals(emptyList<Int>(), started)
     }
 
     @Test
     fun anUnparseableUriReportsAPlaybackError() {
         // Uri.parse is left unstubbed and answers null, so the deferred work fails inside Rx.
-        val preparer = MediaBrowserPlaybackPreparer(
-            context,
-            { _, code -> errors.add(code) },
-            {},
-            {}
+        MediaBrowserPlaybackPreparer(context).resolve("unstubbed").subscribe(
+            { started.add(it.index) },
+            { errors.add(SessionError.ERROR_UNKNOWN) }
         )
-        preparer.onPrepareFromMediaId("unstubbed", true, null)
-        preparer.dispose()
-        assertEquals(listOf(PlaybackStateCompat.ERROR_CODE_APP_ERROR), errors)
+        assertEquals(listOf(SessionError.ERROR_UNKNOWN), errors)
     }
 }

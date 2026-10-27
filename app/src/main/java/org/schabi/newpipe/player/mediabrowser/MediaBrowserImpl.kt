@@ -4,15 +4,12 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaDescriptionCompat
 import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.core.net.toUri
-import androidx.media.MediaBrowserServiceCompat
-import androidx.media.MediaBrowserServiceCompat.BrowserRoot.EXTRA_RECENT
-import androidx.media.MediaBrowserServiceCompat.Result
-import androidx.media.utils.MediaConstants
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaLibraryService.LibraryParams
 import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.disposables.CompositeDisposable
@@ -45,12 +42,12 @@ import org.schabi.newpipe.util.image.ImageStrategy
  *
  * @param notifyChildrenChanged takes the parent id of the children that changed
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MediaBrowserImpl(
     private val context: Context,
     // parentId
     notifyChildrenChanged: Consumer<String>
 ) {
-    private val packageValidator = PackageValidator(context)
     private val database = NewPipeDatabase.getInstance(context)
     private var disposables = CompositeDisposable()
 
@@ -67,57 +64,15 @@ class MediaBrowserImpl(
     }
     //endregion
 
-    //region onGetRoot
-    fun onGetRoot(
-        clientPackageName: String,
-        clientUid: Int,
-        rootHints: Bundle?
-    ): MediaBrowserServiceCompat.BrowserRoot? {
-        if (DEBUG) {
-            Log.d(TAG, "onGetRoot($clientPackageName, $clientUid, $rootHints)")
-        }
-
-        if (!packageValidator.isKnownCaller(clientPackageName, clientUid)) {
-            // this is a caller we can't trust (see PackageValidator's rules taken from uamp)
-            return null
-        }
-
-        if (rootHints?.getBoolean(EXTRA_RECENT, false) == true) {
-            // the system is asking for a root to do media resumption, but we can't handle that yet,
-            // see https://developer.android.com/media/implement/surfaces/mobile#mediabrowserservice_implementation
-            return null
-        }
-
-        val extras = Bundle()
-        extras.putBoolean(
-            MediaConstants.BROWSER_SERVICE_EXTRAS_KEY_SEARCH_SUPPORTED,
-            true
-        )
-        return MediaBrowserServiceCompat.BrowserRoot(ID_ROOT, extras)
-    }
-    //endregion
-
-    //region onLoadChildren
-    fun onLoadChildren(parentId: String, result: Result<List<MediaBrowserCompat.MediaItem>>) {
-        if (DEBUG) {
-            Log.d(TAG, "onLoadChildren($parentId)")
-        }
-
-        result.detach() // allows sendResult() to happen later
-        disposables.add(
-            onLoadChildren(parentId)
-                .subscribe(
-                    { result.sendResult(it) },
-                    { throwable ->
-                        // null indicates an error, see the docs of MediaSessionCompat.onSearch()
-                        result.sendResult(null)
-                        Log.e(TAG, "onLoadChildren error for parentId=$parentId: $throwable")
-                    }
-                )
-        )
+    fun root(params: LibraryParams?): MediaItem? {
+        if (params?.isRecent == true) return null
+        return BrowserItemBuilder().setMediaId(ID_ROOT)
+            .setTitle(context.getString(R.string.app_name)).build(true)
     }
 
-    private fun onLoadChildren(parentId: String): Single<List<MediaBrowserCompat.MediaItem>> {
+    fun loadChildren(parentId: String): Single<List<MediaItem>> = Single.defer { loadChildrenRequest(parentId) }
+
+    private fun loadChildrenRequest(parentId: String): Single<List<MediaItem>> {
         try {
             val parentIdUri = parentId.toUri()
             val path = ArrayList(parentIdUri.pathSegments)
@@ -170,8 +125,8 @@ class MediaBrowserImpl(
         mediaId: String?,
         folderName: String?,
         @DrawableRes iconResId: Int
-    ): MediaBrowserCompat.MediaItem {
-        val builder = MediaDescriptionCompat.Builder()
+    ): MediaItem {
+        val builder = BrowserItemBuilder()
         builder.setMediaId(mediaId)
         builder.setTitle(folderName)
         val resources = context.resources
@@ -186,18 +141,15 @@ class MediaBrowserImpl(
 
         val extras = Bundle()
         extras.putString(
-            MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE,
+            "android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT",
             context.getString(R.string.app_name)
         )
         builder.setExtras(extras)
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
-        )
+        return builder.build(true)
     }
 
-    private fun createPlaylistMediaItem(playlist: PlaylistLocalItem): MediaBrowserCompat.MediaItem {
-        val builder = MediaDescriptionCompat.Builder()
+    private fun createPlaylistMediaItem(playlist: PlaylistLocalItem): MediaItem {
+        val builder = BrowserItemBuilder()
         builder
             .setMediaId(createMediaIdForInfoItem(playlist is PlaylistRemoteEntity, playlist.uid))
             .setTitle(playlist.orderingName)
@@ -205,18 +157,15 @@ class MediaBrowserImpl(
 
         val extras = Bundle()
         extras.putString(
-            MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE,
+            "android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT",
             context.resources.getString(R.string.tab_bookmarks)
         )
         builder.setExtras(extras)
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
-        )
+        return builder.build(true)
     }
 
-    private fun createInfoItemMediaItem(item: InfoItem): MediaBrowserCompat.MediaItem? {
-        val builder = MediaDescriptionCompat.Builder()
+    private fun createInfoItemMediaItem(item: InfoItem): MediaItem? {
+        val builder = BrowserItemBuilder()
         builder.setMediaId(createMediaIdForInfoItem(item))
             .setTitle(item.name)
 
@@ -231,10 +180,7 @@ class MediaBrowserImpl(
             builder.setIconUri(imageUriOrNullIfDisabled(it))
         }
 
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
-        )
+        return builder.build(false)
     }
 
     private fun buildMediaId(): Uri.Builder {
@@ -269,25 +215,22 @@ class MediaBrowserImpl(
         playlistId: Long,
         item: PlaylistStreamEntry,
         index: Int
-    ): MediaBrowserCompat.MediaItem {
-        val builder = MediaDescriptionCompat.Builder()
+    ): MediaItem {
+        val builder = BrowserItemBuilder()
         builder.setMediaId(createMediaIdForPlaylistIndex(false, playlistId, index))
             .setTitle(item.streamEntity.title)
             .setSubtitle(item.streamEntity.uploader)
             .setIconUri(imageUriOrNullIfDisabled(item.streamEntity.thumbnailUrl))
 
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
-        )
+        return builder.build(false)
     }
 
     private fun createRemotePlaylistStreamMediaItem(
         playlistId: Long,
         item: StreamInfoItem,
         index: Int
-    ): MediaBrowserCompat.MediaItem {
-        val builder = MediaDescriptionCompat.Builder()
+    ): MediaItem {
+        val builder = BrowserItemBuilder()
         builder.setMediaId(createMediaIdForPlaylistIndex(true, playlistId, index))
             .setTitle(item.name)
             .setSubtitle(item.uploaderName)
@@ -296,10 +239,7 @@ class MediaBrowserImpl(
             builder.setIconUri(imageUriOrNullIfDisabled(it))
         }
 
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
-        )
+        return builder.build(false)
     }
 
     private fun createMediaIdForPlaylistIndex(
@@ -316,15 +256,15 @@ class MediaBrowserImpl(
         return buildInfoItemMediaId(item).build().toString()
     }
 
-    private fun populateHistory(): Single<List<MediaBrowserCompat.MediaItem>> {
+    private fun populateHistory(): Single<List<MediaItem>> {
         val history = database.streamHistoryDAO().history.firstOrError()
         return history.map { items ->
             items.map { this.createHistoryMediaItem(it) }
         }
     }
 
-    private fun createHistoryMediaItem(streamHistoryEntry: StreamHistoryEntry): MediaBrowserCompat.MediaItem {
-        val builder = MediaDescriptionCompat.Builder()
+    private fun createHistoryMediaItem(streamHistoryEntry: StreamHistoryEntry): MediaItem {
+        val builder = BrowserItemBuilder()
         val mediaId = buildMediaId()
             .appendPath(ID_HISTORY)
             .appendPath(streamHistoryEntry.streamId.toString())
@@ -334,10 +274,7 @@ class MediaBrowserImpl(
             .setSubtitle(streamHistoryEntry.streamEntity.uploader)
             .setIconUri(imageUriOrNullIfDisabled(streamHistoryEntry.streamEntity.thumbnailUrl))
 
-        return MediaBrowserCompat.MediaItem(
-            builder.build(),
-            MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
-        )
+        return builder.build(false)
     }
 
     private fun getMergedPlaylists(): Flowable<MutableList<PlaylistLocalItem>> {
@@ -347,14 +284,14 @@ class MediaBrowserImpl(
         )
     }
 
-    private fun populateBookmarks(): Single<List<MediaBrowserCompat.MediaItem>> {
+    private fun populateBookmarks(): Single<List<MediaItem>> {
         val playlists = getMergedPlaylists().firstOrError()
         return playlists.map { playlist ->
             playlist.map { this.createPlaylistMediaItem(it) }
         }
     }
 
-    private fun populateLocalPlaylist(playlistId: Long): Single<List<MediaBrowserCompat.MediaItem>> {
+    private fun populateLocalPlaylist(playlistId: Long): Single<List<MediaItem>> {
         val playlist = LocalPlaylistManager(database).getPlaylistStreams(playlistId).firstOrError()
         return playlist.map { items ->
             items.mapIndexed { index, item ->
@@ -363,7 +300,7 @@ class MediaBrowserImpl(
         }
     }
 
-    private fun populateRemotePlaylist(playlistId: Long): Single<List<MediaBrowserCompat.MediaItem>> {
+    private fun populateRemotePlaylist(playlistId: Long): Single<List<MediaItem>> {
         return RemotePlaylistManager(database).getPlaylist(playlistId).firstOrError()
             .flatMap { ExtractorHelper.getPlaylistInfo(it.serviceId, it.url, false) }
             .map {
@@ -377,31 +314,9 @@ class MediaBrowserImpl(
     //endregion
 
     //region Search
-    fun onSearch(
-        query: String,
-        result: Result<List<MediaBrowserCompat.MediaItem>>
-    ) {
-        if (DEBUG) {
-            Log.d(TAG, "onSearch($query)")
-        }
-
-        result.detach() // allows sendResult() to happen later
-        disposables.add(
-            searchMusicBySongTitle(query)
-                // ignore it.errors, i.e. ignore errors about specific items, since there would
-                // be no way to show the error properly in Android Auto anyway
-                .map { it.relatedItems.mapNotNull(this::createInfoItemMediaItem) }
-                .subscribeOn(Schedulers.io())
-                .subscribe(
-                    { result.sendResult(it) },
-                    { throwable ->
-                        // null indicates an error, see the docs of MediaSessionCompat.onSearch()
-                        result.sendResult(null)
-                        Log.e(TAG, "Search error for query=\"$query\": $throwable")
-                    }
-                )
-        )
-    }
+    fun search(query: String): Single<List<MediaItem>> = searchMusicBySongTitle(query)
+        .map { it.relatedItems.mapNotNull(this::createInfoItemMediaItem) }
+        .subscribeOn(Schedulers.io())
 
     private fun searchMusicBySongTitle(query: String?): Single<SearchInfo> {
         val serviceId = ServiceHelper.getSelectedServiceId(context)
@@ -420,4 +335,22 @@ class MediaBrowserImpl(
             }
         }
     }
+}
+
+/** Keeps catalog IDs separate from stream URLs and represents browse/play flags as metadata. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private class BrowserItemBuilder {
+    private val item = MediaItem.Builder()
+    private val metadata = MediaMetadata.Builder()
+
+    fun setMediaId(id: String?) = apply { item.setMediaId(requireNotNull(id)) }
+    fun setTitle(value: CharSequence?) = apply { metadata.setTitle(value) }
+    fun setSubtitle(value: CharSequence?) = apply { metadata.setSubtitle(value).setArtist(value) }
+    fun setIconUri(uri: Uri?) = apply { metadata.setArtworkUri(uri) }
+    fun setExtras(extras: Bundle) = apply { metadata.setExtras(extras) }
+    fun build(browsable: Boolean): MediaItem = item.setMediaMetadata(
+        metadata.setIsBrowsable(browsable).setIsPlayable(!browsable)
+            .setMediaType(if (browsable) MediaMetadata.MEDIA_TYPE_FOLDER_MIXED else MediaMetadata.MEDIA_TYPE_MIXED)
+            .build()
+    ).build()
 }

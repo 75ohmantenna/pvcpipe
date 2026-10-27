@@ -2,10 +2,11 @@ package org.schabi.newpipe.player.mediasource;
 
 import androidx.annotation.NonNull;
 
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface ManagedMediaSource extends MediaSource {
     /**
      * Determines whether or not this {@link ManagedMediaSource} can be replaced.

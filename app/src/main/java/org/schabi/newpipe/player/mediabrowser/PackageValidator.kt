@@ -26,16 +26,14 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED
 import android.content.pm.PackageManager
 import android.os.Process
-import android.support.v4.media.session.MediaSessionCompat
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
-import androidx.media.MediaBrowserServiceCompat
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import org.schabi.newpipe.BuildConfig
 
 /**
- * Validates that the calling package is authorized to browse a [MediaBrowserServiceCompat].
+ * Validates that the calling package is authorized to browse a media library.
  *
  * The list of allowed signing certificates and their corresponding package names is defined in
  * res/xml/allowed_media_browser_callers.xml.
@@ -46,14 +44,14 @@ import org.schabi.newpipe.BuildConfig
  *
  * For more information, see res/xml/allowed_media_browser_callers.xml.
  */
-internal class PackageValidator(context: Context) {
+class PackageValidator(context: Context) {
     private val context: Context = context.applicationContext
     private val packageManager: PackageManager = this.context.packageManager
     private val platformSignature: String = getSystemSignature()
     private val callerChecked = mutableMapOf<String, Pair<Int, Boolean>>()
 
     /**
-     * Checks whether the caller attempting to connect to a [MediaBrowserServiceCompat] is known.
+     * Checks whether the caller attempting to connect to a media library is known.
      * See [MusicService.onGetRoot] for where this is utilized.
      *
      * @param callingPackage The package name of the caller.
@@ -104,17 +102,17 @@ internal class PackageValidator(context: Context) {
             /*
              * [MEDIA_CONTENT_CONTROL] permission is only available to system applications, and
              * while it isn't required to allow these apps to connect to a
-             * [MediaBrowserServiceCompat], allowing this ensures optimal compatibility with apps
+             * media library, allowing this ensures optimal compatibility with apps
              * such as Android TV and the Google Assistant.
              */
             callerPackageInfo.permissions.contains(MEDIA_CONTENT_CONTROL) -> true
 
             /*
              * If the calling app has a notification listener it is able to retrieve notifications
-             * and can connect to an active [MediaSessionCompat].
+             * and can connect to an active media session.
              *
              * It's not required to allow apps with a notification listener to
-             * connect to your [MediaBrowserServiceCompat], but it does allow easy compatibility
+             * connect to your media library, but it does allow easy compatibility
              * with apps such as Wear OS.
              */
             NotificationManagerCompat.getEnabledListenerPackages(this.context)
@@ -146,7 +144,7 @@ internal class PackageValidator(context: Context) {
     /**
      * Builds a [CallerPackageInfo] for a given package that can be used for all the
      * various checks that are performed before allowing an app to connect to a
-     * [MediaBrowserServiceCompat].
+     * media library.
      */
     private fun buildCallerInfo(callingPackage: String): CallerPackageInfo? {
         val packageInfo = getPackageInfo(callingPackage) ?: return null

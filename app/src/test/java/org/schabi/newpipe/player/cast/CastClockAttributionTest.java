@@ -16,7 +16,7 @@ import android.content.SharedPreferences;
 
 import androidx.preference.PreferenceManager;
 
-import com.google.android.exoplayer2.MediaItem;
+import androidx.media3.common.MediaItem;
 
 import org.junit.Test;
 import org.mockito.MockedConstruction;
@@ -35,6 +35,7 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 
 /** Real Player capture, queue recovery and history adapter; controlled engine and SDK delivery. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class CastClockAttributionTest extends CastPlaybackTestFixture {
     @Test
     public void metadataBeforeSynchronizationPausePreservesSelectedRecovery() throws Exception {
@@ -214,7 +215,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
                     .setUri(second.getUrl()).setTag(tag).build();
             when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(engineItem);
             player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
+                    mock(androidx.media3.common.Player.Events.class));
             playback.pause();
             assertEquals(12000, occurrence.getRecoveryPosition());
             verify(history.record, never()).saveStreamState(any(StreamInfo.class), anyLong());
@@ -394,7 +395,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
             doCallRealMethod().when(player).play();
             doCallRealMethod().when(player).restoreLocalAfterCasting(anyLong(),
                     org.mockito.ArgumentMatchers.anyBoolean());
-            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final androidx.media3.exoplayer.ExoPlayer exo = player.getExoPlayer();
             final java.util.concurrent.atomic.AtomicLong local =
                     new java.util.concurrent.atomic.AtomicLong(10000);
             when(exo.getCurrentPosition()).thenAnswer(call -> local.get());
@@ -431,7 +432,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
             throws Exception {
         try (InitialPreparation fixture = new InitialPreparation();
                 HistoryCapture history = new HistoryCapture(historyEnabled)) {
-            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final androidx.media3.exoplayer.ExoPlayer exo = player.getExoPlayer();
             final java.util.concurrent.atomic.AtomicLong local =
                     new java.util.concurrent.atomic.AtomicLong(10000);
             final java.util.concurrent.atomic.AtomicInteger index =
@@ -498,7 +499,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
             fixture.handoff();
             fixture.queue.setIndex(1);
             when(player.getExoPlayer().getCurrentMediaItemIndex()).thenReturn(0);
-            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final androidx.media3.exoplayer.ExoPlayer exo = player.getExoPlayer();
             org.mockito.Mockito.doAnswer(call -> {
                 when(exo.getCurrentMediaItemIndex()).thenReturn(1);
                 when(exo.getCurrentPosition()).thenReturn(0L);
@@ -538,7 +539,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
     private void localProgressThenHandoff(final boolean close) throws Exception {
         try (InitialPreparation fixture = new InitialPreparation();
                 HistoryCapture history = new HistoryCapture()) {
-            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final androidx.media3.exoplayer.ExoPlayer exo = player.getExoPlayer();
             when(exo.getCurrentMediaItemIndex()).thenReturn(0);
             when(exo.getContentPosition()).thenReturn(10000L);
             player.saveStreamProgressState();
@@ -570,7 +571,7 @@ public class CastClockAttributionTest extends CastPlaybackTestFixture {
             io.triggerActions();
             org.junit.Assert.assertFalse(playback.ownsClock(fixture.second));
             assertEquals(10000, playback.getPosition());
-            final com.google.android.exoplayer2.ExoPlayer exo = player.getExoPlayer();
+            final androidx.media3.exoplayer.ExoPlayer exo = player.getExoPlayer();
             final java.util.concurrent.atomic.AtomicLong local =
                     new java.util.concurrent.atomic.AtomicLong(10000);
             when(exo.getCurrentPosition()).thenAnswer(call -> local.get());

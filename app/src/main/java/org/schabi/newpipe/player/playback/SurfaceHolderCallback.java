@@ -3,8 +3,8 @@ package org.schabi.newpipe.player.playback;
 import android.content.Context;
 import android.view.SurfaceHolder;
 
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.video.PlaceholderSurface;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.video.PlaceholderSurface;
 
 /**
  * Prevent error message: 'Unrecoverable player error occurred'
@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.video.PlaceholderSurface;
  * -> exoplayer fix suggestion link
  * https://github.com/google/ExoPlayer/issues/2703#issuecomment-300599981
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
     private final Context context;

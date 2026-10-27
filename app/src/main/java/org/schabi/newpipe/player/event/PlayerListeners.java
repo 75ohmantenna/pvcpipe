@@ -3,8 +3,8 @@ package org.schabi.newpipe.player.event;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.PlaybackException;
-import com.google.android.exoplayer2.PlaybackParameters;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.PlaybackParameters;
 
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
@@ -17,6 +17,7 @@ import java.util.Optional;
  * There is at most one of each. Every update goes to the fragment first and then to the
  * activity. A listener that was replaced or removed gets nothing more.
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlayerListeners {
     @Nullable
     private PlayerServiceEventListener fragmentListener = null;

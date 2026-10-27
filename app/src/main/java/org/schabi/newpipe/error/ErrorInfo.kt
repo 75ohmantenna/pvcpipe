@@ -4,9 +4,9 @@ import android.content.Context
 import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
-import com.google.android.exoplayer2.ExoPlaybackException
-import com.google.android.exoplayer2.upstream.HttpDataSource
-import com.google.android.exoplayer2.upstream.Loader
+import androidx.media3.datasource.HttpDataSource
+import androidx.media3.exoplayer.ExoPlaybackException
+import androidx.media3.exoplayer.upstream.Loader
 import java.net.UnknownHostException
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
@@ -40,6 +40,7 @@ import org.schabi.newpipe.util.text.getText
  * and request preference-controlled log capture; parcel reconstruction bypasses those helpers.
  */
 @Parcelize
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class ErrorInfo private constructor(
     @TypeParceler<Array<String>, PvcErrorInfoTracesParceler>()
     val stackTraces: Array<String>,

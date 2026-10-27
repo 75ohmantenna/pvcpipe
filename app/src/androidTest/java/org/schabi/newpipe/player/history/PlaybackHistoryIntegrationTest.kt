@@ -8,11 +8,11 @@ package org.schabi.newpipe.player.history
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import androidx.media3.common.Player.DISCONTINUITY_REASON_AUTO_TRANSITION
+import androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK
+import androidx.media3.common.Player.REPEAT_MODE_OFF
+import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.test.core.app.ApplicationProvider
-import com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION
-import com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK
-import com.google.android.exoplayer2.Player.REPEAT_MODE_OFF
-import com.google.android.exoplayer2.Player.REPEAT_MODE_ONE
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
 import io.reactivex.rxjava3.schedulers.TestScheduler
 import java.util.UUID
@@ -37,6 +37,7 @@ import org.schabi.newpipe.testUtil.TrampolineSchedulerRule
 import org.schabi.newpipe.util.InfoCache
 
 /** Exercises the production preferences and history adapters against real in-memory Room. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackHistoryIntegrationTest {
     @get:Rule
     val trampolineScheduler = TrampolineSchedulerRule()
@@ -45,6 +46,7 @@ class PlaybackHistoryIntegrationTest {
     private lateinit var context: Context
     private lateinit var preferenceName: String
     private lateinit var preferences: SharedPreferences
+    private var previousDatabase: Any? = null
     private lateinit var database: AppDatabase
     private lateinit var history: PlaybackHistory
     private lateinit var watchHistoryKey: String
@@ -59,6 +61,7 @@ class PlaybackHistoryIntegrationTest {
         context = object : ContextWrapper(application) {
             override fun getSharedPreferences(name: String, mode: Int): SharedPreferences = preferences
         }
+        previousDatabase = databaseField().get(null)
         database = TestDatabase.createReplacingNewPipeDatabase()
         history = PlaybackHistory(context)
     }
@@ -68,9 +71,13 @@ class PlaybackHistoryIntegrationTest {
         cachedInfos.forEach {
             InfoCache.getInstance().removeInfo(it.serviceId, it.url, InfoCache.Type.STREAM)
         }
+        databaseField().set(null, previousDatabase)
         database.close()
         application.deleteSharedPreferences(preferenceName)
     }
+
+    private fun databaseField() = org.schabi.newpipe.NewPipeDatabase::class.java
+        .getDeclaredField("databaseInstance").apply { isAccessible = true }
 
     @Test
     fun normalProgressPersistsPositionAndKeepsContentRecoveryDistinct() {

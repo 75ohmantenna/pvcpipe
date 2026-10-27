@@ -11,7 +11,7 @@ import static org.schabi.newpipe.player.resolver.PlaybackSourcesTestEnvironment.
 import static org.schabi.newpipe.player.resolver.PlaybackSourcesTestEnvironment.tag;
 import static org.schabi.newpipe.player.resolver.PlaybackSourcesTestEnvironment.video;
 
-import com.google.android.exoplayer2.source.MediaSource;
+import androidx.media3.exoplayer.source.MediaSource;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -24,6 +24,7 @@ import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 
 import java.util.List;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlaybackSourcesTest {
     private PlaybackSourcesTestEnvironment environment;
     private PlaybackSourcesTestEnvironment.Quality quality;

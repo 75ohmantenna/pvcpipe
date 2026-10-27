@@ -5,17 +5,16 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.audiofx.AudioEffect;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.media.AudioFocusRequestCompat;
-import androidx.media.AudioManagerCompat;
-
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.analytics.AnalyticsListener;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.analytics.AnalyticsListener;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.player.helper.PlayerHelper;
@@ -23,13 +22,14 @@ import org.schabi.newpipe.player.helper.PlayerHelper;
 import java.util.function.Consumer;
 
 /** Executes Android focus, audio-session and animation effects for playback audio. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment,
         AudioManager.OnAudioFocusChangeListener, AnalyticsListener {
     private static final int STREAM_TYPE = AudioManager.STREAM_MUSIC;
     private final Context context;
     private final ExoPlayer player;
     private final AudioManager audioManager;
-    private AudioFocusRequestCompat request;
+    private AudioFocusRequest request;
     private Consumer<PlaybackAudio.FocusChange> focusListener;
     private boolean closed;
 
@@ -43,7 +43,9 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
     public void attach(final Consumer<PlaybackAudio.FocusChange> listener) {
         focusListener = listener;
         player.addAnalyticsListener(this);
-        request = new AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN)
+        request = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setLegacyStreamType(STREAM_TYPE).build())
                 .setWillPauseWhenDucked(true)
                 .setOnAudioFocusChangeListener(this).build();
     }
@@ -105,13 +107,13 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
 
     @Override
     public boolean requestFocus() {
-        return AudioManagerCompat.requestAudioFocus(audioManager, request)
+        return audioManager.requestAudioFocus(request)
                 == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
     @Override
     public void abandonFocus() {
-        AudioManagerCompat.abandonAudioFocusRequest(audioManager, request);
+        audioManager.abandonAudioFocusRequest(request);
     }
 
     @Override
@@ -172,7 +174,7 @@ final class AndroidPlaybackAudioEnvironment implements PlaybackAudio.Environment
 
     @Override
     public int maxSystemVolume() {
-        return AudioManagerCompat.getStreamMaxVolume(audioManager, STREAM_TYPE);
+        return audioManager.getStreamMaxVolume(STREAM_TYPE);
     }
 
     @Override

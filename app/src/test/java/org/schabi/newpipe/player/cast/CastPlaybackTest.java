@@ -1,6 +1,6 @@
 package org.schabi.newpipe.player.cast;
 
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
+import static androidx.media3.common.Player.REPEAT_MODE_ALL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -22,9 +22,9 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.PlaybackParameters;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackParameters;
 
 import org.fcast.sender_sdk.PlaybackState;
 import org.fcast.sender_sdk.Source;
@@ -49,6 +49,7 @@ import kotlin.Unit;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class CastPlaybackTest extends CastPlaybackTestFixture {
 
     @Test
@@ -1085,7 +1086,7 @@ public class CastPlaybackTest extends CastPlaybackTestFixture {
                         .setUri(replacement.getStreamUrl()).setTag(replacement).build();
                 when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(replacementItem);
                 player.onEvents(player.getExoPlayer(),
-                        mock(com.google.android.exoplayer2.Player.Events.class));
+                        mock(androidx.media3.common.Player.Events.class));
                 when(resolvers.constructed().get(1)
                         .resolve(any(), any(), any(InetAddress.class)))
                         .thenReturn(replacementMedia);
@@ -1193,7 +1194,7 @@ public class CastPlaybackTest extends CastPlaybackTestFixture {
             final MediaItem placeholder = PlaceholderTag.EMPTY.asMediaItem();
             when(player.getExoPlayer().getCurrentMediaItem()).thenReturn(placeholder);
             player.onEvents(player.getExoPlayer(),
-                    mock(com.google.android.exoplayer2.Player.Events.class));
+                    mock(androidx.media3.common.Player.Events.class));
             playback.seek(65000);
             playback.pause();
             verify(playback.getSession()).seek(65000);

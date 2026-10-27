@@ -19,7 +19,7 @@ import android.content.Intent;
 
 import androidx.core.content.IntentCompat;
 
-import com.google.android.exoplayer2.ExoPlayer;
+import androidx.media3.exoplayer.ExoPlayer;
 
 import org.junit.After;
 import org.junit.Before;
@@ -54,6 +54,7 @@ import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subjects.SingleSubject;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerIntentTest {
     private Player player;
     private Intent intent;
@@ -111,7 +112,7 @@ public class PlayerIntentTest {
         when(intent.getBooleanExtra(Player.PLAY_WHEN_READY, true)).thenReturn(true);
         when(intent.getStringExtra(Player.PLAY_QUEUE_KEY)).thenReturn("queue");
         when(exoPlayer.getPlaybackState()).thenReturn(
-                com.google.android.exoplayer2.Player.STATE_READY);
+                androidx.media3.common.Player.STATE_READY);
     }
 
     @After
@@ -246,7 +247,7 @@ public class PlayerIntentTest {
         final SingleSubject<StreamInfo> pending = timestamp("target", 30);
         setField("playQueue", queue("target"));
         when(exoPlayer.getPlaybackState()).thenReturn(
-                com.google.android.exoplayer2.Player.STATE_IDLE);
+                androidx.media3.common.Player.STATE_IDLE);
         player.handleIntent(intent);
 
         pending.onSuccess(info("target"));

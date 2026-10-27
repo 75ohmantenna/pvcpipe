@@ -9,21 +9,19 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.net.Uri
-import android.support.v4.media.session.MediaSessionCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player as EnginePlayer
+import androidx.media3.common.Timeline
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player as EnginePlayer
-import com.google.android.exoplayer2.Timeline
-import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.upstream.DefaultDataSource
-import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
-import com.google.android.exoplayer2.upstream.cache.SimpleCache
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -75,6 +73,7 @@ import org.schabi.newpipe.player.ui.PlayerUiList
  * durability, background-service survival, network extraction, audible output or receiver behavior.
  */
 @RunWith(AndroidJUnit4::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PreparedPlayerSqliteHistoryTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val singleton = NewPipeDatabase::class.java.getDeclaredField("databaseInstance").apply {
@@ -96,7 +95,6 @@ class PreparedPlayerSqliteHistoryTest {
     private lateinit var preferenceName: String
     private lateinit var databaseName: String
     private lateinit var media: File
-    private lateinit var session: MediaSessionCompat
     private lateinit var player: Player
     private lateinit var engine: ExoPlayer
     private lateinit var history: PlaybackHistory
@@ -141,8 +139,7 @@ class PreparedPlayerSqliteHistoryTest {
             val service = PlayerService()
             ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
                 .apply { isAccessible = true }.invoke(service, context)
-            session = MediaSessionCompat(context, "prepared-history-$id")
-            player = Player(service, session, MediaSessionConnector(session))
+            player = Player(service)
             // Retain the real Player, history, casting and application listeners, without creating
             // notifications or binding external UI/media-session behavior to this isolated fixture.
             setPlayerField("UIs", PlayerUiList())
@@ -194,7 +191,6 @@ class PreparedPlayerSqliteHistoryTest {
         }
         attempt { if (::player.isInitialized) onMain { destroyPlayer() } }
         attempt { if (::history.isInitialized && ::first.isInitialized) resume(first) }
-        attempt { if (::session.isInitialized) onMain { session.release() } }
         attempt { if (databaseInstalled) singleton.set(null, previousDatabase) }
         attempt { if (cacheInstalled) cacheField.set(null, previousCache) }
         attempt { if (::database.isInitialized) database.close() }
@@ -211,6 +207,139 @@ class PreparedPlayerSqliteHistoryTest {
             }
         }
         failure?.let { throw it }
+    }
+
+    @Test
+    fun sessionCommandsUseThePreparedApplicationPlayer() {
+        lateinit var sessionPlayer: org.schabi.newpipe.player.mediasession.PvcSessionPlayer
+        onMain {
+            sessionPlayer = org.schabi.newpipe.player.mediasession.PvcSessionPlayer(
+                android.os.Looper.getMainLooper()
+            ) { com.google.common.util.concurrent.Futures.immediateVoidFuture() }
+            sessionPlayer.attach(player)
+            assertEquals(2, sessionPlayer.mediaItemCount)
+            assertEquals(first.title, sessionPlayer.mediaMetadata.title)
+            assertEquals(20000L, sessionPlayer.duration)
+            assertEquals(EnginePlayer.STATE_READY, sessionPlayer.playbackState)
+        }
+        try {
+            awaitEngine("session seek reaches prepared engine", {
+                sessionPlayer.seekTo(8000)
+            }) { engine.currentPosition == 8000L }
+            onMain {
+                sessionPlayer.refreshPosition()
+                assertEquals(8000L, sessionPlayer.currentPosition)
+                sessionPlayer.setPlaybackSpeed(1.5f)
+                assertEquals(1.5f, engine.playbackParameters.speed)
+                sessionPlayer.repeatMode = EnginePlayer.REPEAT_MODE_ONE
+                assertEquals(EnginePlayer.REPEAT_MODE_ONE, engine.repeatMode)
+                sessionPlayer.pause()
+                assertFalse(engine.playWhenReady)
+            }
+        } finally {
+            onMain { sessionPlayer.release() }
+        }
+    }
+
+    @Test
+    fun sessionRetiresEmptyAndDisposedQueuesWithoutReusingTheirCachedTimeline() {
+        onMain {
+            val sessionPlayer = org.schabi.newpipe.player.mediasession.PvcSessionPlayer(
+                android.os.Looper.getMainLooper()
+            ) { com.google.common.util.concurrent.Futures.immediateVoidFuture() }
+            try {
+                sessionPlayer.attach(player)
+                assertEquals(2, sessionPlayer.mediaItemCount)
+                // No metadata refresh: simulate queue retirement between engine/session ticks.
+                queue.remove(1)
+                queue.remove(0)
+                sessionPlayer.refreshPosition()
+                assertTrue(sessionPlayer.currentTimeline.isEmpty)
+                assertEquals(EnginePlayer.STATE_IDLE, sessionPlayer.playbackState)
+                assertEquals(0L, sessionPlayer.currentPosition)
+
+                queue.append(listOf(first))
+                sessionPlayer.refreshPosition()
+                assertEquals(1, sessionPlayer.mediaItemCount)
+                queue.dispose()
+                sessionPlayer.refreshPosition()
+                assertTrue(sessionPlayer.currentTimeline.isEmpty)
+                assertEquals(EnginePlayer.STATE_IDLE, sessionPlayer.playbackState)
+
+                queue.init()
+                sessionPlayer.refreshPosition()
+                assertEquals(1, sessionPlayer.mediaItemCount)
+
+                val replacement = SinglePlayQueue(first).apply { init() }
+                setPlayerField("playQueue", replacement)
+                sessionPlayer.refreshPosition()
+                assertEquals(1, sessionPlayer.mediaItemCount)
+                assertEquals(first.title, sessionPlayer.mediaMetadata.title)
+            } finally {
+                sessionPlayer.release()
+            }
+        }
+    }
+
+    @Test
+    fun pausedEngineSeekPublishesASessionPositionDiscontinuity() {
+        lateinit var sessionPlayer: org.schabi.newpipe.player.mediasession.PvcSessionPlayer
+        val discontinuities = java.util.concurrent.atomic.AtomicInteger()
+        onMain {
+            sessionPlayer = org.schabi.newpipe.player.mediasession.PvcSessionPlayer(
+                android.os.Looper.getMainLooper()
+            ) { com.google.common.util.concurrent.Futures.immediateVoidFuture() }
+            sessionPlayer.attach(player)
+            assertEquals(0L, sessionPlayer.currentPosition)
+            sessionPlayer.addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPositionDiscontinuity(
+                    oldPosition: androidx.media3.common.Player.PositionInfo,
+                    newPosition: androidx.media3.common.Player.PositionInfo,
+                    reason: Int
+                ) {
+                    discontinuities.incrementAndGet()
+                }
+            })
+        }
+        try {
+            awaitEngine("external paused seek reaches the session listener", {
+                engine.seekTo(8000)
+            }) { engine.currentPosition == 8000L && discontinuities.get() > 0 }
+            onMain {
+                assertEquals(8000L, sessionPlayer.currentPosition)
+                assertFalse(sessionPlayer.playWhenReady)
+            }
+        } finally {
+            onMain { sessionPlayer.release() }
+        }
+    }
+
+    @Test
+    fun sessionSelectionPublishesPendingRecoveryInsteadOfThePreviousEngineClock() {
+        seek(8000)
+        onMain {
+            val sessionPlayer = org.schabi.newpipe.player.mediasession.PvcSessionPlayer(
+                android.os.Looper.getMainLooper()
+            ) { com.google.common.util.concurrent.Futures.immediateVoidFuture() }
+            try {
+                sessionPlayer.attach(player)
+                val firstId = sessionPlayer.getMediaItemAt(0).mediaId
+                val secondId = sessionPlayer.getMediaItemAt(1).mediaId
+                assertFalse("Queue occurrences have distinct IDs", firstId == secondId)
+                sessionPlayer.seekTo(1, androidx.media3.common.C.TIME_UNSET)
+                sessionPlayer.refresh()
+                assertEquals(1, queue.index)
+                assertEquals(second.title, sessionPlayer.mediaMetadata.title)
+                assertEquals(EnginePlayer.STATE_BUFFERING, sessionPlayer.playbackState)
+                assertEquals(12000L, sessionPlayer.currentPosition)
+                val expected = minOf(20000L, 12000L + sessionPlayer.seekForwardIncrement)
+                sessionPlayer.seekForward()
+                assertEquals(expected, second.recoveryPosition)
+                assertEquals(8000L, engine.currentPosition)
+            } finally {
+                sessionPlayer.release()
+            }
+        }
     }
 
     @Test

@@ -6,7 +6,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.PlaybackParameters;
+import androidx.media3.common.PlaybackParameters;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -24,6 +24,7 @@ import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /** Owns the remote playback handoff for one player service, on the application thread. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class CastPlayback implements FCastSession.Listener {
     private final Player player;
     private final FCastSession session;

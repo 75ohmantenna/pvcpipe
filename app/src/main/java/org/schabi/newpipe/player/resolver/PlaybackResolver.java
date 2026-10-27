@@ -8,14 +8,14 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.source.dash.DashMediaSource;
-import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
-import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
-import com.google.android.exoplayer2.source.hls.HlsMediaSource;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.exoplayer.dash.DashMediaSource;
+import androidx.media3.exoplayer.dash.manifest.DashManifest;
+import androidx.media3.exoplayer.dash.manifest.DashManifestParser;
+import androidx.media3.exoplayer.hls.HlsMediaSource;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -45,6 +45,7 @@ import java.util.Objects;
  * {@link MediaSource} as product. It contains many static methods that can be used by classes
  * implementing this interface, and nothing else.
  */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
     String TAG = PlaybackResolver.class.getSimpleName();
 

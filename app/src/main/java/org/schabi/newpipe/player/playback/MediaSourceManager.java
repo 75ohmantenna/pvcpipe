@@ -48,6 +48,7 @@ import static org.schabi.newpipe.player.mediasource.FailedMediaSource.StreamInfo
 import static org.schabi.newpipe.player.playqueue.PlayQueue.DEBUG;
 import static org.schabi.newpipe.util.ServiceHelper.getCacheExpirationMillis;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class MediaSourceManager {
     @NonNull
     private final String TAG = "MediaSourceManager@" + hashCode();
@@ -525,7 +526,7 @@ public class MediaSourceManager {
 
     /**
      * Checks if the corresponding MediaSource in
-     * {@link com.google.android.exoplayer2.source.ConcatenatingMediaSource}
+     * {@link androidx.media3.exoplayer.source.ConcatenatingMediaSource}
      * for a given {@link PlayQueueItem} needs replacement, either due to gapless playback
      * readiness or playlist desynchronization.
      * <p>

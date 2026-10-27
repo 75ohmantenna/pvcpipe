@@ -3,8 +3,8 @@ package org.schabi.newpipe.player;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.SeekParameters;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.SeekParameters;
 
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.util.SponsorBlockMode;
@@ -13,6 +13,7 @@ import org.schabi.newpipe.util.SponsorBlockSegment;
 import org.schabi.newpipe.util.SponsorBlockSettings;
 
 /** Keeps skip policy and repeated-target state independent of playback UI type. */
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 final class SponsorBlockController {
     private SponsorBlockMode mode = SponsorBlockMode.DISABLED;
     private final SponsorBlockPlaybackController playback =

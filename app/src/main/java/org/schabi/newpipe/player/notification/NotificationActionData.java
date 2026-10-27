@@ -1,7 +1,7 @@
 package org.schabi.newpipe.player.notification;
 
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ONE;
+import static androidx.media3.common.Player.REPEAT_MODE_ALL;
+import static androidx.media3.common.Player.REPEAT_MODE_ONE;
 import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_CLOSE;
 import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_FAST_FORWARD;
 import static org.schabi.newpipe.player.notification.NotificationConstants.ACTION_FAST_REWIND;
@@ -22,6 +22,7 @@ import org.schabi.newpipe.player.Player;
 
 import java.util.Objects;
 
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class NotificationActionData {
 
     @NonNull
