@@ -47,7 +47,10 @@ stores the results in batches and then trims old entries from the feed.
   outcome replayed. An observer that detaches does not stop the work.
 - `cancel` cooperatively stops admitting channel loads at the pipeline's
   cancellation checks. Loads already under way finish, and collected results
-  are still stored.
+  are still stored. Cancellation does not interrupt these admitted loads;
+  an Odysee resolve already under way can also perform its one timeout retry,
+  so completion and the foreground refresh notification may wait through
+  that additional request timeout.
 - All of this runs inside the app's process. If Android kills the process,
   the refresh is gone.
 
@@ -56,6 +59,13 @@ leaves out subscriptions of services the app does not have, and it uses a
 service's feed extractor in place of loading the channel when the dedicated
 feed setting is on and the service has one
 (see [services.md](services.md#the-services)).
+
+Feed error reports retain each failed subscription's service ID and URL.
+The report names a service only when every error belongs to that same
+service; mixed or unattributed failures have no shared service. The request
+description includes up to ten distinct failed requests, separated by
+semicolons on one display line and capped at 4,000 characters. The underlying
+exception causes remain available in the traces.
 
 ## Subscriptions tab
 
@@ -178,6 +188,7 @@ promises that a backup will open after future database migrations.
 
 Unit tests, run by `make ci`:
 [`FeedRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedRefreshTest.kt),
+[`FeedErrorContextTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedErrorContextTest.kt),
 [`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
 [`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
 [`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt)

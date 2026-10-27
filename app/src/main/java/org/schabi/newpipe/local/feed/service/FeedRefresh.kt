@@ -115,7 +115,8 @@ class FeedRefresh internal constructor(
             Notification.createOnError(
                 RequestException(
                     subscription.uid,
-                    "${subscription.serviceId}:${subscription.url}",
+                    subscription.serviceId,
+                    subscription.url,
                     error
                 )
             )
@@ -142,7 +143,12 @@ class FeedRefresh internal constructor(
         postEvent(FeedEventManager.Event.ProgressEvent(R.string.feed_processing_message))
     }.subscribeOn(io)
 
-    class RequestException(val subscriptionId: Long, message: String, cause: Throwable) : Exception(message, cause)
+    class RequestException(
+        val subscriptionId: Long,
+        val serviceId: Int,
+        val url: String?,
+        cause: Throwable
+    ) : Exception("$serviceId:$url", cause)
 
     internal interface Operations {
         fun subscriptions(groupId: Long, outdatedThreshold: OffsetDateTime): Flowable<List<SubscriptionEntity>>

@@ -218,7 +218,8 @@ class FeedLoadManager(private val context: Context) {
                                     info.errors.map {
                                         FeedRefresh.RequestException(
                                             info.uid,
-                                            "${info.serviceId}:${info.url}",
+                                            info.serviceId,
+                                            info.url,
                                             it
                                         )
                                     }
