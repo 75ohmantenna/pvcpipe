@@ -6,9 +6,45 @@ development. These observations describe the tested builds and conditions.
 [service-protocol-observations.md](service-protocol-observations.md) records
 the later recommendation and cache work.
 
-Everything was seen from one home network. The tools were `curl`, the
+The October 12–13 checks were seen from one home network. The tools were `curl`, the
 extractor's `OdyseeLiveTest`, a disposable emulator (AVD `pvcpipe_ci_api37`,
 Android 17, API 37, x86_64, software video decoding) and a Pixel 6a.
+
+## Feed resolve timeout follow-up, 2026-10-27
+
+A debug-app feed error reported a socket timeout while waiting for the
+response headers of a channel `resolve` request. The same channel resolved
+successfully from the development host later (HTTP 200 in about 0.53 seconds).
+That later response does not establish the cause of the original timeout or
+the phone's network conditions.
+
+The implementation now retries a timed-out, read-only `resolve` once and
+retains service/request context in feed reports. Offline tests exercise a
+timeout followed by successful channel extraction, permanent failures,
+interruption and mixed-service reports. These are controlled JVM checks;
+no new phone, receiver or playback checks were run for this correction.
+
+### Independent Opus CLI review, 2026-10-27
+
+A fresh read-only Opus CLI session (`claude-opus-5-5`) reviewed PR #159
+against master independently of PR #158. The parent agent checked each
+finding against implementation and callers:
+
+- Confirmed: newline-separated requests displaced the label/value columns
+  in `ErrorActivity`. Requests now use semicolons; the horizontal scroll
+  container keeps them on one display line.
+- Confirmed: a failed retry discarded the first timeout. It is now retained
+  as suppressed context, guarding against self-suppression when a test or
+  downloader rethrows the same object.
+- Confirmed limitation, consistent with the existing cancellation contract:
+  feed cancellation drains admitted loads rather than interrupting workers.
+  Their bounded retry may add one request timeout. The library-data guide
+  now makes this delay explicit; no worker interruption policy was added.
+
+Before the corrections, the strengthened tests failed in three feed cases
+and two extractor cases. After correction, all 24 feed tests and all nine
+resolve-timeout tests passed, along with app Checkstyle and ktlint. These
+checks are deterministic JVM evidence, not phone or receiver results.
 
 ## View counts and follower counts, 2026-10-12
 

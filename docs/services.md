@@ -204,6 +204,14 @@ The implementation uses the request shapes in `OdyseeApi`. The development
 records describe the external references and live checks used to establish
 those shapes; they are evidence for the implementation, not an API contract.
 
+The read-only `resolve` lookup retries once after a socket timeout, unless
+the thread is interrupted. A second timeout, other I/O failures and API or
+HTTP errors reach the caller. This does not change downloader timeouts or
+add retries to other Odysee operations. A persistently slow lookup can take
+two request timeouts before failing. When the retry fails, its exception
+retains the first timeout as suppressed diagnostic context (unless both
+attempts threw the same exception object).
+
 ### Addresses
 
 [`OdyseeUrl`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/odysee/OdyseeUrl.java)

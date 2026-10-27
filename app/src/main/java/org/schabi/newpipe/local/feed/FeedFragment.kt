@@ -73,6 +73,7 @@ import org.schabi.newpipe.ktx.animate
 import org.schabi.newpipe.ktx.animateHideRecyclerViewAllowingScrolling
 import org.schabi.newpipe.ktx.slideUp
 import org.schabi.newpipe.local.feed.item.StreamItem
+import org.schabi.newpipe.local.feed.service.FeedErrorContext
 import org.schabi.newpipe.local.feed.service.FeedLoadService
 import org.schabi.newpipe.local.feed.service.FeedRefresh
 import org.schabi.newpipe.local.subscription.SubscriptionManager
@@ -506,7 +507,11 @@ class FeedFragment : BaseStateFragment<FeedState>() {
 
         if (errors.isNotEmpty()) {
             // if no error was a ContentNotAvailableException, show a general error snackbar
-            ErrorUtil.showSnackbar(this, ErrorInfo(errors, UserAction.REQUESTED_FEED, ""))
+            val details = FeedErrorContext(errors)
+            ErrorUtil.showSnackbar(
+                this,
+                ErrorInfo(errors, UserAction.REQUESTED_FEED, details.request, details.serviceId)
+            )
         }
     }
 
