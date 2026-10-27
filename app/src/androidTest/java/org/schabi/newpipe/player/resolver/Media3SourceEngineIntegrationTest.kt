@@ -58,7 +58,8 @@ class Media3SourceEngineIntegrationTest {
         cacheField.set(null, cache)
         data = PlayerDataSource(context, DefaultBandwidthMeter.Builder(context).build())
         onMain {
-            player = ExoPlayer.Builder(context).setLoadControl(LoadController()).build()
+            player = ExoPlayer.Builder(context, org.schabi.newpipe.player.helper.PlaybackRenderersFactory(context))
+                .setLoadControl(LoadController()).build()
             player.volume = 0f
             player.addListener(object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -147,7 +148,91 @@ class Media3SourceEngineIntegrationTest {
         """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="0s" end="3s">Media3 controlled caption</p></div></body></tt>"""
     )
 
-    private fun subtitlesProduceRealCues(format: MediaFormat, content: String) {
+    @Test
+    fun unselectedMissingSubtitleDoesNotLoadOrBlockPlayback() {
+        val requests = java.util.concurrent.atomic.AtomicInteger()
+        val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val worker = Thread {
+            while (!server.isClosed) {
+                try {
+                    server.accept().use { socket ->
+                        socket.soTimeout = 5000
+                        val input = socket.getInputStream().bufferedReader()
+                        while (!input.readLine().isNullOrEmpty()) { /* Drain headers. */ }
+                        requests.incrementAndGet()
+                        socket.getOutputStream().apply {
+                            write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+                            flush()
+                        }
+                    }
+                } catch (failure: Exception) {
+                    if (!server.isClosed) engineError.compareAndSet(null, failure)
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+        try {
+            optionalSubtitleKeepsPlaybackReady(Uri.parse("http://127.0.0.1:${server.localPort}/missing.vtt"), false)
+            assertEquals("An unselected optional track must not be fetched", 0, requests.get())
+        } finally {
+            server.close()
+            worker.join(6000)
+        }
+    }
+
+    @Test
+    fun unselectedMalformedSubtitleDoesNotBlockPlayback() {
+        val file = File(directory, "malformed-unselected.vtt").apply { writeText("not a WebVTT file") }
+        optionalSubtitleKeepsPlaybackReady(Uri.fromFile(file), false)
+    }
+
+    @Test
+    fun selectedMissingSubtitleDoesNotStopPlayback() {
+        optionalSubtitleKeepsPlaybackReady(Uri.fromFile(File(directory, "missing-selected.vtt")), true)
+    }
+
+    @Test
+    fun selectedMalformedSubtitleDoesNotStopPlayback() {
+        val file = File(directory, "malformed-selected.vtt").apply { writeText("not a WebVTT file") }
+        optionalSubtitleKeepsPlaybackReady(Uri.fromFile(file), true)
+    }
+
+    @Test
+    fun customVideoRendererRetainsOptionalSubRipDecoding() {
+        onMain {
+            player.release()
+            player = ExoPlayer.Builder(context, org.schabi.newpipe.player.helper.CustomRenderersFactory(context))
+                .setLoadControl(LoadController()).build()
+            player.volume = 0f
+            player.addListener(object : Player.Listener {
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    engineError.set(error)
+                }
+            })
+        }
+        subtitlesProduceRealCues(MediaFormat.SRT, "1\n00:00:00,000 --> 00:00:03,000\nMedia3 controlled caption\n\n")
+    }
+
+    private fun optionalSubtitleKeepsPlaybackReady(uri: Uri, selected: Boolean) {
+        val subtitles = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(androidx.media3.common.MimeTypes.TEXT_VTT).setLanguage("en").build()
+        val wave = waveFile()
+        onMain {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setPreferredTextLanguage("en")
+                .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, !selected).build()
+            val text = requireNotNull(data.createSubtitleSource(subtitles))
+            val audio = data.progressiveMediaSourceFactory.createMediaSource(MediaItem.fromUri(Uri.fromFile(wave)))
+            player.setMediaSource(MergingMediaSource(audio, text))
+            player.prepare()
+            player.play()
+        }
+        await { player.playbackState == Player.STATE_READY && player.currentPosition > 500 }
+    }
+
+    private fun waveFile(): File {
         val wave = File(directory, "audio.wav")
         val rate = 8000 * 2
         val size = rate * 4
@@ -159,6 +244,11 @@ class Media3SourceEngineIntegrationTest {
             it.write(header)
             it.write(ByteArray(size))
         }
+        return wave
+    }
+
+    private fun subtitlesProduceRealCues(format: MediaFormat, content: String) {
+        val wave = waveFile()
         val subtitles = File(directory, "captions.${format.suffix}").apply { writeText(content) }
         val configuration = SubtitlesStream.Builder().setId("captions").setContent(Uri.fromFile(subtitles).toString(), true)
             .setMediaFormat(format).setLanguageCode("en").setAutoGenerated(false).build()

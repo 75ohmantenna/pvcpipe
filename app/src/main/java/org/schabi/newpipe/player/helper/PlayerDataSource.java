@@ -6,6 +6,7 @@ import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
@@ -23,9 +24,8 @@ import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistTracker;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ProgressiveMediaSource;
-import androidx.media3.extractor.Extractor;
+import androidx.media3.exoplayer.source.SingleSampleMediaSource;
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
-import androidx.media3.extractor.text.SubtitleExtractor;
 
 import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeOtfDashManifestCreator;
@@ -178,10 +178,13 @@ public class PlayerDataSource {
         if (!parsers.supportsFormat(format)) {
             return null;
         }
-        // SingleSampleMediaSource requires legacy renderer decoding, disabled in Media3.
-        return new ProgressiveMediaSource.Factory(cacheDataSourceFactory,
-                () -> new Extractor[] {new SubtitleExtractor(parsers.create(format), format)})
-                .createMediaSource(MediaItem.fromUri(configuration.uri));
+        // Optional sidecars prepare without I/O and load only when selected. A failed
+        // subtitle request must not prevent the primary audio/video source from playing.
+        // PlaybackRenderersFactory opts into Media3's matching renderer decoder.
+        return new SingleSampleMediaSource.Factory(cacheDataSourceFactory)
+                .setTreatLoadErrorsAsEndOfStream(true)
+                .createMediaSource(configuration.buildUpon()
+                        .setMimeType(format.sampleMimeType).build(), C.TIME_UNSET);
     }
     //endregion
 
