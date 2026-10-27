@@ -7,9 +7,12 @@ ExoPlayer 2.19.1 or physical-receiver observations.
 ## Implementation
 
 Production playback uses AndroidX Media3 1.11.1. Standalone ExoPlayer modules and
-the app's direct legacy Media dependency and compat imports have been removed.
+the app's direct legacy Media dependency and old support-media imports have been
+removed.
 Both runtime dependency reports resolve Media3 modules to 1.11.1 and contain no
-`com.google.android.exoplayer` modules. Media3 session retains its transitive
+`com.google.android.exoplayer` modules. The October 27 correction adds an API
+26/27 browser delegate using Media3's bundled legacy transport types. Media3
+session retains its transitive
 `androidx.media:media:1.7.0` interoperability dependency; it is not force-excluded.
 The extractor, FCast SDK,
 application IDs, SDK levels, preferences, Room schema and app version are unchanged.
@@ -26,14 +29,15 @@ video surface workaround and stream transport implementations remain. The
 independent local-file player's construction, UI and silence-skipping API have
 also migrated.
 
-Sidecar subtitles use `SubtitleExtractor` and Media3's parsers, retaining language
-and role metadata. The old single-sample source requires legacy decoding, which
-Media3 disables by default. SubRip's extractor MIME type (`text/srt`) is normalized
+Optional sidecar subtitles now use Media3 `SingleSampleMediaSource`, with failed
+loads treated as end-of-stream. Both standard and custom-video renderer factories
+opt into Media3's corresponding renderer subtitle decoder. This preserves lazy
+selection and prevents a missing optional subtitle from blocking primary media.
+The path is deprecated/experimental in Media3 1.11.1 and needs reassessment on
+future engine upgrades. SubRip's extractor MIME type (`text/srt`) is normalized
 to Media3's `application/x-subrip`; unsupported parser formats are omitted.
-The controlled renderer checks use generated SubRip, WebVTT and TTML captions.
-These standalone progressive subtitle sources prepare their tracks eagerly;
-subtitle request timing and large multilingual catalogs need observation on real
-streams. Media3's lazy sidecar helper is package-private.
+Language, roles and labels remain attached. The initial migration used eager
+`SubtitleExtractor` sources; the October 27 review below records why that changed.
 
 ## Baseline and JVM verification
 
@@ -180,8 +184,9 @@ a separate compat messenger client exercises the minimum-SDK legacy path. The
 test client uses Media3's bundled restricted compat classes only in instrumentation;
 the app does not add a direct legacy Media dependency. See the
 [Media3 bridge implementation](https://github.com/androidx/media/blob/1.11.1/libraries/session/src/main/java/androidx/media3/session/legacy/MediaBrowserServiceCompat.java).
-Support for native framework browser clients on API 26/27 needs resolution before
-claiming full legacy-client parity.
+This was an unresolved defect in the October 26 candidate. The October 27
+correction below restores native browsing through a compatibility delegate;
+the earlier observations do not verify that later implementation.
 
 ## Repeating the controlled checks
 
@@ -208,10 +213,11 @@ disposable environment; see [the installation-preservation record](local-playlis
 ## Outstanding release checks
 
 The user confirmed that physical FCast testing must wait until later and that
-Android Auto/Desktop Head Unit is unavailable. Keep the PR draft until the
-required receiver and automotive checks are resolved. Controlled FCast tests and
-emulators do not establish physical receiver picture, audio, timing or automotive
-UI behavior.
+Android Auto/Desktop Head Unit is unavailable. On October 27 the user explicitly
+authorized independent Opus review, corrections and merging into master while
+phone/FCast testing remains deferred. That authorization does not supply the
+missing hardware evidence. Controlled FCast tests and emulators do not establish
+physical receiver picture, audio, timing or automotive UI behavior.
 
 The receiver follow-up should cover paused handoff, play/pause and paused seeks
 from both normal and system controls, supported speed/volume, queue navigation,
@@ -220,4 +226,99 @@ Exercise receiver switching when a second receiver is available. Android Auto UI
 and automotive-specific behavior remain unverified even when the framework
 legacy-browser protocol tests pass.
 
-No merge, version bump, tag or release publication is part of this change.
+The October 26 verification did not merge the change. The October 27 follow-up
+below records the review and corrections for the newly authorized merge. App
+version remains 0.2.4; tags and release publication are outside that follow-up.
+
+## Independent Opus CLI review and corrections — 2026-10-27
+
+Separate fresh read-only Opus CLI sessions (`claude-opus-5-5`) reviewed PR #158
+and the independent feed fix in PR #159 against their common master baseline.
+The parent agent checked the findings against implementation, the exact local
+Media3 1.11.1 sources and controlled regression runs. A further fresh Opus
+session reviewed a frozen snapshot of the playback corrections, including the
+actual Media3 sources rather than relying on recollection of library internals.
+
+- **Optional subtitle failure, confirmed:** the original candidate failed both
+  an unselected HTTP-404 subtitle and a selected missing-file subtitle. The
+  primary media could not reach ready playback. The lazy single-sample source
+  and matching renderer decoding correct this. Malformed WebVTT bodies in the
+  controlled cases already allowed playback; that part of the review's broader
+  parsing-error claim was not reproduced.
+- **Stale foreground start, confirmed:** delivering a stale authenticated
+  browser intent through Android's actual `startForegroundService` caused an
+  API 26 ANR: `did not then call Service.startForeground()`. The new handler
+  satisfies the deadline and restores notification policy without creating an
+  engine or cancelling a newer preparation. The regression waits through the
+  real platform watchdog while a newer request remains pending.
+- **Native API 26/27 browsing, confirmed on API 26:** the original candidate
+  connected but failed to load children. The API-specific delegate uses the
+  existing catalog, caller/UID validation and one Media3 platform session token.
+  Native and compat clients now load the two root folders on API 26. API 27
+  uses the same implementation branch but has no separate runtime result.
+- **Duplicate legacy subscription work, confirmed by source/protocol:** the
+  compat service already sends initial children. Its Media3 callback now
+  acknowledges the subscription without loading and notifying again. Modern
+  browsers retain their initial notification. The claim of an unavoidable
+  second network request was overstated: `ExtractorHelper` also caches playlist
+  results. Controlled tests check one initial compat callback and the retained
+  modern initial notification.
+- **Background foreground-promotion exception, unsubstantiated:** the review
+  supplied no concrete non-exempt resume path. Tracing the current pause/cast
+  policies did not establish one. This remains a hypothesis, rather than a
+  reproduced regression or a reason to add a blanket exception handler.
+
+The focused follow-up found no blocking regressions. Its service-lifetime
+corner was valid: a stale start must not stop an otherwise unbound service
+while a newer preparation is pending. The handler now preserves that started
+service, and terminal preparation cleanup releases it when no player exists.
+The strengthened regression checks the platform's `RunningServiceInfo.started`
+state as well as future ownership. The extra compat-token binder round trip is
+standard recovery through `COMMAND_GET_EXTRA_BINDER`, now noted in the bridge;
+its public token still identifies the same Media3 session.
+
+The first corrected candidate passed all 21 focused API 26 checks, including
+native/compat browsing, caller validation, the real foreground-start deadline,
+standard/custom renderer captions, selected/unselected missing and malformed
+optional tracks, and native transport commands. These are emulator results;
+physical FCast and automotive behavior remain unverified. The final combined-tree
+verification follows below.
+
+The review also mentioned exported player broadcasts and ignored foreground
+starts already present on master. Those are separate baseline observations;
+they were not established or changed by this correction's regression checks.
+
+### Final combined-tree verification
+
+After integrating master with merged PR #159 and applying all corrections,
+`make ci` passed: the host checks, recorded fixtures, build-source and
+style/dependency-order checks, all 1,044 app JVM tests, 610 extractor offline
+tests (three additional cases skipped), lint, debug assembly and signed/R8
+release assembly. Lint reported zero errors and 59 warnings.
+
+The exact final debug and instrumentation APKs passed all 21 focused checks on
+API 26. All 20 applicable checks passed on API 37; the API 26/27-only delegate
+caller test is excluded there by its SDK annotation. Both runs include the
+newer-preparation started-service ownership assertion and a stale start with an
+existing paused player and hidden notification. The former catches the final
+follow-up finding; the latter verifies that the player and notification policy
+survive the deadline-handling path.
+
+The first API 37 installation stalled while sharing host resources with lint.
+An idle-host restart with 4 GiB configured memory installed both APKs but then
+hit a process-startup ANR before any test ran. A Google app also failed startup,
+and CPU pressure was near 100%. The guest exposed only CPU 0 despite configuring
+four emulator cores. The final attempt used the same installed APKs after the
+emulator settled and its display was put to sleep to reduce rendering load;
+all 20 checks passed. App/startup watchdogs and test deadlines were unchanged.
+These results do not establish foreground UI, audible output, physical receiver
+behavior or successful API 37 H.264 video rendering.
+
+The October 27 signed release APK is 14,417,979 bytes, version 0.2.4/code 1000204,
+with SHA-256 `0f3d79862d062de4664cf6e2e05883b7f278794c4e5478802496d2a516bddc5e`.
+Its verified release certificate SHA-256 remains
+`14a4e83570c8d32855ad271c8eec1f5822ba225673c11111c4f653dc0bf996bb`.
+The earlier October 26 fingerprints and observations remain historical. The
+phone retains that previously installed FCast candidate; this review did not
+update it or run phone/FCast tests. Physical FCast and Android Auto/Desktop Head
+Unit checks remain deferred under the user's explicit merge instruction.

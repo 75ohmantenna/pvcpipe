@@ -47,6 +47,25 @@ preparation is asynchronous, canceled by replacement or shutdown, and checked
 again when its authenticated service-start intent arrives. Arbitrary URI/search
 playback and automatic post-reboot playback resumption remain unsupported.
 
+On API 26/27, `LegacyBrowserBridge` serves native and compat browser transport
+through the same catalog and `PackageValidator`, using the existing Media3
+platform session token. This bypasses the upstream library bridge's loss of
+native caller identity. Its compatibility types come from the pinned Media3
+session artifact. Modern browsers retain `SessionLibraryCallback`; legacy
+subscriptions get their initial children from the compat service without an
+extra children-changed notification.
+
+A stale authenticated browser start still satisfies Android's foreground-start
+deadline when needed, then restores the prior notification policy. It neither
+creates an engine nor cancels a newer browser preparation.
+
+Optional sidecar subtitles use Media3 `SingleSampleMediaSource` with load errors
+treated as end-of-stream. Preparation performs no subtitle I/O; only selected
+tracks load. `PlaybackRenderersFactory` enables the matching Media3 renderer
+subtitle decoding, and `CustomRenderersFactory` inherits that text policy while
+retaining the video-surface workaround. This deprecated/experimental decoding
+path is pinned to Media3 1.11.1 and must be reassessed on a future engine upgrade.
+
 `NotificationUtil` is the Media3 notification provider. `PlayerService` owns
 notification posting and foreground transitions, overriding Media3's default
 notification lifecycle to retain the app's minimize, task-removal and active-cast
@@ -62,9 +81,9 @@ completion callbacks. Migrating to the newer engine playlist API is a separate
 change because the current recovery/synchronization policy depends on those
 completion boundaries. Cache directory/keys and the cache database name are
 unchanged. See the [dated migration record](media3-migration.md) for verification,
-the API 26/27 framework-browser defect and outstanding hardware checks. Older
-ExoPlayer observations below retain their
-original version and evidence limits.
+the correction of the API 26/27 framework-browser defect and outstanding
+hardware checks. Older ExoPlayer observations below retain their original
+version and evidence limits.
 
 ## FCast video casting
 
