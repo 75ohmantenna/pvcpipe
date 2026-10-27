@@ -91,6 +91,8 @@ class FeedRefreshTest {
         assertEquals(setOf(1L, 3L), result.mapNotNull { it.value?.uid }.toSet())
         val error = result.single { it.isOnError }.error as FeedRefresh.RequestException
         assertEquals(2L, error.subscriptionId)
+        assertEquals(42, error.serviceId)
+        assertEquals("https://example.test/channel/2", error.url)
         assertEquals("42:https://example.test/channel/2", error.message)
         assertSame(cause, error.cause)
         assertEquals(result, operations.storedBatches.single())

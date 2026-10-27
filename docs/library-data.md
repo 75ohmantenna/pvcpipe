@@ -57,6 +57,12 @@ service's feed extractor in place of loading the channel when the dedicated
 feed setting is on and the service has one
 (see [services.md](services.md#the-services)).
 
+Feed error reports retain each failed subscription's service ID and URL.
+The report names a service only when every error belongs to that same
+service; mixed or unattributed failures have no shared service. The request
+description includes up to ten distinct failed requests, capped at 4,000
+characters. The underlying exception causes remain available in the traces.
+
 ## Subscriptions tab
 
 Subscribed channels are grouped by their stored service ID in ascending ID
@@ -178,6 +184,7 @@ promises that a backup will open after future database migrations.
 
 Unit tests, run by `make ci`:
 [`FeedRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedRefreshTest.kt),
+[`FeedErrorContextTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedErrorContextTest.kt),
 [`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
 [`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
 [`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt)

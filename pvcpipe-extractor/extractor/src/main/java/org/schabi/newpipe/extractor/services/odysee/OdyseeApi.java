@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.services.odysee.settings.OdyseeSettings;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -95,7 +96,7 @@ public final class OdyseeApi {
             throws IOException, ExtractionException {
         final JsonObject params = new JsonObject();
         params.put("urls", array(List.of(lbryUri)));
-        final JsonObject claim = callProxy("resolve", params).getObject(lbryUri);
+        final JsonObject claim = resolveRequest(params).getObject(lbryUri);
         if (claim == null || claim.isEmpty()) {
             throw new ContentNotAvailableException("Odysee has nothing at " + lbryUri);
         }
@@ -491,6 +492,21 @@ public final class OdyseeApi {
         final JsonArray array = new JsonArray();
         array.addAll(values);
         return array;
+    }
+
+    @Nonnull
+    private static JsonObject resolveRequest(final JsonObject params)
+            throws IOException, ExtractionException {
+        try {
+            return callProxy("resolve", params);
+        } catch (final SocketTimeoutException timeout) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw timeout;
+            }
+        }
+        // Resolve is read-only, even though the proxy uses POST. Retry one timed-out
+        // lookup; other errors and a second timeout still reach the caller.
+        return callProxy("resolve", params);
     }
 
     @Nonnull
