@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -41,6 +42,7 @@ class Media3ServiceIntegrationTest {
     private lateinit var browser: MediaBrowser
     private var bound = false
     private val sessionErrors = LinkedBlockingQueue<SessionError>()
+    private val childrenChanges = LinkedBlockingQueue<Pair<String, Int>>()
     private val connected = CountDownLatch(1)
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -67,6 +69,9 @@ class Media3ServiceIntegrationTest {
                 .setListener(object : MediaBrowser.Listener {
                     override fun onError(controller: MediaController, sessionError: SessionError) {
                         sessionErrors.offer(sessionError)
+                    }
+                    override fun onChildrenChanged(browser: MediaBrowser, parentId: String, itemCount: Int, params: androidx.media3.session.MediaLibraryService.LibraryParams?) {
+                        childrenChanges.offer(parentId to itemCount)
                     }
                 }).buildAsync()
         }
@@ -105,9 +110,6 @@ class Media3ServiceIntegrationTest {
 
     @Test
     fun frameworkLegacyBrowserRetainsRootAndBrowsableChildren() {
-        // Media3's framework bridge learns the real browser identity from API 28 onward.
-        // On API 26/27 use the compat messenger protocol, covered by the test below.
-        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 28)
         val ready = CountDownLatch(1)
         val loaded = CountDownLatch(1)
         val children = AtomicReference<List<android.media.browse.MediaBrowser.MediaItem>>()
@@ -156,6 +158,7 @@ class Media3ServiceIntegrationTest {
     fun compatLegacyBrowserRetainsRootAndBrowsableChildren() {
         val ready = CountDownLatch(1)
         val loaded = CountDownLatch(1)
+        val duplicate = CountDownLatch(2)
         val children = AtomicReference<List<androidx.media3.session.legacy.MediaBrowserCompat.MediaItem>>()
         lateinit var legacy: androidx.media3.session.legacy.MediaBrowserCompat
         onMain {
@@ -187,16 +190,46 @@ class Media3ServiceIntegrationTest {
                         ) {
                             children.set(items.orEmpty())
                             loaded.countDown()
+                            duplicate.countDown()
                         }
                     }
                 )
             }
             assertTrue("Compat children load", loaded.await(20, TimeUnit.SECONDS))
+            assertFalse("A legacy subscription has one initial callback", duplicate.await(1, TimeUnit.SECONDS))
             assertEquals(2, children.get().size)
             assertTrue(children.get().all { it.isBrowsable && !it.isPlayable })
         } finally {
             onMain { legacy.disconnect() }
         }
+    }
+
+    @Test
+    @androidx.test.filters.SdkSuppress(maxSdkVersion = 27)
+    fun legacyBridgeRetainsCallerAndRootValidation() {
+        onMain {
+            val bridge = PlayerService::class.java.getDeclaredField("legacyBrowser")
+                .apply { isAccessible = true }.get(service) as org.schabi.newpipe.player.mediabrowser.LegacyBrowserBridge
+            val uid = android.os.Process.myUid()
+            assertTrue(bridge.onGetRoot(context.packageName, uid, null) != null)
+            assertNull(bridge.onGetRoot(context.packageName, uid + 1, null))
+            assertNull(bridge.onGetRoot(null, uid, null))
+            assertNull(
+                bridge.onGetRoot(
+                    context.packageName,
+                    uid,
+                    android.os.Bundle().apply { putBoolean(android.service.media.MediaBrowserService.BrowserRoot.EXTRA_RECENT, true) }
+                )
+            )
+        }
+    }
+
+    @Test
+    fun modernSubscriptionStillNotifiesItsInitialChildren() {
+        val root = request { browser.getLibraryRoot(null) }.value!!.mediaId
+        assertEquals(LibraryResult.RESULT_SUCCESS, request { browser.subscribe(root, null) }.resultCode)
+        assertEquals(root to 2, childrenChanges.poll(20, TimeUnit.SECONDS))
+        assertEquals(2, children(root, 0, 10).size)
     }
 
     @Test
@@ -275,6 +308,41 @@ class Media3ServiceIntegrationTest {
     }
 
     @Test
+    fun staleForegroundBrowserStartHonorsTheDeadlineWithoutCancellingANewerRequest() {
+        val newer = com.google.common.util.concurrent.SettableFuture.create<Void>()
+        val newerId = java.util.UUID.randomUUID().toString()
+        onMain {
+            PlayerService::class.java.getDeclaredField("browserPreparation").apply { isAccessible = true }
+                .set(service, newer)
+            PlayerService::class.java.getDeclaredField("browserRequest").apply { isAccessible = true }
+                .set(service, newerId)
+            val stale = PlayerService.authenticateInternalIntent(
+                context,
+                Intent(context, PlayerService::class.java)
+                    .putExtra(PlayerService.SHOULD_START_FOREGROUND_EXTRA, true)
+                    .putExtra("browser_request", "retired-request")
+            )
+            context.startForegroundService(stale)
+        }
+        // Exercise Android's actual foreground-start watchdog, rather than directly invoking
+        // onStartCommand. The fixture remains bound while the stale started request is retired.
+        android.os.SystemClock.sleep(12000)
+        onMain {
+            assertNull(service.player)
+            assertFalse("A stale start must preserve the newer preparation", newer.isDone)
+            @Suppress("DEPRECATION")
+            val started = context.getSystemService(android.app.ActivityManager::class.java)
+                .getRunningServices(100).single { it.service.className == PlayerService::class.java.name }.started
+            assertTrue("The newer preparation must retain the service even without bindings", started)
+            assertTrue(browser.isConnected)
+            assertTrue(
+                context.getSystemService(NotificationManager::class.java).activeNotifications
+                    .none { it.id == NotificationUtil.NOTIFICATION_ID }
+            )
+        }
+    }
+
+    @Test
     fun realServicePlaybackAndSessionControlsKeepOneNotification() {
         val file = waveFile()
         val info = org.schabi.newpipe.extractor.stream.StreamInfo(
@@ -319,6 +387,34 @@ class Media3ServiceIntegrationTest {
             }
             onMain { browser.pause() }
             awaitCondition { !service.player!!.playWhenReady }
+            onMain {
+                val session = PlayerService::class.java.getDeclaredField("mediaSession")
+                    .apply { isAccessible = true }.get(service) as androidx.media3.session.MediaSession
+                android.media.session.MediaController(context, session.platformToken)
+                    .transportControls.seekTo(12000)
+            }
+            awaitCondition { service.player!!.currentPosition == 12000L }
+            val originalPlayer = service.player
+            onMain {
+                service.hidePlayerNotification()
+                context.startForegroundService(
+                    PlayerService.authenticateInternalIntent(
+                        context,
+                        Intent(context, PlayerService::class.java)
+                            .putExtra(PlayerService.SHOULD_START_FOREGROUND_EXTRA, true)
+                            .putExtra("browser_request", "retired-while-paused")
+                    )
+                )
+            }
+            android.os.SystemClock.sleep(12000)
+            onMain {
+                assertSame(originalPlayer, service.player)
+                assertFalse(service.player!!.playWhenReady)
+                assertTrue(
+                    context.getSystemService(NotificationManager::class.java).activeNotifications
+                        .none { it.id == NotificationUtil.NOTIFICATION_ID }
+                )
+            }
             val closed = request {
                 browser.sendCustomCommand(
                     androidx.media3.session.SessionCommand(

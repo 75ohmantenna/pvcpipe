@@ -25,6 +25,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.os.BadParcelableException;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -54,6 +55,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.ktx.BundleKt;
 import org.schabi.newpipe.player.mediabrowser.MediaBrowserImpl;
+import org.schabi.newpipe.player.mediabrowser.LegacyBrowserBridge;
 import org.schabi.newpipe.player.mediabrowser.MediaBrowserPlaybackPreparer;
 import org.schabi.newpipe.player.mediabrowser.SessionLibraryCallback;
 import org.schabi.newpipe.player.mediasession.PvcSessionPlayer;
@@ -106,6 +108,7 @@ public final class PlayerService extends MediaLibraryService {
     private List<CommandButton> customButtons = List.of();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static final String BROWSER_REQUEST = "browser_request";
+    @Nullable private LegacyBrowserBridge legacyBrowser;
     @Nullable private String browserRequest;
     @Nullable private SettableFuture<Void> browserPreparation;
     @Nullable private Disposable browserResolution;
@@ -136,6 +139,9 @@ public final class PlayerService extends MediaLibraryService {
         mediaBrowserImpl = new MediaBrowserImpl(this, parent -> mainHandler.post(() -> {
             if (libraryCallback != null) {
                 libraryCallback.notifyChildrenChanged(mediaSession, parent);
+                if (legacyBrowser != null) {
+                    legacyBrowser.notifyCatalogChanged(parent);
+                }
             }
         }));
         sessionPlayer = new PvcSessionPlayer(Looper.getMainLooper(), this::prepareBrowserMediaId);
@@ -144,6 +150,11 @@ public final class PlayerService extends MediaLibraryService {
         mediaSession = new MediaLibrarySession.Builder(this, sessionPlayer, libraryCallback)
                 .build();
         addSession(mediaSession);
+        if (Build.VERSION.SDK_INT < 28) {
+            legacyBrowser = new LegacyBrowserBridge(this, mediaBrowserImpl,
+                    mediaSession.getPlatformToken());
+            legacyBrowser.onCreate();
+        }
         notificationProvider = new NotificationUtil(this);
         setMediaNotificationProvider(notificationProvider);
     }
@@ -184,6 +195,7 @@ public final class PlayerService extends MediaLibraryService {
         if (request != null) {
             if (!request.equals(browserRequest) || browserPreparation == null
                     || browserPreparation.isDone()) {
+                finishStaleBrowserStart(intent, startId);
                 return START_NOT_STICKY;
             }
             intent.putExtra(Player.RESUME_PLAYBACK, sessionPlayer.browserPlayWhenReady());
@@ -294,6 +306,9 @@ public final class PlayerService extends MediaLibraryService {
         cleanup();
         cancelBrowserPreparation();
         libraryCallback.dispose();
+        if (legacyBrowser != null) {
+            legacyBrowser.onDestroy();
+        }
         sessionPlayer.release();
 
         mediaSession.release();
@@ -364,6 +379,9 @@ public final class PlayerService extends MediaLibraryService {
             // after unbind() has been called: https://stackoverflow.com/a/8794930 .
             return mBinder;
 
+        } else if (legacyBrowser != null
+                && "android.media.browse.MediaBrowserService".equals(intent.getAction())) {
+            return legacyBrowser.bindBrowser(intent);
         } else if ("android.media.browse.MediaBrowserService".equals(intent.getAction())
                 || MediaLibraryService.SERVICE_INTERFACE.equals(intent.getAction())
                 || "androidx.media3.session.MediaSessionService".equals(intent.getAction())) {
@@ -558,6 +576,25 @@ public final class PlayerService extends MediaLibraryService {
         }
     }
 
+    private void finishStaleBrowserStart(final Intent intent, final int startId) {
+        if (intent.getBooleanExtra(SHOULD_START_FOREGROUND_EXTRA, false) && !foreground) {
+            // Even an obsolete startForegroundService request has an Android deadline.
+            // Satisfy it without creating an engine, cancelling a newer preparation or
+            // changing the current player's notification policy.
+            final boolean wasVisible = notificationVisible;
+            showPlayerNotification(true);
+            if (wasVisible) {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH);
+                foreground = false;
+            } else {
+                hidePlayerNotification();
+            }
+        }
+        if (player == null && (browserPreparation == null || browserPreparation.isDone())) {
+            stopSelf(startId);
+        }
+    }
+
     private ListenableFuture<?> prepareBrowserMediaId(final String mediaId) {
         cancelBrowserPreparation();
         final String request = UUID.randomUUID().toString();
@@ -585,8 +622,13 @@ public final class PlayerService extends MediaLibraryService {
                     future.setException(error);
                 });
         future.addListener(() -> mainHandler.post(() -> {
-            if (future.isCancelled() && request.equals(browserRequest)) {
+            if (request.equals(browserRequest)) {
+                // A failed/cancelled resolution may be the only owner of a started service.
+                // Successful starts already retire this request before completing the future.
                 cancelBrowserPreparation();
+                if (player == null) {
+                    stopSelf();
+                }
             }
         }), Runnable::run);
         return future;

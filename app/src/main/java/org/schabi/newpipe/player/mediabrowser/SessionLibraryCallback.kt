@@ -82,12 +82,19 @@ class SessionLibraryCallback(
         browser: MediaSession.ControllerInfo,
         parentId: String,
         params: LibraryParams?
-    ): ListenableFuture<LibraryResult<Void>> = result(
-        catalog.loadChildren(parentId).observeOn(AndroidSchedulers.mainThread()).map {
-            session.notifyChildrenChanged(browser, parentId, it.size, params)
-            LibraryResult.ofVoid(params)
+    ): ListenableFuture<LibraryResult<Void>> {
+        // The legacy service sends the initial children itself. Notifying again causes
+        // a duplicate catalog load and a second callback for the same subscription.
+        if (browser.controllerVersion == MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION) {
+            return Futures.immediateFuture(LibraryResult.ofVoid(params))
         }
-    )
+        return result(
+            catalog.loadChildren(parentId).observeOn(AndroidSchedulers.mainThread()).map {
+                session.notifyChildrenChanged(browser, parentId, it.size, params)
+                LibraryResult.ofVoid(params)
+            }
+        )
+    }
 
     override fun onSearch(
         session: MediaLibrarySession,
