@@ -497,16 +497,25 @@ public final class OdyseeApi {
     @Nonnull
     private static JsonObject resolveRequest(final JsonObject params)
             throws IOException, ExtractionException {
+        final SocketTimeoutException firstTimeout;
         try {
             return callProxy("resolve", params);
         } catch (final SocketTimeoutException timeout) {
             if (Thread.currentThread().isInterrupted()) {
                 throw timeout;
             }
+            firstTimeout = timeout;
         }
         // Resolve is read-only, even though the proxy uses POST. Retry one timed-out
         // lookup; other errors and a second timeout still reach the caller.
-        return callProxy("resolve", params);
+        try {
+            return callProxy("resolve", params);
+        } catch (final IOException | ExtractionException failure) {
+            if (failure != firstTimeout) {
+                failure.addSuppressed(firstTimeout);
+            }
+            throw failure;
+        }
     }
 
     @Nonnull

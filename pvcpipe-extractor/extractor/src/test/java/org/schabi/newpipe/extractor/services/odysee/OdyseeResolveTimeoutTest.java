@@ -73,6 +73,48 @@ class OdyseeResolveTimeoutTest {
         assertSame(timeout, assertThrows(SocketTimeoutException.class,
                 () -> OdyseeApi.resolve(URI)));
         assertEquals(2, downloader.requests.size());
+        assertEquals(0, timeout.getSuppressed().length);
+    }
+
+    @Test
+    void retryFailuresRetainTheFirstTimeoutAsDiagnosticContext() {
+        for (final IOException terminal : List.of(new SocketTimeoutException("second timeout"),
+                new IOException("retry failed"))) {
+            final SocketTimeoutException first = new SocketTimeoutException("first timeout");
+            final List<Request> attempts = new ArrayList<>();
+            NewPipe.init(new Downloader() {
+                @Override
+                public Response execute(@Nonnull final Request request) throws IOException {
+                    attempts.add(request);
+                    throw attempts.size() == 1 ? first : terminal;
+                }
+            });
+
+            assertSame(terminal, assertThrows(IOException.class, () -> OdyseeApi.resolve(URI)));
+            assertEquals(2, attempts.size());
+            assertArrayEquals(new Throwable[]{first}, terminal.getSuppressed());
+        }
+    }
+
+    @Test
+    void anApiErrorOnRetryRetainsTheFirstTimeout() {
+        final SocketTimeoutException first = new SocketTimeoutException("first timeout");
+        final List<Request> attempts = new ArrayList<>();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws IOException {
+                attempts.add(request);
+                if (attempts.size() == 1) {
+                    throw first;
+                }
+                return OdyseeFakeDownloader.ok(request, "{\"error\":{\"message\":\"unavailable\"}}");
+            }
+        });
+
+        final ExtractionException terminal = assertThrows(ExtractionException.class,
+                () -> OdyseeApi.resolve(URI));
+        assertEquals(2, attempts.size());
+        assertArrayEquals(new Throwable[]{first}, terminal.getSuppressed());
     }
 
     @Test

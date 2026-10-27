@@ -24,6 +24,28 @@ timeout followed by successful channel extraction, permanent failures,
 interruption and mixed-service reports. These are controlled JVM checks;
 no new phone, receiver or playback checks were run for this correction.
 
+### Independent Opus CLI review, 2026-10-27
+
+A fresh read-only Opus CLI session (`claude-opus-5-5`) reviewed PR #159
+against master independently of PR #158. The parent agent checked each
+finding against implementation and callers:
+
+- Confirmed: newline-separated requests displaced the label/value columns
+  in `ErrorActivity`. Requests now use semicolons; the horizontal scroll
+  container keeps them on one display line.
+- Confirmed: a failed retry discarded the first timeout. It is now retained
+  as suppressed context, guarding against self-suppression when a test or
+  downloader rethrows the same object.
+- Confirmed limitation, consistent with the existing cancellation contract:
+  feed cancellation drains admitted loads rather than interrupting workers.
+  Their bounded retry may add one request timeout. The library-data guide
+  now makes this delay explicit; no worker interruption policy was added.
+
+Before the corrections, the strengthened tests failed in three feed cases
+and two extractor cases. After correction, all 24 feed tests and all nine
+resolve-timeout tests passed, along with app Checkstyle and ktlint. These
+checks are deterministic JVM evidence, not phone or receiver results.
+
 ## View counts and follower counts, 2026-10-12
 
 - `file/view_count` and `subscription/sub_count` on `api.odysee.com` answered

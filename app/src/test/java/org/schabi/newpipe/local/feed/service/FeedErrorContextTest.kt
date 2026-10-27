@@ -36,7 +36,7 @@ class FeedErrorContextTest {
         val details = FeedErrorContext(listOf(first, second, first))
 
         assertEquals(odysee, details.serviceId)
-        assertEquals("${first.message}\n${second.message}", details.request)
+        assertEquals("${first.message}; ${second.message}", details.request)
     }
 
     @Test
@@ -46,7 +46,7 @@ class FeedErrorContextTest {
         val details = FeedErrorContext(listOf(first, second))
 
         assertNull(details.serviceId)
-        assertEquals("${first.message}\n${second.message}", details.request)
+        assertEquals("${first.message}; ${second.message}", details.request)
     }
 
     @Test
@@ -65,6 +65,7 @@ class FeedErrorContextTest {
         assertTrue(details.request.contains("@Example1:1"))
         assertTrue(details.request.endsWith("..."))
         assertTrue(details.request.length <= 4000)
+        assertEquals(1, details.request.lines().size)
 
         val longRequest = FeedErrorContext(listOf(failure(odysee, "https://odysee.com/" + "a".repeat(8000))))
         assertEquals(4000, longRequest.request.length)

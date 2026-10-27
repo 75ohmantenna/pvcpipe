@@ -7,8 +7,9 @@ internal class FeedErrorContext(errors: List<Throwable>) {
         .distinct().singleOrNull()
 
     // Keep per-request service IDs in the description even for a mixed-service report.
+    // Keep one display line so ErrorActivity's parallel label/value columns stay aligned.
     // Bound metadata as well as the traces so a large failed refresh fits an Intent.
     val request: String = errors.filterIsInstance<FeedRefresh.RequestException>()
-        .mapNotNull { it.message }.distinct().joinToString("\n", limit = 10)
+        .mapNotNull { it.message }.distinct().joinToString("; ", limit = 10)
         .ifEmpty { "Loading feed" }.let { if (it.length > 4000) it.take(3999) + "…" else it }
 }

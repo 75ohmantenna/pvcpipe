@@ -208,7 +208,9 @@ The read-only `resolve` lookup retries once after a socket timeout, unless
 the thread is interrupted. A second timeout, other I/O failures and API or
 HTTP errors reach the caller. This does not change downloader timeouts or
 add retries to other Odysee operations. A persistently slow lookup can take
-two request timeouts before failing.
+two request timeouts before failing. When the retry fails, its exception
+retains the first timeout as suppressed diagnostic context (unless both
+attempts threw the same exception object).
 
 ### Addresses
 
