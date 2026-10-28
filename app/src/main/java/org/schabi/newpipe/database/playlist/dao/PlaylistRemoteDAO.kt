@@ -52,4 +52,7 @@ interface PlaylistRemoteDAO : BasicDAO<PlaylistRemoteEntity> {
 
     @Query("DELETE FROM remote_playlists WHERE uid = :playlistId")
     fun deletePlaylist(playlistId: Long): Int
+
+    @Query("UPDATE remote_playlists SET display_index = :displayIndex WHERE uid = :playlistId")
+    fun updateDisplayIndex(playlistId: Long, displayIndex: Long): Int
 }

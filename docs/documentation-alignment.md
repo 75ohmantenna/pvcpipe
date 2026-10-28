@@ -702,7 +702,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | Null stream lists were not handled safely at the audited revision | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L148) stored getter results through setters without normalization. Its source check dereferenced the video list unconditionally and the audio list when the video list was empty, before checking manifest URLs. Null video/audio lists could therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reached callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). The documentation-only pass changed no signatures, annotations or behavior. The separately authorized [null-list correction below](#null-list-implementation-follow-up--2026-10-28) now normalizes those results. |
 | ZIP inspection did not validate format at the audited revision | The [former `ZipHelper.isValidZipFile`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) only opened/closed a `ZipInputStream`, and `BackupRestore.inspect` used that result. A standalone JDK probe accepted synthetic plain text and found no entry. That was stream-boundary evidence, not the complete Android workflow. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) replaces this predicate with private-copy central-directory inspection. |
 | Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
-| Bookmark save may clear a newer draft's dirty flag | [`BookmarkFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) uses unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). Intervening edits are a suspected race; no new scheduling regression was added. |
+| Bookmark save could clear a newer draft's dirty flag at the audited revision | The [former `BookmarkFragment.saveImmediate`](https://github.com/75ohmantenna/pvcpipe/blob/6b6d3a786bd514e25f030cf452c033ffd098c1a6/app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) used unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). The audit reported a suspected race without a new scheduling regression. The separately authorized [bookmark-save follow-up below](#bookmark-save-ownership-follow-up--2026-10-28) reproduces and corrects it. |
 | Orphan cleanup omits permanent-thumbnail references | [`StreamDAO.deleteOrphans`](../app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checks history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. A synthetic SQLite probe of the actual deletion query removes a row referenced only by a permanent thumbnail, making the image lookup null. This is SQL-boundary evidence, not an Android/Room or rendered-image test. |
 | Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
 | SAF exception cleanup may stop early | [`FileStreamSAF.close`](../app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) groups all closes in one try and marks disposed first. An early IOException skips later explicit closes; actual descriptor/provider consequences were not tested. |
@@ -1069,3 +1069,78 @@ legacy-settings UI tests retain their controlled payloads. No physical-device,
 API 36 app-runtime or power-loss result is claimed. Service responses were not
 used as validation evidence.
 The disposable AVD remains available for reinspection.
+
+### Bookmark-save ownership follow-up — 2026-10-28
+
+Started from clean `master` at `6b6d3a786bd514e25f030cf452c033ffd098c1a6`,
+on branch `fix-bookmark-save-ownership`. This separately authorized implementation
+follow-up addresses the bookmark dirty-flag finding above and preserves failed
+bookmark edits for retry. Earlier audit and restore results remain historical.
+Current behavior is described in [Library data](library-data.md#bookmarks).
+
+Three controlled regressions failed against the original save implementation:
+an older completion cleared a newer revision, failed deletions were removed
+before persistence, and saving mutated adapter display indices before success.
+The first fixture attempt also encountered an `ErrorInfo` logcat/App initializer
+error; isolating report construction made all three failures assertion failures.
+These are method-level reproductions with deferred persistence doubles, not
+device or actual database scheduling results.
+
+`BookmarkSaveManager` freezes the complete typed-ID order and deletion batch,
+then applies both tables in one Room transaction on the existing shared local
+playlist write queue. Its cached operation starts on first subscription and
+survives observer disposal. Targeted index updates preserve other metadata and
+do not recreate deleted rows. Completion acknowledges only the captured revision
+and deletion batch for the same saver owner. Errors retain the draft instead of
+resetting the adapter; accepted writes and callbacks survive view disposal.
+
+Adversarial self-review covered revision interleavings, deletion batches with
+equal IDs in different tables, replacement saver owners, repeated observation,
+cross-manager admission, metadata changes, rollback after either table fails,
+failed-save retries, database emissions, and view destruction/recreation.
+It is self-review, not an independent reviewer or real-device observation.
+Native host SQLite tests use the production generated Room queries and aborting
+triggers. Fragment tests call production methods with controlled adapters,
+rendering, persistence and error-reporting side effects.
+
+The lifecycle review found another failure in the first correction: destroying
+a replacement view before its first database emission replaced the retained
+draft with that unloaded adapter's empty list. A new regression failed with
+expected order `[2, 1]` versus `[]`; snapshotting only a loaded view corrects it.
+The same run's detached-error test initially lacked the base fragment's activity
+for preference-listener cleanup. Supplying a Robolectric activity fixes that
+fixture setup without bypassing production destruction or error routing.
+The next attempt's static verification called Kotlin's unmocked companion instead
+of Java's static bridge, causing report-resource and subsequent mock-cleanup
+failures. Verification now invokes the same static bridge as production, and
+fixture cleanup also handles partial setup. Those attempts are not passing runs.
+A subsequent fixture compile rejected an unnecessary type argument on the
+non-generic `RuntimeEnvironment.getApplication()` API; removing it corrects the
+test compilation without changing production code.
+
+The first full gate passed all 1,118 app JVM tests and debug assembly. Lint
+reported 60 warnings, including the intentionally unretained save observer.
+That observer must outlive view disposal to acknowledge completion. The run was
+stopped during release assembly to add a method-scoped `CheckResult` suppression
+with its lifetime rationale, then the complete gate was restarted. This does
+not suppress other lint checks or the existing thumbnail observer's warning.
+
+A failed draft is retained only within the live fragment instance, including
+view recreation. It is not a persistent outbox for process death or full fragment
+destruction. Unrelated remote-playlist metadata operations retain their existing
+scheduling; this correction does not establish a global order for those writes.
+
+| Verification | Result |
+| --- | --- |
+| JVM stage | Fresh app run: 1,118 tests, no failures/errors/skips, including 16 controlled fragment-method tests and 8 Room/native host SQLite bookmark tests. Offline extractor: 651 tests with 3 skips; build logic: 3 tests. The latter two reused up-to-date results. |
+| Static checks | App/extractor Checkstyle, ktlint and dependency ordering passed. |
+| Documentation | All 212 local Markdown paths/heading anchors and 12 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. The historical bookmark finding is pinned to the pre-correction revision. |
+| Debug lint | Passed with 59 warnings and no errors, matching the preceding baseline count. The new save observer's intentional lifetime is documented and annotated locally. |
+| `make ci` | Passed all five serial Gradle stages, including debug/release assembly. The sanitizer's 12 tests passed; all 685 recorded fixtures needed no replacements. Cached/up-to-date outputs were reused where Gradle reported them. |
+| Android test APK | `:app:assembleDebugAndroidTest` passed, reusing up-to-date test compilation/packaging where reported. Its dry-run contained 81 build tasks and no installation, uninstall, device-data or instrumentation execution task. The APK was not installed or run. |
+| Preservation | All seven source/test hashes remained unchanged through the final gate and APK build and matched their staged contents. The diff covers bookmark persistence/ownership, two DAO order queries, access to the existing write scheduler, two new test files and four documentation files. No schema, dependency, version, signing or device/repository safety configuration changed. |
+
+These are host-JVM and build results. This follow-up accessed no device or
+emulator and ran no instrumentation or live-service checks. The restore emulator
+results above remain evidence of their stated revision and scenarios. Other
+open audit findings and UI-text proposals remain separate.

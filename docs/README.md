@@ -20,7 +20,7 @@ A guide describes the code as it is now and names the classes to read.
 | [building.md](building.md) | SDK and JDK requirements, build tasks, application IDs, signing, versioning and safe testing |
 | [services.md](services.md) | Service IDs, extraction capabilities, search filters, Kick metadata, retired services and integration requirements |
 | [playback.md](playback.md) | Source selection, FCast setup and limits, queue control, audio focus, history, errors and YouTube proof tokens |
-| [library-data.md](library-data.md) | Local playlists, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
+| [library-data.md](library-data.md) | Local playlists, bookmarks, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Download selection and submission, checkpoints, HLS processing and finished-file sharing |
 | [error-reporting.md](error-reporting.md) | Pagination diagnostics, report timestamp provenance, formatting and remaining exposure |
 | [../GLOSSARY.md](../GLOSSARY.md) | The terms the code and these pages use |
