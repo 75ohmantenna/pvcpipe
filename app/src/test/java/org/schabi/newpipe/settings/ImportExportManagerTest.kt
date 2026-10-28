@@ -123,7 +123,7 @@ class ImportExportManagerTest {
         ImportExportManager(fileLocator) { }.prepareRestore(storedFileHelper, null).use { it.publish() }
         assertEquals(0, db.fileSize())
         assertTrue(dbWal.exists())
-        PendingDatabaseRestore.install(db)
+        PendingDatabaseRestore.install(db, emptyRestorePreferences()) { }
         assertFalse(dbJournal.exists())
         assertFalse(dbWal.exists())
         assertFalse(dbShm.exists())

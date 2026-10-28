@@ -279,9 +279,10 @@ class BackupValidationTest {
             backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_ONLY).test().assertComplete()
             assertArrayEquals(originalDatabase, Files.readAllBytes(database))
             assertArrayEquals(archiveBytes, Files.readAllBytes(path))
-            val pending = database.resolveSibling("${database.fileName}.restore")
+            val pending = PendingDatabaseRestore.pendingDatabase(database)
             assertDatabase(pending, Migrations.DB_VER_9, "restored")
-            Files.delete(pending)
+            assertEquals(null, activate())
+            originalDatabase = Files.readAllBytes(database)
             assertCleaned()
         }
     }
@@ -293,10 +294,11 @@ class BackupValidationTest {
             val path = archive(Files.readAllBytes(schema(9)))
             backups.restore(inspect(path), choice).test().assertComplete()
             assertArrayEquals(originalDatabase, Files.readAllBytes(database))
+            assertEquals(mapOf("original" to "settings"), preferences.all)
+            assertEquals(null, activate())
             assertEquals(Uri.fromFile(path.toFile()).toString(), preferences.getString("location", null))
             assertEquals(choice == BackupRestore.RestoreChoice.DATABASE_ONLY, preferences.contains("original"))
             assertEquals(choice == BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS, preferences.getBoolean("restored", false))
-            PendingDatabaseRestore.install(database)
             assertDatabase(database, 9, "restored")
             originalDatabase = Files.readAllBytes(database)
             assertCleaned()
@@ -347,7 +349,7 @@ class BackupValidationTest {
         val path = archive(Files.readAllBytes(schema(9)), "{broken JSON")
         backups.restore(inspect(path), BackupRestore.RestoreChoice.DATABASE_ONLY).test().assertComplete()
         assertEquals("settings", preferences.getString("original", null))
-        assertDatabase(database.resolveSibling("${database.fileName}.restore"), 9, "restored")
+        assertDatabase(PendingDatabaseRestore.pendingDatabase(database), 9, "restored")
         assertCleaned()
     }
 
@@ -364,9 +366,11 @@ class BackupValidationTest {
         val inspection = inspect(path)
         assertEquals(BackupRestore.PreferenceFormat.LEGACY_SERIALIZED, inspection.preferenceFormat())
         backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS).test().assertComplete()
+        assertEquals("settings", preferences.getString("original", null))
+        assertDatabase(PendingDatabaseRestore.pendingDatabase(database), 9, "restored")
+        assertEquals(null, activate())
         assertTrue(preferences.getBoolean("restored", false))
         assertFalse(preferences.contains("original"))
-        assertDatabase(database.resolveSibling("${database.fileName}.restore"), 9, "restored")
         assertCleaned()
     }
 
@@ -384,9 +388,15 @@ class BackupValidationTest {
         published.close()
         published.close()
         assertTrue(PendingDatabaseRestore.hasPending(database))
-        assertDatabase(database.resolveSibling("${database.fileName}.restore"), 9, "restored")
+        assertDatabase(PendingDatabaseRestore.pendingDatabase(database), 9, "restored")
         assertCleaned()
     }
+
+    private fun activate() = PendingDatabaseRestore.install(
+        database,
+        PendingDatabaseRestore.preferenceStore(preferences),
+        BackupDatabaseValidator(context)
+    )
 
     private fun assertDatabase(path: Path, version: Int, search: String) {
         SQLiteDatabase.openDatabase(path.toString(), null, SQLiteDatabase.OPEN_READONLY).use { db ->

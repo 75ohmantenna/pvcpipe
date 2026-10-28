@@ -109,18 +109,21 @@ public class BackupRestoreIntegrationTest {
     }
 
     @Test
-    public void realPreferencesAndFilesCommitBeforeStartupActivation() throws IOException {
+    public void realPreferencesAndFilesCommitDuringStartupActivation() throws IOException {
         final Uri uri = archive(true);
         final var inspection = backups.inspect(uri).blockingGet();
         backups.restore(inspection, BackupRestore.RestoreChoice.DATABASE_AND_SETTINGS)
                 .test().assertComplete();
-        assertFalse(preferences.contains("original"));
-        assertTrue(preferences.getBoolean("restored", false));
-        assertEquals(uri.toString(), preferences.getString("location", null));
+        assertEquals("settings", preferences.getString("original", null));
+        assertFalse(preferences.contains("restored"));
         assertEquals(1, restarts);
         assertEquals("live database", Files.readString(database));
         assertTrue(Files.exists(directory.resolve("newpipe.db-wal")));
-        PendingDatabaseRestore.install(database);
+        assertEquals(null, PendingDatabaseRestore.install(database,
+                PendingDatabaseRestore.preferenceStore(preferences), path -> { }));
+        assertFalse(preferences.contains("original"));
+        assertTrue(preferences.getBoolean("restored", false));
+        assertEquals(uri.toString(), preferences.getString("location", null));
         assertEquals("restored database", Files.readString(database));
         assertFalse(Files.exists(directory.resolve("newpipe.db-wal")));
     }

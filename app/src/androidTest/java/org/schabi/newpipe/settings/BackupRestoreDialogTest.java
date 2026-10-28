@@ -275,7 +275,7 @@ public class BackupRestoreDialogTest {
             assertEquals(null, dialog());
             return null;
         });
-        assertStaged(uri, false);
+        assertStagedThenActivate(uri, false);
     }
 
     @Test
@@ -305,7 +305,7 @@ public class BackupRestoreDialogTest {
         });
         instrumentation.waitForIdleSync();
         assertFalse(onMain(dialog::isShowing));
-        assertStaged(uri, withSettings);
+        assertStagedThenActivate(uri, withSettings);
     }
 
     private void assertDestroyedDuringInspection(final BackupRestore.PreferenceFormat format)
@@ -576,16 +576,20 @@ public class BackupRestoreDialogTest {
         assertEquals(null, restoreFailure);
     }
 
-    private void assertStaged(final Uri uri, final boolean withSettings) throws IOException {
+    private void assertStagedThenActivate(final Uri uri, final boolean withSettings)
+            throws IOException {
+        assertEquals(Map.of("original", "settings"), preferences.getAll());
+        assertTrue(PendingDatabaseRestore.hasPending(database));
+        assertEquals("restored database", Files.readString(
+                PendingDatabaseRestore.pendingDatabase(database)));
+        assertEquals("live database", Files.readString(database));
+        assertEquals("live WAL", Files.readString(directory.resolve("newpipe.db-wal")));
+        assertEquals(null, PendingDatabaseRestore.install(database,
+                PendingDatabaseRestore.preferenceStore(preferences), path -> { }));
         final Map<String, Object> expected = new HashMap<>();
         expected.put(withSettings ? "restored" : "original", withSettings ? true : "settings");
         expected.put("location", uri.toString());
         assertEquals(expected, preferences.getAll());
-        assertTrue(PendingDatabaseRestore.hasPending(database));
-        assertEquals("restored database",
-                Files.readString(directory.resolve("newpipe.db.restore")));
-        assertEquals("live database", Files.readString(database));
-        assertEquals("live WAL", Files.readString(directory.resolve("newpipe.db-wal")));
         assertEquals(1, restarts);
         assertEquals(null, restoreFailure);
     }

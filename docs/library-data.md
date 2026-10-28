@@ -178,47 +178,72 @@ this check:
   the migration runs at the next start and has to read it. Add a key there
   when a migration changes a type.
 
-**Restore.** A restore never touches the open database:
+**Restore.** Preparation leaves the running database and preferences unchanged:
 
-1. It copies the archive to a private file and takes the database, and the
-   settings if the user chose them, from that copy. It verifies each selected
-   entry's size and CRC, then opens and migrates the private database through
-   the app's Room configuration before changing any preferences.
-2. It commits the chosen settings, or a copy of the current preferences for
-   database-only restore. Both choices update the remembered backup document URI.
-3. It publishes the new database as a pending restore and restarts the app.
-4. At the next start,
-   [`PendingDatabaseRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java)
-   moves the pending database into place before any database connection is
-   opened.
+1. It copies the archive to a private file, extracts the selected entries, checks
+   their sizes/CRCs, and opens/migrates the private database with the app's Room
+   configuration. Settings are decoded and normalized only when selected.
+2. It atomically publishes a private `newpipe.db.restore-transaction` directory
+   containing the database and a typed settings intent, then requests restart.
+   Both choices stage the remembered backup document URI. Database-only restore
+   stages a patch; it keeps the preferences present at activation, including edits
+   made after staging. Restore with settings stages a complete replacement.
+3. In the main process's `App.attachBaseContext`, before content providers or
+   `Application.onCreate` can open the database,
+   [`PendingDatabaseRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.kt)
+   verifies and revalidates a fresh copy of the queued database. Phoenix and ACRA
+   helper processes skip activation.
+4. [`RestoreTransaction`](../app/src/main/java/org/schabi/newpipe/settings/export/RestoreTransaction.java)
+   saves the previous preferences and database family (main file, journal, WAL
+   and shared-memory sidecar) and publishes an activation record before changing
+   live data. It atomically replaces the main database before removing old
+   sidecars, commits preferences, then writes a completion record.
 
-A completed restore has staged the database and requested a restart; it has
-not replaced the database in the running process. If restart fails, the
-restore stays pending. While a restore is pending, further restores and
-exports are refused. Accepted work survives screen closure, not application
-process termination.
+The records and snapshots use checksums, forced file writes and directory syncs.
+An interrupted activation without a completion record restores the saved pair
+before startup returns to consumers. Recovery can itself be retried after an
+interruption. If a required undo snapshot is damaged or recovery cannot persist
+its changes, startup fails rather than exposing an unresolved pair. A valid
+completion record prevents replay over later database or preference edits,
+including when transaction cleanup failed. Handled rejection/rollback/cleanup
+errors are reported through the application's error-notification path after
+normal initialization, unless error reporting is disabled. Notification visibility
+also depends on Android notification permission/settings.
 
-Replacing the preferences and publishing the database are two steps, not one
-transaction. If the second fails, the app puts the old preferences back, and
-tries again at the next backup operation if that failed too. A process that
-dies between the steps can leave new settings with the old database. Nothing
-promises that a backup will open after future database migrations.
+Rejected and rolled-back transactions are quarantined in private
+`newpipe.db.restore-rejected-<UUID>` paths. They are retained for diagnosis rather
+than automatically deleted. Successfully completed transactions are retired
+before best-effort deletion; cleanup failure cannot authorize replay. Interrupted
+pre-publication and installation temporaries may also remain on disk. These
+files can require additional private storage; there is no cleanup UI. Validation
+and snapshot copying run synchronously during attach, so launch time and storage
+cost grow with the database size.
+
+A successful restore request has staged work and requested restart; it has not
+activated the replacement in the running process. Before publication, accepted
+work survives screen closure only while its process remains alive. After
+publication, the intent survives process termination. If restart fails, it stays
+pending; further restores and exports are refused until startup handles it.
+Legacy `newpipe.db.restore` files are converted to the same recovery protocol and
+validated before replacement. They preserve the preferences present at startup;
+old versions did not record enough information to undo an earlier settings
+change made before publishing a legacy file.
 
 [`BackupDatabaseValidator`](../app/src/main/java/org/schabi/newpipe/settings/export/BackupDatabaseValidator.kt)
 checks the SQLite header, a positive supported schema version, SQLite integrity,
 Room migrations/schema and foreign-key consistency. Future or otherwise
-unsupported migration paths fail before publication. The private copy's Room
-identity metadata is rebuilt so a matching hash cannot bypass schema validation.
-The candidate is closed with migrations already applied. Snapshot and migration
-sidecar cleanup finishes before preferences can commit; the resulting validated
-database file is then either published or removed when the attempt closes.
-The source archive, live database and its sidecars are not migration targets.
+unsupported migration paths fail before new ZIP restores are published. The
+private copy's Room identity metadata is rebuilt so a matching hash cannot bypass
+schema validation. The candidate closes with migrations applied; the original
+archive and live database are never migration targets. Startup uses a unique
+validation directory so a killed migration's sidecars cannot contaminate a retry.
 
 These checks establish structural compatibility with the current build, not the
 authenticity or meaning of every stored value. Ignored archive entries and
-settings omitted by database-only restore are not decoded or CRC-checked. The
-existing process-death gap between preference commit and database publication
-still applies.
+settings omitted by database-only restore are not decoded or CRC-checked.
+Process-interruption tests and host filesystem syncs do not establish survival
+of arbitrary device power loss or storage failure. Future app migrations may
+also change compatibility.
 
 ## Tests
 
@@ -228,8 +253,10 @@ Unit tests, run by `make ci`:
 [`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
 [`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
 [`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt),
-[`BackupValidationTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupValidationTest.kt) and
-[`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java).
+[`BackupValidationTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupValidationTest.kt),
+[`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java),
+[`RestoreTransactionTest`](../app/src/test/java/org/schabi/newpipe/settings/export/RestoreTransactionTest.java)
+and [`RestoreStartupTest`](../app/src/test/java/org/schabi/newpipe/settings/RestoreStartupTest.kt).
 
 Instrumentation tests on a device, not in `make ci`:
 [`FeedRefreshDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/feed/service/FeedRefreshDatabaseTest.kt),
@@ -246,6 +273,16 @@ with real files/preferences and controlled restart/report callbacks. Its version
 2–9 fixtures use exported Room schemas; the version-1 fixture is constructed from
 the inputs consumed by migration 1 → 2, since schema 1 is not exported.
 [building.md](building.md) says where it is safe to run them.
+
+`RestoreTransactionTest` uses actual host files, a controlled text-database
+validator and typed disk preferences. Child JVMs halt without cleanup at selected
+publication, activation, rollback and retirement checkpoints, then another JVM
+recovers the same files. `RestoreStartupTest` separately exercises production
+`App.attachBaseContext`, SQLite validation and Android preferences under
+Robolectric API 26; it uses controlled process-role/ACRA hooks and suppresses main-process
+`onCreate` initialization; its helper test calls the production early-return path. Its interrupted-commit case injects an `Error` in the
+same JVM. Neither suite establishes Android process scheduling, physical storage
+durability or hardware behavior.
 
 These tests exercise controlled workflow failures and local persistence.
 The feed and subscription Room tests supply extraction results rather than

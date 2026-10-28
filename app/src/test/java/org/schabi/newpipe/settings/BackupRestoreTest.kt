@@ -58,8 +58,9 @@ class BackupRestoreTest {
         restore.test().assertComplete()
         assertEquals(1, environment.restarts)
         assertEquals(1, environment.cleanups)
+        assertEquals(mapOf("original" to "settings"), environment.values)
+        assertEquals(null, environment.activate())
         assertFalse(environment.values.containsKey("original"))
-        PendingDatabaseRestore.install(environment.database)
         assertTrue(Files.size(environment.database) > 0)
         assertFalse(Files.exists(temporary.root.toPath().resolve("newpipe.db-wal")))
     }
@@ -167,6 +168,8 @@ class BackupRestoreTest {
         }
         assertEquals(1, environment.restarts)
         assertTrue(environment.errors.isEmpty())
+        assertEquals("settings", environment.values["original"])
+        assertEquals(null, environment.activate())
         assertFalse(environment.values.containsKey("original"))
     }
 }
