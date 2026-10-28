@@ -625,8 +625,10 @@ not establish runtime failures, and this gate does not exercise API 37 devices.
 ## Repository-wide documentation follow-up — 2026-10-28
 
 Started with a clean checkout on `master` at
-`6b4d4bf01fc976bcbfae99fda1548f5ab13e8573`. Changes remain local; no commit,
-push, PR, issue, comment or other remote mutation was made. Root `AGENTS.md`
+`6b4d4bf01fc976bcbfae99fda1548f5ab13e8573`. At the end of this documentation
+pass, changes remained local; no commit, push, PR, issue, comment or other remote
+mutation had been made. The separately authorized implementation follow-up below
+also covers committing, merging and pushing the accumulated changes. Root `AGENTS.md`
 and `/home/user/.codex/RTK.md` were read before inspection; no nested
 `AGENTS.md` was found. Repository and device-safety rules remain unchanged.
 
@@ -681,7 +683,9 @@ comment or a new hardware campaign.
   Test descriptions identify their actual kiosk subset and downloader-selection
   behavior rather than claiming complete service or universal generator coverage.
   The review correction below removes the inherited null-list wording that this
-  pass initially repeated; null lists remain an implementation defect, not a contract.
+  pass initially repeated. At that point null lists remained an implementation
+  defect, not a contract; the separately authorized implementation follow-up below
+  corrects their handling.
 - Remaining corrections cover the real Checkstyle tag settings, standalone
   extractor version validation limits, debounce completion API, timestamp-request
   dispatch, duration truncation, blocking image loads, seek-option resource
@@ -695,7 +699,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 
 | Finding | Implementation and evidence limit |
 | --- | --- |
-| Null stream lists are not handled safely | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L147) stores getter results through setters without normalization. Its source check dereferences the video list unconditionally and the audio list when the video list is empty, before checking manifest URLs. Null video/audio lists can therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reaches callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). Getter comments now require empty lists for absence. Null normalization or enforceable nonnull contracts require a separate code change; no signature, annotation or behavior was changed here. |
+| Null stream lists were not handled safely at the audited revision | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L148) stored getter results through setters without normalization. Its source check dereferenced the video list unconditionally and the audio list when the video list was empty, before checking manifest URLs. Null video/audio lists could therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reached callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). The documentation-only pass changed no signatures, annotations or behavior. The separately authorized [null-list correction below](#null-list-implementation-follow-up--2026-10-28) now normalizes those results. |
 | ZIP inspection is not format validation | [`ZipHelper.isValidZipFile`](../app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) opens/closes a `ZipInputStream` without reading a header; [`BackupRestore.inspect`](../app/src/main/java/org/schabi/newpipe/settings/BackupRestore.java#L126) uses the result. A standalone JDK probe accepts synthetic plain text and finds no entry. This mirrors the stream boundary, not the complete Android workflow. |
 | Non-SQLite database can reach staging | [`ImportExportManager.prepareRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checks entry presence/nonzero size before publication; [`PendingDatabaseRestore.install`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moves it before database opening. Placeholder/rollback tests do not establish SQLite openability. Startup behavior for a malformed database was not exercised. |
 | Bookmark save may clear a newer draft's dirty flag | [`BookmarkFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) uses unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). Intervening edits are a suspected race; no new scheduling regression was added. |
@@ -780,3 +784,55 @@ including bounds checks on 17 code-line references. Incremental diff review
 confirmed that only these four Java comment edits and this record changed from
 the reviewed working tree; Java executable tokens are unchanged. No full
 `make ci`, JVM tests, live-network extraction or device checks were rerun.
+
+### Null-list implementation follow-up — 2026-10-28
+
+After the documentation review, the user explicitly authorized a separate code
+fix, regression coverage, adversarial review, signed commits, a local merge and
+a push to `github.com/75ohmantenna/pvcpipe`. The documentation corrections remain
+a separate commit from this implementation change. The starting revision is
+still `6b4d4bf01fc976bcbfae99fda1548f5ab13e8573`.
+
+The three `StreamInfo` stream-list setters now convert null inputs to empty
+lists, retaining supplied nonnull lists. This also protects results assembled
+through `StreamInfo.getInfo`. Source admission still requires audio, combined
+video, DASH or HLS; video-only streams alone still fail. With an admitted source,
+optional getter failures remain in the returned info's diagnostics. An explicit
+audio `ContentNotSupportedException` still aborts extraction. This correction
+does not validate individual list elements or migrate previously serialized
+objects that bypass the setters.
+
+The new offline `StreamInfoTest` invokes the real assembly path with synthetic
+extractor metadata and a downloader that rejects network requests. Its 38 cases
+cover all eight null/empty combinations with DASH and HLS, missing sources,
+video-only rejection, live manifest-only metadata, retained audio/video sources,
+public setter clearing and the existing exception paths. Against the unchanged
+implementation, 28 cases failed and ten controls passed; with the setter guards,
+all 38 passed. An earlier fixture initialization error (a required video-builder
+flag was missing) was corrected before recording this red/green baseline.
+Manifest cases establish `StreamInfo` admission, not downstream resolver
+selection or successful media playback.
+
+Two adversarial self-review passes examined the actual short-circuit/source
+admission path and the API/error-handling boundaries. They added live-manifest
+coverage and checked that normalization does not swallow exceptions, copy
+nonnull lists or strengthen serialization guarantees. These are self-reviews
+and offline JVM results, not independent reviews or live-service, Android-engine,
+emulator or receiver observations. The other suspected defects and UI-text
+proposals above remain open.
+
+Fresh verification of the combined documentation and implementation tree:
+
+| Check | Result |
+| --- | --- |
+| `make ci` | Passed all five serial Gradle stages, including debug lint and both debug/release APK assembly; Gradle reused cached/up-to-date outputs where reported. The fixture tool's 12 tests passed, and 685 recordings needed no replacements. |
+| JVM reports | Build logic: 3 tests (up-to-date); app: 1,044; offline extractor: 651, including 3 skips and all 38 new regressions. No failures or errors. Existing suites use their own mocks, recordings or controlled peers; these counts do not establish live-service or device behavior. |
+| Android lint | Passed; the debug XML report contains 59 warnings and no errors. This was static analysis, not instrumentation. |
+| JavaDoc | `:pvcpipe-extractor:extractor:javadoc` passed after the final source changes, reporting 100 missing-documentation/tag warnings. |
+| Documentation checks | All 200 local prose links resolved, including bounds checks on 17 source-line references; all 363 tracked XML files parsed. Changed-file `codespell` and staged/unstaged `git diff --check` passed. |
+| Preservation and review | All 40 previously changed source/config/resource files retain executable tokens and values. The only production-code changes are the three setter guards; regression coverage is a new test file. Existing test assertions, legal notices, dependencies, configuration values and repository/device safety rules remain unchanged. |
+
+Generated output, caches, binaries and third-party material remain excluded from
+documentation editing. No emulator/device access, instrumentation, package
+installation/uninstall, data clearing, live extraction or physical receiver
+check was performed for this implementation follow-up.

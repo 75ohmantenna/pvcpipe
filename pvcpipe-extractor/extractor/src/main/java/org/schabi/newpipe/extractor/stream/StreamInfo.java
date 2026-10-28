@@ -43,6 +43,7 @@ import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 
 /**
  * Info object for opened contents, i.e. the content ready to play.
+ * Stream-list setters normalize null inputs to empty lists.
  */
 public class StreamInfo extends Info {
     private static final String TAG = StreamInfo.class.getSimpleName();
@@ -592,7 +593,7 @@ public class StreamInfo extends Info {
     }
 
     public void setVideoStreams(final List<VideoStream> videoStreams) {
-        this.videoStreams = videoStreams;
+        this.videoStreams = videoStreams == null ? List.of() : videoStreams;
     }
 
     public List<AudioStream> getAudioStreams() {
@@ -600,7 +601,7 @@ public class StreamInfo extends Info {
     }
 
     public void setAudioStreams(final List<AudioStream> audioStreams) {
-        this.audioStreams = audioStreams;
+        this.audioStreams = audioStreams == null ? List.of() : audioStreams;
     }
 
     public List<VideoStream> getVideoOnlyStreams() {
@@ -608,7 +609,7 @@ public class StreamInfo extends Info {
     }
 
     public void setVideoOnlyStreams(final List<VideoStream> videoOnlyStreams) {
-        this.videoOnlyStreams = videoOnlyStreams;
+        this.videoOnlyStreams = videoOnlyStreams == null ? List.of() : videoOnlyStreams;
     }
 
     public String getDashMpdUrl() {

@@ -299,7 +299,7 @@ public abstract class StreamExtractor extends Extractor {
 
     /**
      * Returns available audio-only streams. Implementations should return an empty list when
-     * none are available; {@link StreamInfo} does not handle null stream lists safely.
+     * none are available; {@link StreamInfo} normalizes null results to empty lists.
      * {@link StreamInfo} requires at least one audio stream, combined video stream, DASH URL
      * or HLS URL. Video-only streams alone do not satisfy that extraction check.
      *
@@ -309,7 +309,6 @@ public abstract class StreamExtractor extends Extractor {
 
     /**
      * Returns video streams that include audio, or an empty list if none are available.
-     * Implementations should not return null; {@link StreamInfo} does not handle it safely.
      * See {@link #getAudioStreams()} for the minimum source requirements in {@link StreamInfo}.
      *
      * @return combined video/audio streams
@@ -318,7 +317,6 @@ public abstract class StreamExtractor extends Extractor {
 
     /**
      * Returns video streams without audio, or an empty list if none are available.
-     * Implementations should not return null; {@link StreamInfo} passes it on to callers.
      * These are optional and do not alone satisfy {@link StreamInfo}'s source requirements.
      *
      * @return video-only streams
