@@ -1144,3 +1144,94 @@ These are host-JVM and build results. This follow-up accessed no device or
 emulator and ran no instrumentation or live-service checks. The restore emulator
 results above remain evidence of their stated revision and scenarios. Other
 open audit findings and UI-text proposals remain separate.
+
+### Bookmark emulator validation — 2026-10-28
+
+Started from clean `master` at `9ceed01c296010f314255c00afa1bfdbe655875c`,
+on branch `test-bookmark-emulator-ownership`. This follow-up adds Android
+validation for the bookmark correction above; the earlier host results remain
+evidence of their own run. Android CLI started the existing disposable
+`pvcpipe_restore_api26_20261028` AVD as `emulator-5554`, Android 8.0/API 26 x86_64.
+The connected physical Pixel was not accessed.
+
+`BookmarkEmulatorTest` launches the actual `MainActivity` and bookmark fragment,
+uses touch drags, long presses and delete dialogs, and observes real
+`FragmentManager` callbacks. It temporarily swaps the process's database
+singleton for an in-memory Room database with real Android SQLite, restoring the
+singleton, three preference overrides and image-quality state afterwards.
+Test-only latches hold the existing production write scheduler; SQL triggers
+abort either table's update. Metadata fixtures use local PNG files and synthetic
+URLs without loading a service. Production sources, runners and build values
+are unchanged.
+
+The host refuses physical-device serials, verifies the exact AVD, emulator
+properties and both installed APK hashes, then writes a private nonce required
+by the fixture. Signers matched before updates: Android CLI installed the app
+with replacement enabled, and targeted `adb install -r -t` updated only the test
+APK. Direct instrumentation selects only the guarded class. No Gradle-managed
+device task, package uninstall or app-data clearing was used.
+
+Development attempts were not passing matrix runs. The first fixture wrote an
+integer to the service-name preference and crashed during activity creation.
+That unnecessary override was removed; only the integer introduced on the
+disposable emulator was repaired. The next probe was covered by the queued crash
+report from that failure. A subsequent upward drag stopped at the target's drop
+threshold; crossing the row center and allowing the drop animation to finish
+corrects the gesture. Both drags then passed, but an accessibility action did not
+activate the delete menu; the fixture now taps its screen coordinates. An
+attempted accessibility handoff also failed to compile because `destroy` is not
+in the public SDK; the fixture uses `FLAG_DONT_USE_ACCESSIBILITY` instead.
+
+The focused drag/delete probe then passed. The first complete seven-case run
+passed five cases, including both SQL rollback/retry directions and both
+view-recreation paths. It failed two fixture checks: an immediate pop had removed
+the fragment but its exit effect had not yet delivered destruction, and the
+thumbnail helper attempted to draw a hardware bitmap on a software canvas.
+The checks now wait for the actual destruction state and read a software copy
+of the bitmap loaded into the real ImageView. The lifecycle expectation and
+thumbnail color assertions remain required.
+
+The next run passed six cases, including bitmap/name preservation; its screenshot
+was visually inspected. Waiting on the removed object's current lifecycle state
+still failed: the APK uses AndroidX Fragment 1.8.9, whose `detach` path calls
+`Fragment.initState` and replaces its lifecycle registry after destruction.
+Recursive lifecycle callbacks also include child fragments. The final witness
+selects only the top-level bookmark owner and requires its destruction callback
+and cleared saver before creating the replacement. Android CLI layout requests
+returned instrumentation-server errors; screen capture worked and was used as
+the visual fallback.
+
+The final complete run at `/tmp/pvcpipe-bookmark-emulator-run4` passed all seven
+cases (`OK (7 tests)`, 86.052 seconds including the visual pause). Per-case JSON,
+the runner output, APK hashes and the final summary remain there. Both tested
+APKs were copied to `/tmp/pvcpipe-bookmark-emulator-final-apks`. The final
+`metadata-screen.png` was visually inspected before releasing the test: it shows
+`Remote newer`, `Beta`, `Alpha newer` and `Gamma`, with the updated blue thumbnails
+and remote count 91. Layout-server failures above are not counted as passing
+layout checks.
+
+| Emulator scenario | Observed result |
+| --- | --- |
+| Rapid drag/delete during pending writes | An older write completed while the newer draft stayed dirty and retained its pending deletion. Releasing the newer write persisted the complete new order and deletion. |
+| Accepted save without a view | The write and acknowledgment completed while the actual fragment had no view; reattachment created a different view and loaded the saved order. |
+| Pending save and view recreation | The same fragment's replacement view retained the newer draft through an older acknowledgment, then saved it. |
+| Replacement fragment owner | Actual destruction cleared the old saver; a new fragment at the same revision stayed dirty after the old owner's completion and then persisted its own order. |
+| Remote-table SQL failure | The local deletion and order changes rolled back. The snackbar left the draft intact through view recreation; a new save succeeded after removing the trigger. |
+| Local-table SQL failure | A remote deletion and earlier remote index update rolled back. Retry removed only the intended remote row, preserving the local row with the same numeric ID. |
+| Concurrent metadata and missing row | A stale order save preserved newer local/remote names, thumbnail metadata and remote count, and did not recreate an externally removed remote bookmark. Reload displayed the newer names and blue image targets. |
+| Default database isolation | Main-file and empty journal hashes matched before/after. WAL and SHM files were absent at both boundaries; this run does not verify active-WAL preservation. The fixture's writes used its in-memory database. |
+
+These are API 26 x86_64 emulator observations with controlled queue timing,
+injected SQL failures and synthetic metadata. They do not establish physical
+device scheduling, API 37 runtime behavior, live-service metadata update policy,
+process-death draft recovery or power-loss durability. The prior restore/WAL
+results remain separate evidence of their own scenarios.
+
+| Local verification | Result |
+| --- | --- |
+| `make ci` | Passed all five serial Gradle stages, including debug/release assembly. Sanitizer: 12 tests, 685 recordings, no replacements. JVM stages reused up-to-date results: app 1,118; offline extractor 651 with 3 skips; build logic 3. No failures/errors. |
+| Static analysis | App/extractor Checkstyle, ktlint and dependency ordering passed. Debug lint passed with 59 warnings and no errors, matching the preceding baseline count. |
+| Instrumentation build | The inspected initial dry-run had 103 formatting/build tasks and no device task. Debug app/test APK builds passed; the final matrix ran direct instrumentation, independently of Gradle. |
+| Host tooling | Python compilation and a physical-serial rejection probe passed. The driver required seven successful case records and the complete JUnit success result; earlier partial runs were not accepted. |
+| Documentation/review | All 217 local Markdown links and 12 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Adversarial self-review covered lifecycle ownership, queue gates, both rollback directions, target/nonce guards, result parsing, setup/teardown and the actual Fragment 1.8.9 implementation; this was not an independent review. |
+| Preservation | Both fixture/driver source hashes remained unchanged through the passing matrix and final gate. Production source, dependencies, SDK/version/application IDs, signing, runners and repository/device safety rules are unchanged. The disposable emulator was stopped after testing; its AVD remains available. |

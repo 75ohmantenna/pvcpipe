@@ -366,6 +366,58 @@ The driver records PID changes, byte hashes, phase results and a final summary.
 It does not use Gradle-managed device tasks, uninstall packages or invoke
 `pm clear`. These are emulator process-death checks, not power-loss tests.
 
+### Disposable bookmark validation
+
+[`BookmarkEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/local/bookmark/BookmarkEmulatorTest.kt)
+uses the real `MainActivity`, bookmark fragment, touch gestures, delete dialogs
+and Android SQLite. Test gates hold the production playlist write queue; SQLite
+triggers inject failures. The fixture temporarily substitutes an in-memory Room
+database, three preference keys and image-quality state, then restores them.
+Restoration runs during completed tests' teardown; a process crash can bypass it.
+Names and thumbnail updates use synthetic metadata and local PNG files.
+
+Use a disposable emulator, created as described above. Verify its AVD name and
+emulator property **before installing** anything. For an update, verify signer
+compatibility first, following [the device-safety procedure](local-playlist-mutations.md).
+No Gradle-managed device task is needed.
+
+```sh
+(
+set -e
+bookmark_avd=pvcpipe_bookmarks_api26_demo
+bookmark_serial=emulator-5554
+android emulator start "$bookmark_avd" --cold --headless
+test "$(adb -s "$bookmark_serial" emu avd name | head -n 1 | tr -d '\r')" = "$bookmark_avd"
+test "$(adb -s "$bookmark_serial" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+./gradlew --no-daemon --no-continue :app:assembleDebug :app:assembleDebugAndroidTest
+android install --device "$bookmark_serial" --apks app/build/outputs/apk/debug/app-debug.apk \
+  --install-options=-r --use-delta-install=false
+adb -s "$bookmark_serial" install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+bookmark_results=$(mktemp -d -t pvcpipe-bookmarks.XXXXXX)
+python3 tools/bookmark_emulator_validation.py \
+  --serial "$bookmark_serial" --avd-name "$bookmark_avd" --allow-disposable \
+  --output "$bookmark_results/results"
+)
+```
+
+The [host driver](../tools/bookmark_emulator_validation.py) refuses physical
+serials, checks the exact AVD, emulator properties and installed APK hashes, then
+creates a nonce marker required by the fixture. Ordinary discovery skips these
+tests without the explicit host arguments. The driver records all seven cases,
+JUnit output and before/after hashes of the default database family. It does not
+install, uninstall or clear app data.
+
+With `--visual`, the metadata case pauses for up to 120 seconds. Inspect it with
+`android layout --device <serial> --output <json-path>` and
+`android screen capture --device <serial> --output <png-path>`;
+view the PNG before continuing. Then create the printed `visual-release` marker
+with `adb -s <serial> shell run-as org.seventyfiveohmantenna.pvcpipe.debug touch <printed-path>`.
+If the CLI layout server cannot respond during instrumentation, use the visually
+inspected PNG as the fallback and record the failed layout request separately.
+These checks cover actual fragment transitions on the selected emulator, using
+controlled write timing and synthetic data. They do not test power loss,
+process-death draft recovery or live service metadata updates.
+
 ## Conventions the checks enforce
 
 - Java follows `checkstyle/checkstyle.xml`, with exceptions in
