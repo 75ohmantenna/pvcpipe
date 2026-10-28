@@ -27,6 +27,10 @@ val pvcpipeVersion = PvcVersion.name(
         .asText.get()
 )
 
+// A separately installed, emulator-guarded runner holds restore checkpoints before App startup.
+val restoreFixture = providers.gradleProperty("pvcpipe.restoreFixture")
+    .map { it.toBooleanStrict() }.getOrElse(false)
+
 val releaseSigningOverride = providers.environmentVariable("PVCPIPE_SIGNING_PROPERTIES")
 val releaseSigningFile = layout.projectDirectory.file(
     releaseSigningOverride.orElse(
@@ -59,7 +63,14 @@ configure<ApplicationExtension> {
         versionCode = PvcVersion.code(pvcpipeVersion)
         System.getProperty("versionNameSuffix")?.let { versionNameSuffix = it }
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = if (restoreFixture) {
+            "org.schabi.newpipe.settings.RestoreFixtureRunner"
+        } else {
+            "androidx.test.runner.AndroidJUnitRunner"
+        }
+        if (restoreFixture) {
+            testApplicationId = "org.seventyfiveohmantenna.pvcpipe.debug.restorefixture"
+        }
     }
 
     val releaseSigningConfig = releaseSigningProperties?.let { properties ->

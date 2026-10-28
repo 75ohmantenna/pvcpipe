@@ -307,6 +307,61 @@ A live-network test establishes only what a site returned during that run.
 Avoid bursts of requests. [odysee-observations.md](odysee-observations.md)
 records a media host becoming unavailable during repeated test requests.
 
+### Disposable restore validation
+
+[`RestoreEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/RestoreEmulatorTest.kt)
+and [`restore_emulator_validation.py`](../tools/restore_emulator_validation.py)
+replace the debug app's **default database and preferences** on a new disposable
+emulator. Do not use an existing user installation. Ordinary test discovery skips
+the phase driver unless its explicit host arguments are present.
+
+Use Android CLI to inspect profiles and create/start a new AVD. Its presets select
+their own system image. To select API 26 explicitly, the SDK's `avdmanager` can
+create a uniquely named AVD from `system-images;android-26;default;x86_64`; start
+that AVD with `android emulator start <name> --cold --headless`. Verify the serial,
+AVD name and boot completion before installing anything. Every device command
+must name that emulator explicitly.
+
+Save both test APKs: the opt-in fixture build has its own test application ID and
+runner, but writes to the same Gradle output path as the normal test APK. The
+fixture runner substitutes a bare Application for controlled interruption phases;
+normal verification uses the debug App's inherited production startup recovery.
+Production application IDs and the default instrumentation runner are unchanged.
+
+```sh
+# Set these to the newly created disposable AVD and its reported emulator serial.
+restore_avd=pvcpipe_restore_api26_demo
+restore_serial=emulator-5554
+adb -s "$restore_serial" emu avd name
+adb -s "$restore_serial" shell getprop sys.boot_completed
+restore_artifacts=$(mktemp -d -t pvcpipe-restore-apks.XXXXXX)
+
+./gradlew --no-daemon --no-continue :app:assembleDebug :app:assembleDebugAndroidTest
+cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk "$restore_artifacts/normal.apk"
+./gradlew --no-daemon --no-continue -Ppvcpipe.restoreFixture=true :app:assembleDebugAndroidTest
+cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk "$restore_artifacts/fixture.apk"
+
+android run --device "$restore_serial" --apks app/build/outputs/apk/debug/app-debug.apk \
+  --activity org.schabi.newpipe.MainActivity --install-options=-g
+android install --device "$restore_serial" --apks "$restore_artifacts/normal.apk"
+android install --device "$restore_serial" --apks "$restore_artifacts/fixture.apk"
+python3 tools/restore_emulator_validation.py \
+  --serial "$restore_serial" --avd-name "$restore_avd" --allow-disposable \
+  --test-apk "$restore_artifacts/normal.apk" --fixture-apk "$restore_artifacts/fixture.apk" \
+  --output "$restore_artifacts/results"
+```
+
+The host checks the exact AVD name, emulator properties and all three installed
+APK hashes. A private nonce marker and runner checks guard fixture writes.
+Nonterminal phases publish evidence and remain alive for host SIGKILL, or for the
+production ProcessPhoenix restart outside target instrumentation, driven through
+the real settings dialog and system document picker using Android CLI. Terminal verification runs in a fresh normal
+app process. Interrupted activation/rollback use production recovery with a
+test-only filesystem checkpoint; they do not pause `App.attachBaseContext` itself.
+The driver records PID changes, byte hashes, phase results and a final summary.
+It does not use Gradle-managed device tasks, uninstall packages or invoke
+`pm clear`. These are emulator process-death checks, not power-loss tests.
+
 ## Conventions the checks enforce
 
 - Java follows `checkstyle/checkstyle.xml`, with exceptions in

@@ -984,3 +984,88 @@ was performed. Host results do not certify Android process scheduling or arbitra
 power-loss/storage durability. Startup validation/copying is synchronous, and
 retained failed snapshots have no cleanup UI. Other open audit findings and
 unrelated UI-text proposals remain separate.
+
+
+### Restore emulator validation — 2026-10-28
+
+Started from clean `master` at `ba1c45014d96e0de52d06184e996e19781a56a1f`,
+on branch `test-restore-emulator-recovery`. The user requested Android CLI device
+creation and Android checks of both restore choices, interrupted activation and
+rollback, and preservation of existing database/WAL data. Earlier host-only
+results above remain evidence of their own runs.
+
+Android CLI 1.1.16717390 created its `medium_phone` preset with an API 36 Play
+Store image. That new AVD timed out during first boot after 300 seconds, before
+PVCPipe installation. The CLI create command exposes presets without an API-level
+option. A separate `pvcpipe_restore_api26_20261028` AVD was therefore created with
+the SDK's installed API 26 default x86_64 image and software rendering, then
+started using Android CLI. It booted as `emulator-5554`, Android 8.0/API 26,
+fingerprint `Android/sdk_phone_x86_64/generic_x86_64:8.0.0/OSR1.180418.004/4931640:userdebug/test-keys`.
+A connected physical Pixel was left untouched. All installs, UI inspection,
+instrumentation and process signals targeted the disposable emulator explicitly.
+
+The existing 16 `BackupRestoreDialogTest` cases passed on that emulator. Their
+archive/database payloads remain controlled text fixtures. The new host-driven
+suite uses real Room/SQLite databases and Android preferences. A main-file-only
+control must omit a committed `wal-only` row; a copy with the WAL must contain it.
+Both source choices use JSON settings archives, the real settings dialog/system
+document picker and production ProcessPhoenix restart, driven by Android CLI
+outside target instrumentation. Fault phases use production `RestoreTransaction`
+with a test-only checkpoint, then host SIGKILL. Verification uses a fresh normal
+`DebugApp`, whose inherited `App.attachBaseContext` consumes the recovery journal.
+The fault gate does not intercept `App.attachBaseContext` itself.
+
+The optional `-Ppvcpipe.restoreFixture=true` build changes only the test application
+ID/runner, producing a separately installed, emulator-guarded fixture APK. The
+default runner and production application IDs/signing remain unchanged. The host
+checks all three installed APK hashes, the exact AVD name and per-run nonce;
+fixture phases intentionally replace the disposable app's default database and
+preferences. Ordinary discovery skips the phase driver. No Gradle-managed device
+task, package uninstall or `pm clear` was used.
+
+Initial harness attempts exposed three test assumptions: `adb exec-out` did not
+propagate missing-file status for the process-exit probe; the normal debug
+application is `DebugApp`, not the exact base `App`; and ProcessPhoenix schedules
+its helper asynchronously, so finishing instrumentation immediately after the
+restore callback could cancel the restart. The driver now uses checked shell-v2
+reads, verifies the production App subclass, keeps nonterminal phases alive, and
+requires a new app PID with resumed `MainActivity` for the two choice cases.
+A subsequent run observed a new process but Android instrumentation cleanup
+force-finished its new MainActivity. The UI restore cases now run outside target
+instrumentation, with instrumentation used only for terminal verification.
+Those failed attempts were harness failures, not successful matrix runs. Normal
+startup then consumed the earlier staged database-only request, and its terminal
+data/settings verification passed before the complete rerun.
+
+The final complete run (`/tmp/pvcpipe-restore-device-run5`) passed all 11 scenarios,
+with 20 explicit host SIGKILLs. The UI database-only restore changed PID 6336 →
+6502; restore with settings changed 6769 → 6896. Both new processes resumed the
+real MainActivity before fresh terminal instrumentation verified their data.
+Remembered SAF document URIs reopened the selected archive byte-for-byte after
+restart. Per-phase JSON, instrumentation/CLI logs, UI layouts, APK hashes and the
+summary remain in that evidence directory. A separate real-archive dialog capture
+was visually inspected at `/tmp/pvcpipe-restore-api26-real-dialog.png`.
+
+| Android scenario | Observed result |
+| --- | --- |
+| Both UI restore choices | Passed real document selection, overwrite confirmation, the selected restore action, production restart and fresh-process database/settings assertions. |
+| Database-only staging | Passed preservation of preference edits made after publication and before activation. |
+| Modified queued DB and invalid legacy pending DB | Both rejected; original main/WAL bytes and tested typed preferences preserved. |
+| Interrupted activation | Kills after main-file replacement, WAL removal and preference commit all recovered the original main/WAL bytes, committed WAL-only row and tested preferences. |
+| Interrupted rollback | Kills after restoring the old main file and after restoring the WAL both recovered correctly on another startup. The host accounts for whether the fixture had a rollback journal and checks restored WAL hashes at the gate. |
+| Completed restore with later edits | Later database rows and preference edits survived completion-record cleanup without replay. |
+
+| Local verification | Result |
+| --- | --- |
+| `make ci` | Passed all five serial Gradle stages, including debug/release assembly. Sanitizer: 12 tests and 685 recordings, no replacements. JVM reports reused up-to-date results: app 1,094; offline extractor 651 with 3 skips; build logic 3. No failures/errors. |
+| Final harness checks | After the UI-harness changes, normal and fixture test APK builds passed. Final app Checkstyle, ktlint and debug lint passed; lint reported 59 warnings and no errors. Python compilation and the physical-target rejection probe passed. |
+| Preservation | The four code/configuration hashes remained unchanged through the final matrix/checks. Production source files, application SDK/version/IDs, dependency versions, signing and repository/device safety rules are unchanged. Only the explicit test-runner option adds a separate test ID. |
+
+All 210 local Markdown links and 13 source-line bounds passed across 21 tracked
+Markdown files. Changed-file spelling and final diff whitespace checks passed.
+These are API 26 x86_64 emulator results with small synthetic current-schema
+SQLite archives. Historical-schema migration tests remain host-JVM evidence;
+legacy-settings UI tests retain their controlled payloads. No physical-device,
+API 36 app-runtime or power-loss result is claimed. Service responses were not
+used as validation evidence.
+The disposable AVD remains available for reinspection.
