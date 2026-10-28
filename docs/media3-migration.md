@@ -405,3 +405,81 @@ the release rule. It independently traced the earlier class merging through
 the relevant UI classes separate. The reviewer did not run builds or devices;
 its documentation/evidence findings were checked against the actual snapshots
 and APK metadata before updating this record.
+
+## October 28 physical receiver measurements
+
+After a complete Fire TV reboot, the independent H.264/AAC clip was fetched
+and advanced from zero to ten seconds. The following measurements used the same
+signed APK recorded above, the Pixel 6a, and FCast Receiver 2.1.5-playstore.
+The additional public test item was Tom Scott's "This bus transforms into a
+train" (`Kn56bMZ9OE8`), which exposed original, dubbed and descriptive English
+audio tracks during this run.
+
+| Check | Observed result |
+| --- | --- |
+| Paused handoff | The phone was locally paused at 315.474 seconds. The receiver briefly reported Playing with zero duration during load, then fresh samples settled paused at 315.477 seconds with duration 634.566 seconds and no subsequent position advance. |
+| Paused quality replacement | Selecting 480p produced a new DASH manifest containing 854×480 H.264 video at 30 fps. After a brief Playing-state report during load, receiver and Android snapshots settled paused at 315.477 seconds without subsequent position advance. |
+| Paused speed change | Selecting 1× from 1.25× produced fresh paused receiver samples at speed 1.0, preserving 315.477 seconds. This sequence did not change orientation. |
+| Queue navigation | The queue contained two items. Next selected Tom Scott at index 1 and zero seconds, with receiver duration 303.670 seconds. Previous returned to Big Buck Bunny at index 0 and 320.546 seconds. Next selected the second item again. Each load briefly reported Playing before settling paused at the requested position, with no subsequent position advance. |
+| Alternate audio | At ten seconds, selecting "English descriptive" replaced "English original". Fresh receiver and Android snapshots stayed paused at ten seconds. Served 64 KiB video samples matched before/after, while the 64 KiB AAC audio samples differed. |
+| Play on this device | From remote pause at ten seconds, the action produced local playing state. A rendered local video frame was captured at eleven seconds; a subsequent pause snapshot was at 12.845 seconds. |
+| Interrupted control connection | A temporary TCP relay forwarded the actual phone SDK connection to the Fire TV. The sender advertised v4 and the receiver answered v3; the relay forwarded the bytes unchanged. The connection was cut during playback, with no sender Stop command before the cut. The last relayed receiver clock was 14.542 seconds; Android's remote-session snapshot contained a sender-estimated 15.317 seconds before the cut. Within the first one-second follow-up, the phone reported local pause at an estimated 15.550 seconds and held it in two further snapshots. |
+| On-screen play/pause, final run | Tapping the normal player's play/pause button produced fresh receiver Playing state at 26.232 seconds, then Paused state at 28.611 seconds. Android's session reflected both changes. These two transitions were initiated by the on-screen button, not framework transport dispatch. |
+| Explicit disconnect, final run | Before disconnect, a fresh receiver sample was paused at 28.623 seconds. The dialog's Disconnect action returned the phone to local pause at 28.623 seconds, stable in the follow-up snapshot. The independent receiver observer reported Idle with a zero clock and duration. |
+
+The alternate-audio result verifies selection, replacement media and receiver
+state; the description's audible content was not separately confirmed by the
+user. The earlier picture/sound confirmation applies to Big Buck Bunny. The
+relay result verifies loss of a real v3 control connection without changing the
+phone's Wi-Fi; it does not verify secure v4 behavior or receiver switching.
+
+The brief Playing-state reports during loads are protocol observations, not
+proof of decoded frames or audible output during those intervals. The settled
+paused clocks above do not establish that the receiver never briefly played.
+
+The queue sequence began after a discarded setup attempt: the test driver sent
+`ACTION_HIDE_MAIN_PLAYER`, whose hidden-state cleanup intentionally stops the
+player. A fresh local play/pause and recast established the 320.546-second
+checkpoint before enqueueing. The queue results are not continuous with the
+earlier 315.477-second quality/speed sequence, and the setup error is not counted
+as an enqueue failure.
+
+After the relay cut, the independent observer saw the receiver continue playing
+from its buffer, reaching 43.557 seconds. It went idle after a phone-proxy
+connection error about 28 seconds after the cut. The phone's paused checkpoint
+and the receiver's subsequent advancing clock therefore diverged; this verifies
+the phone's paused recovery, not synchronized stopping of both devices.
+
+An initial disconnect attempt returned the phone to a stable local pause at
+12.849 seconds. A receiver-info snapshot about 35 seconds later contained no
+current media. The independent playback observer had already reached its time
+limit during both Play on this device and that recast/disconnect sequence;
+receiver stopping during Play on this device was not directly observed. The
+later final run separately verified the on-screen play/pause button and explicit
+disconnect with fresh receiver observations, as recorded in the table.
+
+After the source-error exit and cleanup, a later load again produced an
+acknowledgement without fresh receiver playback samples. It remained at
+"Preparing video" and another full Fire TV reboot was requested. This is an
+unresolved intermittent startup observation; these acknowledged-only attempts
+are not counted as successful playback or reliable cold reconnection.
+
+For the final button run, the short MP4 opened the receiver player and was left
+loaded while the app connected. Observation sockets closed during setup; after
+reconnecting the independent observer, fresh samples confirmed the actual
+303.670-second item paused at 26.232 seconds. The lost observer coverage was not
+counted as another receiver failure. The button and disconnect results apply to
+that prepared-receiver context and do not resolve the cold-start observation.
+
+All temporary diagnostic and relay firewall allowances were removed. The phone
+was returned to Termux with its original music volume (14/25) and unmuted state;
+orientation remained unlocked. The installed APK hash and the app's credential-
+and device-encrypted data-directory identities were verified unchanged. No
+instrumentation, uninstall or app-data clear was performed. A second physical
+receiver, secure-v4 receiver and Android Auto/Desktop Head Unit were unavailable.
+
+The documentation received a read-only Opus CLI evidence review. Its corrections
+were checked against the raw protocol journal, app session snapshots and test
+driver actions: load-time Playing reports, continued buffered receiver playback
+after the relay cut, the discarded queue setup, sender-estimated clocks, and
+observer coverage gaps are kept explicit above. The reviewer did not run tests.
