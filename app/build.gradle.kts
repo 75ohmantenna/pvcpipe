@@ -130,9 +130,9 @@ configure<ApplicationExtension> {
 
     packaging {
         jniLibs {
-            // PvcFromHlsRemuxer runs libffmpeg.so as a program. Android lets an app execute a
-            // file only from its nativeLibraryDir, and the installer extracts libraries to
-            // that directory only with legacy packaging.
+            // PvcFromHlsRemuxer executes libffmpeg.so from nativeLibraryDir rather than a
+            // writable app-data directory. Legacy packaging requests an extracted library;
+            // the remuxer cannot execute the binary directly from inside the APK.
             useLegacyPackaging = true
         }
         resources {
@@ -315,7 +315,7 @@ dependencies {
     androidTestImplementation(libs.assertj.core)
 
     /** PVCPipe libraries **/
-    // JavaNetCookieJar, see https://github.com/75ohmantenna/pvcpipe-extractor/issues/123
+    // JavaNetCookieJar adapts the Rumble-only response-cookie policy in PvcCookieManager.
     implementation(libs.squareup.okhttp.urlconnection)
     // HLS parsing, downloading and remuxing shared by supported services
     implementation(libs.evermind.hlsdownloader)

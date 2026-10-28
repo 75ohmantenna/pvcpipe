@@ -8,19 +8,15 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Manage the hosts we want to set cookies here.
+ * Stores response cookies only from {@code rumble.com} and its subdomains.
  * <p>
- * This is done globally as setting it in the service extractor implementation in
- * NewPipeExtractor it is not possible as in cases of redirection and cookie usage
- * we have not yet fetched anything and might need to set cookies
- * to proceed.. This was the case with rumble reported on 20240302 in
- * <a href="https://github.com/pvcpipe/NewPipeExtractor/issues/123">issue#123</a>
- * even though it seems it was only temporary Rumble glitch this functionality is added here.
+ * Installed through {@code JavaNetCookieJar} in the app and live-test HTTP clients so cookies
+ * can participate in redirect handling before a response reaches the extractor. The inherited
+ * {@link CookieManager} handles request-cookie selection from its store.
  * <p>
- * The class has to be used globally within OkHttp. In our cases from within testing
- * (DownloaderTestImpl) here and in DownloaderImpl in NewPipe
- * <p>
- * TODO maybe add also bitchute it may help avoid some exceptions
+ * A Rumble redirect problem was reported on 2024-03-02, referenced in the pre-rebrand source as
+ * <a href="https://github.com/bravenewpipe/NewPipeExtractor/issues/123">issue #123</a>.
+ * That historical report does not establish that every Rumble request needs cookies.
  */
 public class PvcCookieManager extends CookieManager {
 

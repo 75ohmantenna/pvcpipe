@@ -268,7 +268,8 @@ public final class Localization {
     /**
      * Localize an amount of seconds into a human readable string.
      *
-     * <p>The seconds will be converted to the closest whole time unit.
+     * <p>Uses the largest nonzero unit among days, hours and minutes, discarding the remainder;
+     * durations below one minute use seconds.
      * <p>For example, 60 seconds would give "1 minute", 119 would also give "1 minute".
      *
      * @param context        used to get plurals resources.

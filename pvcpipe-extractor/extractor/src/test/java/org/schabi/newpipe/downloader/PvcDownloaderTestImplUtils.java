@@ -12,13 +12,8 @@ final class PvcDownloaderTestImplUtils {
     }
 
     /**
-     * Rumble needs to handle cookies to correctly redirect. It was
-     *
-     * Reported in
-     * <a href="https://github.com/pvcpipe/NewPipeExtractor/issues/123">issue#123</a>
-     * even though it seems it was only temporary Rumble glitch this functionality is added here.
-     *
-     * Note: this code is duplicated from NewPipe#PvcDownloaderImplUtils class
+     * Installs the same Rumble response-cookie policy as the app's
+     * {@code PvcDownloaderImplUtils.addCookieManager}, including during redirects.
      *
      * @param theBuilder the builder
      */

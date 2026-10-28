@@ -52,11 +52,13 @@ website or every item is available on a particular network.
 YouTube also has a feed extractor. The feed refresh uses it in place of
 loading each channel when the dedicated feed setting
 (`feed_use_dedicated_fetch_method_key`) is on. The other services have none,
-so a refresh loads the channel and its tab.
+so a refresh loads channel metadata and the stream tabs selected by the feed
+tab preferences. This may include multiple tabs; it is separate from which
+tabs are visible on the channel screen (`ChannelTabHelper`).
 
 PVCPipe has no service sign-in and cannot follow accounts, vote or post on a
 service. Local subscriptions do not change a service account. Subscriptions,
-saved playlists, history and queues stay on the device
+saved playlists, history and queues are stored locally
 (see [library-data.md](library-data.md)). Optional Odysee count lookups register
 an anonymous visitor token; see [Odysee](#odysee).
 
@@ -64,8 +66,10 @@ an anonymous visitor token; see [Odysee](#odysee).
 can only do something about a captcha from YouTube: `ReCaptchaActivity` keeps
 YouTube's cookies and `DownloaderImpl` sends them back to YouTube only. So
 `ErrorInfo.solvableCaptchaUrl` offers the captcha screen for YouTube and
-Google hosts, and for any other host the app says that the site is refusing
-requests from this network for now.
+Google-related hosts in its explicit allowlist. For other hosts it offers
+the service-specific “is not accepting requests right now” message rather
+than a challenge it cannot use. This classification does not establish the
+cause or scope of the refusal; Kick security blocks also use `ReCaptchaException`.
 
 "Hide paid content videos" in the PVCPipe settings sets a switch in the
 extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). When enabled,

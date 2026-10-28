@@ -55,7 +55,8 @@ public class MediaSourceManager {
 
     /**
      * Determines how many streams before and after the current stream should be loaded.
-     * The default value (1) ensures seamless playback under typical network settings.
+     * The value (1) preloads neighboring metadata/sources to reduce transition delays;
+     * it does not guarantee gapless playback or media availability.
      * <p>
      * The streams after the current will be loaded into the playlist timeline while the
      * streams before will only be cached for future usage.
@@ -67,8 +68,8 @@ public class MediaSourceManager {
 
     /**
      * Determines the maximum number of disposables allowed in the {@link #loaderReactor}.
-     * Once exceeded, new calls to {@link #loadImmediate()} will evict all disposables in the
-     * {@link #loaderReactor} in order to load a new set of items.
+     * Once exceeded, {@link #loadImmediate()} clears loaders if the selected item is not
+     * already loading, allowing a new set to be admitted.
      *
      * @see #loadImmediate()
      * @see #maybeLoadItem(PlayQueueItem)

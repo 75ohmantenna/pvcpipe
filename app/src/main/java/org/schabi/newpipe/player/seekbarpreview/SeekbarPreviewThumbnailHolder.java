@@ -226,8 +226,8 @@ public class SeekbarPreviewThumbnailHolder {
         try {
             Log.d(TAG, "Downloading bitmap for seekbarPreview from '" + url + "'");
 
-            // Gets the bitmap within the timeout of 15 seconds imposed by default by OkHttpClient
-            // Ensure that you are not running on the main thread, otherwise this will hang
+            // Blocking Coil load through the app's image loader and downloader client.
+            // Run off the main thread; this call imposes no separate total request deadline.
             final var bitmap = CoilHelper.INSTANCE.loadBitmapBlocking(App.getInstance(), url);
 
             if (logTiming) {

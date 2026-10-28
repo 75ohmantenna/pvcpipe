@@ -169,7 +169,8 @@ public final class PlayerHelper {
      *
      * @param info          currently playing stream
      * @param existingItems existing items in the queue
-     * @return {@link SinglePlayQueue} with the next stream to queue
+     * @return {@link SinglePlayQueue} with the next stream to queue, or null when no
+     *         non-repeating stream is available
      */
     @Nullable
     public static PlayQueue autoQueueOf(@NonNull final StreamInfo info,

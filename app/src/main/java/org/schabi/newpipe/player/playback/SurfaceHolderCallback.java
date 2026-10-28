@@ -7,14 +7,12 @@ import androidx.media3.common.Player;
 import androidx.media3.exoplayer.video.PlaceholderSurface;
 
 /**
- * Prevent error message: 'Unrecoverable player error occurred'
- * In case of rotation some users see this kind of an error which is preventable
- * having a Callback that handles the lifecycle of the surface.
+ * Keeps a video output attached while the view's surface is destroyed and recreated.
  * <p>
- * How?: In case we are no longer able to write to the surface eg. through rotation/putting in
- * background we set set a DummySurface. Although it it works on API >= 23 only.
- * Result: we get a little video interruption (audio is still fine) but we won't get the
- * 'Unrecoverable player error occurred' error message.
+ * Rotation or backgrounding can destroy the view's surface. A lazily created Media3
+ * {@link PlaceholderSurface} replaces it until {@link #surfaceCreated(SurfaceHolder)} attaches
+ * the new surface. This is a workaround for surface-lifecycle failures, not a guarantee that
+ * every codec or device can switch surfaces without interruption.
  * <p>
  * This implementation is based on:
  * 'ExoPlayer stuck in buffering after re-adding the surface view a few time #2703'

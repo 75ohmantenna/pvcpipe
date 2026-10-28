@@ -15,23 +15,12 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 
 /**
- * FileStreamSAF.
+ * Read/write adapter for a Storage Access Framework descriptor opened in {@code rw} mode.
  * <p>
- * Robust implementation of a read/write interface for files
- * opened via the Storage Access Framework (SAF).
- * <p>
- * Supports:
- * - Random access (seek)
- * - Truncate (setLength)
- * - Reading & writing
- * <p>
- * Notes:
- * - File must exist and be accessible by the app.
- * - Not guaranteed to work with virtual cloud files (e.g., Google Drive, Dropbox)
- *   due to SAF limitations, as some providers may not support random access or
- *   truncate operations. Test thoroughly with specific cloud providers.
- * - Not thread-safe. Use ReentrantReadWriteLock for synchronization
- *   if multi-threaded access is required.
+ * Seeking and truncation use the output stream's {@link FileChannel}; actual support depends
+ * on the document provider. The capability methods report the adapter's operations, not a
+ * successful probe of the provider. {@code setLength} truncates and does not extend a file.
+ * Reads and writes share the descriptor position. Concurrent access requires caller ordering.
  */
 public class FileStreamSAF extends SharpStream {
 
@@ -44,7 +33,7 @@ public class FileStreamSAF extends SharpStream {
 
     public FileStreamSAF(@NonNull final ContentResolver contentResolver, final Uri fileUri)
             throws IOException {
-        // Open file in read-write mode (SAF ensures positioning)
+        // The provider must supply a descriptor usable for the requested read/write operations.
         file = contentResolver.openFileDescriptor(fileUri, "rw");
 
         if (file == null) {

@@ -23,17 +23,9 @@ import static org.schabi.newpipe.extractor.services.DefaultTests.assertNoMoreIte
 import static org.schabi.newpipe.extractor.services.DefaultTests.defaultTestRelatedItems;
 
 /**
- * Tests for {@link BitchuteTrendingKioskExtractor}
- * and tests for {@link BitchuteRecommendedChannelKioskExtractor}
- *
- * We have 4 different Kiosk categories:
- * - Trending Day
- * - Trending Week
- * - Trending Month
- * - And we have the Recommended Channels
- *
- *  Here we have a base class Trending that implements testing for all of those categories.
- *  For every category we have one derived test class.
+ * Live-downloader tests for the day, week and month variants of
+ * {@link BitchuteTrendingKioskExtractor}, sharing the assertions in {@code Trending}.
+ * This class does not cover the service's Popular, Suggested or Live kiosks.
  */
 public class BitchuteTrendingKioskExtractorTest {
 

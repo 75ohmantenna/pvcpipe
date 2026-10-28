@@ -362,15 +362,9 @@ public final class Player implements PlaybackListener, Listener {
         // branching parameters for below
         final boolean samePlayQueue = playQueue != null && playQueue.equalStreamsAndIndex(newQueue);
 
-        /*
-         * TODO As seen in #7427 this does not work:
-         * There are 3 situations when playback shouldn't be started from scratch (zero timestamp):
-         * 1. User pressed on a timestamp link and the same video should be rewound to the timestamp
-         * 2. User changed a player from, for example. main to popup, or from audio to main, etc
-         * 3. User chose to resume a video based on a saved timestamp from history of played videos
-         * In those cases time will be saved because re-init of the play queue is a not an instant
-         *  task and requires network calls
-         * */
+        // Reuse an eligible loaded queue for timestamp/mode changes, or resolve history before
+        // initialization. QueuePlaybackChoice orders those cases to avoid unnecessary source
+        // reinitialization; outstanding timestamp/history delivery was cancelled above.
         switch (QueuePlaybackChoice.of(!exoPlayerIsNull(), playQueue, newQueue, samePlayQueue,
                 intent.getBooleanExtra(RESUME_PLAYBACK, false),
                 () -> DependentPreferenceHelper.getResumePlaybackEnabled(context))) {
@@ -407,7 +401,7 @@ public final class Player implements PlaybackListener, Listener {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(info -> playFromTimestamp(info, data.getSeconds(), playWhenReady),
                         throwable -> {
-                            // Show a snackbar when a root view is available, otherwise notify.
+                            // Timestamp resolution has no view-bound error observer here.
                             final var info = new ErrorInfo(throwable, UserAction.PLAY_ON_POPUP,
                                     data.getUrl(), null, data.getUrl());
                             ErrorUtil.createNotification(context, info);

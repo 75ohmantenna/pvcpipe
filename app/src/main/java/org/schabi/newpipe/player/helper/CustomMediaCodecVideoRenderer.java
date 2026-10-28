@@ -11,7 +11,7 @@ import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
 import androidx.media3.exoplayer.video.VideoRendererEventListener;
 
 /**
- * A {@link MediaCodecVideoRenderer} which always enable the output surface workaround that
+ * A {@link MediaCodecVideoRenderer} which always enables the output surface workaround that
  * ExoPlayer enables on several devices which are known to implement
  * {@link android.media.MediaCodec#setOutputSurface(android.view.Surface)
  * MediaCodec.setOutputSurface(Surface)} incorrectly.
@@ -27,9 +27,9 @@ import androidx.media3.exoplayer.video.VideoRendererEventListener;
  * </p>
  *
  * <p>
- * This class has only effect on devices with Android 6 and higher, as the {@code setOutputSurface}
- * method is only implemented in these Android versions and the method used as a workaround is
- * always applied on older Android versions (releasing and re-instantiating video codec instances).
+ * The workaround releases and recreates the codec instead of using {@code setOutputSurface},
+ * which was introduced in API 23. All PVCPipe-supported Android versions (API 26+) have that API;
+ * this class is used when {@link CustomRenderersFactory} is selected.
  * </p>
  */
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)

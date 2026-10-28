@@ -85,8 +85,9 @@ public class DownloaderFactory {
      * where abcd is one of {@link DownloaderType}
      * </p>
      * <p>
-     * Otherwise it falls back to {@link DownloaderFactory#DEFAULT_DOWNLOADER}.
-     * Change this during development on the local machine to use a different downloader.
+     * An absent or empty property selects {@link DownloaderFactory#DEFAULT_DOWNLOADER} (REAL).
+     * REC is an alias for RECORDING; any other unknown nonempty value throws
+     * {@link IllegalArgumentException}. The selection is cached for this JVM.
      * </p>
      *
      * @param path The path to the folder where mocks are saved/retrieved.

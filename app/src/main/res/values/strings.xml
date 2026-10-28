@@ -277,7 +277,8 @@
     <string name="audio">Audio</string>
     <string name="retry">Retry</string>
     <string name="drawer_header_description">Toggle service, currently selected:</string>
-    <!--Zero don't get selected (in some languages) as it is not a "special case" for android-->
+    <!-- Separate zero-count labels: plural selection follows locale rules and does not
+         universally select a quantity="zero" item for the numeric value 0. -->
     <string name="no_subscribers">No subscribers</string>
     <plurals name="subscribers">
         <item quantity="one">%s subscriber</item>

@@ -6,6 +6,11 @@ backup/restore move data to or from user-selected sources. This guide covers
 their behavior and failure boundaries. The implementation defines batch
 sizes, delays and file formats.
 
+Local storage is not an exclusive-device privacy guarantee. `AndroidManifest.xml`
+sets `android:allowBackup="true"` and declares no app-specific backup exclusions.
+Android's backup/transfer behavior depends on the platform, user settings and
+transport. The ZIP workflow below is the app's own export/restore mechanism.
+
 ## Local playlists
 
 `LocalPlaylistManager` stores ordered stream references, including repeated
@@ -29,6 +34,12 @@ with automatic-thumbnail updates in the same transaction.
   image when empty. Permanent thumbnails are not adjusted by content edits.
 - The fragment tracks draft revisions so a completed save does not mark newer
   edits as saved or replace them with an older result.
+
+A permanent thumbnail stores a stream ID, not an independent image copy.
+`StreamDAO.deleteOrphans` currently checks history, playlist contents and feed
+references but not playlist-thumbnail references. Cleanup can therefore remove
+an otherwise unreferenced permanent thumbnail's stream row; this is a suspected
+retention defect, not a guarantee that the chosen image survives cleanup.
 
 The Room instrumentation tests live in
 `app/src/androidTest/java/org/schabi/newpipe/local/playlist/`. Follow
@@ -59,6 +70,10 @@ leaves out subscriptions of services the app does not have, and it uses a
 service's feed extractor in place of loading the channel when the dedicated
 feed setting is on and the service has one
 (see [services.md](services.md#the-services)).
+That setting defaults to off. The channel path loads each tab enabled by the
+feed tab preferences, independently of channel-screen tab visibility. It uses
+the initial page, or one continuation page when the initial page is empty;
+it does not exhaust every tab's pagination (`FeedLoadManager.AndroidOperations.fetch`).
 
 Feed error reports retain each failed subscription's service ID and URL.
 The report names a service only when every error belongs to that same
@@ -122,10 +137,14 @@ with three entries: `newpipe.db`, `preferences.json` and `newpipe.settings`
 (the legacy serialized form of the same preferences). It excludes downloaded
 media, the separate finished-downloads database and unfinished-download state.
 
-**Inspection.** Before a restore the app looks at the chosen file and reports
-whether it is a readable ZIP and which form of settings it holds. JSON
+**Inspection.** Before a restore the app tries to open the document and discover
+which form of settings it holds. JSON
 settings are preferred when both forms are present. Inspection is advisory:
-it does not validate the database or snapshot the archive. When settings
+it does not validate the database or snapshot the archive.
+`ZipHelper.isValidZipFile` currently constructs a `ZipInputStream` without reading
+its header, so a positive result alone does not establish that the file is a ZIP
+(a suspected validation defect). Entry scanning or preparation can still fail.
+When settings
 are included in the restore, a change in the preferred settings format
 before preparation stops the restore and requires a new inspection.
 Database-only restores do not recheck the settings format.
@@ -165,7 +184,8 @@ this check:
 
 1. It copies the archive to a private file and takes the database, and the
    settings if the user chose them, from that copy.
-2. It replaces the live preferences.
+2. It commits the chosen settings, or a copy of the current preferences for
+   database-only restore. Both choices update the remembered backup document URI.
 3. It publishes the new database as a pending restore and restarts the app.
 4. At the next start,
    [`PendingDatabaseRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java)
@@ -183,6 +203,12 @@ transaction. If the second fails, the app puts the old preferences back, and
 tries again at the next backup operation if that failed too. A process that
 dies between the steps can leave new settings with the old database. Nothing
 promises that a backup will open after future database migrations.
+
+Preparation currently checks that `newpipe.db` exists and is nonempty, without
+opening it as SQLite or validating its schema before publication. Inspection
+and a completed staging operation therefore do not establish database
+openability. Acceptance of a corrupt or incompatible database is a potential
+restore defect, not a supported archive format.
 
 ## Tests
 

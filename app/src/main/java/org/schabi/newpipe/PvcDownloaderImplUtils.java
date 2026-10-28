@@ -338,11 +338,9 @@ public final class PvcDownloaderImplUtils {
     }
 
     /**
-     * Rumble needs to handle cookies to correctly redirect.
-     *
-     * It was reported in
-     * <a href="https://github.com/75ohmantenna/pvcpipe-extractor/issues/123">issue#123</a>
-     * even though it seems it was only temporary Rumble glitch this functionality is added here.
+     * Installs the cookie jar used for Rumble redirect handling at the HTTP-client layer.
+     * {@link PvcCookieManager} restricts which response hosts can store cookies; redirects
+     * can need them before a response reaches an extractor.
      *
      * @param theBuilder the builder
      */
@@ -352,7 +350,8 @@ public final class PvcDownloaderImplUtils {
     }
 
     /**
-     * Listen to the SharedPreferences and handle if replacing hosts or sponsorblock are enabled.
+     * Rebuilds the downloader client after host-replacement, challenge-helper, SponsorBlock
+     * or Return YouTube Dislike preferences change.
      */
     public static class Config implements SharedPreferences.OnSharedPreferenceChangeListener {
 

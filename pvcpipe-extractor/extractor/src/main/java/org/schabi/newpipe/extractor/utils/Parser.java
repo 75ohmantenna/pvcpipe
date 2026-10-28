@@ -31,7 +31,11 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /**
- * Avoid using regex.
+ * Regular-expression helpers using {@link Matcher#find()}, rather than whole-input matching.
+ * <p>
+ * Group helpers delegate to {@link Matcher#group(int)}. An unmatched optional group currently
+ * yields null despite their {@code Nonnull} annotations, and an invalid group number propagates
+ * {@link IndexOutOfBoundsException}; neither case is converted to {@link RegexException}.
  */
 public final class Parser {
 
@@ -66,7 +70,7 @@ public final class Parser {
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
      * @return The matching group as a string.
-     * @throws RegexException If the pattern does not match the input or if the group is not found.
+     * @throws RegexException if the pattern has no match in the input
      */
     @Nonnull
     public static String matchGroup1(final String pattern, final String input)
@@ -81,7 +85,7 @@ public final class Parser {
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
      * @return The matching group as a string.
-     * @throws RegexException If the pattern does not match the input or if the group is not found.
+     * @throws RegexException if the pattern has no match in the input
      */
     @Nonnull
     public static String matchGroup1(final Pattern pattern, final String input)
@@ -95,9 +99,9 @@ public final class Parser {
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
-     * @param group   The group number to retrieve (1-based index).
+     * @param group   zero for the whole match, or a positive capture-group number
      * @return The matching group as a string.
-     * @throws RegexException If the pattern does not match the input or if the group is not found.
+     * @throws RegexException if the pattern has no match in the input
      */
     @Nonnull
     public static String matchGroup(final String pattern, final String input, final int group)
@@ -111,9 +115,9 @@ public final class Parser {
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
-     * @param group   The group number to retrieve (1-based index).
+     * @param group   zero for the whole match, or a positive capture-group number
      * @return The matching group as a string.
-     * @throws RegexException If the pattern does not match the input or if the group is not found.
+     * @throws RegexException if the pattern has no match in the input
      */
     @Nonnull
     public static String matchGroup(@Nonnull final Pattern pattern,
@@ -124,12 +128,12 @@ public final class Parser {
     }
 
     /**
-     * Matches multiple patterns against the input string and
-     * returns the first successful matcher.
+     * Returns group 1 of the first pattern with a match in the input.
      *
      * @param patterns The array of regex patterns to match.
      * @param input    The input string to match against.
-     * @return A {@code Matcher} for the first successful match.
+     * @return group 1 from the first successful match, possibly null for an unmatched
+     *         optional group
      * @throws RegexException If no patterns match the input or if {@code patterns} is empty.
      */
     public static String matchGroup1MultiplePatterns(final Pattern[] patterns, final String input)

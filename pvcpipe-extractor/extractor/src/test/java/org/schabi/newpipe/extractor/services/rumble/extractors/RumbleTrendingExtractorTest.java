@@ -22,9 +22,9 @@ import static org.schabi.newpipe.extractor.services.DefaultTests.defaultTestMore
 import static org.schabi.newpipe.extractor.services.DefaultTests.defaultTestRelatedItems;
 
 /**
- * Tests for {@link RumbleTrendingExtractor}
+ * Live-downloader tests for five {@link RumbleTrendingExtractor} categories.
  *
- * We have atm 5 different Kiosk categories:
+ * This class covers:
  *<p>
  * - Live
  * - Editor Picks
@@ -32,8 +32,8 @@ import static org.schabi.newpipe.extractor.services.DefaultTests.defaultTestRela
  * - Today's Battle Leaderboard Top 50
  * - Latest
  *<p>
- *  Here we have a base class called Trending that implements testing for all of those categories.
- *  For every category we have one derived test class.
+ * Each derived class shares the assertions in {@code Trending}. This is a coverage list,
+ * not the service registry: the separate Shorts kiosk is not exercised here.
  */
 public class RumbleTrendingExtractorTest {
 

@@ -27,9 +27,13 @@ abstract class FeedDAO {
      *                         [FeedGroupEntity.GROUP_ALL_ID] to not filter by group
      * @param includePlayed    if false, only return all of the live, never-played or non-finished
      *                         feed streams (see `@see` items); if true no filter is applied
+     *                         by this condition, but includePartiallyPlayed still applies
+     * @param includePartiallyPlayed if false, exclude streams with history and valid unfinished
+     *                              progress, even when includePlayed is true
      * @param uploadDateBefore get only streams uploaded before this date (useful to filter out
      *                         future streams); use null to not filter by upload date
-     * @return the feed streams filtered according to the conditions provided in the parameters
+     * @return at most 500 matching streams, with undated streams first and then newest uploads;
+     *         streams without an upload date remain eligible with a date cutoff
      * @see StreamStateEntity.isFinished()
      * @see StreamStateEntity.PLAYBACK_FINISHED_END_MILLISECONDS
      * @see StreamStateEntity.PLAYBACK_SAVE_THRESHOLD_START_MILLISECONDS

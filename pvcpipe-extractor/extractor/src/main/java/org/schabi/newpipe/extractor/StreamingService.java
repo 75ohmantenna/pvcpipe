@@ -134,20 +134,20 @@ public abstract class StreamingService {
     //////////////////////////////////////////////////////////////////////////*/
 
     /**
-     * Must return a new instance of an implementation of LinkHandlerFactory for streams.
+     * Returns the stream link-handler factory; implementations may share a singleton.
      * @return an instance of a LinkHandlerFactory for streams
      */
     public abstract LinkHandlerFactory getStreamLHFactory();
 
     /**
-     * Must return a new instance of an implementation of ListLinkHandlerFactory for channels.
+     * Returns the channel link-handler factory; implementations may share a singleton.
      * If support for channels is not given null must be returned.
      * @return an instance of a ListLinkHandlerFactory for channels or null
      */
     public abstract ListLinkHandlerFactory getChannelLHFactory();
 
     /**
-     * Must return a new instance of an implementation of ListLinkHandlerFactory for channel tabs.
+     * Returns the channel-tab link-handler factory; implementations may share a singleton.
      * If support for channel tabs is not given null must be returned.
      *
      * @return an instance of a ListLinkHandlerFactory for channel tabs or null
@@ -155,7 +155,7 @@ public abstract class StreamingService {
     public abstract ListLinkHandlerFactory getChannelTabLHFactory();
 
     /**
-     * Must return a new instance of an implementation of ListLinkHandlerFactory for playlists.
+     * Returns the playlist link-handler factory; implementations may share a singleton.
      * If support for playlists is not given null must be returned.
      * @return an instance of a ListLinkHandlerFactory for playlists or null
      */
@@ -194,10 +194,10 @@ public abstract class StreamingService {
     public abstract SubscriptionExtractor getSubscriptionExtractor();
 
     /**
-     * This method decides which strategy will be chosen to fetch the feed. In YouTube, for example,
-     * a separate feed exists which is lightweight and made specifically to be used like this.
+     * Returns an optional lightweight channel-feed extractor. YouTube provides one; the default
+     * implementation returns null. The caller decides whether to use it or the channel tabs.
      * <p>
-     * In services which there's no other way to retrieve them, null should be returned.
+     * A null return means that this dedicated feed path is unavailable.
      *
      * @return a {@link FeedExtractor} instance or null.
      */
@@ -230,9 +230,9 @@ public abstract class StreamingService {
             throws ExtractionException;
 
     /**
-     * Must crete a new instance of a PlaylistExtractor implementation.
+     * Returns a playlist extractor, or null for services without playlist support.
      * @param linkHandler is pointing to the playlist which should be handled by this new instance.
-     * @return a new PlaylistExtractor
+     * @return a new PlaylistExtractor or null
      */
     public abstract PlaylistExtractor getPlaylistExtractor(ListLinkHandler linkHandler)
             throws ExtractionException;
@@ -360,8 +360,8 @@ public abstract class StreamingService {
      * the user prefer (using {@link NewPipe#getPreferredLocalization()}), then it will:
      * <ul>
      * <li>Check if the exactly localization is supported by this service.</li>
-     * <li>If not, check if a less specific localization is available, using only the language
-     * code.</li>
+     * <li>If not, use the first supported localization with the same language code, which
+     * may have a different country.</li>
      * <li>Fallback to the {@link Localization#DEFAULT default} localization.</li>
      * </ul>
      */

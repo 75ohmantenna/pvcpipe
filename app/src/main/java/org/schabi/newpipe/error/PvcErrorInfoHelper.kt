@@ -9,13 +9,12 @@ import org.schabi.newpipe.pvc.feature.logcat.PvcLogcatDumper
 object PvcErrorInfoHelper {
 
     /**
-     * dump [ErrorInfo] stack traces via Log.e.
+     * Logs traces before truncating them for [ErrorInfo] transport.
      *
-     * - The traces need to be dumped early for [PvcLogcatDumper] to actually catch
-     *   them. In the current NewPipe implementation the traces will be dumped
-     *   to logcat only if the [ErrorActivity] is already started. That is way too late and
-     *   also user dependent.
-     * - If the [PvcLogcatDumper] is enabled we disable the dumping in [ErrorActivity]
+     * When [PvcLogcatDumper] is enabled, early logging makes the traces available to the
+     * capture triggered during construction. [ErrorActivity] logs them on opening only when
+     * the dumper is disabled. Attached exception data has its own logging path in the
+     * throwable overloads; this preference is not a general log-suppression switch.
      */
     fun logStackTraces(stackTraces: Array<String>): Array<String> {
         logIfPvcLocatDumperIsEnabled(stackTraces)

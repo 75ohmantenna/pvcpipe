@@ -4,11 +4,11 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * This class contains a simple implementation of {@link Locale#forLanguageTag(String)} for Android
- * API levels below 21 (Lollipop). This is needed as core library desugaring does not backport that
- * method as of this writing.
- * <br>
- * Relevant issue: https://issuetracker.google.com/issues/171182330
+ * Legacy locale parser retained by localization and subtitle callers.
+ * Accepts hyphen- or underscore-separated language, country and variant components; it does not
+ * implement full BCP 47 script/extension parsing like {@link Locale#forLanguageTag(String)}.
+ * PVCPipe's minimum API is 26, so the original pre-21 compatibility motivation no longer applies
+ * to the app. Replacing this parser would be a behavior change for existing callers.
  */
 public final class LocaleCompat {
     private LocaleCompat() {
