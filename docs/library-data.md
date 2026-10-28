@@ -80,6 +80,12 @@ transactions with native host SQLite from fragment-method tests with controlled
 adapters, rendering and persistence. They do not establish device lifecycle or
 storage durability guarantees.
 
+The separate [bookmark emulator suite](building.md#disposable-bookmark-validation)
+uses real views, fragment transitions and Android SQLite, with controlled queue
+gates and SQL failures. Its synthetic metadata uses local images. Dated results
+in [the alignment record](documentation-alignment.md) identify the tested revision
+and emulator; they do not establish physical-device or process-death durability.
+
 ## Feed refresh
 
 [`FeedRefresh`](../app/src/main/java/org/schabi/newpipe/local/feed/service/FeedRefresh.kt)
