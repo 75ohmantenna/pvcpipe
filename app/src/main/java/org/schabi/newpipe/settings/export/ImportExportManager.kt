@@ -29,9 +29,9 @@ class ImportExportManager(
     private val fileLocator: BackupFileLocator,
     private val databaseValidator: DatabaseValidator
 ) {
-    fun interface DatabaseValidator {
+    fun interface DatabaseValidator : RestoreTransaction.Validator {
         @Throws(IOException::class)
-        fun validate(database: Path)
+        override fun validate(database: Path)
     }
 
     /** Advisory central-directory inspection; restore takes and validates a fresh snapshot. */
@@ -164,7 +164,7 @@ class ImportExportManager(
                 Files.move(candidate, ready, StandardCopyOption.REPLACE_EXISTING)
                 decoded
             }
-            // Finish directory/sidecar cleanup before allowing settings commit or publication.
+            // Finish preparation cleanup before publishing the database and settings intent.
             val prepared = PreparedRestore(fileLocator.db, checkNotNull(temporary), preferences)
             temporary = null
             return prepared
@@ -229,9 +229,16 @@ class ImportExportManager(
     ) : AutoCloseable {
         private var published = false
 
-        fun publish() {
-            PendingDatabaseRestore.publish(database, temporary)
-            published = true
+        @JvmOverloads
+        @Throws(IOException::class)
+        fun publish(values: Map<String, *> = emptyMap<String, Any>(), replaceAll: Boolean = false) {
+            try {
+                PendingDatabaseRestore.publish(database, temporary, values, replaceAll)
+                published = true
+            } catch (staged: RestoreTransaction.StagedException) {
+                published = true
+                throw staged
+            }
         }
 
         override fun close() {

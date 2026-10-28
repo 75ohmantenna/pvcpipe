@@ -23,7 +23,9 @@ A restore request accepted by the application for completion even if the
 settings screen closes, while the application process remains running.
 
 **Pending database restore**:
-A replacement database prepared for activation when the application next starts.
+A published replacement database and settings intent awaiting startup recovery.
+Live data stays unchanged during staging. Startup either commits the replacement
+pair or recovers the previous pair before allowing database consumers to run.
 
 ## Downloads
 

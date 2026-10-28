@@ -279,9 +279,13 @@ sign or publish an APK. Never label a debug-key APK as a production-signed relea
   rollovers and rejects codes outside Android's supported range.
 - **App unit tests.** `./gradlew :app:testDebugUnitTest`, with
   `--tests '<pattern>'` for a subset. They run on the JVM. `BackupValidationTest`
-  uses Robolectric with API 26 and native host SQLite to exercise the real Room
-  restore-validation path without a device. Its first run may download the
-  Robolectric Android runtime in addition to Gradle's test dependencies.
+  and `RestoreStartupTest` use Robolectric with API 26 and native host SQLite
+  to exercise Room validation and pre-provider recovery without a device.
+  Their first run may download the Robolectric Android runtime in addition to
+  Gradle's test dependencies. `RestoreTransactionTest` launches child JVMs that
+  halt at filesystem checkpoints and recovers their files in a fresh JVM; its
+  database validator and disk preferences are controlled substitutes. These
+  tests do not simulate device power loss or run Android instrumentation.
 - **Offline extractor tests.** `forkCiTest` runs JUnit tests tagged `offline`
   and the extractor's main-source Checkstyle task. The tagged tests use
   recorded or synthetic responses rather than live websites.

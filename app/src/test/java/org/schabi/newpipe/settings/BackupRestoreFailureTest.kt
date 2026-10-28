@@ -92,46 +92,47 @@ class BackupRestoreFailureTest {
     fun `failed preference commit rolls back including in-memory values`() {
         val inspection = inspect(environment.source("settings/db_ser_json.zip"))
         environment.failedCommits = 1
-        restore(inspection).assertError(java.io.IOException::class.java)
+        restore(inspection).assertComplete()
+        assertLiveDataUnchanged()
+        org.junit.Assert.assertNotNull(environment.activate())
         assertLiveDataUnchanged()
         assertFalse(PendingDatabaseRestore.hasPending(environment.database))
         assertPreparationCleaned()
     }
 
     @Test
-    fun `failed rollback is explicit and later work retries recovery first`() {
-        val uri = environment.source("settings/db_ser_json.zip")
-        val inspection = inspect(uri)
+    fun `failed rollback stops startup and fresh recovery retries the durable snapshot`() {
+        val inspection = inspect(environment.source("settings/db_ser_json.zip"))
+        restore(inspection).assertComplete()
         environment.failedCommits = 2
-        restore(inspection).assertError(BackupRestore.RestoreRecoveryRequiredException::class.java)
-        assertEquals(0, environment.restarts)
+        org.junit.Assert.assertThrows(org.schabi.newpipe.settings.export.RestoreTransaction.RecoveryException::class.java) {
+            environment.activate()
+        }
+        assertTrue(PendingDatabaseRestore.hasPending(environment.database))
         environment.values["original"] = "unrecovered"
         environment.failedCommits = 1
-        backups.inspect(uri).test().also {
-            io.triggerActions()
-            it.assertError(BackupRestore.RestoreRecoveryRequiredException::class.java)
+        org.junit.Assert.assertThrows(org.schabi.newpipe.settings.export.RestoreTransaction.RecoveryException::class.java) {
+            environment.activate()
         }
-        backups.inspect(uri).test().also {
-            io.triggerActions()
-            it.assertComplete()
-        }
+        org.junit.Assert.assertNotNull(environment.activate())
         assertLiveDataUnchanged()
         assertPreparationCleaned()
+        assertFalse(PendingDatabaseRestore.hasPending(environment.database))
     }
 
     @Test
-    fun `publication failure preserves competing pending restore and rolls back copied sets`() {
+    fun `publication failure preserves competing restore and concurrent preference edits`() {
         val originalSet = mutableSetOf("before")
         environment.values["set"] = originalSet
         val inspection = inspect(environment.source("settings/db_ser_json.zip"))
         val pending = temporary.root.toPath().resolve("newpipe.db.restore")
-        environment.afterPreferenceCommit = {
+        environment.afterNormalization = {
             originalSet.add("later mutation")
             Files.createDirectory(pending)
         }
-        restore(inspection).assertError(java.nio.file.FileAlreadyExistsException::class.java)
+        restore(inspection).assertError(java.io.IOException::class.java)
         assertLiveDataUnchanged()
-        assertEquals(setOf("before"), environment.values["set"])
+        assertEquals(setOf("before", "later mutation"), environment.values["set"])
         assertTrue(Files.isDirectory(pending))
         assertPreparationCleaned()
     }
@@ -188,7 +189,7 @@ class BackupRestoreFailureTest {
         }
         assertEquals("existing backup", Files.readString(path))
         assertEquals(0, environment.checkpoints)
-        assertEquals(uri.toString(), environment.values["location"])
+        assertFalse(environment.values.containsKey("location"))
         assertTrue(PendingDatabaseRestore.hasPending(environment.database))
     }
 
@@ -234,8 +235,10 @@ class BackupRestoreFailureTest {
         environment.failRestart = true
         restore(inspection).assertError(BackupRestore.RestoreCommittedException::class.java)
         assertTrue(PendingDatabaseRestore.hasPending(environment.database))
-        assertFalse(environment.values.containsKey("original"))
+        assertEquals("settings", environment.values["original"])
         assertEquals(1, environment.errors.size)
         assertPreparationCleaned()
+        assertEquals(null, environment.activate())
+        assertFalse(environment.values.containsKey("original"))
     }
 }

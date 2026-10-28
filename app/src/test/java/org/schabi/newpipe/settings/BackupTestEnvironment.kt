@@ -24,6 +24,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
     var failRestart = false
     var failedCommits = 0
     var afterPreferenceCommit: (() -> Unit)? = null
+    var afterNormalization: (() -> Unit)? = null
     var reads = 0
     var sourceStream: org.schabi.newpipe.streams.io.SharpStream? = null
     val preferences: SharedPreferences = mock(SharedPreferences::class.java) { call ->
@@ -50,6 +51,11 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
         Files.writeString(database, "live database")
         Files.writeString(directory.resolve("newpipe.db-wal"), "live WAL")
     }
+
+    fun activate(): java.io.IOException? = org.schabi.newpipe.settings.export.PendingDatabaseRestore.install(
+        database,
+        org.schabi.newpipe.settings.export.PendingDatabaseRestore.preferenceStore(preferences)
+    ) { }
 
     fun source(resource: String): Uri {
         val path = directory.resolve(resource.substringAfterLast('/'))
@@ -86,6 +92,8 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
 
     override fun normalizeImportedPreferences(values: MutableMap<String, Any>) {
         cleanups++
+        afterNormalization?.invoke()
+        afterNormalization = null
     }
 
     override fun restart() {

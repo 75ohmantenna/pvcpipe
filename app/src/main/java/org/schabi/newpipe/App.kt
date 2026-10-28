@@ -27,14 +27,16 @@ import java.net.SocketException
 import org.acra.ACRA.init
 import org.acra.ACRA.isACRASenderServiceProcess
 import org.acra.config.CoreConfigurationBuilder
+import org.schabi.newpipe.error.ErrorInfo
+import org.schabi.newpipe.error.ErrorUtil
 import org.schabi.newpipe.error.ReCaptchaActivity
+import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.ktx.hasAssignableCause
 import org.schabi.newpipe.pvc.bus.PvcSharedPrefsListenerToEventsBridge
 import org.schabi.newpipe.settings.NewPipeSettings
-import org.schabi.newpipe.settings.export.BackupFileLocator
 import org.schabi.newpipe.settings.export.PendingDatabaseRestore
 import org.schabi.newpipe.util.Localization
 import org.schabi.newpipe.util.StateSaver
@@ -73,15 +75,17 @@ open class App :
     var notificationsRequested = false
         private set
 
+    private var restoreStartupFailure: IOException? = null
+
     fun setNotificationsRequested() {
         notificationsRequested = true
     }
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-        if (!ProcessPhoenix.isPhoenixProcess(this)) {
+        if (!ProcessPhoenix.isPhoenixProcess(this) && !isACRASenderServiceProcess()) {
             // Content providers (including WorkManager) initialize before Application.onCreate.
-            PendingDatabaseRestore.install(getDatabasePath(BackupFileLocator.FILE_NAME_DB).toPath())
+            restoreStartupFailure = PendingDatabaseRestore.install(requireNotNull(base))
         }
         initACRA()
     }
@@ -89,18 +93,18 @@ open class App :
     override fun onCreate() {
         super.onCreate()
 
-        // These run first, in every process including the Phoenix restart process.
+        instance = this
+
+        if (ProcessPhoenix.isPhoenixProcess(this) || isACRASenderServiceProcess()) {
+            Log.i(TAG, "This is a helper process; skipping main application initialization")
+            return
+        }
+
+        // Helpers must not open cached preferences while the main process may recover them.
         extractorSettings = PvcExtractorSettings(this).apply { initExtractorConfig() }
         prefsChangeListener = PvcSharedPrefsListenerToEventsBridge(applicationContext)
         PreferenceManager.getDefaultSharedPreferences(applicationContext)
             .registerOnSharedPreferenceChangeListener(prefsChangeListener)
-
-        instance = this
-
-        if (ProcessPhoenix.isPhoenixProcess(this)) {
-            Log.i(TAG, "This is a phoenix process! Aborting initialization of App[onCreate]")
-            return
-        }
 
         // check if the last used preference version is set
         // to determine whether this is the first app run
@@ -140,6 +144,10 @@ open class App :
         PvcDownloaderImplUtils.CONFIG.registerOnChanged(applicationContext)
 
         YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl)
+
+        restoreStartupFailure?.let {
+            ErrorUtil.createNotification(this, ErrorInfo(it, UserAction.DATABASE_IMPORT_EXPORT, "Restoring backup"))
+        }
     }
 
     override fun newImageLoader(context: Context): ImageLoader = ImageLoader

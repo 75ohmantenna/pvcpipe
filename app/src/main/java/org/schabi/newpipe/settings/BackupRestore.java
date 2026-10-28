@@ -18,14 +18,13 @@ import org.schabi.newpipe.settings.export.BackupDatabaseValidator;
 import org.schabi.newpipe.player.notification.NotificationConstants;
 import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.settings.export.ImportedPreferenceTypes;
+import org.schabi.newpipe.settings.export.RestoreTransaction;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.DeviceUtils;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Completable;
@@ -82,8 +81,6 @@ final class BackupRestore {
         return applicationInstance;
     }
 
-    // Retained by the application instance if a preference rollback itself fails.
-    private Map<String, Object> recoveryPreferences;
     private final BackupOperations operations;
     private final ImportExportManager archives;
     private final SharedPreferences preferences;
@@ -113,7 +110,6 @@ final class BackupRestore {
 
     Completable exportTo(final Uri destination) {
         return operations.submit(() -> {
-            recoverPreferencesIfNeeded();
             if (archives.hasPendingRestore()) {
                 throw new IOException("A restored database is awaiting restart");
             }
@@ -126,7 +122,6 @@ final class BackupRestore {
 
     Single<Inspection> inspect(final Uri source) {
         return operations.submit(() -> {
-            recoverPreferencesIfNeeded();
             final StoredFileHelper file = platform.document(source);
             final var archive = archives.inspect(file);
             if (!archive.getReadable()) {
@@ -149,31 +144,21 @@ final class BackupRestore {
      */
     Completable restore(final Inspection inspection, final RestoreChoice choice) {
         return operations.submit(() -> {
-            recoverPreferencesIfNeeded();
             final String settingsEntry = choice == RestoreChoice.DATABASE_ONLY ? null
                     : inspection.preferenceFormat == PreferenceFormat.JSON
                     ? BackupFileLocator.FILE_NAME_JSON_PREFS
                     : BackupFileLocator.FILE_NAME_SERIALIZED_PREFS;
             try (var prepared = archives.prepareRestore(inspection.source, settingsEntry)) {
-                final Map<String, Object> previous = copyPreferences(preferences.getAll());
                 final Map<String, Object> replacement = prepared.getPreferences() == null
-                        ? copyPreferences(previous) : prepared.getPreferences();
+                        ? new HashMap<>() : prepared.getPreferences();
                 if (prepared.getPreferences() != null) {
                     platform.normalizeImportedPreferences(replacement);
                 }
                 replacement.put(pathKey, inspection.uri.toString());
                 try {
-                    ImportExportManager.replacePreferences(preferences, replacement);
-                    prepared.publish();
-                } catch (final Exception failure) {
-                    recoveryPreferences = previous;
-                    try {
-                        recoverPreferencesIfNeeded();
-                    } catch (final RestoreRecoveryRequiredException recovery) {
-                        recovery.addSuppressed(failure);
-                        throw recovery;
-                    }
-                    throw failure;
+                    prepared.publish(replacement, prepared.getPreferences() != null);
+                } catch (final RestoreTransaction.StagedException failure) {
+                    throw new RestoreCommittedException(failure);
                 }
             }
             return true;
@@ -187,30 +172,6 @@ final class BackupRestore {
                 })
                 .doOnError(platform::reportRestoreFailure)
                 .cache().ignoreElement();
-    }
-
-    private void recoverPreferencesIfNeeded() throws RestoreRecoveryRequiredException {
-        if (recoveryPreferences != null) {
-            try {
-                ImportExportManager.replacePreferences(preferences, recoveryPreferences);
-                recoveryPreferences = null;
-            } catch (final Exception failure) {
-                throw new RestoreRecoveryRequiredException(failure);
-            }
-        }
-    }
-
-    private static Map<String, Object> copyPreferences(final Map<String, ?> values) {
-        final Map<String, Object> copy = new HashMap<>();
-        values.forEach((key, value) -> copy.put(key,
-                value instanceof Set<?> ? new HashSet<>((Set<?>) value) : value));
-        return copy;
-    }
-
-    static final class RestoreRecoveryRequiredException extends IOException {
-        RestoreRecoveryRequiredException(final Throwable cause) {
-            super("Restore failed and settings recovery is incomplete; retry recovery", cause);
-        }
     }
 
     static final class RestoreCommittedException extends IOException {

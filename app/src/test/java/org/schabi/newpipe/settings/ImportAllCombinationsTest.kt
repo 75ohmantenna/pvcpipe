@@ -60,7 +60,7 @@ class ImportAllCombinationsTest {
         if (containsDb) {
             runTest {
                 ImportExportManager(fileLocator) { }.prepareRestore(zip, null).use { it.publish() }
-                PendingDatabaseRestore.install(fileLocator.db)
+                PendingDatabaseRestore.install(fileLocator.db, emptyRestorePreferences()) { }
                 Assert.assertFalse(dbJournal.exists())
                 Assert.assertFalse(dbWal.exists())
                 Assert.assertFalse(dbShm.exists())

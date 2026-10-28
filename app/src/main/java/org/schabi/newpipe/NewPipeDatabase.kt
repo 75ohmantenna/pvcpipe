@@ -31,7 +31,7 @@ object NewPipeDatabase {
         journalMode: RoomDatabase.JournalMode = RoomDatabase.JournalMode.AUTOMATIC
     ): AppDatabase {
         return databaseBuilder(
-            context.applicationContext,
+            context.applicationContext ?: context,
             AppDatabase::class.java,
             name
         ).addMigrations(

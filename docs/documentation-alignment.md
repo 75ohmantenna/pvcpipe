@@ -701,7 +701,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | --- | --- |
 | Null stream lists were not handled safely at the audited revision | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L148) stored getter results through setters without normalization. Its source check dereferenced the video list unconditionally and the audio list when the video list was empty, before checking manifest URLs. Null video/audio lists could therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reached callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). The documentation-only pass changed no signatures, annotations or behavior. The separately authorized [null-list correction below](#null-list-implementation-follow-up--2026-10-28) now normalizes those results. |
 | ZIP inspection did not validate format at the audited revision | The [former `ZipHelper.isValidZipFile`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) only opened/closed a `ZipInputStream`, and `BackupRestore.inspect` used that result. A standalone JDK probe accepted synthetic plain text and found no entry. That was stream-boundary evidence, not the complete Android workflow. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) replaces this predicate with private-copy central-directory inspection. |
-| Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
+| Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
 | Bookmark save may clear a newer draft's dirty flag | [`BookmarkFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) uses unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). Intervening edits are a suspected race; no new scheduling regression was added. |
 | Orphan cleanup omits permanent-thumbnail references | [`StreamDAO.deleteOrphans`](../app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checks history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. A synthetic SQLite probe of the actual deletion query removes a row referenced only by a permanent thumbnail, making the image lookup null. This is SQL-boundary evidence, not an Android/Room or rendered-image test. |
 | Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
@@ -916,3 +916,71 @@ installation/uninstall, app-data clearing, live-service extraction or physical
 receiver check was performed. Compiler deprecation warnings remain. The changes
 are scoped to new ZIP restore preparation and its documentation/testing; other
 open audit findings and UI-text proposals remain separate.
+
+### Restore crash-recovery follow-up — 2026-10-28
+
+Started from clean `master` at `cd4deb21c43bd3bb2e6c62d92c8b008bef89fd39`,
+on branch `fix-restore-crash-recovery`. The user requested durable recovery for
+paired database/settings activation, interrupted/fault tests, and validation of
+pending databases before replacement or sidecar deletion. The preceding
+validation follow-up's process-death gap and lack of startup revalidation describe
+that earlier revision; the [current restore guide](library-data.md#backup-and-restore)
+describes this follow-up. Earlier failures and hardware results remain historical.
+
+Two new regression tests failed against unchanged production code: queuing a
+restore changed preferences while the old database remained live, and a failed
+pending-file replacement removed the old WAL. The new protocol publishes the
+database and a typed preference intent together without changing live settings.
+Main-process attach revalidates a private copy before providers initialize,
+snapshots the old database family and settings, then installs the replacement
+before removing sidecars. A checked activation record supports repeatable
+rollback after interruption; a completion record prevents replay after commit.
+Recovery failure stops startup instead of allowing an unresolved pair to open.
+Phoenix/ACRA helper processes skip activation and main application initialization.
+
+Self-review traced interruption before publication, during validation/snapshot,
+after database replacement and each sidecar deletion, around preference commit,
+during rollback and around completion/retirement. It also checked damaged undo
+and completion records, post-commit failures, initially absent databases, legacy
+pending files and preference numeric/set preservation. Fresh child JVMs use real
+host filesystem operations and `Runtime.halt`, with controlled text databases and
+disk preferences. Separate Robolectric API 26 tests use native host SQLite,
+Android preferences and production `App.attachBaseContext`, suppressing normal
+`onCreate` and ACRA initialization. They do not run Android providers, Android
+process death, actual power loss or physical-device storage. These are adversarial
+self-reviews, not independent reviews.
+
+Successful transactions are retired before garbage collection. Rejected or
+rolled-back snapshots remain quarantined; interrupted unpublished/install
+resources may remain. There is no cleanup UI. The protocol uses file forcing,
+atomic moves, directory syncs and cooperating-process locks, but this host testing
+does not certify arbitrary device storage/power-loss durability. Old raw pending
+files cannot reconstruct pre-import settings that older releases never saved.
+
+The helper-process review found that extractor settings initialized before the
+helper early return and could write preferences during main-process recovery.
+That initialization now follows the return, with a regression for the ACRA path.
+The expanded native WAL fixture initially failed before activation because
+`execSQL` cannot execute its result-producing PRAGMA; using `rawQuery` fixes the
+fixture setup. Its main-file-only control checks that the committed extra row
+requires the WAL, and recovery checks the saved family's bytes and both rows.
+The initial complete JVM run reported 1,094 tests with only that setup failure;
+the preceding static gate also caught a 101-character test line, which was wrapped.
+
+| Verification | Result |
+| --- | --- |
+| JVM stage | App: 1,094 tests, including 19 core recovery tests, 10 native startup tests and 2 workflow regressions. Offline extractor: 651 with 3 skips (up-to-date); build logic: 3 (up-to-date). No failures or errors in the final complete JVM run. |
+| Static checks | App/extractor Checkstyle, ktlint and dependency ordering passed. |
+| Debug lint | Passed with 59 warnings and no errors. This is static analysis. |
+| Host evidence | Fresh child JVMs halt without cleanup on real host files; their database validator and preference store are controlled. Robolectric uses API 26 and native host SQLite, including a committed WAL-only row verified absent from a main-file-only copy. Neither path is Android process-death or physical-storage evidence. |
+| `make ci` | Passed all five serial Gradle stages, including debug lint and debug/release assembly. Gradle reused cached/up-to-date outputs where reported. The fixture sanitizer's 12 tests passed and all 685 recordings needed no replacements. |
+| Android test APK | `:app:assembleDebugAndroidTest` passed, compiling the adapted instrumentation sources. Its inspected dry-run contained 81 build tasks and no installation, uninstall, device-data or instrumentation execution task. The APK was not installed or run. |
+| Documentation | All 205 local Markdown links resolved across 21 tracked Markdown files, including bounds checks on 13 local source-line references. Changed-file spelling and `git diff --check` passed. The historical pending-installer link is pinned to its original revision after replacing that Java helper with the Kotlin adapter. |
+| Preservation | All source/test hashes remained unchanged through the final gate and APK build. Changes cover restore preparation/publication, startup activation/rollback, preferences, database sidecars, process roles, their tests and current guides. Dependencies, version/application IDs, signing configuration, license notices and repository/device safety rules are unchanged. |
+
+No device/emulator access, instrumentation execution, package installation or
+uninstall, app-data clearing, live-service extraction or physical-receiver check
+was performed. Host results do not certify Android process scheduling or arbitrary
+power-loss/storage durability. Startup validation/copying is synchronous, and
+retained failed snapshots have no cleanup UI. Other open audit findings and
+unrelated UI-text proposals remain separate.
