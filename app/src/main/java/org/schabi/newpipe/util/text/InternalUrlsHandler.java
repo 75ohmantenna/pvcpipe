@@ -87,13 +87,16 @@ public final class InternalUrlsHandler {
     }
 
     /**
-     * Play a content in the floating player.
+     * Submits a timestamp request to the player service after normalizing the stream URL.
+     * The active player handles the asynchronous lookup and seek/queue change; this method
+     * does not select popup mode or wait for playback to start.
      *
      * @param context     the context to be used
      * @param url         the URL of the content
      * @param service     the service of the content
-     * @param seconds     the position in seconds at which the floating player will start
-     * @return true if the playback of the content has successfully started or false if not
+     * @param seconds     the requested position in seconds
+     * @return true after service-start dispatch, or false if URL normalization fails;
+     *         service-start exceptions propagate
      */
     public static boolean playOnPopup(final Context context,
                                       final String url,

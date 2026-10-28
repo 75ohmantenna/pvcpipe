@@ -21,9 +21,9 @@ public interface CommentsInfoItemExtractor extends InfoItemExtractor {
      *
      * <br>
      * <p>
-     * NOTE: Currently only implemented for YT {@link
-     * YoutubeCommentsInfoItemExtractor#getLikeCount()}
-     * with limitations (only approximate like count is returned)
+     * Service implementations differ in precision. For example,
+     * {@link YoutubeCommentsInfoItemExtractor#getLikeCount()} can parse an abbreviated count;
+     * BitChute, Rumble and Odysee also implement this method.
      *
      * @return the comment's like count
      * or {@link CommentsInfoItem#NO_LIKE_COUNT} if it is unavailable

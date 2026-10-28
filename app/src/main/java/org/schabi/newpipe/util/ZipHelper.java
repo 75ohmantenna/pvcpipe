@@ -147,7 +147,7 @@ public final class ZipHelper {
      *
      * @param zipFile   the zip file
      * @param fileInZip the filename to check
-     * @return whether the provided filename is in the zip; only the first level is checked
+     * @return whether an entry has that exact full name, including any directory prefix
      */
     public static boolean zipContainsFile(final StoredFileHelper zipFile, final String fileInZip)
             throws Exception {
@@ -164,6 +164,7 @@ public final class ZipHelper {
         }
     }
 
+    // This only opens/closes a ZIP stream; it does not read or validate an archive header.
     public static boolean isValidZipFile(final StoredFileHelper file) {
         try (ZipInputStream ignored = new ZipInputStream(new BufferedInputStream(
                 new SharpInputStream(file.getStream())))) {

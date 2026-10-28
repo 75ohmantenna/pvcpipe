@@ -198,10 +198,10 @@ class ErrorInfo private constructor(
         )
 
         /**
-         * The downloader reports every HTTP 429 as a [ReCaptchaException]. Only a few hosts
-         * answer 429 with a captcha that the app can show and whose result it can use. For any
-         * other host 429 means "too many requests, try again later", and a captcha screen
-         * would show an API address and change nothing.
+         * Offers a challenge URL only for a [ReCaptchaException] on the explicit host allowlist.
+         * The downloader uses this exception for every HTTP 429, and Kick also uses it for
+         * security blocks. The exception alone does not establish a solvable challenge or a
+         * rate limit. Other hosts receive refusal feedback without opening the challenge screen.
          *
          * @return the address to open in the captcha screen, or `null` if [throwable] is not a
          * captcha the app can solve

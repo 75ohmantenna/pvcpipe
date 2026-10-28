@@ -1,7 +1,7 @@
 # PVCPipe
 
-PVCPipe is a video and audio app for **Android 8.0+**. Subscriptions,
-playlists and history stay on your device. No service account is required.
+PVCPipe is a video and audio app for **Android 8.0+**. It stores subscriptions,
+playlists and history locally. No service account is required.
 
 **Still in development.** Expect bugs and changes in site support.
 

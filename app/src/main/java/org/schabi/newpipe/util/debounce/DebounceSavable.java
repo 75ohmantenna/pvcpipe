@@ -5,9 +5,10 @@ import org.schabi.newpipe.error.ErrorInfo;
 public interface DebounceSavable {
 
     /**
-     * Execute operations to save the data. <br>
-     * Must set {@link DebounceSaver#setIsModified(boolean)} false in this method manually
-     * after the data has been saved.
+     * Starts saving the current draft.
+     * Mark a successful save with {@link DebounceSaver#setNoChangesToSave(long)} using the
+     * revision captured for that save, so later edits remain dirty. The no-argument overload
+     * clears the flag unconditionally and is appropriate only when newer edits cannot intervene.
      */
     void saveImmediate();
 

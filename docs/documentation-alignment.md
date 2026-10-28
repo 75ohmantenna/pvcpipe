@@ -621,3 +621,218 @@ app JVM and offline extractor gates, Android lint, debug assembly and release
 assembly. Instrumentation assembly passed after temporary probe removal.
 Gradle reused unchanged outputs where reported. Existing compiler warnings do
 not establish runtime failures, and this gate does not exercise API 37 devices.
+
+## Repository-wide documentation follow-up — 2026-10-28
+
+Started with a clean checkout on `master` at
+`6b4d4bf01fc976bcbfae99fda1548f5ab13e8573`. At the end of this documentation
+pass, changes remained local; no commit, push, PR, issue, comment or other remote
+mutation had been made. The separately authorized implementation follow-up below
+also covers committing, merging and pushing the accumulated changes. Root `AGENTS.md`
+and `/home/user/.codex/RTK.md` were read before inspection; no nested
+`AGENTS.md` was found. Repository and device-safety rules remain unchanged.
+
+### Inventory and implementation coverage
+
+The starting tracked tree contained 2,513 files, including 22 maintained
+Markdown/text documentation surfaces and 1,299 Java/Kotlin/Gradle Kotlin files
+before generated-source exclusions. A mechanical source-comment inventory
+identified 7,792 nonlicense comment blocks in 843 files. Those counts describe
+the inventory, not independent verification of every statement. The review used
+repository-wide searches and cross-reference checks, then traced substantive
+guide claims and discrepancies through implementations and callers.
+
+| Area | Sources and treatment |
+| --- | --- |
+| Overview, terminology, agents and contributors | Root README, glossary, AGENTS, documentation index and all current guides; retained remote/device restrictions |
+| Versions and builds | `version.properties`, `PvcVersion` and tests, app/extractor/settings/buildSrc scripts, version catalogs, wrapper/daemon properties, Makefile, Checkstyle, ktlint, lint and shrinker configuration |
+| Services | `ServiceList`, `NewPipe` lookup, all six service registrations and capability factories, migrations, filters, downloader/cookie handling, Odysee retry/count policies and YouTube client/proof-token callers |
+| Playback | Source selection/resolution, Media3 session/service and notifications, FCast controller/session/discovery/proxy, queue events and managed-source completions, recovery/history ownership, audio, detail navigation and the assertions/mocked boundaries of related tests |
+| Library data | Local playlist manager/fragment, bookmark saves, subscription grouping/transfers, feed selection/loading/storage, backup inspection/preparation/publication and startup activation |
+| Downloads and reporting | Selection/dispatch, HLS preprocessing/remuxing, checkpoint/finalization and file sharing; ErrorInfo, log capture, report copy/share builders, ACRA initialization/sender and pagination diagnostics |
+| Embedded and test documentation | JavaDoc/KDoc, inline/block/XML/config comments, package docs, test helpers and fixture READMEs, Python tool docstrings/comments, OMP adapter and timeago generator entry points; hand-written `PatternsManager`/`PatternsHolder` inspected separately from generated patterns |
+| Dated records | Retained dated observations, failures, hardware results and historical engine versions; old ExoPlayer links in the current playback guide are explicitly identified as the earlier investigation |
+
+Generated output/caches, binaries, recorded response payloads, generated timeago
+patterns/PatternMap, json2java4nanoJson models and Protocol Buffers/Wire output
+were excluded from prose editing. License/copyright/attribution notices and
+incorporated third-party algorithm provenance were preserved. There are no
+tracked CI workflow files in this checkout; the local gate is the Makefile.
+Historical artifact captures and hashes, every external link, live services,
+and device/receiver scheduling were not re-certified. This is a claim-focused
+implementation review, not a line-by-line proof of every inherited algorithm
+comment or a new hardware campaign.
+
+### Corrections
+
+- Media3 controllers can change active FCast speed when supported. The old
+  media-session-connector limitation no longer describes `PvcSessionPlayer`.
+  Surface, codec, service-lifetime, queue-reordering and managed-completion
+  comments now distinguish implemented behavior from old API names or guarantees.
+- Feed loading uses separately enabled stream tabs, with initial-page/one-empty-page
+  continuation loading, rather than exhausting a channel or loading one fixed tab.
+  Progress validity is strictly above five seconds **or** one quarter of duration;
+  completion uses at most 60 seconds remaining **and** at least three quarters.
+- “Stored locally” replaces an exclusive-device claim: the manifest permits
+  Android backup. App ZIP exports include both settings formats; database-only
+  restore still updates the remembered document URI. Inspection/staging limits
+  are explicit without endorsing malformed archives as supported inputs.
+- Extractor comments now acknowledge HLS and its source-admission rules,
+  singleton link factories, other services' comment likes, actual parser group
+  behavior, locale-parser limits, cookie scope and valid tagged logger examples.
+  Test descriptions identify their actual kiosk subset and downloader-selection
+  behavior rather than claiming complete service or universal generator coverage.
+  The review correction below removes the inherited null-list wording that this
+  pass initially repeated. At that point null lists remained an implementation
+  defect, not a contract; the separately authorized implementation follow-up below
+  corrects their handling.
+- Remaining corrections cover the real Checkstyle tag settings, standalone
+  extractor version validation limits, debounce completion API, timestamp-request
+  dispatch, duration truncation, blocking image loads, seek-option resource
+  fallback, SAF capabilities and width/theme/plural XML comments. Runtime strings,
+  resource values, assertions, dependencies and executable configuration are unchanged.
+
+### Suspected defects and remaining ambiguities
+
+These were reported rather than fixed by this documentation task. Unless stated
+otherwise, they are source-level findings without a new Android reproduction.
+
+| Finding | Implementation and evidence limit |
+| --- | --- |
+| Null stream lists were not handled safely at the audited revision | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L148) stored getter results through setters without normalization. Its source check dereferenced the video list unconditionally and the audio list when the video list was empty, before checking manifest URLs. Null video/audio lists could therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reached callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). The documentation-only pass changed no signatures, annotations or behavior. The separately authorized [null-list correction below](#null-list-implementation-follow-up--2026-10-28) now normalizes those results. |
+| ZIP inspection is not format validation | [`ZipHelper.isValidZipFile`](../app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) opens/closes a `ZipInputStream` without reading a header; [`BackupRestore.inspect`](../app/src/main/java/org/schabi/newpipe/settings/BackupRestore.java#L126) uses the result. A standalone JDK probe accepts synthetic plain text and finds no entry. This mirrors the stream boundary, not the complete Android workflow. |
+| Non-SQLite database can reach staging | [`ImportExportManager.prepareRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checks entry presence/nonzero size before publication; [`PendingDatabaseRestore.install`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moves it before database opening. Placeholder/rollback tests do not establish SQLite openability. Startup behavior for a malformed database was not exercised. |
+| Bookmark save may clear a newer draft's dirty flag | [`BookmarkFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) uses unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). Intervening edits are a suspected race; no new scheduling regression was added. |
+| Orphan cleanup omits permanent-thumbnail references | [`StreamDAO.deleteOrphans`](../app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checks history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. A synthetic SQLite probe of the actual deletion query removes a row referenced only by a permanent thumbnail, making the image lookup null. This is SQL-boundary evidence, not an Android/Room or rendered-image test. |
+| Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
+| SAF exception cleanup may stop early | [`FileStreamSAF.close`](../app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) groups all closes in one try and marks disposed first. An early IOException skips later explicit closes; actual descriptor/provider consequences were not tested. |
+| Seek-option error path has no label fallback | [`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L135) adds a value before plural lookup but appends no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android. |
+
+The separate inherited cast initial-source-start concerns under
+[active-cast checkpoint attribution](playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23)
+remain open. This pass does not strengthen the older controlled JVM evidence,
+resolve source-start ordering or claim real receiver-clock provenance beyond the
+implemented protocol policy.
+
+### UI-text proposals left separate
+
+No user-facing text or translation was changed, including in XML files whose
+comments were corrected.
+
+| Surface | Proposed follow-up |
+| --- | --- |
+| [`disable_error_reports_title` / `disable_error_reports_summary`](../app/src/main/res/values/strings.xml#L912) | Describe hiding report screens **and notifications**, and state that local capture/ACRA collection remain enabled separately. The title “Disable error reporting” can imply a broader collection switch than [`ErrorUtil`](../app/src/main/java/org/schabi/newpipe/error/ErrorUtil.kt#L204) implements. Remove unsupported generic risk language only in a separately scoped UI change. |
+| [`ServiceHelper.getNameOfServiceById`](../app/src/main/java/org/schabi/newpipe/util/ServiceHelper.kt#L102) and [`subscription_header.xml`](../app/src/main/res/layout/subscription_header.xml) | The existing untranslated `<unknown>` heading for retired services remains. Consider localized, distinguishable retired-service labels and accessibility heading semantics, with a dedicated rendering/TalkBack check. |
+
+### Verification of this follow-up
+
+Local Markdown paths and heading anchors, source references, documented Gradle
+tasks, changed diffs and executable-token/resource-value preservation were checked.
+Selected external references were read from the official
+[Kotlin compatibility matrix](https://kotlinlang.org/docs/gradle-configure-project.html),
+[FCast protocol](https://docs.fcast.org/protocol/),
+[FCast Android guidance](https://docs.fcast.org/sdk/tutorials/android/),
+[Android APK debugger guide](https://developer.android.com/studio/debug/apk-debugger)
+and [Android bound-service lifecycle guide](https://developer.android.com/develop/background-work/services/bound-services).
+These verify referenced guidance, not this app's runtime interoperability.
+
+| Check | Result |
+| --- | --- |
+| `./gradlew --offline --no-daemon --version` | Gradle 9.8.2; daemon criteria Java 25; launcher Java 17. The compilation toolchain remains Java 21 in the build definitions. |
+| `make ci` | Passed all five serial Gradle stages: build-logic/static checks, app JVM/offline extractor tests, debug lint, debug assembly and release assembly. Cached/up-to-date outputs were reused where reported. |
+| Python fixture checks within `make ci` | 12 sanitizer tests passed; 685 recordings checked, zero replacements required, zero skipped binary payloads or remaining detected identifiers. This is not general secret-scanner certification. |
+| JVM reports | Build logic: 3 tests; app: 1,044; offline extractor: 613, including 3 skips. No failures or errors. These are JVM/fixture results, not new Android engine or service observations. |
+| Final comment checks | `:app:runCheckstyle`, `:pvcpipe-extractor:extractor:checkstyleMain` and `:pvcpipe-extractor:extractor:javadoc` passed together after the last source-comment adjustments. JavaDoc emitted 100 missing-documentation/tag warnings, including generated patterns. No symbol-by-symbol documentation expansion was attempted. |
+| Links, XML and spelling | All 197 local prose links resolved, including 15 code-line references; all 363 tracked XML files parsed; changed-file `codespell` and `git diff --check` passed. |
+| Preservation review | All 40 changed source/resource/config files retained executable tokens, resource values and property values. Legal headers were retained. All changed diffs and a second stale-reference/contradiction pass were reviewed. |
+| Command and boundary probes | Makefile dry run and both device-harness `--help` commands matched documented flags without device access. Standalone JDK ZIP/compiled-parser and synthetic SQLite cleanup probes produced the results described above. |
+
+Two intermediate gates caught overlong JavaDoc lines introduced during editing;
+both were wrapped before the successful gate. An initial standalone parser-probe
+launch overlapped rebuilding the extractor class output and could not resolve
+`Parser`; the repeated launch after compilation succeeded. No test assertion or
+executable code was changed to obtain a pass. Compiler/Gradle deprecation warnings
+remain. No instrumentation execution, emulator/device access, installation,
+uninstall, app-data clearing, live-service extraction or physical receiver test
+was performed in this follow-up.
+
+### Review corrections — 2026-10-28
+
+A user-supplied read-only Claude review identified three inaccurate comment
+rewrites and one unchanged stale comment. Implementation/caller inspection
+confirmed all four. The stream getters now call for empty lists instead of
+presenting null as supported; the unhandled-null defect is recorded in the
+table above. No nullability annotation, signature or implementation was changed.
+
+The cookie comment again carries one historical issue reference. The source
+before rebrand commit `f2a324bad` identifies it as
+`bravenewpipe/NewPipeExtractor#123`, rather than either rebranded repository URL.
+That URL could not be fetched during this follow-up; the reference preserves
+source provenance and does not certify current issue availability or service
+behavior. The DASH test description now distinguishes a real-network suite
+from livestream content. The adjacent seek-option comment about initializing
+`seek_duration_description` was removed because labels come from `R.plurals.seconds`.
+
+The earlier `make ci` result above belongs to the preceding repository-wide pass.
+This comment-only correction does not claim a new full gate or newer JVM test
+results. Fresh `:app:runCheckstyle`,
+`:pvcpipe-extractor:extractor:checkstyleMain` and
+`:pvcpipe-extractor:extractor:javadoc` passed together after these corrections;
+JavaDoc again reported 100 missing-documentation/tag warnings. Changed-file
+`codespell`, `git diff --check` and all 199 local documentation links passed,
+including bounds checks on 17 code-line references. Incremental diff review
+confirmed that only these four Java comment edits and this record changed from
+the reviewed working tree; Java executable tokens are unchanged. No full
+`make ci`, JVM tests, live-network extraction or device checks were rerun.
+
+### Null-list implementation follow-up — 2026-10-28
+
+After the documentation review, the user explicitly authorized a separate code
+fix, regression coverage, adversarial review, signed commits, a local merge and
+a push to `github.com/75ohmantenna/pvcpipe`. The documentation corrections remain
+a separate commit from this implementation change. The starting revision is
+still `6b4d4bf01fc976bcbfae99fda1548f5ab13e8573`.
+
+The three `StreamInfo` stream-list setters now convert null inputs to empty
+lists, retaining supplied nonnull lists. This also protects results assembled
+through `StreamInfo.getInfo`. Source admission still requires audio, combined
+video, DASH or HLS; video-only streams alone still fail. With an admitted source,
+optional getter failures remain in the returned info's diagnostics. An explicit
+audio `ContentNotSupportedException` still aborts extraction. This correction
+does not validate individual list elements or migrate previously serialized
+objects that bypass the setters.
+
+The new offline `StreamInfoTest` invokes the real assembly path with synthetic
+extractor metadata and a downloader that rejects network requests. Its 38 cases
+cover all eight null/empty combinations with DASH and HLS, missing sources,
+video-only rejection, live manifest-only metadata, retained audio/video sources,
+public setter clearing and the existing exception paths. Against the unchanged
+implementation, 28 cases failed and ten controls passed; with the setter guards,
+all 38 passed. An earlier fixture initialization error (a required video-builder
+flag was missing) was corrected before recording this red/green baseline.
+Manifest cases establish `StreamInfo` admission, not downstream resolver
+selection or successful media playback.
+
+Two adversarial self-review passes examined the actual short-circuit/source
+admission path and the API/error-handling boundaries. They added live-manifest
+coverage and checked that normalization does not swallow exceptions, copy
+nonnull lists or strengthen serialization guarantees. These are self-reviews
+and offline JVM results, not independent reviews or live-service, Android-engine,
+emulator or receiver observations. The other suspected defects and UI-text
+proposals above remain open.
+
+Fresh verification of the combined documentation and implementation tree:
+
+| Check | Result |
+| --- | --- |
+| `make ci` | Passed all five serial Gradle stages, including debug lint and both debug/release APK assembly; Gradle reused cached/up-to-date outputs where reported. The fixture tool's 12 tests passed, and 685 recordings needed no replacements. |
+| JVM reports | Build logic: 3 tests (up-to-date); app: 1,044; offline extractor: 651, including 3 skips and all 38 new regressions. No failures or errors. Existing suites use their own mocks, recordings or controlled peers; these counts do not establish live-service or device behavior. |
+| Android lint | Passed; the debug XML report contains 59 warnings and no errors. This was static analysis, not instrumentation. |
+| JavaDoc | `:pvcpipe-extractor:extractor:javadoc` passed after the final source changes, reporting 100 missing-documentation/tag warnings. |
+| Documentation checks | All 200 local prose links resolved, including bounds checks on 17 source-line references; all 363 tracked XML files parsed. Changed-file `codespell` and staged/unstaged `git diff --check` passed. |
+| Preservation and review | All 40 previously changed source/config/resource files retain executable tokens and values. The only production-code changes are the three setter guards; regression coverage is a new test file. Existing test assertions, legal notices, dependencies, configuration values and repository/device safety rules remain unchanged. |
+
+Generated output, caches, binaries and third-party material remain excluded from
+documentation editing. No emulator/device access, instrumentation, package
+installation/uninstall, data clearing, live extraction or physical receiver
+check was performed for this implementation follow-up.

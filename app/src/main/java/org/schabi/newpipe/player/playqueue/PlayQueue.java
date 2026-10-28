@@ -394,9 +394,9 @@ public abstract class PlayQueue implements Serializable {
      * <p>
      * If the item being moved is the currently playing, then the current playing index is set
      * to that of the target.
-     * If the moved item is not the currently playing and moves to an index <b>AFTER</b> the
-     * current playing index, then the current playing index is decremented.
-     * Vice versa if the an item after the currently playing is moved <b>BEFORE</b>.
+     * Moving an item from before the current index to that index or later decrements the
+     * current index. Moving an item from after it to that index or earlier increments it.
+     * Moves that do not cross the current item leave its index unchanged.
      * </p>
      *
      * @param source the original index of the item
@@ -499,8 +499,8 @@ public abstract class PlayQueue implements Serializable {
     /**
      * Unshuffles the current play queue if a backup play queue exists.
      * <p>
-     * This method undoes shuffling and index will be set to the previously playing item if found,
-     * otherwise, the index will reset to 0.
+     * Restores the backup order while retaining the item selected at the time of unshuffling,
+     * if it is found in the backup; otherwise the index resets to 0.
      * </p>
      * <p>
      * Will emit a {@link ReorderEvent} if a backup exists.
@@ -530,12 +530,12 @@ public abstract class PlayQueue implements Serializable {
     }
 
     /**
-     * Selects previous played item.
+     * Selects the previous queue-history item and emits the selection event.
      *
-     * This method removes currently playing item from history and
-     * starts playing the last item from history if it exists
+     * Removes the current history entry and reselects the preceding one through
+     * {@link #setIndex(int)}. Playback is handled by observers of the queue.
      *
-     * @return true if history is not empty and the item can be played
+     * @return true if history had at least two entries and selection was requested
      * */
     public synchronized boolean previous() {
         if (history.size() <= 1) {

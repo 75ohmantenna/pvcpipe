@@ -126,12 +126,11 @@ public class VideoAudioSettingsFragment extends BasePreferenceFragment {
     }
 
     /**
-     * Update fast-forward/-rewind seek duration options
-     * according to language and inexact seek setting.
-     * Exoplayer can't seek 5 seconds in audio when using inexact seek.
+     * Builds localized fast-forward/rewind entries and filters 5, 15 and 25 seconds in
+     * inexact-seek mode. The filtering is an inherited coarse-seek workaround, not a probe
+     * of the current Media3 decoder's seek accuracy.
      */
     private void updateSeekOptions() {
-        // initializing R.array.seek_duration_description to display the translation of seconds
         final Resources res = getResources();
         final String[] durationsValues = res.getStringArray(R.array.seek_duration_value);
         final List<String> displayedDurationValues = new LinkedList<>();
@@ -154,8 +153,8 @@ public class VideoAudioSettingsFragment extends BasePreferenceFragment {
                                 currentDurationValue),
                         currentDurationValue));
             } catch (final Resources.NotFoundException ignored) {
-                // if this happens, the translation is missing,
-                // and the english string will be displayed instead
+                // No label is appended on failure. Normal locale fallback is handled by
+                // Android's resource lookup, not by the static description array here.
             }
         }
 

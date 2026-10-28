@@ -274,10 +274,9 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * Get the dash mpd url. If you don't know what a dash MPD is you can read about it
-     * <a href="https://www.brendanlong.com/the-structure-of-an-mpeg-dash-mpd.html">here</a>.
+     * Gets a standalone DASH manifest URL, when supplied by the service.
      *
-     * @return the url as a string or an empty string or an empty string if not available
+     * @return the manifest URL or an empty string if not available
      * @throws ParsingException if an error occurs while reading
      */
     @Nonnull
@@ -286,10 +285,10 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * I am not sure if this is in use, and how this is used. However the frontend is missing
-     * support for HLS streams. Prove me if I am wrong. Please open an
-     * <a href="https://github.com/teamnewpipe/newpipe/issues">issue</a>,
-     * or fix this description if you know what's up with this.
+     * Gets a standalone HLS manifest URL, when supplied by the service.
+     * {@link StreamInfo} accepts this as a source even when the stream lists are empty.
+     * The app's live-source resolver can use it; individual renditions may also be exposed
+     * as streams with {@link org.schabi.newpipe.extractor.stream.DeliveryMethod#HLS} delivery.
      *
      * @return The Url to the hls stream or an empty string if not available.
      */
@@ -299,34 +298,28 @@ public abstract class StreamExtractor extends Extractor {
     }
 
     /**
-     * This should return a list of available {@link AudioStream}s.
-     * You can also return null or an empty list, however be aware that if you don't return anything
-     * in getVideoStreams(), getVideoOnlyStreams() and getDashMpdUrl() either the Collector will
-     * handle this as a failed extraction procedure.
+     * Returns available audio-only streams. Implementations should return an empty list when
+     * none are available; {@link StreamInfo} normalizes null results to empty lists.
+     * {@link StreamInfo} requires at least one audio stream, combined video stream, DASH URL
+     * or HLS URL. Video-only streams alone do not satisfy that extraction check.
      *
      * @return a list of audio only streams in the format of AudioStream
      */
     public abstract List<AudioStream> getAudioStreams() throws IOException, ExtractionException;
 
     /**
-     * This should return a list of available {@link VideoStream}s.
-     * Be aware this is the list of video streams which do contain an audio stream.
-     * You can also return null or an empty list, however be aware that if you don't return anything
-     * in getAudioStreams(), getVideoOnlyStreams() and getDashMpdUrl() either the Collector will
-     * handle this as a failed extraction procedure.
+     * Returns video streams that include audio, or an empty list if none are available.
+     * See {@link #getAudioStreams()} for the minimum source requirements in {@link StreamInfo}.
      *
-     * @return a list of combined video and streams in the format of AudioStream
+     * @return combined video/audio streams
      */
     public abstract List<VideoStream> getVideoStreams() throws IOException, ExtractionException;
 
     /**
-     * This should return a list of available {@link VideoStream}s.
-     * Be aware this is the list of video streams which do NOT contain an audio stream.
-     * You can also return null or an empty list, however be aware that if you don't return anything
-     * in getAudioStreams(), getVideoStreams() and getDashMpdUrl() either the Collector will handle
-     * this as a failed extraction procedure.
+     * Returns video streams without audio, or an empty list if none are available.
+     * These are optional and do not alone satisfy {@link StreamInfo}'s source requirements.
      *
-     * @return a list of video and streams in the format of AudioStream
+     * @return video-only streams
      */
     public abstract List<VideoStream> getVideoOnlyStreams() throws IOException, ExtractionException;
 

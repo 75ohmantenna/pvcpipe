@@ -248,6 +248,9 @@ fork came from.
   numbering, because Android refuses to install a lower code over a higher
   one.
 - The bundled extractor has the same version. Its build reads the same file.
+- The app validates the version's shape and code during configuration through
+  `PvcVersion`. A standalone extractor build only requires the `version` property
+  and copies its text; it does not run that Android version-code validation.
 - Change the version only in `version.properties`, not in either build script.
 
 ### Release procedure
@@ -300,11 +303,12 @@ records a media host becoming unavailable during repeated test requests.
 ## Conventions the checks enforce
 
 - Java follows `checkstyle/checkstyle.xml`, with exceptions in
-  `checkstyle/suppressions.xml`. Checkstyle does not ask for Javadoc, but existing
-  Javadoc needs a summary sentence ending with a period, and a method's Javadoc
-  has to carry a tag for every parameter. Both builds use `SummaryJavadoc`;
-  Checkstyle removed the old `JavadocStyle` check. License-only and author-only
-  metadata belongs in ordinary block comments, not Javadoc.
+  `checkstyle/suppressions.xml`. The extractor uses its own files under
+  `pvcpipe-extractor/checkstyle/`. Neither enables `MissingJavadocMethod`.
+  Both use `SummaryJavadoc` for existing summaries. The app's `JavadocMethod`
+  uses its default parameter/return-tag checks; the extractor explicitly allows
+  missing parameter and return tags. License-only and author-only metadata
+  belongs in ordinary block comments, not Javadoc.
 - The extractor's Checkstyle rejects `toLowerCase()` and `toUpperCase()`
   without a `Locale`. With the language of the device set to Turkish they
   turn `i` into `İ` and `I` into `ı`, and host names stop matching.

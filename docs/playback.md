@@ -259,9 +259,9 @@ Receiver codec support still determines whether a source plays.
 
 Local subtitle, resize, pitch and silence-skipping controls do not control the
 receiver. Subtitle and resize controls are disabled while casting; the normal
-speed menu is available when the receiver advertises speed support. The
-media-session connector does not enable transport speed changes in its default
-action set; use the player's speed menu instead.
+speed menu and Media3 session speed command are available when the receiver
+advertises speed support. `PvcSessionPlayer.handleSetPlaybackParameters` sends
+only speed to an active receiver; pitch remains a local-playback setting.
 
 The implementation follows the official
 [FCast protocol](https://docs.fcast.org/protocol/) and
@@ -352,8 +352,8 @@ applicable. The
 [2026-10-23 prepared-engine/SQLite validation](pvcpipe-device-smoke.md#combined-playback-integration-validation-2026-10-23)
 records the real-engine regression and the API/receiver evidence limits.
 
-Rx cancellation does not cancel ExoPlayer's separately retained completion
-actions. In the resolved ExoPlayer **2.19.1**,
+Rx cancellation does not cancel the media source's separately retained completion
+actions. The original 2026-10-23 investigation inspected ExoPlayer **2.19.1**:
 [`ConcatenatingMediaSource.releaseSourceInternal()`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L525-L539)
 dispatches outstanding actions, and
 [`HandlerAndRunnable.dispatch()`](https://github.com/google/ExoPlayer/blob/r2.19.1/library/core/src/main/java/com/google/android/exoplayer2/source/ConcatenatingMediaSource.java#L1043-L1055)
@@ -362,9 +362,12 @@ posts them to the supplied handler. Mutations
 (including after release) can also post completions. Removing queued handler
 callbacks is cleanup only: the permanent ownership check also rejects actions
 already dequeued or posted during/after cleanup and release.
+The current build uses Media3's `ConcatenatingMediaSource`; the links above
+document the earlier engine investigation, not the currently resolved source.
+The manager retains its retirement checks around those callbacks after migration.
 
 `MediaSourceManagerTest` controls Rx and Android delivery independently. It runs
-real queue, manager and ExoPlayer playlist methods for stale synchronization,
+real queue, manager and Media3 playlist methods for stale synchronization,
 reload, release-time dispatch, post-release mutation, same-URL replacement,
 repeated disposal and valid current-manager work. Android handlers/loopers,
 the playback listener and child media sources are mocked; prepared-source

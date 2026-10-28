@@ -113,8 +113,8 @@ public class ManagedMediaSourcePlaylist {
      * @see #update(int, ManagedMediaSource, Handler, Runnable)
      * @param index            index of {@link ManagedMediaSource} to invalidate
      * @param handler          the {@link Handler} to run {@code finalizingAction}
-     * @param finalizingAction a {@link Runnable} which is executed immediately
-     *                         after the media source has been removed from the playlist
+     * @param finalizingAction a completion posted to the handler after removal is applied;
+     *                         it can outlive the manager that requested it
      */
     public synchronized void invalidate(final int index,
                                         @Nullable final Handler handler,
@@ -147,8 +147,8 @@ public class ManagedMediaSourcePlaylist {
      * @param index            index of {@link ManagedMediaSource} to update
      * @param source           new {@link ManagedMediaSource} to use
      * @param handler          the {@link Handler} to run {@code finalizingAction}
-     * @param finalizingAction a {@link Runnable} which is executed immediately
-     *                         after the media source has been removed from the playlist
+     * @param finalizingAction a completion posted to the handler after removal is applied;
+     *                         it can outlive the manager that requested it
      */
     public synchronized void update(final int index, @NonNull final ManagedMediaSource source,
                                     @Nullable final Handler handler,
@@ -157,18 +157,12 @@ public class ManagedMediaSourcePlaylist {
             return;
         }
 
-        // Add and remove are sequential on the same thread, therefore here, the exoplayer
-        // message queue must receive and process add before remove, effectively treating them
-        // as atomic.
-
-        // Since the finalizing action occurs strictly after the timeline has completed
-        // all its changes on the playback thread, thus, it is possible, in the meantime,
-        // other calls that modifies the playlist media source occur in between. This makes
-        // it unsafe to call remove as the finalizing action of add.
+        // Submit both mutations in order. They are separate engine operations; do not defer
+        // removal to the add completion, since other playlist edits can arrive before delivery.
         internalSource.addMediaSource(index + 1, source);
 
-        // Because of the above race condition, it is thus only safe to synchronize the player
-        // in the finalizing action AFTER the removal is complete and the timeline has changed.
+        // Synchronize after removal completion. The owner must still reject retired callbacks;
+        // an unprepared source can also post completion without a playback-thread mutation.
         internalSource.removeMediaSource(index, handler, finalizingAction);
     }
 }

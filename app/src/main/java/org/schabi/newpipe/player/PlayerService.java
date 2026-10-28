@@ -352,12 +352,9 @@ public final class PlayerService extends MediaLibraryService {
         cancelBrowserPreparation();
         cleanup();
 
-        // This only really stops the service if there are no other service connections (see docs):
-        // for example the (Android Auto) media browser binder will block stopService().
-        // This is why we also stopForeground() above, to make sure the notification is removed.
-        // If we were to call stopSelf(), then the service would be surely stopped (regardless of
-        // other service connections), but this would be a waste of resources since the service
-        // would be immediately restarted by those same connections to perform the queries.
+        // Remove the started-service lifetime; bound browser clients can keep the service alive.
+        // stopSelf() would not override those bindings either. Foreground/notification cleanup
+        // above is therefore explicit rather than waiting for service destruction.
         stopService(new Intent(this, PlayerService.class));
     }
 

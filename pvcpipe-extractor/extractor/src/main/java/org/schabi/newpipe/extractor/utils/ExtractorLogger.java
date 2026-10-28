@@ -3,10 +3,13 @@ package org.schabi.newpipe.extractor.utils;
 /**
  * Logging class for outputting logs from the extractor to the desired output.<br><br>
  * Intended to be used in the same manner as Android's {@code Log}:<br>
- * {@code ExtractorLogger.d("Hello my name Jeff")}<br>
+ * {@code ExtractorLogger.d("Example", "Hello my name Jeff")}<br>
  * <br>
  * Also supports formatted arguments:<br>
- * {@code ExtractorLogger.d("Hello my name is {Name} {}", name, surname)}
+ * {@code ExtractorLogger.d("Example", "Hello my name is {Name} {}", name, surname)}
+ * <p>
+ * Logging is silent until a logger is installed. The app does not install one here; extractor
+ * tests enable {@link ConsoleLogger} through their JUnit extension.
  */
 public final class ExtractorLogger {
 
@@ -23,8 +26,8 @@ public final class ExtractorLogger {
      * it will be routed through to {@code customLogger}
      * <br>
      * <br>
-     * For NewPipe, this should be set at the start of the application ideally in
-     * {@code MainActivity.onCreate}, but absolutely before any extractor code can run
+     * Install a logger before extraction if those logs are wanted. Passing null restores the
+     * silent default; it does not install Android logcat integration.
      */
     public static void setLogger(final Logger customLogger) {
         logger = customLogger != null ? customLogger : EMPTY_LOGGER;

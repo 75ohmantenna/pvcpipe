@@ -56,8 +56,9 @@ import javax.xml.parsers.DocumentBuilderFactory;
  * </p>
  *
  * <p>
- * We cannot test the generation of DASH manifests for ended livestreams because these videos will
- * be re-encoded as normal videos later, so we can't use a specific video.
+ * This real-network suite does not test ended-livestream manifests. An ended livestream can
+ * later be re-encoded as an ordinary video, so a fixed ID is not a stable post-live fixture.
+ * Synthetic inputs can test that generator separately.
  * </p>
  *
  * <p>

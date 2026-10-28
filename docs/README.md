@@ -41,7 +41,7 @@ guides and implementation for current behavior.
 | [media3-migration.md](media3-migration.md) | Media3 migration, release class-identity correction, physical FCast observations and outstanding hardware checks, 2026-10-26–28 |
 | [dependency-audit.md](dependency-audit.md) | Dependency roles, compatibility decisions, toolchain and checksum verification, October 2026 |
 | [license-audit.json](license-audit.json) | About license entries, dependency/source evidence, copyright corrections and bundled notices, 2026-10-26 |
-| [documentation-alignment.md](documentation-alignment.md) | Documentation/comment audit coverage, unresolved discrepancies and proposed UI-text follow-ups, 2026-10-23 |
+| [documentation-alignment.md](documentation-alignment.md) | Documentation/comment audit coverage, unresolved discrepancies and proposed UI-text follow-ups, 2026-10-23–28 |
 
 Detailed local evidence cited by temporary paths in these dated records was
 selectively consolidated into a separate local evidence repository on

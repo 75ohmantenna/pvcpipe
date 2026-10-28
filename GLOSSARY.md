@@ -5,8 +5,10 @@ PVCPipe plays remote streams and stores viewing data and settings locally.
 ## Backup and restore
 
 **Backup archive**:
-A ZIP archive of PVCPipe's local library database, optionally including
-application settings. Downloaded media and download-manager state are excluded.
+A ZIP archive of PVCPipe's local library database. PVCPipe's export includes
+application settings in JSON and legacy serialized form; imported archives may
+omit settings, and restoring them is optional. Downloaded media and
+download-manager state are excluded from the app's export.
 
 **Backup inspection**:
 An assessment of a selected backup archive that helps the user choose what to
@@ -88,7 +90,9 @@ removed, the first remaining stream supplies the image; an empty playlist
 uses the default image.
 
 **Permanent playlist thumbnail**:
-A fixed playlist image retained independently of playlist contents.
+A chosen thumbnail-stream reference that content edits leave unchanged. This
+is not a stored image copy: the stream metadata and remote image must still
+be available.
 
 ## Proof tokens
 

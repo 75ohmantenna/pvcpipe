@@ -98,7 +98,8 @@ public final class ImageSuffix implements Serializable {
      * {@code width} and {@code resolutionLevel} represent the corresponding properties:
      * <br>
      * <br>
-     * {@code ImageSuffix {url=url, height=height, width=width, resolutionLevel=resolutionLevel}'}
+     * {@code ImageSuffix {suffix=suffix, height=height, width=width,
+     * resolutionLevel=resolutionLevel}}
      * </p>
      *
      * @return a string representation of this {@link ImageSuffix} instance

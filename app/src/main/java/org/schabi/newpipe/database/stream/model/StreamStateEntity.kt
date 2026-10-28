@@ -37,7 +37,7 @@ data class StreamStateEntity(
 ) {
     /**
      * The state will be considered valid, and thus be saved, if the progress is more than
-     * [PLAYBACK_SAVE_THRESHOLD_START_MILLISECONDS] or at least 1/4 of the video length.
+     * [PLAYBACK_SAVE_THRESHOLD_START_MILLISECONDS] or strictly more than 1/4 of the video length.
      * @param durationInSeconds the duration of the stream connected with this state, in seconds
      * @return whether this stream state entity should be saved or not
      */
@@ -47,7 +47,7 @@ data class StreamStateEntity(
     }
 
     /**
-     * The video will be considered as finished, if the time left is less than
+     * The video will be considered as finished, if the time left is at most
      * [PLAYBACK_FINISHED_END_MILLISECONDS] and the progress is at least 3/4 of the video length.
      * The state will be saved anyway, so that it can be shown under stream info items, but the
      * player will not resume if a state is considered as finished. Finished streams are also the
@@ -70,14 +70,14 @@ data class StreamStateEntity(
         const val STREAM_PROGRESS_MILLIS = "progress_time"
 
         /**
-         * Playback state will not be saved, if playback time is less than this threshold
-         * (5000ms = 5s).
+         * Absolute progress threshold (5000ms = 5s). Exceeding either this threshold or
+         * one quarter of the duration makes the state valid; see [isValid].
          */
         const val PLAYBACK_SAVE_THRESHOLD_START_MILLISECONDS = 5000L
 
         /**
-         * Stream will be considered finished if the playback time left exceeds this threshold
-         * (60000ms = 60s).
+         * Maximum remaining time (60000ms = 60s) for a finished stream, together with
+         * the three-quarter progress requirement in [isFinished].
          * @see org.schabi.newpipe.database.stream.model.StreamStateEntity.isFinished
          */
         const val PLAYBACK_FINISHED_END_MILLISECONDS = 60000L
