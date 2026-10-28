@@ -45,6 +45,41 @@ The Room instrumentation tests live in
 `app/src/androidTest/java/org/schabi/newpipe/local/playlist/`. Follow
 [the device-safety procedure](local-playlist-mutations.md) before running them.
 
+## Bookmarks
+
+`BookmarkFragment` edits the combined order of local playlists and remote
+playlist bookmarks. [`BookmarkSaveManager`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkSaveManager.kt)
+copies that order's IDs and item types, together with pending deletions, when a
+save is requested. Local and remote IDs belong to separate tables; equal numeric
+IDs do not identify the same bookmark.
+
+- The first subscription admits a save onto the shared local-playlist write
+  queue. Its cached operation runs once and continues if observers detach.
+  Later accepted saves run after earlier ones, including across manager instances.
+- Each save applies both tables' deletions and order updates in one Room
+  transaction. Either table's write failure rolls back the transaction. Only
+  display indices are updated: stale adapter metadata cannot overwrite a newer
+  name or thumbnail, and a missing row is not recreated.
+- Completion acknowledges only the captured draft revision and deletion batch,
+  for the same saver instance. An older completion cannot mark a newer edit saved.
+  Adapter display indices are not changed to claim persistence before success.
+- Write failures leave the visible draft and pending deletions available for
+  retry. Each later save request submits the current draft as a new operation.
+  The loaded fragment's reload path retries saving instead of discarding the
+  draft. Database emissions do not replace a dirty draft. Errors use the existing
+  snackbar or detached error-reporting path.
+- Accepted writes and their completion callbacks outlive view subscriptions.
+  A dirty draft is retained when the same fragment's view is destroyed and
+  recreated. This is process-local state: a failed draft is not stored for
+  recovery after full fragment destruction or process death. Other remote
+  playlist operations retain their own scheduling and metadata-update behavior.
+
+The focused JVM tests under
+`app/src/test/java/org/schabi/newpipe/local/bookmark/` distinguish actual Room
+transactions with native host SQLite from fragment-method tests with controlled
+adapters, rendering and persistence. They do not establish device lifecycle or
+storage durability guarantees.
+
 ## Feed refresh
 
 [`FeedRefresh`](../app/src/main/java/org/schabi/newpipe/local/feed/service/FeedRefresh.kt)

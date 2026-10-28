@@ -286,6 +286,10 @@ sign or publish an APK. Never label a debug-key APK as a production-signed relea
   halt at filesystem checkpoints and recovers their files in a fresh JVM; its
   database validator and disk preferences are controlled substitutes. These
   tests do not simulate device power loss or run Android instrumentation.
+  `BookmarkSaveManagerTest` exercises combined bookmark transactions and the
+  shared write queue with real Room/native host SQLite. `BookmarkSaveOwnershipTest`
+  checks production fragment methods and draft ownership using controlled
+  adapters, rendering and persistence; it does not run a real fragment lifecycle.
 - **Offline extractor tests.** `forkCiTest` runs JUnit tests tagged `offline`
   and the extractor's main-source Checkstyle task. The tagged tests use
   recorded or synthetic responses rather than live websites.

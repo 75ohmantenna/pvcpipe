@@ -239,11 +239,11 @@ open class LocalPlaylistManager internal constructor(
         .map { it > 0 }
         .subscribeOn(Schedulers.io())
 
-    private companion object {
+    companion object {
         private val THUMBNAIL_ID_LEAVE_UNCHANGED = -2L
 
         // Application-owned ordering for accepted playlist mutations, across manager instances.
-        val WRITES: Scheduler = Schedulers.from(
+        internal val WRITES: Scheduler = Schedulers.from(
             Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "PlaylistWrites").apply { isDaemon = true }
             }
