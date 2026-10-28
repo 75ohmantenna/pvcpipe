@@ -164,13 +164,4 @@ public final class ZipHelper {
         }
     }
 
-    // This only opens/closes a ZIP stream; it does not read or validate an archive header.
-    public static boolean isValidZipFile(final StoredFileHelper file) {
-        try (ZipInputStream ignored = new ZipInputStream(new BufferedInputStream(
-                new SharpInputStream(file.getStream())))) {
-            return true;
-        } catch (final IOException ioe) {
-            return false;
-        }
-    }
 }

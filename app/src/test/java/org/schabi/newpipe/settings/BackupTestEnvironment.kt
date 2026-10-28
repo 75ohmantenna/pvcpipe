@@ -11,7 +11,7 @@ import org.schabi.newpipe.settings.export.ImportExportManager
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import us.shandian.giga.io.FileStream
 
-/** Real files and codecs with controlled Android effects and preference persistence. */
+/** Real files/codecs with controlled effects, preferences and a no-op SQLite validator. */
 internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platform {
     val values = mutableMapOf<String, Any>("original" to "settings")
     val errors = mutableListOf<Throwable>()
@@ -44,7 +44,7 @@ internal class BackupTestEnvironment(val directory: Path) : BackupRestore.Platfo
         `when`(it.dbWal).thenReturn(directory.resolve("newpipe.db-wal"))
         `when`(it.dbShm).thenReturn(directory.resolve("newpipe.db-shm"))
     }
-    val archives = org.mockito.Mockito.spy(ImportExportManager(locator))
+    val archives = org.mockito.Mockito.spy(ImportExportManager(locator) { })
 
     init {
         Files.writeString(database, "live database")

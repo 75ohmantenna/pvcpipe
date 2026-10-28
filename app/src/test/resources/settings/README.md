@@ -12,4 +12,8 @@ The standalone `newpipe.db` is a text placeholder, not a SQLite database.
 `BackupRestoreFailureTest` packs it into archives built during the test, and
 `ImportExportManagerTest` compares its text after export. Those controlled
 rollback/preparation and archive-copy tests do not establish that SQLite can
-open that payload; device/Room tests are separate evidence.
+open that payload; those tests explicitly inject a no-op database validator.
+`BackupValidationTest` separately creates real SQLite candidates from exported
+Room schemas (versions 2–9), plus a version-1 fixture derived from migration
+inputs. It uses the production validator, Room and native host SQLite under
+Robolectric; these are JVM results, not device observations.

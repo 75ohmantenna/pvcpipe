@@ -32,7 +32,10 @@ import java.util.zip.ZipOutputStream;
 
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
-/** Uses isolated files and real Android preferences; never invokes application restart. */
+/**
+ * Uses isolated files and real Android preferences; never invokes application restart.
+ * Database validation is controlled because these workflow archives contain text placeholders.
+ */
 public class BackupRestoreIntegrationTest {
     private Context context;
     private Path directory;
@@ -75,7 +78,8 @@ public class BackupRestoreIntegrationTest {
             public void reportRestoreFailure(final Throwable error) { }
         };
         backups = new BackupRestore(new BackupOperations(Schedulers.trampoline()),
-                new ImportExportManager(new BackupFileLocator(filesContext)), preferences,
+                new ImportExportManager(new BackupFileLocator(filesContext), path -> { }),
+                preferences,
                 "location", platform, Schedulers.trampoline());
     }
 

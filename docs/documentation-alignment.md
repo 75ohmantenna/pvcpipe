@@ -700,8 +700,8 @@ otherwise, they are source-level findings without a new Android reproduction.
 | Finding | Implementation and evidence limit |
 | --- | --- |
 | Null stream lists were not handled safely at the audited revision | [`StreamInfo.extractStreams`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java#L148) stored getter results through setters without normalization. Its source check dereferenced the video list unconditionally and the audio list when the video list was empty, before checking manifest URLs. Null video/audio lists could therefore escape as `NullPointerException`, rather than `StreamExtractException`; a null video-only list reached callers such as [`AndroidPlaybackEnvironment`](../app/src/main/java/org/schabi/newpipe/player/resolver/AndroidPlaybackEnvironment.java#L53). The documentation-only pass changed no signatures, annotations or behavior. The separately authorized [null-list correction below](#null-list-implementation-follow-up--2026-10-28) now normalizes those results. |
-| ZIP inspection is not format validation | [`ZipHelper.isValidZipFile`](../app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) opens/closes a `ZipInputStream` without reading a header; [`BackupRestore.inspect`](../app/src/main/java/org/schabi/newpipe/settings/BackupRestore.java#L126) uses the result. A standalone JDK probe accepts synthetic plain text and finds no entry. This mirrors the stream boundary, not the complete Android workflow. |
-| Non-SQLite database can reach staging | [`ImportExportManager.prepareRestore`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checks entry presence/nonzero size before publication; [`PendingDatabaseRestore.install`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moves it before database opening. Placeholder/rollback tests do not establish SQLite openability. Startup behavior for a malformed database was not exercised. |
+| ZIP inspection did not validate format at the audited revision | The [former `ZipHelper.isValidZipFile`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) only opened/closed a `ZipInputStream`, and `BackupRestore.inspect` used that result. A standalone JDK probe accepted synthetic plain text and found no entry. That was stream-boundary evidence, not the complete Android workflow. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) replaces this predicate with private-copy central-directory inspection. |
+| Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](../app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
 | Bookmark save may clear a newer draft's dirty flag | [`BookmarkFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) uses unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). Intervening edits are a suspected race; no new scheduling regression was added. |
 | Orphan cleanup omits permanent-thumbnail references | [`StreamDAO.deleteOrphans`](../app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checks history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. A synthetic SQLite probe of the actual deletion query removes a row referenced only by a permanent thumbnail, making the image lookup null. This is SQL-boundary evidence, not an Android/Room or rendered-image test. |
 | Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
@@ -836,3 +836,83 @@ Generated output, caches, binaries and third-party material remain excluded from
 documentation editing. No emulator/device access, instrumentation, package
 installation/uninstall, data clearing, live extraction or physical receiver
 check was performed for this implementation follow-up.
+
+### Backup-validation follow-up — 2026-10-28
+
+Started from clean `master` at `86adf7b59d8e2baef869eeeeffe05dccaf5a1a99`,
+on branch `fix-backup-validation`. The user requested an implementation fix
+with signed commits carrying `gpt-6.1-sol`, following the preceding documentation
+and null-list work. The dated findings and older test/hardware results above
+remain evidence of their respective revisions.
+
+`ImportExportManager.inspect` now examines a private ZIP snapshot's central
+directory. Preparation takes a fresh snapshot, rejects ambiguous critical
+entries (including directory aliases), and verifies the database's size/CRC and
+those of selected settings. Both phases use the same central-directory entry
+selection. Ignored archive entries and omitted settings payloads are not
+validated; database-only restore remains available when settings are malformed.
+
+The new `BackupDatabaseValidator` opens only the private candidate. It checks
+the SQLite header, version and integrity, removes the copy's Room identity
+metadata to force schema validation, then opens it with the same migrations as
+`NewPipeDatabase` and checks integrity/foreign keys after migration. A current
+identity hash alone cannot authorize a malformed schema. Room's current schema
+and migration paths determine compatibility; no separate maximum-version
+constant or destructive fallback was added. The candidate is closed before it
+leaves the working directory. Snapshot/sidecar cleanup finishes before
+preferences can commit; the resulting database file retains the previous
+publication/abandonment ownership rules. Startup still installs the accepted,
+app-private pending file rather than revalidating it.
+
+The test-only Robolectric 4.17 dependency exercises Room and native host SQLite
+at API 26, with real file streams and Android preference persistence. Restart
+and error-reporting callbacks are controlled, and the locator supplies an
+isolated path. Existing archive/workflow/dialog suites explicitly inject a
+no-op database validator for their text-placeholder payloads; their existing
+assertions were retained. No fixture ZIP or placeholder was relabeled as a real
+database. Version 2–9 candidates use exported Room schemas; the version-1 fixture
+uses the inputs consumed by migration 1 → 2 because schema 1 is not exported.
+These fixtures do not prove compatibility with every historical user database.
+
+The initial 12-test baseline failed 11 cases against unchanged production code;
+the current-schema round-trip control passed. The first corrected run passed
+those 12 tests plus 31 existing backup tests. An expanded adversarial suite of
+19 tests then caught a directory-alias gap, with its other 18 tests passing.
+The entry validation now rejects that alias. The second adversarial self-review
+moved working-directory cleanup ahead of commit/publication to avoid introducing
+a post-publication cleanup failure that would suppress restart. An initial
+compilation error was fixed by explicitly closing Room in `finally` rather
+than treating `RoomDatabase` as `Closeable`.
+Compatibility review also replaced the newer host-JDK `readNBytes` call with
+`DataInputStream.readFully`, after inspecting the resolved desugaring helpers.
+Android documents [readNBytes](https://developer.android.com/reference/java/io/InputStream#readNBytes%28int%29)
+at API 33 and [readFully](https://developer.android.com/reference/java/io/DataInputStream#readFully%28byte%5B%5D%29)
+at API 1; Robolectric does not establish availability of every Java API on Android 26.
+
+Additional regressions cover central/local CRC disagreement, truncated SQLite
+pages, partial migration failure, foreign-key errors, schema forgery, changed
+source documents, repeated close, JSON/legacy settings, both restore choices
+and private-copy migrations from versions 1–8 to 9. These are self-reviews and
+host-JVM observations, not independent reviews, device SQLite evidence, process
+kill tests or service/receiver observations. The preference-commit/publication
+process-death gap remains; already-published pending files are not retroactively
+validated by this change. See the current [restore guide](library-data.md#backup-and-restore)
+for the implemented validation boundary.
+
+| Verification | Result |
+| --- | --- |
+| Complete JVM stage | App: 1,063 tests, including all 19 `BackupValidationTest` cases; offline extractor: 651 with 3 skips (up-to-date); build logic: 3 (up-to-date). No failures or errors. The older-schema test loops over all versions 1–8, so those are eight migration cases within one reported test. |
+| Static checks | App/extractor Checkstyle, ktlint and dependency ordering passed. The first gate stopped on three 103-character Java constructor lines; wrapping them resolved the violations without changing assertions. |
+| `make ci` | Passed all five serial Gradle stages, including debug lint and debug/release assembly. Gradle reused cached/up-to-date outputs where reported. The fixture sanitizer's 12 tests passed and its scan of 685 recordings needed no replacements. |
+| Debug lint | Passed with 59 warnings and no errors. This is static analysis, not device evidence. |
+| Android test APK | `:app:assembleDebugAndroidTest` passed, compiling the updated Java/Kotlin test sources. Its dry-run graph contained 81 build tasks and no install/uninstall/instrumentation task. The APK was not installed or run. |
+| Release dependency boundary | `:app:dependencyInsight --dependency robolectric --configuration releaseRuntimeClasspath` reported no matching dependency. Robolectric is declared only for JVM tests. The added schema resources belong to that test source set; instrumentation retains its existing schema assets. |
+| Documentation and preservation | All 202 local prose links resolved, including bounds checks on 14 local source-line references. Changed-file spelling and `git diff --check` passed. Existing test executable tokens/assertions were unchanged apart from explicit validator injection; existing version-catalog entries were unchanged. |
+
+All 13 changed source/configuration/test files retained their verified hashes
+through the final review; the remaining changes are the current guides, fixture
+README and this dated record. No device/emulator access, instrumentation,
+installation/uninstall, app-data clearing, live-service extraction or physical
+receiver check was performed. Compiler deprecation warnings remain. The changes
+are scoped to new ZIP restore preparation and its documentation/testing; other
+open audit findings and UI-text proposals remain separate.

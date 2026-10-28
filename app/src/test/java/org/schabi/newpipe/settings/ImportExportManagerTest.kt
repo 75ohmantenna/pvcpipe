@@ -68,7 +68,7 @@ class ImportExportManagerTest {
 
         val output = File.createTempFile("newpipe_", "")
         `when`(storedFileHelper.openAndTruncateStream()).thenReturn(FileStream(output))
-        ImportExportManager(fileLocator).exportDatabase(sharedPreferences, storedFileHelper)
+        ImportExportManager(fileLocator) { }.exportDatabase(sharedPreferences, storedFileHelper)
 
         val zipFile = ZipFile(output)
         val entries = zipFile.entries().toList()
@@ -97,7 +97,7 @@ class ImportExportManagerTest {
         Assume.assumeTrue(path.parent.deleteIfExists())
         `when`(fileLocator.db).thenReturn(path)
 
-        ImportExportManager(fileLocator).ensureDbDirectoryExists()
+        ImportExportManager(fileLocator) { }.ensureDbDirectoryExists()
         assertTrue(path.parent.exists())
     }
 
@@ -106,7 +106,7 @@ class ImportExportManagerTest {
         val path = createTempDirectory("newpipe_") / BackupFileLocator.FILE_NAME_DB
         `when`(fileLocator.db).thenReturn(path)
 
-        ImportExportManager(fileLocator).ensureDbDirectoryExists()
+        ImportExportManager(fileLocator) { }.ensureDbDirectoryExists()
         assertTrue(path.parent.exists())
     }
 
@@ -120,7 +120,7 @@ class ImportExportManagerTest {
 
         val zip = File(classloader.getResource("settings/db_ser_json.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(zip))
-        ImportExportManager(fileLocator).prepareRestore(storedFileHelper, null).use { it.publish() }
+        ImportExportManager(fileLocator) { }.prepareRestore(storedFileHelper, null).use { it.publish() }
         assertEquals(0, db.fileSize())
         assertTrue(dbWal.exists())
         PendingDatabaseRestore.install(db)
@@ -141,7 +141,7 @@ class ImportExportManagerTest {
         val emptyZip = File(classloader.getResource("settings/nodb_noser_nojson.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(emptyZip))
         assertThrows(IOException::class.java) {
-            ImportExportManager(fileLocator).prepareRestore(storedFileHelper, null).use { it.publish() }
+            ImportExportManager(fileLocator) { }.prepareRestore(storedFileHelper, null).use { it.publish() }
         }
         assertTrue(dbJournal.exists())
         assertTrue(dbWal.exists())
@@ -153,14 +153,14 @@ class ImportExportManagerTest {
     fun `Contains setting must return true if a settings file exists in the zip`() {
         val zip = File(classloader.getResource("settings/db_ser_json.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(zip))
-        assertTrue(ImportExportManager(fileLocator).exportHasSerializedPrefs(storedFileHelper))
+        assertTrue(ImportExportManager(fileLocator) { }.exportHasSerializedPrefs(storedFileHelper))
     }
 
     @Test
     fun `Contains setting must return false if no settings file exists in the zip`() {
         val emptyZip = File(classloader.getResource("settings/nodb_noser_nojson.zip")?.file!!)
         `when`(storedFileHelper.stream).thenReturn(FileStream(emptyZip))
-        assertFalse(ImportExportManager(fileLocator).exportHasSerializedPrefs(storedFileHelper))
+        assertFalse(ImportExportManager(fileLocator) { }.exportHasSerializedPrefs(storedFileHelper))
     }
 
     @Test
@@ -173,7 +173,7 @@ class ImportExportManagerTest {
         `when`(preferences.edit()).thenReturn(editor)
         `when`(editor.commit()).thenReturn(true)
 
-        ImportExportManager(fileLocator).loadSerializedPrefs(storedFileHelper, preferences)
+        ImportExportManager(fileLocator) { }.loadSerializedPrefs(storedFileHelper, preferences)
 
         verify(editor, atLeastOnce()).putBoolean(anyString(), anyBoolean())
         verify(editor, atLeastOnce()).putString(anyString(), anyString())
@@ -197,7 +197,7 @@ class ImportExportManagerTest {
         `when`(preferences.edit()).thenReturn(editor)
         `when`(editor.commit()).thenReturn(true)
 
-        ImportExportManager(fileLocator).loadJsonPrefs(storedFileHelper, preferences)
+        ImportExportManager(fileLocator) { }.loadJsonPrefs(storedFileHelper, preferences)
 
         verify(editor).putFloat("playback_speed_key", 1.25f)
         verify(editor, Mockito.never()).putFloat(Mockito.eq("overflow_float"), Mockito.anyFloat())
@@ -211,7 +211,7 @@ class ImportExportManagerTest {
         val preferences = Mockito.mock(SharedPreferences::class.java, withSettings().stubOnly())
 
         assertThrows(ClassNotFoundException::class.java) {
-            ImportExportManager(fileLocator).loadSerializedPrefs(storedFileHelper, preferences)
+            ImportExportManager(fileLocator) { }.loadSerializedPrefs(storedFileHelper, preferences)
         }
     }
 }

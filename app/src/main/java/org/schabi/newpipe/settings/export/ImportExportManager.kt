@@ -12,19 +12,40 @@ import java.io.ObjectOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.Comparator
+import java.util.zip.CRC32
+import java.util.zip.CheckedInputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipException
 import java.util.zip.ZipFile
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createParentDirectories
-import kotlin.io.path.deleteIfExists
 import org.schabi.newpipe.streams.io.SharpInputStream
 import org.schabi.newpipe.streams.io.SharpOutputStream
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import org.schabi.newpipe.util.ZipHelper
 
-class ImportExportManager(private val fileLocator: BackupFileLocator) {
+class ImportExportManager(
+    private val fileLocator: BackupFileLocator,
+    private val databaseValidator: DatabaseValidator
+) {
+    fun interface DatabaseValidator {
+        @Throws(IOException::class)
+        fun validate(database: Path)
+    }
+
+    /** Advisory central-directory inspection; restore takes and validates a fresh snapshot. */
+    data class Inspection(val readable: Boolean, val settingsEntry: String?)
+
     companion object {
         const val TAG = "ImportExportManager"
+
+        private fun deleteWorkingDirectory(directory: Path) {
+            if (Files.notExists(directory)) return
+            Files.walk(directory).use { paths ->
+                paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+            }
+        }
 
         /** Persist a complete map; failed commit may still change Android's in-memory values. */
         @JvmStatic
@@ -98,71 +119,109 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
         fileLocator.db.createParentDirectories()
     }
 
-    /** Prepare from one private copy; no live settings or pending restore are modified. */
+    fun inspect(file: StoredFileHelper): Inspection = workingDirectory().use { working ->
+        try {
+            ZipFile(copyArchive(file, working.path).toFile()).use { zip ->
+                validateEntries(zip)
+                Inspection(true, offeredSettings(zip))
+            }
+        } catch (_: IOException) {
+            Inspection(false, null)
+        }
+    }
+
+    /** Validate and migrate one private copy before changing settings or publishing anything. */
     fun prepareRestore(file: StoredFileHelper, settingsEntry: String?): PreparedRestore {
         if (hasPendingRestore()) throw IOException("A restored database is awaiting restart")
-        ensureDbDirectoryExists()
-        val snapshot = Files.createTempFile(fileLocator.db.parent, "backup-source-", ".zip")
         var temporary: Path? = null
         try {
-            file.stream.use { stream ->
-                Files.copy(SharpInputStream(stream), snapshot, StandardCopyOption.REPLACE_EXISTING)
-            }
-            val preferences = ZipFile(snapshot.toFile()).use { zip ->
-                if (settingsEntry == null) {
-                    null
-                } else {
-                    val offered = if (zip.getEntry(BackupFileLocator.FILE_NAME_JSON_PREFS) != null) {
-                        BackupFileLocator.FILE_NAME_JSON_PREFS
-                    } else if (zip.getEntry(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) != null) {
-                        BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
-                    } else {
+            val preferences = workingDirectory().use { working ->
+                val snapshot = copyArchive(file, working.path)
+                val candidate = working.path.resolve(BackupFileLocator.FILE_NAME_DB)
+                val decoded = ZipFile(snapshot.toFile()).use { zip ->
+                    validateEntries(zip)
+                    val entries = if (settingsEntry == null) {
                         null
-                    }
-                    if (offered != settingsEntry) {
-                        throw IOException("Backup settings changed; inspect the backup again")
-                    }
-                    zip.getInputStream(zip.getEntry(settingsEntry)).use {
-                        if (settingsEntry == BackupFileLocator.FILE_NAME_JSON_PREFS) {
-                            decodeJson(it)
-                        } else {
-                            decodeSerialized(it)
+                    } else {
+                        if (offeredSettings(zip) != settingsEntry) {
+                            throw IOException("Backup settings changed; inspect the backup again")
+                        }
+                        val settings = working.path.resolve("settings")
+                        extractVerified(zip, zip.getEntry(settingsEntry), settings)
+                        Files.newInputStream(settings).use {
+                            if (settingsEntry == BackupFileLocator.FILE_NAME_JSON_PREFS) decodeJson(it) else decodeSerialized(it)
                         }
                     }
+                    val database = zip.getEntry(BackupFileLocator.FILE_NAME_DB)
+                        ?: throw IOException("Backup does not contain a database")
+                    extractVerified(zip, database, candidate)
+                    if (Files.size(candidate) == 0L) throw IOException("Backup database is empty")
+                    entries
                 }
+                databaseValidator.validate(candidate)
+                val ready = Files.createTempFile(fileLocator.db.parent, "backup-db-", ".tmp")
+                temporary = ready
+                Files.move(candidate, ready, StandardCopyOption.REPLACE_EXISTING)
+                decoded
             }
-            val preparedDatabase = Files.createTempFile(fileLocator.db.parent, "backup-db-", ".tmp")
-            temporary = preparedDatabase
-            var found = false
-            ZipInputStream(Files.newInputStream(snapshot)).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    if (entry.name == BackupFileLocator.FILE_NAME_DB) {
-                        Files.copy(zip, preparedDatabase, StandardCopyOption.REPLACE_EXISTING)
-                        found = true
-                        break
-                    }
-                }
-            }
-            if (!found || Files.size(preparedDatabase) == 0L) {
-                throw IOException("Backup does not contain a nonempty database")
-            }
-            Files.delete(snapshot)
-            val prepared = PreparedRestore(fileLocator.db, preparedDatabase, preferences)
+            // Finish directory/sidecar cleanup before allowing settings commit or publication.
+            val prepared = PreparedRestore(fileLocator.db, checkNotNull(temporary), preferences)
             temporary = null
             return prepared
         } finally {
-            try {
-                temporary?.deleteIfExists()
-            } finally {
-                snapshot.deleteIfExists()
+            temporary?.let { Files.deleteIfExists(it) }
+        }
+    }
+
+    private fun offeredSettings(zip: ZipFile): String? = when {
+        zip.getEntry(BackupFileLocator.FILE_NAME_JSON_PREFS) != null -> BackupFileLocator.FILE_NAME_JSON_PREFS
+        zip.getEntry(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) != null -> BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
+        else -> null
+    }
+
+    private fun validateEntries(zip: ZipFile) {
+        val critical = setOf(
+            BackupFileLocator.FILE_NAME_DB,
+            BackupFileLocator.FILE_NAME_JSON_PREFS,
+            BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
+        )
+        val seen = mutableSetOf<String>()
+        for (entry in zip.entries()) {
+            if (entry.name.removeSuffix("/") in critical && (!seen.add(entry.name) || entry.isDirectory)) {
+                throw ZipException("Duplicate or invalid backup entry: ${entry.name}")
             }
         }
     }
 
+    private fun extractVerified(zip: ZipFile, entry: ZipEntry, destination: Path) {
+        CheckedInputStream(zip.getInputStream(entry), CRC32()).use { input ->
+            val count = Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING)
+            if (entry.size != count || entry.crc != input.checksum.value) {
+                throw ZipException("Backup entry size or CRC mismatch: ${entry.name}")
+            }
+        }
+    }
+
+    private fun workingDirectory(): WorkingDirectory {
+        ensureDbDirectoryExists()
+        return WorkingDirectory(Files.createTempDirectory(fileLocator.db.parent, "backup-restore-"))
+    }
+
+    private fun copyArchive(file: StoredFileHelper, directory: Path): Path {
+        val snapshot = directory.resolve("source.zip")
+        file.stream.use { stream ->
+            Files.copy(SharpInputStream(stream), snapshot)
+        }
+        return snapshot
+    }
+
+    private class WorkingDirectory(val path: Path) : AutoCloseable {
+        override fun close() = deleteWorkingDirectory(path)
+    }
+
     fun hasPendingRestore(): Boolean = PendingDatabaseRestore.hasPending(fileLocator.db)
 
-    /** Owns only this attempt's unpublished database; publication transfers ownership to startup. */
+    /** Owns the closed, validated database; publication transfers ownership to startup. */
     class PreparedRestore internal constructor(
         private val database: Path,
         private val temporary: Path,
@@ -176,7 +235,7 @@ class ImportExportManager(private val fileLocator: BackupFileLocator) {
         }
 
         override fun close() {
-            if (!published) temporary.deleteIfExists()
+            if (!published) Files.deleteIfExists(temporary)
         }
     }
 

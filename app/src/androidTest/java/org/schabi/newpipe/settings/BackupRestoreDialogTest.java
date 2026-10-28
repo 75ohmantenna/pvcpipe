@@ -61,7 +61,10 @@ import java.util.zip.ZipOutputStream;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 
-/** Real fragment actions with isolated files/preferences and a counting restart callback. */
+/**
+ * Real fragment actions with isolated files/preferences and a counting restart callback.
+ * Database validation is controlled for the archives' text placeholders.
+ */
 @RunWith(AndroidJUnit4.class)
 public class BackupRestoreDialogTest {
     private Instrumentation instrumentation;
@@ -118,7 +121,8 @@ public class BackupRestoreDialogTest {
             }
         };
         backups = new BackupRestore(new BackupOperations(Schedulers.trampoline()),
-                new ImportExportManager(new BackupFileLocator(filesContext)), preferences,
+                new ImportExportManager(new BackupFileLocator(filesContext), path -> { }),
+                preferences,
                 "location", platform, Schedulers.trampoline());
         activity = (SettingsActivity) instrumentation.startActivitySync(
                 new Intent(context, SettingsActivity.class)
@@ -308,7 +312,8 @@ public class BackupRestoreDialogTest {
             throws Exception {
         final TestScheduler io = new TestScheduler();
         final BackupRestore delayed = new BackupRestore(new BackupOperations(io),
-                new ImportExportManager(new BackupFileLocator(filesContext)), preferences,
+                new ImportExportManager(new BackupFileLocator(filesContext), path -> { }),
+                preferences,
                 "location", platform, Schedulers.trampoline());
         final Uri uri = archive(format);
         onMain(() -> {

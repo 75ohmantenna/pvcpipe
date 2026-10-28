@@ -8,6 +8,7 @@ package org.schabi.newpipe
 
 import android.content.Context
 import androidx.room.Room.databaseBuilder
+import androidx.room.RoomDatabase
 import kotlin.concurrent.Volatile
 import org.schabi.newpipe.database.AppDatabase
 import org.schabi.newpipe.database.Migrations.MIGRATION_1_2
@@ -24,11 +25,15 @@ object NewPipeDatabase {
     @Volatile
     private var databaseInstance: AppDatabase? = null
 
-    private fun getDatabase(context: Context): AppDatabase {
+    internal fun createDatabase(
+        context: Context,
+        name: String = AppDatabase.DATABASE_NAME,
+        journalMode: RoomDatabase.JournalMode = RoomDatabase.JournalMode.AUTOMATIC
+    ): AppDatabase {
         return databaseBuilder(
             context.applicationContext,
             AppDatabase::class.java,
-            AppDatabase.Companion.DATABASE_NAME
+            name
         ).addMigrations(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -38,7 +43,7 @@ object NewPipeDatabase {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9
-        ).build()
+        ).setJournalMode(journalMode).build()
     }
 
     @JvmStatic
@@ -48,7 +53,7 @@ object NewPipeDatabase {
             synchronized(NewPipeDatabase::class.java) {
                 result = databaseInstance
                 if (result == null) {
-                    databaseInstance = getDatabase(context)
+                    databaseInstance = createDatabase(context)
                     result = databaseInstance
                 }
             }

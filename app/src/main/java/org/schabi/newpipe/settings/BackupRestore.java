@@ -14,11 +14,11 @@ import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.settings.export.BackupFileLocator;
+import org.schabi.newpipe.settings.export.BackupDatabaseValidator;
 import org.schabi.newpipe.player.notification.NotificationConstants;
 import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.settings.export.ImportedPreferenceTypes;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
-import org.schabi.newpipe.util.ZipHelper;
 import org.schabi.newpipe.util.DeviceUtils;
 
 import java.io.IOException;
@@ -92,7 +92,8 @@ final class BackupRestore {
     private final Scheduler main;
 
     private BackupRestore(final Context context) {
-        this(BackupOperations.INSTANCE, new ImportExportManager(new BackupFileLocator(context)),
+        this(BackupOperations.INSTANCE, new ImportExportManager(new BackupFileLocator(context),
+                        new BackupDatabaseValidator(context)),
                 PreferenceManager.getDefaultSharedPreferences(context),
                 context.getString(R.string.import_export_data_path),
                 new AndroidPlatform(context.getApplicationContext()),
@@ -127,11 +128,14 @@ final class BackupRestore {
         return operations.submit(() -> {
             recoverPreferencesIfNeeded();
             final StoredFileHelper file = platform.document(source);
-            if (!ZipHelper.isValidZipFile(file)) {
+            final var archive = archives.inspect(file);
+            if (!archive.getReadable()) {
                 return new Inspection(file, source, false, PreferenceFormat.NONE);
             }
-            final PreferenceFormat format = archives.exportHasJsonPrefs(file)
-                    ? PreferenceFormat.JSON : archives.exportHasSerializedPrefs(file)
+            final String settingsEntry = archive.getSettingsEntry();
+            final PreferenceFormat format = BackupFileLocator.FILE_NAME_JSON_PREFS
+                    .equals(settingsEntry) ? PreferenceFormat.JSON
+                    : BackupFileLocator.FILE_NAME_SERIALIZED_PREFS.equals(settingsEntry)
                     ? PreferenceFormat.LEGACY_SERIALIZED : PreferenceFormat.NONE;
             return new Inspection(file, source, true, format);
         });
