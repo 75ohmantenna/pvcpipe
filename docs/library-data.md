@@ -284,6 +284,20 @@ Robolectric API 26; it uses controlled process-role/ACRA hooks and suppresses ma
 same JVM. Neither suite establishes Android process scheduling, physical storage
 durability or hardware behavior.
 
+[`RestoreEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/RestoreEmulatorTest.kt)
+adds host-driven Android phases with real SQLite databases, preferences and
+committed WAL-only data. The two restore choices use the production backup
+workflow, real settings dialog/system document picker and ProcessPhoenix restart,
+driven using Android CLI outside target instrumentation. Controlled filesystem checkpoints hold
+activation and rollback until the host sends SIGKILL; a fresh normal debug App
+then runs the inherited production startup recovery. A separate guarded fixture
+runner prevents startup from consuming those journals before the selected fault
+point. These tests replace the default database/preferences and require a new
+disposable emulator. They are separate from `make ci`; see
+[the build guide](building.md#disposable-restore-validation) for commands and
+the [dated record](documentation-alignment.md#restore-emulator-validation--2026-10-28)
+for observed results and limits.
+
 These tests exercise controlled workflow failures and local persistence.
 The feed and subscription Room tests supply extraction results rather than
 contacting services; they do not establish live extractor/network behavior
