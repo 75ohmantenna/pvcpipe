@@ -46,6 +46,7 @@ preference = "1.2.1"
 prettytime = "5.0.8.Final"
 pvcpipe-extractor = "local"
 recyclerview = "1.4.0"
+robolectric = "4.17"
 room = "2.8.5"
 runner = "1.7.0"
 rxandroid = "3.0.2"
@@ -126,6 +127,7 @@ pvcpipe-extractor = { module = "com.github.75ohmantenna:pvcpipe-extractor", vers
 pvcpipe-slimhls-converter = { module = "com.github.75ohmantenna:slimhls-converter", version.ref = "slimhls-converter" }
 reactivex-rxandroid = { module = "io.reactivex.rxjava3:rxandroid", version.ref = "rxandroid" }
 reactivex-rxjava = { module = "io.reactivex.rxjava3:rxjava", version.ref = "rxjava" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 squareup-leakcanary-core = { module = "com.squareup.leakcanary:leakcanary-android-core", version.ref = "leakcanary" }
 squareup-leakcanary-plumber = { module = "com.squareup.leakcanary:plumber-android", version.ref = "leakcanary" }
 squareup-leakcanary-watcher = { module = "com.squareup.leakcanary:leakcanary-object-watcher-android", version.ref = "leakcanary" }

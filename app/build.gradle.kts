@@ -113,6 +113,9 @@ configure<ApplicationExtension> {
     }
 
     sourceSets {
+        getByName("test") {
+            resources.directories += "$projectDir/schemas"
+        }
         getByName("androidTest") {
             assets.directories += "$projectDir/schemas"
         }
@@ -308,6 +311,7 @@ dependencies {
     /** Testing **/
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)

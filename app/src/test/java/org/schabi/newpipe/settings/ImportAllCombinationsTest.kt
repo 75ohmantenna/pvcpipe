@@ -59,7 +59,7 @@ class ImportAllCombinationsTest {
 
         if (containsDb) {
             runTest {
-                ImportExportManager(fileLocator).prepareRestore(zip, null).use { it.publish() }
+                ImportExportManager(fileLocator) { }.prepareRestore(zip, null).use { it.publish() }
                 PendingDatabaseRestore.install(fileLocator.db)
                 Assert.assertFalse(dbJournal.exists())
                 Assert.assertFalse(dbWal.exists())
@@ -69,7 +69,7 @@ class ImportAllCombinationsTest {
         } else {
             runTest {
                 Assert.assertThrows(IOException::class.java) {
-                    ImportExportManager(fileLocator).prepareRestore(zip, null).use { it.publish() }
+                    ImportExportManager(fileLocator) { }.prepareRestore(zip, null).use { it.publish() }
                 }
                 Assert.assertTrue(dbJournal.exists())
                 Assert.assertTrue(dbWal.exists())
@@ -85,8 +85,8 @@ class ImportAllCombinationsTest {
 
         when (containsSer) {
             Ser.YES -> runTest {
-                Assert.assertTrue(ImportExportManager(fileLocator).exportHasSerializedPrefs(zip))
-                ImportExportManager(fileLocator).loadSerializedPrefs(zip, preferences)
+                Assert.assertTrue(ImportExportManager(fileLocator) { }.exportHasSerializedPrefs(zip))
+                ImportExportManager(fileLocator) { }.loadSerializedPrefs(zip, preferences)
 
                 Mockito.verify(editor, Mockito.times(1)).clear()
                 Mockito.verify(editor, Mockito.times(1)).commit()
@@ -99,9 +99,9 @@ class ImportAllCombinationsTest {
             }
 
             Ser.VULNERABLE -> runTest {
-                Assert.assertTrue(ImportExportManager(fileLocator).exportHasSerializedPrefs(zip))
+                Assert.assertTrue(ImportExportManager(fileLocator) { }.exportHasSerializedPrefs(zip))
                 Assert.assertThrows(ClassNotFoundException::class.java) {
-                    ImportExportManager(fileLocator).loadSerializedPrefs(zip, preferences)
+                    ImportExportManager(fileLocator) { }.loadSerializedPrefs(zip, preferences)
                 }
 
                 Mockito.verify(editor, Mockito.never()).clear()
@@ -109,9 +109,9 @@ class ImportAllCombinationsTest {
             }
 
             Ser.NO -> runTest {
-                Assert.assertFalse(ImportExportManager(fileLocator).exportHasSerializedPrefs(zip))
+                Assert.assertFalse(ImportExportManager(fileLocator) { }.exportHasSerializedPrefs(zip))
                 Assert.assertThrows(IOException::class.java) {
-                    ImportExportManager(fileLocator).loadSerializedPrefs(zip, preferences)
+                    ImportExportManager(fileLocator) { }.loadSerializedPrefs(zip, preferences)
                 }
 
                 Mockito.verify(editor, Mockito.never()).clear()
@@ -126,8 +126,8 @@ class ImportAllCombinationsTest {
 
         if (containsJson) {
             runTest {
-                Assert.assertTrue(ImportExportManager(fileLocator).exportHasJsonPrefs(zip))
-                ImportExportManager(fileLocator).loadJsonPrefs(zip, preferences)
+                Assert.assertTrue(ImportExportManager(fileLocator) { }.exportHasJsonPrefs(zip))
+                ImportExportManager(fileLocator) { }.loadJsonPrefs(zip, preferences)
 
                 Mockito.verify(editor, Mockito.times(1)).clear()
                 Mockito.verify(editor, Mockito.times(1)).commit()
@@ -140,9 +140,9 @@ class ImportAllCombinationsTest {
             }
         } else {
             runTest {
-                Assert.assertFalse(ImportExportManager(fileLocator).exportHasJsonPrefs(zip))
+                Assert.assertFalse(ImportExportManager(fileLocator) { }.exportHasJsonPrefs(zip))
                 Assert.assertThrows(IOException::class.java) {
-                    ImportExportManager(fileLocator).loadJsonPrefs(zip, preferences)
+                    ImportExportManager(fileLocator) { }.loadJsonPrefs(zip, preferences)
                 }
 
                 Mockito.verify(editor, Mockito.never()).clear()

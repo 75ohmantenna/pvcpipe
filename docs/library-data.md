@@ -137,16 +137,14 @@ with three entries: `newpipe.db`, `preferences.json` and `newpipe.settings`
 (the legacy serialized form of the same preferences). It excludes downloaded
 media, the separate finished-downloads database and unfinished-download state.
 
-**Inspection.** Before a restore the app tries to open the document and discover
-which form of settings it holds. JSON
-settings are preferred when both forms are present. Inspection is advisory:
-it does not validate the database or snapshot the archive.
-`ZipHelper.isValidZipFile` currently constructs a `ZipInputStream` without reading
-its header, so a positive result alone does not establish that the file is a ZIP
-(a suspected validation defect). Entry scanning or preparation can still fail.
-When settings
-are included in the restore, a change in the preferred settings format
-before preparation stops the restore and requires a new inspection.
+**Inspection.** Before a restore the app copies the document to a private temporary
+directory, opens its ZIP central directory and discovers which form of settings
+it holds. Duplicate critical entries and directories in place of the database
+or settings entries are rejected. JSON settings are preferred when both formats
+are present. This copy is deleted after inspection: the result is advisory, does
+not validate the database or entry payloads, and is not a retained snapshot.
+When settings are included in the restore, a change in the preferred settings
+format before preparation stops the restore and requires a new inspection.
 Database-only restores do not recheck the settings format.
 
 **Restore choices.** The overwrite confirmation still comes first. If the
@@ -183,7 +181,9 @@ this check:
 **Restore.** A restore never touches the open database:
 
 1. It copies the archive to a private file and takes the database, and the
-   settings if the user chose them, from that copy.
+   settings if the user chose them, from that copy. It verifies each selected
+   entry's size and CRC, then opens and migrates the private database through
+   the app's Room configuration before changing any preferences.
 2. It commits the chosen settings, or a copy of the current preferences for
    database-only restore. Both choices update the remembered backup document URI.
 3. It publishes the new database as a pending restore and restarts the app.
@@ -204,11 +204,21 @@ tries again at the next backup operation if that failed too. A process that
 dies between the steps can leave new settings with the old database. Nothing
 promises that a backup will open after future database migrations.
 
-Preparation currently checks that `newpipe.db` exists and is nonempty, without
-opening it as SQLite or validating its schema before publication. Inspection
-and a completed staging operation therefore do not establish database
-openability. Acceptance of a corrupt or incompatible database is a potential
-restore defect, not a supported archive format.
+[`BackupDatabaseValidator`](../app/src/main/java/org/schabi/newpipe/settings/export/BackupDatabaseValidator.kt)
+checks the SQLite header, a positive supported schema version, SQLite integrity,
+Room migrations/schema and foreign-key consistency. Future or otherwise
+unsupported migration paths fail before publication. The private copy's Room
+identity metadata is rebuilt so a matching hash cannot bypass schema validation.
+The candidate is closed with migrations already applied. Snapshot and migration
+sidecar cleanup finishes before preferences can commit; the resulting validated
+database file is then either published or removed when the attempt closes.
+The source archive, live database and its sidecars are not migration targets.
+
+These checks establish structural compatibility with the current build, not the
+authenticity or meaning of every stored value. Ignored archive entries and
+settings omitted by database-only restore are not decoded or CRC-checked. The
+existing process-death gap between preference commit and database publication
+still applies.
 
 ## Tests
 
@@ -217,8 +227,8 @@ Unit tests, run by `make ci`:
 [`FeedErrorContextTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedErrorContextTest.kt),
 [`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
 [`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
-[`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt)
-and
+[`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt),
+[`BackupValidationTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupValidationTest.kt) and
 [`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java).
 
 Instrumentation tests on a device, not in `make ci`:
@@ -229,6 +239,12 @@ and
 [`BackupRestoreDialogTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreDialogTest.java).
 The dialog tests use the real settings fragment, isolated archive/database files
 and preferences, and a counting restart callback rather than restarting the app.
+The archive/dialog workflow fixtures inject a no-op database validator for their
+text placeholders. `BackupValidationTest` separately exercises the production
+validator, Room migrations and native host SQLite under Robolectric API 26,
+with real files/preferences and controlled restart/report callbacks. Its version
+2–9 fixtures use exported Room schemas; the version-1 fixture is constructed from
+the inputs consumed by migration 1 → 2, since schema 1 is not exported.
 [building.md](building.md) says where it is safe to run them.
 
 These tests exercise controlled workflow failures and local persistence.
