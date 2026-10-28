@@ -36,10 +36,17 @@ with automatic-thumbnail updates in the same transaction.
   edits as saved or replace them with an older result.
 
 A permanent thumbnail stores a stream ID, not an independent image copy.
-`StreamDAO.deleteOrphans` currently checks history, playlist contents and feed
-references but not playlist-thumbnail references. Cleanup can therefore remove
-an otherwise unreferenced permanent thumbnail's stream row; this is a suspected
-retention defect, not a guarantee that the chosen image survives cleanup.
+`StreamDAO.deleteOrphans` preserves streams referenced by history, playlist
+contents, feeds or a stored playlist thumbnail ID. The thumbnail's permanent flag
+does not affect that reference check. Removing a stream from playlist contents
+therefore does not make its permanent cover collectible.
+
+An old cover becomes eligible for cleanup only after its last reference is gone,
+for example after unsetting it to an automatic/default thumbnail or deleting its
+last playlist. History orphan cleanup, feed clearing and age-based pruning use
+this query; changing the thumbnail does not itself delete stream rows. This
+prevents future cleanup loss but does not reconstruct metadata deleted before
+the correction.
 
 The Room instrumentation tests live in
 `app/src/androidTest/java/org/schabi/newpipe/local/playlist/`. Follow

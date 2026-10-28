@@ -27,7 +27,7 @@ TEST = "org.schabi.newpipe.local.bookmark.BookmarkEmulatorTest"
 CASES = (
     "rapid-edits", "save-without-view", "pending-view-recreation",
     "replacement-fragment-owner", "remote-failure-retry", "local-failure-retry",
-    "metadata-preservation",
+    "metadata-preservation", "thumbnail-cleanup",
 )
 
 
@@ -116,7 +116,7 @@ class Driver:
                     process.terminate()  # Stop this host client; never select an Android process by default.
                     process.wait(timeout=10)
         output = self.output.joinpath("instrumentation.txt").read_text()
-        assert "OK (7 tests)" in output and "FAILURES" not in output, output
+        assert f"OK ({len(CASES)} tests)" in output and "FAILURES" not in output, output
         results = {}
         for case in CASES:
             result = json.loads(self.private(f"{self.private_directory}/{case}.json").stdout)

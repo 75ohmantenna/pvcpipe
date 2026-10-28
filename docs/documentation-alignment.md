@@ -703,7 +703,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | ZIP inspection did not validate format at the audited revision | The [former `ZipHelper.isValidZipFile`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/util/ZipHelper.java#L168) only opened/closed a `ZipInputStream`, and `BackupRestore.inspect` used that result. A standalone JDK probe accepted synthetic plain text and found no entry. That was stream-boundary evidence, not the complete Android workflow. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) replaces this predicate with private-copy central-directory inspection. |
 | Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
 | Bookmark save could clear a newer draft's dirty flag at the audited revision | The [former `BookmarkFragment.saveImmediate`](https://github.com/75ohmantenna/pvcpipe/blob/6b6d3a786bd514e25f030cf452c033ffd098c1a6/app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) used unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). The audit reported a suspected race without a new scheduling regression. The separately authorized [bookmark-save follow-up below](#bookmark-save-ownership-follow-up--2026-10-28) reproduces and corrects it. |
-| Orphan cleanup omits permanent-thumbnail references | [`StreamDAO.deleteOrphans`](../app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checks history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. A synthetic SQLite probe of the actual deletion query removes a row referenced only by a permanent thumbnail, making the image lookup null. This is SQL-boundary evidence, not an Android/Room or rendered-image test. |
+| Orphan cleanup omitted permanent-thumbnail references at the audited revision | The [former `StreamDAO.deleteOrphans`](https://github.com/75ohmantenna/pvcpipe/blob/0c7df4bd8210883f22c0e7d3465808029a55328d/app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checked history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. The audit's synthetic SQLite probe removed a row referenced only by a permanent thumbnail, making the image lookup null; that was SQL-boundary evidence, not an Android/Room or rendered-image test. The [thumbnail-retention follow-up below](#thumbnail-retention-follow-up--2026-10-28) adds the missing reference check and behavioral regressions. |
 | Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
 | SAF exception cleanup may stop early | [`FileStreamSAF.close`](../app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) groups all closes in one try and marks disposed first. An early IOException skips later explicit closes; actual descriptor/provider consequences were not tested. |
 | Seek-option error path has no label fallback | [`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L135) adds a value before plural lookup but appends no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android. |
@@ -1235,3 +1235,108 @@ results remain separate evidence of their own scenarios.
 | Host tooling | Python compilation and a physical-serial rejection probe passed. The driver required seven successful case records and the complete JUnit success result; earlier partial runs were not accepted. |
 | Documentation/review | All 217 local Markdown links and 12 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Adversarial self-review covered lifecycle ownership, queue gates, both rollback directions, target/nonce guards, result parsing, setup/teardown and the actual Fragment 1.8.9 implementation; this was not an independent review. |
 | Preservation | Both fixture/driver source hashes remained unchanged through the passing matrix and final gate. Production source, dependencies, SDK/version/application IDs, signing, runners and repository/device safety rules are unchanged. The disposable emulator was stopped after testing; its AVD remains available. |
+
+### Thumbnail-retention follow-up — 2026-10-28
+
+Started from clean `master` at `0c7df4bd8210883f22c0e7d3465808029a55328d`,
+on branch `fix-playlist-thumbnail-retention`. This separately authorized
+implementation follow-up addresses the permanent-thumbnail cleanup finding.
+Current behavior is described in [Library data](library-data.md#local-playlists).
+Earlier SQL probes and emulator observations remain evidence of their own runs.
+
+The new `StreamOrphanRetentionTest` initially ran against unchanged production
+code: 10 tests, 7 assertion failures, no fixture errors. Removing a stream from
+contents while keeping it as a permanent thumbnail made it disappear during
+orphan cleanup. Feed clear/pruning, shared covers, automatic references and
+changing a cover reproduced the same missing-reference problem. The transaction
+failure case rolled back correctly but its retry then deleted the cover. The
+three existing-behavior controls passed: collection after unsetting an empty or
+nonempty playlist's cover, and collection despite a matching playlist numeric ID
+with the default thumbnail sentinel. The failing XML and log were preserved at
+`/tmp/pvcpipe-thumbnail-baseline.xml` and `/tmp/pvcpipe-thumbnail-baseline.log`.
+
+`StreamDAO.deleteOrphans` now excludes the set of non-null stored playlist
+thumbnail IDs, in addition to history, playlist contents and feed references.
+Both automatic and permanent references count; no permanent-flag condition is
+needed to determine whether a row is referenced. The non-null filter avoids
+`NOT IN` null semantics, and the independent ID subquery avoids a correlated
+playlist scan for every candidate stream. No schema or foreign key changed.
+The query prevents future cleanup loss; it cannot recreate already deleted
+metadata or validate arbitrary thumbnail assignments.
+
+All 10 focused Room/native host SQLite tests passed after that change. They
+exercise actual playlist mutations and both production feed cleanup paths,
+unsetting to automatic/default covers, changing/shared references, deletion of
+the last playlist, ordinary orphan removal and transaction failure/retry.
+The host manager uses a controlled write scheduler; these results are not Android
+device or rendered-image evidence.
+
+The guarded bookmark emulator suite gains a separate cleanup case. It pins a
+local image, removes its stream from playlist contents and calls the real
+`FeedDatabaseManager.clear`. It checks the retained stream/metadata and the
+real ImageView's red image. Unsetting to the default makes that old stream
+collectible. Appending and pinning a replacement checks retention again; deleting
+the playlist through the actual dialog then makes the replacement collectible,
+while the other playlist's stream remains. The host requires all eight case
+records and the complete eight-test JUnit result; the seven-case results above
+remain historical.
+
+The completed run at `/tmp/pvcpipe-thumbnail-emulator-run1` passed all eight
+cases (`OK (8 tests)`, 153.555 seconds including the final visual pause).
+Android CLI used the disposable `pvcpipe_restore_api26_20261028` AVD as
+`emulator-5554`, Android 8.0/API 26 x86_64. Both installed signers were checked
+before replacement installs. The new cleanup case passed its stream, metadata,
+red-image, unsetting and final-playlist-deletion assertions; the seven prior
+bookmark cases also passed. The final metadata-case screenshot was visually
+inspected using Android CLI's screen capture. That screenshot shows the separate
+blue-thumbnail scenario, not the intermediate red-cover cleanup state.
+
+Per-case JSON, runner output, APK hashes, the screenshot and the default-database
+comparison remain in that run directory. Both tested APKs were preserved at
+`/tmp/pvcpipe-thumbnail-tested-apks`. The app's default main-file and empty-journal
+hashes were unchanged; WAL and SHM files were absent before and after. Fixture
+writes used the in-memory database. This does not add active-WAL or power-loss
+evidence. The physical Pixel was not accessed, and no package was uninstalled or
+app data cleared.
+
+Caller review also traced `HistoryRecordManager.removeOrphanedRecords`, which
+passes `streamTable::deleteOrphans` to an I/O `Single`. That entry point shares
+the corrected query. The history settings screen still launches state deletion,
+history deletion and orphan cleanup as separate subscriptions; this change adds
+no atomic combined-success guarantee. This was source inspection, not another
+Android history-settings journey.
+
+The first full gate passed 1,128 app JVM tests and debug lint, but lint reported
+66 warnings: seven new fixture calls ignored the return value of `blockingGet`.
+The fixtures now require one affected row or one inserted entry, alongside the
+existing database assertions. No production logic changed for this adjustment.
+Those additional acceptance assertions were followed by another build, complete
+emulator run and final gate; the earlier eight-case run remains recorded above.
+
+The final fixture build passed all 1,128 app JVM tests (zero failures, errors or
+skips), including the 10 retention regressions, and rebuilt the Android test APK.
+The second complete emulator run at `/tmp/pvcpipe-thumbnail-emulator-run2` passed
+all eight cases in 60.424 seconds without a visual pause. Its app APK hash matches
+the first run; the updated test APK passed signer verification before replacement
+installation. The driver verified both installed APK hashes and all eight fresh
+case records. The default main file and empty journal again had unchanged hashes;
+WAL/SHM were absent. No second screenshot or layout inspection was performed.
+This is synthetic API 26 emulator evidence, not physical-device, service or
+power-loss evidence. The disposable AVD was stopped after the run.
+
+Adversarial self-review checked the complete query diff and its callers, shared
+and released thumbnail references, genuine orphans, sentinel/ID confusion, and
+feed transaction failure/retry. The existing seven Android cases and their
+assertions remain intact. The new cases use real Room queries and managers;
+the host tests control scheduling, and the emulator uses synthetic images and
+an isolated in-memory database. No schema, dependency, backup/restore behavior,
+UI string, safety rule or historical test result changed. No additional defect
+was identified within this correction's scope.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-thumbnail-final-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed inspection. Checkstyle, ktlint, dependency ordering, debug lint and both APK builds passed. |
+| JVM evidence | The final fixture build reran all 1,128 app tests successfully; its log is `/tmp/pvcpipe-thumbnail-final-fixtures.log`. The final gate reused those results, the 651-test offline extractor report (3 skipped) and the 3-test build-logic report. None reported failures or errors. |
+| Lint | Zero errors and 59 existing warnings, down from the first gate's 66 after the seven result checks were added. No lint issue points to the three changed Kotlin files. |
+| Emulator | Both complete eight-case runs passed. The final tested APKs are preserved under `/tmp/pvcpipe-thumbnail-emulator-run2/tested-apks`; the driver recorded their installed hashes. The final run adds no active-WAL, layout or hardware evidence. |
+| Documentation and scope | All 218 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling, Python compilation and diff whitespace checks passed. The four implementation/test/driver source hashes remained unchanged through the final build, emulator run and gate. Review was adversarial self-review, not independent review. |
