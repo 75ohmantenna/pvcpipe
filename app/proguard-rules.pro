@@ -6,6 +6,11 @@
 ## Helps debug release versions
 -dontobfuscate
 
+# PlayerUiList uses Class.isInstance/Class.cast to select and retire UI components.
+# Preserve subtype identity: merging MediaSessionPlayerUi into BackgroundPlayerUi
+# otherwise removes the persistent session publisher when switching to video mode.
+-keep,allowshrinking,allowobfuscation class * extends org.schabi.newpipe.player.ui.PlayerUi
+
 ## Rules for NewPipeExtractor
 -keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
 ## Rules for Rhino's direct JavaScript API

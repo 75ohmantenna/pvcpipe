@@ -322,3 +322,86 @@ The earlier October 26 fingerprints and observations remain historical. The
 phone retains that previously installed FCast candidate; this review did not
 update it or run phone/FCast tests. Physical FCast and Android Auto/Desktop Head
 Unit checks remain deferred under the user's explicit merge instruction.
+
+## October 27 physical FCast follow-up
+
+The user subsequently authorized testing on their Pixel 6a (Android 17/API 37)
+and an Amazon Fire TV running FCast Receiver 2.1.5-playstore, negotiating FCast
+protocol v3. These observations supplement the earlier emulator and controlled
+peer results; they do not verify v4 or automotive behavior.
+
+The signed release exposed a defect that the debug instrumentation did not
+exercise. R8 merged `MediaSessionPlayerUi` into `BackgroundPlayerUi`, while
+`PlayerUiList` selects and removes components through `Class.isInstance` and
+`Class.cast`. Entering video mode consequently removed the persistent session
+publisher. Local video rendered and advanced, but Android's session initially
+reported no playback metadata or progress and later retained stale cast state.
+The earlier packaged code confirmed the merged identities.
+
+The release rules now preserve the identities of `PlayerUi` subclasses. A fresh
+minified build keeps the session publisher separate; on the phone, local playback
+published its title, position and playing state. Pause, seek and volume commands
+addressed to the receiver updated Android's session. `make ci` passed with this
+rule. This is release-build and physical-phone evidence, not a new debug JVM
+regression assertion. The shared class selection also serves popup and background
+mode; their behavior was not separately verified on the phone in this run.
+
+The corrected APK is 14,417,919 bytes, version 0.2.4/code 1000204, with SHA-256
+`b48dea108f970bd598b810f77fb4c0dc31643c8161d0d0a2b059a185c6f498aa`.
+Its DEX files embed R8 map ID
+`cb91e17846704114a3f0a8be3aa99d2a4d301cfc2113f3b23c3a00e744332edd`,
+matching the corrected mapping used to verify the separate UI classes.
+Its signing certificate matches the preceding release. It was installed using
+an update that preserved the installed package's credential- and device-encrypted
+data directory identities, and the installed APK hash was verified. No package
+was uninstalled, no app data was cleared, and no instrumentation ran on the
+user's installation.
+
+Observed results so far:
+
+| Check | Physical evidence |
+| --- | --- |
+| Receiver discovery and connection | Android NSD discovered the receiver; the app connected through the official sender SDK. |
+| Independent receiver baseline | A quiet, locally generated H.264/AAC MP4 was fetched and advanced from zero to ten seconds; the user confirmed seeing it play. |
+| YouTube media delivery | Big Buck Bunny at 720p60 used the phone's generated DASH manifest and separate audio/video proxies; the receiver reported the full duration and advancing positions. The user confirmed both picture and sound on the TV. |
+| Pause and paused seeks | The main-player seekbar moved the paused receiver to 92.422 seconds. Android's media transport then advanced it exactly ten seconds to 102.422 seconds, with matching paused receiver and system-session snapshots. |
+| Speed | Selecting 1.25x reached the receiver. That sequence also changed orientation, so preservation of pause intent during a speed change needs a separate check. |
+| Volume | The normal fullscreen volume gesture changed the receiver from 100 to approximately 39 percent, with matching receiver callbacks and Android remote-volume state. |
+| Background playback | Receiver progress continued after Home, with the Android session still reporting remote playback at 1.25x. |
+
+The first receiver loads remained on the receiver home screen despite an accepted
+connection. The user rebooted the Fire TV and reopened FCast Receiver. The
+independent baseline also required a temporary workstation firewall allowance
+restricted to that receiver and diagnostic server port; the rule was removed
+afterward. Those initial attempts are not evidence of successful media playback.
+
+The phone subsequently became unreachable over Wi-Fi, interrupting further UI
+checks. The receiver remained paused at approximately 264.156 seconds. After the
+phone reconnected, its system session reported local playback paused at exactly
+264.156 seconds. This verifies recovery from connection loss while already
+paused; recovery from a loss during active playback still needs a separate check.
+Paused initial handoff, quality/audio replacement, queue navigation, disconnect
+and play-on-device position recovery also remain incomplete. A second physical
+receiver and Android Auto/Desktop Head Unit remain unavailable. Do not infer
+those results from the checks above.
+
+## October 28 resumed verification
+
+The same corrected APK hash was verified on the phone when testing resumed.
+The receiver accepted another media load, but an independent protocol observer
+received its source acknowledgement without fresh playback clock or duration
+updates. The phone's paused session snapshot alone does not establish successful
+paused handoff. That attempt remains incomplete; restarting and reopening the TV
+receiver was requested before continuing the remaining receiver checks. After
+the user reported it ready, an explicit Play command still produced no fresh
+receiver playback samples. The independent H.264/AAC diagnostic also received
+no media fetch request, with its narrow workstation firewall allowance active
+and subsequently removed. A complete Fire TV reboot was requested; no additional
+hardware check is counted as passed from these attempts.
+
+A fresh, read-only Opus CLI review (`claude-opus-5-5`) found no concrete defect in
+the release rule. It independently traced the earlier class merging through
+`PlayerUiList` selection/removal and verified that the corrected mapping keeps
+the relevant UI classes separate. The reviewer did not run builds or devices;
+its documentation/evidence findings were checked against the actual snapshots
+and APK metadata before updating this record.
