@@ -68,6 +68,7 @@ import org.schabi.newpipe.database.playlist.model.PlaylistStreamEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.local.LocalItemListAdapter
+import org.schabi.newpipe.local.feed.FeedDatabaseManager
 import org.schabi.newpipe.local.playlist.LocalPlaylistManager
 import org.schabi.newpipe.settings.tabs.Tab
 import org.schabi.newpipe.settings.tabs.TabsJsonHelper
@@ -347,6 +348,50 @@ class BookmarkEmulatorTest {
         assertNotNull(database.playlistDAO().getPlaylistSync(2))
         assertFalse(database.playlistRemoteDAO().getAll().blockingFirst().any { it.uid == 2L })
         record("local-failure-retry")
+    }
+
+    @Test
+    fun permanentThumbnailSurvivesCleanupUntilUnsetOrPlaylistDeletion() {
+        val manager = LocalPlaylistManager(database)
+        val feeds = FeedDatabaseManager(database)
+        val originalStream = database.streamDAO().getAll().blockingFirst().single { it.uid == 1L }
+        assertEquals(1, manager.changePlaylistThumbnail(1, 1, true).blockingGet())
+        manager.updateJoin(1, emptyList()).blockingAwait()
+
+        feeds.clear()
+
+        assertTrue(database.streamDAO().getAll().blockingFirst().any { it.uid == 1L })
+        assertEquals(red, database.playlistStreamDAO().getPlaylistMetadata().blockingFirst().single { it.uid == 1L }.thumbnailUrl)
+        await("permanent red thumbnail after contents removal and cleanup") { onMain { pixel("L1") == Color.RED } }
+
+        val unset = manager.getAutomaticPlaylistThumbnailStreamId(1)
+            .flatMapMaybe { manager.changePlaylistThumbnail(1, it, false) }.blockingGet()
+        assertEquals(1, unset)
+        feeds.clear()
+        assertFalse(database.streamDAO().getAll().blockingFirst().any { it.uid == 1L })
+        assertEquals(PlaylistEntity.DEFAULT_THUMBNAIL_ID, database.playlistDAO().getPlaylistSync(1)!!.thumbnailStreamId)
+        await("default image after unsetting the only thumbnail reference") {
+            onMain { entries().single { key(it) == "L1" }.thumbnailUrl == null && pixel("L1") != Color.RED }
+        }
+
+        val added = manager.appendToPlaylist(1, listOf(originalStream.copy(uid = 0))).blockingGet()
+        assertEquals(1, added!!.size)
+        val replacementId = manager.getAutomaticPlaylistThumbnailStreamId(1).blockingGet()
+        assertTrue(replacementId > 0 && replacementId != 1L)
+        assertEquals(1, manager.changePlaylistThumbnail(1, replacementId, true).blockingGet())
+        manager.updateJoin(1, emptyList()).blockingAwait()
+        feeds.clear()
+        assertTrue(database.streamDAO().getAll().blockingFirst().any { it.uid == replacementId })
+
+        val held = gate()
+        delete("L1")
+        val draft = onMain { adapterOrder() }
+        held.release.countDown()
+        awaitSaved(draft)
+        feeds.clear()
+        assertFalse(database.streamDAO().getAll().blockingFirst().any { it.uid == replacementId })
+        assertEquals(setOf(2L), database.streamDAO().getAll().blockingFirst().map { it.uid }.toSet())
+        record("thumbnail-cleanup")
     }
 
     @Test

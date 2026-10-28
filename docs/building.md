@@ -290,6 +290,8 @@ sign or publish an APK. Never label a debug-key APK as a production-signed relea
   shared write queue with real Room/native host SQLite. `BookmarkSaveOwnershipTest`
   checks production fragment methods and draft ownership using controlled
   adapters, rendering and persistence; it does not run a real fragment lifecycle.
+  `StreamOrphanRetentionTest` uses real Room/native host SQLite to check thumbnail
+  retention, reference release, feed clear/pruning and transaction rollback.
 - **Offline extractor tests.** `forkCiTest` runs JUnit tests tagged `offline`
   and the extractor's main-source Checkstyle task. The tagged tests use
   recorded or synthetic responses rather than live websites.
@@ -375,6 +377,9 @@ triggers inject failures. The fixture temporarily substitutes an in-memory Room
 database, three preference keys and image-quality state, then restores them.
 Restoration runs during completed tests' teardown; a process crash can bypass it.
 Names and thumbnail updates use synthetic metadata and local PNG files.
+The thumbnail-cleanup case pins an image, removes its stream from the contents,
+runs feed cleanup, and verifies the image remains. It then verifies collection
+after unsetting the cover and after deleting its last playlist through the UI.
 
 Use a disposable emulator, created as described above. Verify its AVD name and
 emulator property **before installing** anything. For an update, verify signer
@@ -403,7 +408,7 @@ python3 tools/bookmark_emulator_validation.py \
 The [host driver](../tools/bookmark_emulator_validation.py) refuses physical
 serials, checks the exact AVD, emulator properties and installed APK hashes, then
 creates a nonce marker required by the fixture. Ordinary discovery skips these
-tests without the explicit host arguments. The driver records all seven cases,
+tests without the explicit host arguments. The driver records all eight cases,
 JUnit output and before/after hashes of the default database family. It does not
 install, uninstall or clear app data.
 

@@ -107,6 +107,7 @@ abstract class StreamDAO : BasicDAO<StreamEntity> {
         }
     }
 
+    // Thumbnail IDs remain references after removal from playlist contents.
     @Query(
         """
         DELETE FROM streams WHERE
@@ -119,6 +120,9 @@ abstract class StreamDAO : BasicDAO<StreamEntity> {
 
         AND NOT EXISTS (SELECT 1 FROM feed f
         WHERE f.stream_id = streams.uid)
+
+        AND streams.uid NOT IN (SELECT thumbnail_stream_id FROM playlists
+        WHERE thumbnail_stream_id IS NOT NULL)
         """
     )
     abstract fun deleteOrphans(): Int
