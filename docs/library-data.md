@@ -376,3 +376,15 @@ debug and standard-runner test APKs separately with Android CLI; use the driver'
 Observed results and limits belong to the
 [dated screen-validation record](documentation-alignment.md#production-subscriptions-screen--2026-10-29),
 separate from the earlier synthetic heading host.
+
+For a release journey without an application test runner, use the
+[uninstrumented subscriptions smoke procedure](building.md#uninstrumented-subscriptions-release-smoke).
+The host-only [`subscriptions_release_fixture.py`](../tools/subscriptions_release_fixture.py)
+prepares a controlled schema-9 backup and compares normal UI exports with its
+snapshot, including every stored subscription field and UID. Importing it
+replaces the selected installation's database/settings; use a fresh separate
+release package on a disposable emulator. The journey covers actual release
+rendering, visual TalkBack heading navigation, unsubscribe and export comparison
+after a normal cold launcher start. It does not inspect private database/WAL
+files or establish power-loss durability. Results and environment failures are
+kept in the [dated release record](documentation-alignment.md#uninstrumented-release-subscriptions--2026-10-29).
