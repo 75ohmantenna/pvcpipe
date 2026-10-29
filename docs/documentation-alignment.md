@@ -2039,3 +2039,167 @@ or physical hardware/service behavior.
 The final review found no additional product defect within this change. The
 shared service helper's fallback elsewhere remains outside this presentation
 change, and the FCast source-start concern remains explicitly deferred.
+
+### Production Subscriptions screen — 2026-10-29
+
+Started from clean `master` at `8fa576faed8e16bdd45f76a216e225c78c8ea5c5`,
+on branch `test-subscriptions-screen`. This follow-up checks the actual
+`MainActivity`/`SubscriptionFragment` and default on-disk Room database. The
+previous heading fixture results above remain evidence of their own synthetic
+host. The FCast source-start concern remains deferred.
+
+The new `SubscriptionScreenEmulatorTest` and
+`tools/subscriptions_screen_validation.py` require an explicitly acknowledged
+disposable emulator, debug package, matching installed APK hashes and nonce
+marker. Seeding refuses existing subscriptions and other library records. It
+uses real DAO inserts without replacing the database singleton or supplying a
+fragment/view-model double. The normal saved-tab preference opens Subscriptions
+through the production activity. The fixture includes two YouTube channels,
+one SoundCloud channel, retired IDs 2/3/4, unknown ID 99 and maximum integer ID.
+No service extraction or playback is requested.
+
+The host starts each phase in a fresh target process. Screen checks inspect
+actual adapter rows, stored UIDs and every fixture subscription field, service
+ordering, list/grid item versions, heading spans/native node metadata and
+untruncated heading text. The large-font case uses the real 220 dp-wide emulator window
+and 200% font setting. Visual checkpoints allow Android CLI layout and screenshot
+inspection. The TalkBack stage waits for host touchscreen gestures while native
+accessibility focus is observed. The deletion stage opens the real channel
+long-press dialog, identifies its title and Unsubscribe label in the focused
+application window, and touches that label. Later phases reread the same default
+database after process restart. These are
+controlled local records, not imported real subscriptions or live-service data.
+
+Cleanup deletes only records with this run's nonce URL prefix and restores the
+three overridden app preferences. The host restores font scale, window-size
+override and accessibility settings even if fixture cleanup fails. It does not
+install/uninstall packages or clear app data; APK installation is a separate
+Android CLI step on the selected AVD. Direct selected instrumentation is used,
+never the Gradle connected-test task. No production code, schema, dependency,
+runner, signing or safety-rule change is required for this validation.
+
+The first run failed before test execution with a bind-application ANR after
+emulator boot. `/tmp/pvcpipe-subscriptions-screen-run-01/summary.json` records
+`passed: false` with no completed cases; the instrumentation log reports
+`Process crashed`. It is not passing evidence and was not rewritten. Initial
+fixture-formatting failures were corrected before rebuilding; their build logs
+remain under `/tmp/pvcpipe-subscriptions-screen-build*.log`.
+
+The second run seeded its records but timed out while the production screen was
+interrupted by a System UI ANR and first notification-permission prompt. Its
+cleanup process also hit a bind-application ANR. The notification prompt was
+denied on the owned emulator. Run 02's failed summary and cleanup failures are
+preserved at `/tmp/pvcpipe-subscriptions-screen-run-02`; they were not converted
+into passes. The saved ANR trace showed the main thread runnable with about
+28 seconds of scheduling wait and guest CPU pressure near 100%. This is an
+observation of that emulator, not proof of an application deadlock.
+
+After stopping the idle Gradle daemon, Android's `cmd package compile -m speed -f`
+precompiled the installed debug and test APKs. A separate cleanup retry then
+passed, deleting the eight nonce-tagged records and restoring the three app
+preferences. Its result is `cleanup-aot.json` in run 02. The final matrix was
+restarted with a fresh nonce; application source and APK contents were unchanged
+by precompilation. No startup timeout was disabled and no application bypass
+was added. These environment/startup failures remain separate from screen
+assertions.
+
+Run 03 passed list, two-column grid, constrained-font and TalkBack checks, but
+the deletion fixture timed out looking for clickable Unsubscribe text in the
+active accessibility window. Its failed summary remains in
+`/tmp/pvcpipe-subscriptions-screen-run-03`; cleanup passed with zero remaining
+fixture subscriptions and restored preferences. The fixture was changed to
+inspect the actual dialog visually, find its title/label in the focused
+application window, and use touch input on the identified text. It does not
+call the manager's deletion method directly. No product change was made to
+satisfy the fixture. The complete matrix is rerun after this harness correction.
+
+The final run at `/tmp/pvcpipe-subscriptions-screen-run-04` passed all eight
+selected instrumentation stages: seed, list, grid, large, TalkBack, delete,
+relaunch and cleanup. Each stage ran as a separate one-test invocation in a
+fresh target process; the host verified distinct PIDs. The summary records
+`passed: true`. Installed/built APK hashes and emulator identity are in
+`target.json`; exact tested APK copies and the final fixture/driver source
+hashes are preserved under `tested-apks/` and `source-hashes.json`. Each phase
+has its native runner output and JSON result; visual phases also retain the
+CLI hierarchy, inspected screenshots and host checkpoint acknowledgement.
+
+- List and grid checks retained all eight channel records and seven service
+  groups, in service-ID order with the database's channel-name order. Supported
+  IDs 0/1, retired IDs 2/3/4, unknown 99 and maximum integer ID were exercised.
+  All header nodes advertised heading metadata and spanned the full row;
+  channel rows did not advertise headings. The grid used two spans, with all
+  service headings spanning both. List/grid channel item versions, titles and
+  original UIDs were checked against the stored records.
+- At 200% font size in the real 220 dp-wide window, unavailable labels wrapped
+  without ellipsis; the maximum-ID label occupied three complete lines.
+  The screenshot still shows existing toolbar/channel-title ellipses. This
+  result is about service headings, not a claim that every narrow-screen label
+  is untruncated.
+- Preinstalled TalkBack 16.0.0.777931756 ran with Headings selected, confirmed
+  in `talkback-control.png`. Host console touchscreen input focused ID 2 and
+  moved to IDs 3 and 4. Native assertions checked the actual app package,
+  accessibility-focused text and heading metadata at both destinations,
+  skipping the intervening channel rows. Speech quality was not assessed.
+- The real long-press dialog for `Fixture 6 service 99` was inspected in
+  `delete-dialog.png` and `delete-layout.json`. The CLI hierarchy exposes
+  Unsubscribe as a TextView without a clickable interaction, explaining why
+  the former text-node predicate was insufficient. The corrected fixture
+  identified the focused dialog's title/label and injected touch at the label's
+  measured center. The resulting production callback deleted only ID 99's
+  channel and removed its now-empty section.
+- After a host force-stop and new application process, the real screen still
+  displayed the other seven subscriptions and six service groups. Every
+  surviving UID, service ID, URL, name, avatar URL, subscriber count, description
+  and notification mode exactly matched the seeded snapshot. Other library
+  tables remained empty. This is real default-database/process-restart evidence
+  for these controlled records, not general filesystem durability certification.
+- Cleanup deleted only this nonce's remaining records, verified zero
+  subscriptions, restored the three app preference overrides, and confirmed
+  the other table counts were unchanged. The host restored and checked its
+  saved font/accessibility settings and original window-size override.
+
+Adversarial self-review checked data ownership and refusal guards, native versus
+synthetic views, adapter recycling/order, list/grid spans, focused versus active
+accessibility windows, non-clickable dialog text, touch dispatch, fresh-process
+storage reads and failure cleanup. It found and corrected fixture assumptions;
+these are self-reviews, not independent review. The negative host-guard probes
+refused physical serials and missing disposable acknowledgement before any ADB
+call. Python compilation/help, source hashes, documentation references and the
+final staged scope are checked separately from emulator assertions.
+
+This run used the existing owned `small_phone` API 36.1 AVD; the physical Pixel
+was never targeted. No package uninstall, app-data clear, in-memory database,
+production singleton override or test runner substitution was used. The tests
+did not request extraction/playback or use live service responses; background
+network traffic was not audited. The installed debug APK contained the unchanged
+application code.
+No additional product defect was found in these scenarios. The startup/OS ANRs
+and earlier failed runs remain recorded above. The emulator is stopped after
+validation. FCast source-start remains explicitly deferred.
+
+Fresh-process phases were launched through the standard AndroidJUnitRunner with
+production `App`/`MainActivity`, not through a substitute application or activity.
+They establish instrumented restart/persistence behavior; this matrix does not
+cover a separate uninstrumented launcher journey, physical hardware, live service
+behavior, speech quality, power loss or arbitrary preexisting user databases.
+
+Final host-tool review added an early refusal of optimized Python execution,
+because `-O` would disable the driver's assertions. Normal physical-target and
+optimized-mode probes both failed before any ADB call; missing disposable
+acknowledgement was also checked separately. The native fixture/APKs are
+unchanged from the passing matrix. Run 04 preserves its original `driver.py`
+and source hashes. An AST comparison verified that the only later driver
+behavior change is this early refusal; the rest matches the passing version.
+Python compilation/help and negative guard checks were rerun for that final
+host-only change; the emulator matrix was not repeated for it.
+
+
+| Final verification | Result |
+| --- | --- |
+| Emulator matrix | All eight selected one-test stages passed on the owned API 36.1 emulator. Run 04's `summary.json`, native outputs, screenshots, CLI hierarchies and preserved APKs record the evidence. The three earlier failed runs remain separate. |
+| Native fixture build | Checkstyle, ktlint and `assembleDebugAndroidTest` passed; log `/tmp/pvcpipe-subscriptions-screen-dialog-build-final.log`. The native fixture source and both tested APK hashes match the final matrix artifacts. |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-subscriptions-screen-ci.log`. All 12 sanitizer cases passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, extractor Checkstyle, lint and debug/release builds passed. |
+| JVM results | The gate reused unchanged reports: 1,157 app cases passed; 810 offline extractor cases, 807 passed and 3 skipped; all 3 build-logic cases passed. No failures or errors. These are JVM results, separate from the eight Android stages. |
+| Lint | Zero errors and 59 existing warnings; none points to the new screen-test source. |
+| Host tooling | Final Python compilation/help and physical-target, missing-acknowledgement and optimized-mode refusal probes passed. The final post-matrix driver change is limited to rejecting optimized execution; AST comparison and the original matrix driver are retained as described above. |
+| Documentation and scope | All 238 local Markdown links and 9 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Review covers the new native fixture/host driver, library test guide, dated evidence and documentation-index date. Production source, schemas, resource values, build definitions, existing test assertions, legal notices and repository/device safety rules are unchanged. |

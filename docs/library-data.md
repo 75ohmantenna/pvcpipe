@@ -359,3 +359,20 @@ These tests exercise controlled workflow failures and local persistence.
 The feed and subscription Room tests supply extraction results rather than
 contacting services; they do not establish live extractor/network behavior
 or survival after Android kills the process.
+
+[`SubscriptionScreenEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/SubscriptionScreenEmulatorTest.kt)
+and the guarded
+[`subscriptions_screen_validation.py`](../tools/subscriptions_screen_validation.py)
+driver exercise the production Subscriptions screen against the default on-disk
+Room database in an empty disposable emulator. They check list/grid rendering,
+heading metadata, constrained large-font text, host-driven TalkBack navigation,
+the real unsubscribe dialog and surviving records after fresh process starts.
+This suite seeds controlled local records; it supplies no extraction results or
+network/service evidence. It changes the selected emulator's library and three
+preferences, removes only its nonce-tagged records on cleanup, and restores the
+overrides. Do not run it on an existing user installation. Build/install the
+debug and standard-runner test APKs separately with Android CLI; use the driver's
+`--help` for required target/acknowledgement arguments and visual checkpoints.
+Observed results and limits belong to the
+[dated screen-validation record](documentation-alignment.md#production-subscriptions-screen--2026-10-29),
+separate from the earlier synthetic heading host.
