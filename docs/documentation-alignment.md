@@ -1492,16 +1492,18 @@ Javadoc passed on the final source (`/tmp/pvcpipe-parser-final-javadoc.log`),
 with 100 reported warnings in untouched sources and none reported for `Parser`.
 These were documentation-coverage warnings, not a warning-free Javadoc result.
 
-Separate caller finding: [`SoundcloudStreamLinkHandlerFactory.getId`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L47)
-uses group 1 of its API-URL pattern, which captures the resource kind rather
+Separate caller finding at the parser checkpoint: the [former `SoundcloudStreamLinkHandlerFactory.getId`](https://github.com/75ohmantenna/pvcpipe/blob/3b0947d7728bfd2fdbd2e57b9992003ec3d56160/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L47)
+used group 1 of its API-URL pattern, which captures the resource kind rather
 than group 2's identifier. A standalone local probe returned `tracks` for
 `getId("https://api-v2.soundcloud.com/tracks/123/")`. The same probe found
 `acceptUrl` false and `fromUrl` rejecting that URL before ID extraction.
-This is a suspected direct-call ID-selection defect, not a nullability issue
+This was a suspected direct-call ID-selection defect, not a nullability issue
 or evidence of an affected normal app flow. No HTTP request was made. The
-branch is unchanged; the probe source/output remain in
+branch was unchanged by the parser correction; the probe source/output remain in
 `/tmp/pvcpipe-parser-contract/SoundcloudIdProbe.java` and
 `/tmp/pvcpipe-parser-contract/soundcloud-id-probe.log`.
+The separately authorized [SoundCloud API-ID follow-up below](#soundcloud-api-id-follow-up--2026-10-29)
+adds factory/service regressions and corrects the selected capture.
 
 Adversarial self-review checked all overloads, null versus empty captures,
 first-match and pattern-order behavior, both regex-array overloads, exception
@@ -1519,3 +1521,79 @@ repository/device safety rule changed.
 | JVM results | All 1,136 app tests and 663 offline extractor tests completed with no failures or errors; 3 extractor tests were skipped. The unchanged 3-test build-logic result was reused. The 12 new parser regressions passed both before and after the annotation correction. |
 | Consumer/API checks | The Kotlin probe rejected all five unsafe dereferences after the correction and successfully ran the null-aware client. Compiled instructions and method descriptors remained unchanged. Final Javadoc passed with 100 reported warnings in untouched sources; Android lint passed with zero errors and 59 existing warnings. |
 | Documentation and scope | All 223 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both parser/test source hashes matched through the passing gate. No APK was installed and no device, emulator or live streaming service was exercised. |
+
+### SoundCloud API-ID follow-up — 2026-10-29
+
+Started from clean `master` at `3b0947d7728bfd2fdbd2e57b9992003ec3d56160`,
+on branch `fix-soundcloud-api-id`. Current routing and its limitations are
+described in [Services](services.md#soundcloud).
+
+The direct API branch read capture group 1, the resource kind, instead of
+group 2, the identifier. `SoundcloudCommentsLinkHandlerFactory` delegates both
+ID extraction and its acceptance check to that stream factory. Unlike the
+stream factory's ordinary `fromUrl` entry point, it therefore accepts matching
+API URLs and builds a comments address using the extracted ID. The service's
+`getCommentsExtractor(String)` goes through this factory; the app's explicit
+service-ID comments path reaches it through `CommentsInfo.getInfo(service, url)`.
+This establishes a source path, not an observed Android UI request.
+
+The new `SoundcloudApiLinkHandlerTest` first ran against unchanged production
+code: 25 cases, 9 incorrect-ID assertion failures, no fixture errors and no
+skips. Six existing resource-kind cases returned the kind rather than the ID;
+HTTP/path-suffix extraction, comments-handler creation and the service comments
+extractor reproduced the same error. The 16 controls passed: the six stream/
+comments acceptance differences, six rejected URLs, ordinary web stream and
+comments resolution, short-link resolution and widget-failure handling.
+The original log/XML remain at `/tmp/pvcpipe-soundcloud-id-baseline.log` and
+`/tmp/pvcpipe-soundcloud-id-baseline.xml`.
+
+The correction selects group 2 and adds a comment identifying the captures.
+No URL pattern, factory acceptance method, client-ID discovery, service
+registration or request-builder code changed. All 25 focused cases then passed,
+with Checkstyle; log `/tmp/pvcpipe-soundcloud-id-focused.log`.
+
+These tests run the real parser, factories, helper, service and comments
+extractor with a strict synthetic downloader. They verify exact request paths
+and sequences for client-ID discovery, widget lookup, embed canonicalization,
+short-link redirects and a comments page. The downloader returns only declared
+fixture responses and fails any unexpected request; it has no network transport.
+Setup saves and teardown restores the raw NewPipe downloader/localization/
+country fields and the cached SoundCloud client ID. The tests do not use a real
+account, website response, Android device or emulator.
+
+The passing service case constructs and requests
+`/tracks/123/comments?client_id=<fixture>&threaded=0&filter_replies=1` and
+parses an empty collection with no next page. Its payload does not establish
+nonempty comment-item extraction, live endpoint availability or behavior for a
+real remote ID. The inherited pattern recognizes non-track resource kinds and
+path prefixes, while comments URLs are still built as track URLs; this change
+does not establish comments support for those other resources. Stream `fromUrl`
+still rejects the API URLs tested here. Web comments acceptance still performs
+widget resolution and returns false for the controlled widget failure.
+
+Separate unresolved finding: the inherited API and ordinary web host patterns
+in [`SoundcloudStreamLinkHandlerFactory`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L17)
+leave the separator before `com` unescaped. A local probe parsed an ID from
+`https://api-v2.soundcloudXcom/tracks/123/`, found comments acceptance true for
+that URL, and found stream acceptance true for
+`https://soundcloudXcom/fixture-artist/fixture-track`. This is a suspected
+host-validation defect, not intended support for those hosts. The patterns
+remain unchanged; there was no network request to either hostname. Probe
+source/output remain in `/tmp/pvcpipe-soundcloud-id-probes`.
+
+Adversarial self-review checked capture participation and group numbering,
+direct versus inherited factory entry points, both acceptance paths, the app/
+service comments call chain, exact request destinations, failure propagation,
+client-ID caching and raw fixture-state restoration. A second pass compared
+all changed source and documentation, including host boundaries and the
+non-track/prefix limitations above. These are self-reviews, not independent
+review. Only the selected capture and its explanatory comment change production
+code; no URL pattern, dependency, build value, service ID, UI string, legal
+notice or repository/device safety rule changed.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-soundcloud-id-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | All 1,136 app tests and 688 offline extractor tests completed with no failures or errors; 3 extractor cases were skipped. The unchanged 3-test build-logic result was reused. All 25 new cases passed after the correction; the 9 baseline failures remain recorded separately. |
+| Lint | Zero errors and 59 existing warnings. No reported issue points to either changed Java file. |
+| Documentation and scope | All 225 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both implementation/test source hashes matched through the passing gate. No APK was installed and no device, emulator or live streaming service was exercised. The lookalike-host finding above remains unresolved. |

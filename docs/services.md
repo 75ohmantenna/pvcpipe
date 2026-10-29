@@ -143,6 +143,20 @@ in memory. A mobile-page socket timeout allows the desktop fallback; other
 interrupted I/O stops discovery. A subscription import takes a SoundCloud
 profile address and imports the channels that profile follows.
 
+The stream link factory's direct API-URL ID branch returns the identifier,
+not the resource kind. Its ordinary `fromUrl` path still rejects API URLs.
+The comments link factory delegates ID extraction to that branch and can build
+`/tracks/<id>/comments` addresses from matching API URLs. Web/short stream links
+still resolve through the widget/embed paths. Comments acceptance for web URLs
+can perform widget resolution and can fail when that resolution fails.
+
+The inherited API pattern requires a slash after the ID and can match a prefix
+before another path component. It also recognizes non-track resource kinds;
+the correction does not establish comments support for those resources.
+Comments addresses are still constructed as track addresses. These are parser
+and routing behaviors, not evidence that a remote ID exists or an endpoint is
+currently available.
+
 ## BitChute
 
 - Links: video, embed, torrent, channel and public playlist addresses on
