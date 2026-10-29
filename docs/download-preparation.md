@@ -633,6 +633,22 @@ grants read access to that one file.
 - Preview thumbnails for the share sheet come from a separate `FileProvider`
   that covers only the `share_preview` cache folder.
 
+## SAF stream cleanup
+
+`StoredFileHelper.getStream` uses `FileStreamSAF` for document URIs and
+`FileStream` for direct paths. The SAF adapter's input/output streams share the
+descriptor position; its output channel provides seeking and truncation where
+the provider supports them. The stream wrappers borrow the descriptor, whose
+owner is the `ParcelFileDescriptor` returned by the resolver.
+
+`FileStreamSAF.close` attempts the channel, input, output and owning descriptor
+in that order, even if an earlier close fails. It logs an `IOException` rather
+than throwing it; later close failures are suppressed on the first exception.
+An unchecked primary exception still propagates after the remaining cleanup
+attempts. `isClosed()` records that closing was attempted, not that every
+resource released successfully. This does not establish provider durability or
+universal seek/truncate support.
+
 ## Tests
 
 `make ci` runs the unit tests: `DownloadPreparationTest`,
@@ -647,6 +663,19 @@ checkpoint-save failure, late errors, replacement offsets, and serialized
 full-response-only recovery.
 `DownloadManagerDeleteEntryTest` covers removing entries, and
 `FilenameUtilsTest` and `StoredFileNameContainmentTest` cover file names.
+`FileStreamSAFCloseTest` executes the adapter's close method against controlled
+resources, covering individual/combined I/O failures, unchecked failure,
+exception reporting and repeated close. It does not run an Android provider.
+
+`FileStreamSAFEmulatorTest` separately uses the app's local `FileProvider` and
+unique cache files. It checks read/write/seek/truncate, descriptor release after
+an injected input-close failure, unchanged file bytes and another descriptor
+surviving repeated close. Ordinary discovery skips it; it requires an explicit
+disposable-emulator argument, debug package, emulator hardware and matching host
+nonce marker. It neither accesses the app database nor changes preferences.
+It is not a cloud document-provider, picker or physical-device test. See the
+[dated SAF follow-up](documentation-alignment.md#saf-close-follow-up--2026-10-29)
+for the invocation and results.
 
 `DownloadPreparationIntegrationTest` and `MissionFileSharingTest` are
 instrumentation tests and need a device. Before running any instrumentation

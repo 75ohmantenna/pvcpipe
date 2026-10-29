@@ -705,7 +705,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | Bookmark save could clear a newer draft's dirty flag at the audited revision | The [former `BookmarkFragment.saveImmediate`](https://github.com/75ohmantenna/pvcpipe/blob/6b6d3a786bd514e25f030cf452c033ffd098c1a6/app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) used unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). The audit reported a suspected race without a new scheduling regression. The separately authorized [bookmark-save follow-up below](#bookmark-save-ownership-follow-up--2026-10-28) reproduces and corrects it. |
 | Orphan cleanup omitted permanent-thumbnail references at the audited revision | The [former `StreamDAO.deleteOrphans`](https://github.com/75ohmantenna/pvcpipe/blob/0c7df4bd8210883f22c0e7d3465808029a55328d/app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checked history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. The audit's synthetic SQLite probe removed a row referenced only by a permanent thumbnail, making the image lookup null; that was SQL-boundary evidence, not an Android/Room or rendered-image test. The [thumbnail-retention follow-up below](#thumbnail-retention-follow-up--2026-10-28) adds the missing reference check and behavioral regressions. |
 | Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
-| SAF exception cleanup may stop early | [`FileStreamSAF.close`](../app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) groups all closes in one try and marks disposed first. An early IOException skips later explicit closes; actual descriptor/provider consequences were not tested. |
+| SAF exception cleanup could stop early at the audited revision | The [former `FileStreamSAF.close`](https://github.com/75ohmantenna/pvcpipe/blob/3115e79a2c71a73db910a4797bd858c10ff1f0d3/app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) grouped all closes in one try and marked disposed first. An early IOException skipped later explicit closes; the audit did not test actual descriptor/provider consequences. The separately authorized [SAF close follow-up below](#saf-close-follow-up--2026-10-29) adds failure-safe cleanup and regression coverage. |
 | Seek-option error path has no label fallback | [`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L135) adds a value before plural lookup but appends no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android. |
 
 The separate inherited cast initial-source-start concerns under
@@ -1340,3 +1340,100 @@ was identified within this correction's scope.
 | Lint | Zero errors and 59 existing warnings, down from the first gate's 66 after the seven result checks were added. No lint issue points to the three changed Kotlin files. |
 | Emulator | Both complete eight-case runs passed. The final tested APKs are preserved under `/tmp/pvcpipe-thumbnail-emulator-run2/tested-apks`; the driver recorded their installed hashes. The final run adds no active-WAL, layout or hardware evidence. |
 | Documentation and scope | All 218 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling, Python compilation and diff whitespace checks passed. The four implementation/test/driver source hashes remained unchanged through the final build, emulator run and gate. Review was adversarial self-review, not independent review. |
+
+### SAF close follow-up — 2026-10-29
+
+Started on 2026-10-28 from clean `master` at
+`3115e79a2c71a73db910a4797bd858c10ff1f0d3`, on branch
+`fix-saf-stream-cleanup`. This separately authorized correction addresses the
+remaining close-failure finding. Current behavior is described in
+[Downloads](download-preparation.md#saf-stream-cleanup).
+
+`StoredFileHelper.getStream` constructs the adapter for document URIs. Its
+callers include download writers, initialization, checksums, truncation and
+post-processing. `SharpStream.close` has no checked-exception result, and some
+callers use `isClosed` to stop using the stream. The closed flag remains a
+logical close-attempt flag; it does not certify successful resource release.
+
+The installed Android 36.1 sources distinguish the borrowed `FileInputStream`
+and `FileOutputStream` wrappers from the owning `ParcelFileDescriptor`. The
+output channel closes through its parent output stream. This source inspection
+alone does not establish behavior on every supported Android version/provider.
+
+Before changing production code, all eight controlled-resource JVM regressions
+ran: six failed because later closes were skipped; normal/repeated close and a
+failure at the final descriptor passed. These were missing-close verification
+failures, not fixture errors. The original log and XML remain at
+`/tmp/pvcpipe-saf-baseline.log` and `/tmp/pvcpipe-saf-baseline.xml`.
+
+The correction closes the channel in a try-with-resources body, declaring the
+borrowed streams and owner in reverse order so cleanup still attempts channel,
+input, output, then owning descriptor.
+I/O failures remain logged rather than thrown, with subsequent failures
+suppressed on the first. An unchecked primary failure propagates after the
+remaining cleanup attempts. Construction, descriptor duplication, file access,
+capability reporting, the closed flag and caller control flow are unchanged.
+
+The emulator fixture uses only unique files below the app's `share_preview`
+cache path and its local `FileProvider`. It has no database/preference mutation
+and does not launch an activity. Ordinary discovery skips it. Host opt-in also
+requires emulator hardware, the debug package, and a matching nonce marker.
+Build the normal `:app:assembleDebug :app:assembleDebugAndroidTest` APKs.
+After verifying the disposable AVD, installed signers and APK hashes as described
+in [Building](building.md#disposable-bookmark-validation), its direct invocation
+is:
+
+```sh
+saf_nonce=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+adb -s emulator-5554 shell run-as org.seventyfiveohmantenna.pvcpipe.debug mkdir -p files
+printf '%s' "$saf_nonce" | adb -s emulator-5554 shell run-as org.seventyfiveohmantenna.pvcpipe.debug tee files/saf-emulator-allow
+adb -s emulator-5554 shell am instrument -w -r \
+  -e class us.shandian.giga.io.FileStreamSAFEmulatorTest \
+  -e safDisposable true -e safNonce "$saf_nonce" \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The final focused run passed all eight JVM regressions, Checkstyle, debug APK
+assembly and Android test APK assembly; log
+`/tmp/pvcpipe-saf-focused-build-final.log`. An earlier empty try-with-resources
+body passed the tests but failed Checkstyle's `EmptyBlock` rule; putting the
+channel close in the body resolved that failure without changing style rules.
+
+Android CLI started the disposable `pvcpipe_restore_api26_20261028` AVD as
+`emulator-5554` (Android 8.0/API 26 x86_64). The host checked its AVD, emulator
+property and boot state, then compared installed/built APK signers before
+replacement installs. The installed baseline app matched the preserved APK from
+the preceding thumbnail-retention run. Only the test APK was replaced first.
+
+The same native fixture first ran against that old app: two tests, one failure
+at `Owning descriptor must be released`. The injected input-close failure left
+the real owning descriptor valid after adapter close; teardown explicitly
+closed it. The normal case passed. After updating the app APK, both cases passed
+(`OK (2 tests)`, 0.033 seconds of reported test time). Both runs verified
+read/write/seek/truncate; the passing run also verified descriptor invalidation,
+unchanged file bytes and another descriptor surviving repeated close.
+
+The logs, commands, nonce, selected target and installed APK hashes remain in
+`/tmp/pvcpipe-saf-native-baseline` and `/tmp/pvcpipe-saf-native-fixed`. The host
+required two successful test status results for the passing run, with no skips
+or ignored tests. Default database main-file and empty-journal hashes were
+unchanged in both runs; WAL/SHM were absent. No activity was launched, no package
+was uninstalled and no app data was cleared. This is a local `FileProvider` with
+a controlled input-close fault, not a live SAF provider, physical-device or
+provider-durability result. No UI/layout/screenshots were evaluated.
+
+Adversarial self-review traced resource aliasing, close order, logical state,
+single/multiple/unchecked failures, repeated close, callers and fixture teardown.
+A second pass checked opt-in guards, exact target/APK selection, complete
+instrumentation results and contradictory documentation. The source correction
+changes only close control flow and explanatory comments; no schema, dependency,
+SDK/application ID, signing, runner, UI string or safety rule changed. These are
+self-reviews, not independent review or evidence for other providers/platforms.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-saf-ci.log`. All 12 sanitizer tests and all 685 recorded fixtures passed. Checkstyle, ktlint, dependency ordering, debug lint and debug/release APK builds passed. |
+| JVM tests | All 1,136 app tests ran successfully, with no failures, errors or skips. The gate reused the unchanged offline extractor report (651 tests, 3 skipped) and build-logic report (3 tests); neither reported failures or errors. |
+| Lint | Zero errors and 59 existing warnings. No issue points to the three changed Java files. |
+| Emulator | The old app failed the injected-fault descriptor-release assertion; both cases passed with the corrected app and identical test APK. The tested APKs are preserved in each native run directory's `tested-apks` subdirectory. The disposable emulator was stopped; its AVD remains available. |
+| Documentation and preservation | All 221 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. A second search found no contradictory current cleanup description. All three implementation/test source hashes matched through the passing build, native run and release gate. |
