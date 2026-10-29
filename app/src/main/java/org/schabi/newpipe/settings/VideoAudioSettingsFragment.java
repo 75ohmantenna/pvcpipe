@@ -129,6 +129,7 @@ public class VideoAudioSettingsFragment extends BasePreferenceFragment {
      * Builds localized fast-forward/rewind entries and filters 5, 15 and 25 seconds in
      * inexact-seek mode. The filtering is an inherited coarse-seek workaround, not a probe
      * of the current Media3 decoder's seek accuracy.
+     * Falls back to the paired static label when plural lookup fails.
      */
     private void updateSeekOptions() {
         final Resources res = getResources();
@@ -139,7 +140,8 @@ public class VideoAudioSettingsFragment extends BasePreferenceFragment {
         final boolean inexactSeek = getPreferenceManager().getSharedPreferences()
                 .getBoolean(res.getString(R.string.use_inexact_seek_key), false);
 
-        for (final String durationsValue : durationsValues) {
+        for (int i = 0; i < durationsValues.length; i++) {
+            final String durationsValue = durationsValues[i];
             currentDurationValue =
                     Integer.parseInt(durationsValue) / (int) DateUtils.SECOND_IN_MILLIS;
             if (inexactSeek && currentDurationValue % 10 == 5) {
@@ -153,8 +155,9 @@ public class VideoAudioSettingsFragment extends BasePreferenceFragment {
                                 currentDurationValue),
                         currentDurationValue));
             } catch (final Resources.NotFoundException ignored) {
-                // No label is appended on failure. Normal locale fallback is handled by
-                // Android's resource lookup, not by the static description array here.
+                // Static labels use the original array positions, before inexact-seek filtering.
+                displayedDescriptionValues.add(
+                        res.getStringArray(R.array.seek_duration_description)[i]);
             }
         }
 

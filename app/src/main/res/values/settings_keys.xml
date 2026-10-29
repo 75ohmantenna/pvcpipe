@@ -32,8 +32,9 @@
     <string name="seek_duration_key">seek_duration</string>
     <string name="seek_duration_default_value">10000</string>
     <string-array name="seek_duration_description">
-        <!-- Initial labels; VideoAudioSettingsFragment.updateSeekOptions replaces the entries
-             with plural-resource labels and filters values for inexact-seek mode. -->
+        <!-- Initial labels and plural-lookup fallback, paired with seek_duration_value.
+             VideoAudioSettingsFragment.updateSeekOptions prefers plural-resource labels
+             and filters values for inexact-seek mode. -->
         <item>5 seconds</item>
         <item>10 seconds</item>
         <item>15 seconds</item>
