@@ -2203,3 +2203,142 @@ host-only change; the emulator matrix was not repeated for it.
 | Lint | Zero errors and 59 existing warnings; none points to the new screen-test source. |
 | Host tooling | Final Python compilation/help and physical-target, missing-acknowledgement and optimized-mode refusal probes passed. The final post-matrix driver change is limited to rejecting optimized execution; AST comparison and the original matrix driver are retained as described above. |
 | Documentation and scope | All 238 local Markdown links and 9 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Review covers the new native fixture/host driver, library test guide, dated evidence and documentation-index date. Production source, schemas, resource values, build definitions, existing test assertions, legal notices and repository/device safety rules are unchanged. |
+
+## Uninstrumented release subscriptions — 2026-10-29
+
+This follow-up exercises the unchanged application at
+`1aad6c132dd432c8cea444b5743a6fb4fff7694b` through a normal launcher journey,
+without a test runner attached to the app. The signed release was built with
+`./gradlew --no-daemon -DpackageSuffix=.smoke :app:assembleRelease`; the build
+passed in 10m 30s. The existing release configuration enabled R8 and resource
+shrinking. The tested package was `org.seventyfiveohmantenna.pvcpipe.smoke`,
+version 0.2.4/code 1000204, non-debuggable, with no instrumentation declaration.
+Its release certificate SHA-256 was
+`14a4e83570c8d32855ad271c8eec1f5822ba225673c11111c4f653dc0bf996bb`.
+The tested APK SHA-256 was
+`ab5bdb9f3272cb5d9b595e31b8ec0a31c4186bf10726eadaf05eca0898e5b4b6`.
+
+Evidence is under `/tmp/pvcpipe-release-subscriptions-01`: preserved APK,
+R8 mapping/configuration/resource reports, manifest, certificate, build metadata,
+CLI hierarchies, visually inspected screenshots, public backup archives,
+comparison reports and before/after device settings. The owned `small_phone`
+Google Play API 36.1 AVD reported Android 16/SDK 36, x86_64, `ranchu` and
+`ro.kernel.qemu=1`. Its `.smoke` package was absent before Android CLI installation.
+No app test APK was installed or invoked in this journey. The CLI inspector used
+its own external instrumentation server; ActivityManager recorded only that
+instrumentation, targeting the inspector's package. It was stopped before
+TalkBack gestures. This is an uninstrumented **application** journey, not a claim
+that the inspection tooling uses no instrumentation.
+
+The host-only `tools/subscriptions_release_fixture.py` prepared a schema-9 backup
+from the checked-in Room schema. It contained eight controlled subscriptions
+with UIDs 101–108 and service IDs 0, 0, 1, 2, 3, 4, 99 and 2147483647, plus
+settings selecting a subscriptions-only tab and list mode. The seed ZIP hash
+was `4b65b4353fce2433b63939e2effde6fa7801470a73e3adb487f3e43c8045c028`.
+The backup was copied to public Downloads, selected through the system document
+picker, and restored using the production Restore with settings dialog and
+normal restart. No private-file injection, `run-as`, root access, singleton
+override or target instrumentation seeded/read the app's database.
+
+The completed journey observed:
+
+- The normal Subscriptions list grouped the eight records into seven sections:
+  YouTube, SoundCloud and distinct unavailable-service headings for IDs 2, 3,
+  4, 99 and 2147483647. The normal Export database action and system save picker
+  produced `baseline-export.zip`. `baseline-check.json` passed, comparing every
+  stored subscription field and UID with the seed, SQLite `quick_check`, foreign
+  keys, schema/Room metadata, subscriptions-only tabs and empty other library
+  tables. The checker reads JSON preferences, never legacy Java serialization.
+- After selecting Grid in Appearance and recreating the app, the real channel
+  screen showed two columns with full-width service headings. At 200% font in
+  the 220 dp-wide window, the maximum-ID heading wrapped into three complete
+  lines without ellipsis (`large-narrow-max.png`). Existing toolbar and channel
+  title truncation remained visible; this does not establish that all labels fit.
+- TalkBack 16.0.0.777931756 ran with Headings selected. Host emulator-console
+  touchscreen gestures moved visible green accessibility focus from SoundCloud
+  to ID 2, then ID 3 and ID 4, skipping intervening channel rows. The selector
+  and destination screenshots are preserved. These are visual focus observations,
+  separate from the previous debug suite's native heading assertions. Speech
+  quality was not assessed.
+- A real long press on `Release fixture 6 service 99` opened its production
+  dialog. Touching Unsubscribe removed the channel and now-empty ID-99 section.
+  A host force-stop followed by a normal launcher start created a different
+  process (PID 8555 → 9020); Android reported `LaunchState: COLD`, MainActivity,
+  and 3460 ms launch time. This was done before exporting again.
+  `post-restart-export.zip` then passed `post-restart-check.json`: exactly seven
+  records, every surviving UID and field unchanged, no ID 99, and no records in
+  the other library tables. No private WAL was inspected and no WAL-only or
+  power-loss guarantee is inferred from this check.
+
+Environment failures are retained rather than counted as passes. During the
+initial boot/install/launch interval Android services were not ready, Downloads
+was initially inaccessible, and system_server aborted. The activity command
+reported Broken pipe; the inspector disconnected. The crash buffer also contains
+a smoke-app WorkManager `SQLiteCantOpenDatabaseException` for its missing
+`no_backup` directory and subsequent `DeadSystemException` entries in the app
+and multiple system processes. Their relationship is not isolated; this is not
+evidence that a release/R8 defect was fixed or that the storage exception is
+harmless. The initial logs and launch attempts remain in this evidence directory.
+
+After Android reached `RUNNING_UNLOCKED`, System UI repeatedly timed out in its
+edge-swipe handler and blocked injected touches. The app, System UI and permission
+controller were precompiled using Android's `cmd package compile -m speed -f`.
+The selected emulator's display was temporarily reduced, animation settings
+disabled and System UI restarted. The completed journey used the same APK after
+that preparation, without uninstall, data clearing or a changed startup timeout.
+Normal display size was restored before the main list/grid journey; the later
+220 dp/large-font phase was deliberate. App notification prompts (including after
+restore) and TalkBack's own notification prompt were declined. Wi-Fi was briefly
+disabled, but cellular data remained enabled: the first Live tab displayed
+network content. No playback or channel extraction was requested, and background
+traffic was not audited. This run is not offline or general live-service evidence.
+
+One UI finding remains separate from the passing rendering checks: changing
+Appearance → List view mode to Grid and returning left the existing Subscriptions
+view in list layout (`channel-grid-top.json`); a cold restart applied Grid
+(`channel-grid-cold.json`).
+[`SubscriptionFragment.initViews`](../app/src/main/java/org/schabi/newpipe/local/subscription/SubscriptionFragment.kt#L202)
+configures the adapter/span count. Review whether settings return should rebuild
+that view; do not treat delayed application as an intentional guarantee.
+The nearby channel-group toggle also advertises the generic List view mode
+description in
+[`subscription_groups_header.xml`](../app/src/main/res/layout/subscription_groups_header.xml#L28)
+while changing groups only; a proposed UI-text correction is a group-specific
+description. Neither behavior nor runtime text was changed here.
+
+All saved font, window-size, animation, accessibility and network setting values
+were restored and compared. The smoke app was stopped with its seven controlled
+records retained for reinspection; existing debug/test packages remained
+installed. The physical Pixel was never targeted. The owned emulator was stopped.
+This evidence does not cover physical hardware, other Android versions,
+arbitrary user libraries, filesystem/power-loss durability or speech quality.
+FCast source-start remains explicitly deferred.
+
+Adversarial self-review checked the selected package/certificate and emulator,
+restore/export provenance, all-field comparisons, fresh-process order,
+instrumentation ownership, actual channel versus group grid, visual TalkBack
+limits and restored settings. A host negative-probe mistake was found: a mutated
+WAL database was archived without checkpointing, so the supposed changed ZIP
+still held the original data. That failed probe is preserved separately as
+`failed-negative-probe-01.json` and its original report. The corrected probe
+checkpoints/closes the host mutation and rereads the archive to establish the
+changed value before testing rejection. This did not change the application,
+tested APK, real UI exports or checker. These are self-reviews, not independent
+reviews.
+
+The second pass reproduced an absent-target gap in the new host checker:
+`--removed-service 100` could accept the unchanged baseline because the seed had
+no such service. An explicit seed-membership guard now refuses that request.
+Baseline and post-restart exports still pass under optimized Python, and the
+absent target is rejected. Earlier probes also reject changed metadata, wrong
+Room identity, a falsely claimed ID-99 deletion and deletion of the wrong service.
+The final helper change only adds this host-side refusal; it does not alter the
+fixture, application or APK, and the emulator journey was not repeated for it.
+
+| Final verification | Result |
+| --- | --- |
+| Release journey | Normal launcher startup, restore with settings, list/grid and large-font headings, visual TalkBack navigation, real unsubscribe and seven-record comparison after a cold restart passed on the owned emulator, after the environment preparation above. Initial failures remain separate. |
+| Host checker | Final baseline/post-restart exports accepted; changed metadata, wrong Room identity, false deletion, wrong-service deletion and absent removal target rejected under optimized Python. Reusing the existing fixture directory was refused without changing its seed. Python compilation/help passed. Results and the final helper hash are in `final-host-checker-probes.json`. |
+| Repository gate | `make ci` passed; log `/tmp/pvcpipe-release-subscriptions-ci.log`. All 12 sanitizer cases and inspection of 685 recorded fixtures passed. App/extractor style checks, dependency ordering, lint and debug/release builds passed. |
+| JVM and lint limits | Gradle reused the unchanged JVM reports: 1,157 app cases passed; 810 offline extractor cases, 807 passed and 3 skipped; all 3 build-logic cases passed. Lint reports zero errors and 59 warnings. These reports are separate from the normal release UI journey. |
+| Documentation and scope | All 244 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files; changed-file spelling and diff whitespace checks passed. Changes are limited to the host fixture/checker, build/library guides and this dated follow-up. No application source, schema, resource value, build definition, existing test assertion, legal notice or safety rule changed. |

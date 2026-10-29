@@ -233,6 +233,57 @@ The populated debug app was not replaced or cleared. Repeat a release-mode cold
 start after shrinker/dependency changes; assembling an APK and running JVM tests
 alone did not catch this failure.
 
+### Uninstrumented subscriptions release smoke
+
+Use an owned disposable emulator and a fresh `.smoke` installation for this
+destructive restore journey. Confirm the selected serial is an emulator and the
+package is absent before installation; a separate ID alone does not make an
+existing installation disposable. Build through the existing release variant:
+
+```sh
+./gradlew --no-daemon -DpackageSuffix=.smoke :app:assembleRelease
+python3 tools/subscriptions_release_fixture.py prepare --output /tmp/pvcpipe-release-seed
+```
+
+The fixture command refuses an existing output directory. It creates a schema-9
+backup containing eight controlled subscriptions, JSON preferences selecting only
+the Subscriptions tab, and an expected-record snapshot. It only accesses host
+files. Check the APK's package, non-debuggable manifest and signing certificate,
+then install it with Android CLI on the explicitly selected emulator. Preserve a
+copy of that APK and its R8 outputs before a later build overwrites them.
+
+Copy the seed ZIP to public emulator storage and use Settings → Backup and
+restore → Import database → Restore with settings. This replaces the smoke
+installation's database/settings and restarts the app. Export a baseline through
+the normal Export database action and system document picker, then pull that
+public ZIP to the host:
+
+```sh
+python3 tools/subscriptions_release_fixture.py check-export \
+  --archive /tmp/baseline-export.zip --expected /tmp/pvcpipe-release-seed/expected.json \
+  --report /tmp/baseline-check.json
+```
+
+Inspect the real list/grid, large-font headings and TalkBack's Headings navigation.
+Select the channel layout in Appearance → List view mode; the nearby channel-group
+button only changes group presentation. Recreate the screen after changing the
+channel layout and verify the actual result. Unsubscribe from the fixture's only
+ID-99 channel through its long-press dialog, force-stop the smoke app, and use a
+normal launcher start **before** another export. Check that export with the same
+command plus `--removed-service 99`. The checker compares every surviving UID and
+stored subscription field, checks other library tables remain empty, and runs
+SQLite `quick_check`, foreign-key and schema-metadata checks. It does not inspect
+private app files or deserialize the legacy Java settings entry.
+
+This journey does not attach an application test runner. Android CLI layout
+inspection uses its own external instrumentation package; stop that inspector
+before TalkBack gestures. Visual TalkBack focus observations are separate from
+native heading assertions in the debug suite. Restore the emulator's original
+display/accessibility/network settings, and never use uninstall or data clearing
+on an existing user installation. See the
+[dated release result](documentation-alignment.md#uninstrumented-release-subscriptions--2026-10-29)
+for tested artifacts, environment failures and limits.
+
 ## Versions
 
 PVCPipe has its own version, in `version.properties` at the top of the
