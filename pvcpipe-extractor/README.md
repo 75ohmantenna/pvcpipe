@@ -34,6 +34,25 @@ extractor features. See [docs/playback.md](../docs/playback.md) for FCast
 controls and media limits. Offline fixtures establish parser behavior, not
 current website availability; live observations remain dated records.
 
+## Regex helpers
+
+`Parser.matchGroup`, `matchGroup1` and `matchGroup1MultiplePatterns` return
+nullable strings: an unmatched optional capture is null, while a participating
+empty capture is `""`. If no pattern matches, these helpers throw
+`Parser.RegexException`; an invalid group number after a match throws
+`IndexOutOfBoundsException`.
+Group zero returns the whole matched substring. Matching uses `find()`.
+
+`matchGroup1MultiplePatterns` stops at the first pattern with a match, even
+when its capture is null. `Utils.getStringResultFromRegexArray` instead tries
+later patterns after null captures and throws if none supplies a non-null
+result. Java and Kotlin consumers must handle nullable group results;
+Kotlin source relying on the former non-null/platform types may need changes.
+`matchOrThrow` still returns a non-null matcher or throws `RegexException`.
+
+`ParserTest`, tagged `offline`, checks these distinctions and the regex-array
+caller's fallback behavior without a downloader or service connection.
+
 ## Maintained and generated sources
 
 The service implementation and offline regression tests are maintained in this

@@ -704,7 +704,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | Non-SQLite databases could reach staging at the audited revision | The [former `ImportExportManager.prepareRestore`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt#L102) only checked entry presence/nonzero size before publication. [`PendingDatabaseRestore.install`](https://github.com/75ohmantenna/pvcpipe/blob/86adf7b59d8e2baef869eeeeffe05dccaf5a1a99/app/src/main/java/org/schabi/newpipe/settings/export/PendingDatabaseRestore.java#L25) moved it before database opening. Placeholder/rollback tests did not establish SQLite openability, and malformed-database startup was not exercised. The [backup-validation follow-up below](#backup-validation-follow-up--2026-10-28) adds SQLite/Room checks before new restores are published. |
 | Bookmark save could clear a newer draft's dirty flag at the audited revision | The [former `BookmarkFragment.saveImmediate`](https://github.com/75ohmantenna/pvcpipe/blob/6b6d3a786bd514e25f030cf452c033ffd098c1a6/app/src/main/java/org/schabi/newpipe/local/bookmark/BookmarkFragment.java#L374) used unconditional `setNoChangesToSave()` in asynchronous completion. Compare the revision captured by [`LocalPlaylistFragment.saveImmediate`](../app/src/main/java/org/schabi/newpipe/local/playlist/LocalPlaylistFragment.java#L652). The audit reported a suspected race without a new scheduling regression. The separately authorized [bookmark-save follow-up below](#bookmark-save-ownership-follow-up--2026-10-28) reproduces and corrects it. |
 | Orphan cleanup omitted permanent-thumbnail references at the audited revision | The [former `StreamDAO.deleteOrphans`](https://github.com/75ohmantenna/pvcpipe/blob/0c7df4bd8210883f22c0e7d3465808029a55328d/app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checked history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. The audit's synthetic SQLite probe removed a row referenced only by a permanent thumbnail, making the image lookup null; that was SQL-boundary evidence, not an Android/Room or rendered-image test. The [thumbnail-retention follow-up below](#thumbnail-retention-follow-up--2026-10-28) adds the missing reference check and behavioral regressions. |
-| Parser nullability does not match annotations | [`Parser.matchGroup`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegates to `Matcher.group`. A JVM probe of the compiled helper returns null for an unmatched optional capture, accepts group zero and propagates `IndexOutOfBoundsException` for a nonexistent group. Documentation is corrected; signatures and callers are unchanged. |
+| Parser nullability did not match annotations at the audited revision | The [former `Parser.matchGroup`](https://github.com/75ohmantenna/pvcpipe/blob/ce6f17429af09ee9478631e04c3eb3169deb9e4d/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegated to `Matcher.group`. The audit's JVM probe returned null for an unmatched optional capture, accepted group zero and propagated `IndexOutOfBoundsException` for a nonexistent group. That documentation-only pass changed no signatures or callers. The separately authorized [parser nullability follow-up below](#parser-nullability-follow-up--2026-10-29) corrects the return annotations while preserving matching behavior. |
 | SAF exception cleanup could stop early at the audited revision | The [former `FileStreamSAF.close`](https://github.com/75ohmantenna/pvcpipe/blob/3115e79a2c71a73db910a4797bd858c10ff1f0d3/app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) grouped all closes in one try and marked disposed first. An early IOException skipped later explicit closes; the audit did not test actual descriptor/provider consequences. The separately authorized [SAF close follow-up below](#saf-close-follow-up--2026-10-29) adds failure-safe cleanup and regression coverage. |
 | Seek-option error path has no label fallback | [`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L135) adds a value before plural lookup but appends no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android. |
 
@@ -1437,3 +1437,85 @@ self-reviews, not independent review or evidence for other providers/platforms.
 | Lint | Zero errors and 59 existing warnings. No issue points to the three changed Java files. |
 | Emulator | The old app failed the injected-fault descriptor-release assertion; both cases passed with the corrected app and identical test APK. The tested APKs are preserved in each native run directory's `tested-apks` subdirectory. The disposable emulator was stopped; its AVD remains available. |
 | Documentation and preservation | All 221 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. A second search found no contradictory current cleanup description. All three implementation/test source hashes matched through the passing build, native run and release gate. |
+
+### Parser nullability follow-up — 2026-10-29
+
+Started from clean `master` at `ce6f17429af09ee9478631e04c3eb3169deb9e4d`,
+on branch `fix-parser-nullability`. The [extractor guide](../pvcpipe-extractor/README.md#regex-helpers)
+now describes the group helpers' return contract and fallback differences.
+
+The four `matchGroup`/`matchGroup1` overloads previously advertised non-null
+results; `matchGroup1MultiplePatterns` had no return annotation. All five now
+use `javax.annotation.Nullable`. Their bodies, matching patterns, exception
+handling and callers are unchanged. An unmatched optional capture remains null,
+a participating empty capture remains `""`, and group zero returns the whole
+matched substring. Missing matches still throw `RegexException`; invalid group
+numbers after a match still throw `IndexOutOfBoundsException`. The matching
+operation remains `find()`, not whole-input matching.
+
+Caller review covered all 24 external production call sites in nine files,
+including multiline calls and a search for static imports/method references.
+No app-source or Kotlin caller was found. The protected timestamp helper's
+three supplied service patterns were also traced.
+
+| Caller area | Null handling inspected |
+| --- | --- |
+| `Utils` (4 calls) | Numeric count/group 1 and multiplier/group 2 are required captures. Google's redirect capture is required. Both regex-array overloads already retry a null capture and throw if no non-null result exists; an empty capture is accepted. |
+| BitChute (1 call) | The requested media-URL capture is required on a successful match. Parsing errors retain the existing unavailable-content path. |
+| YouTube (12 calls) | JavaScript URL/hash, signature, throttling and view-count patterns require the groups they read. Function arguments can be empty but their capture participates. Dynamic function names are quoted when building the relevant patterns. |
+| SoundCloud (2 calls) | Client-ID and direct API-URL branch captures participate on every successful match. An empty client-ID capture is possible but is not null; this correction does not change discovery or ID selection. |
+| Timestamp helper (5 calls) | YouTube, Odysee and SoundCloud supply required outer captures. The four fixed inner patterns require digit captures. Existing absence/error behavior is unchanged. |
+
+`ParserTest` adds 12 offline regressions using real `Pattern`/`Matcher` calls
+and the actual regex-array helper, without a downloader. All 12 passed before
+the annotation change and after it: these are behavior-preservation checks,
+not evidence of a former runtime implementation failure. They distinguish
+optional and empty captures, group zero, substring matching, missing matches,
+invalid groups/patterns, empty pattern arrays, first-pattern null results and
+the regex-array caller's null retry. The baseline log/XML remain at
+`/tmp/pvcpipe-parser-baseline.log` and `/tmp/pvcpipe-parser-baseline.xml`;
+the focused correction run is `/tmp/pvcpipe-parser-focused.log`.
+
+A separate Kotlin 2.1.0 consumer probe on JDK 21 used `-Xjsr305=strict`.
+Against the baseline classes, five unsafe dereferences compiled and each threw
+`NullPointerException` for an unmatched capture. Against the corrected classes,
+the same source failed compilation with five nullable-receiver errors. A
+null-aware consumer compiled and handled all five null results successfully.
+Sources, compiler output and run logs remain in `/tmp/pvcpipe-parser-contract`.
+This demonstrates a source-contract change for Kotlin consumers; it is not a
+claim that existing service calls were crashing or a compiler-version matrix.
+
+`javap -c -s -p` output for `Parser` and its `RegexException` class was identical
+before/after after normalizing constant-pool indices. Executable instructions
+and method descriptors are preserved; exported annotation metadata changes.
+Javadoc passed on the final source (`/tmp/pvcpipe-parser-final-javadoc.log`),
+with 100 reported warnings in untouched sources and none reported for `Parser`.
+These were documentation-coverage warnings, not a warning-free Javadoc result.
+
+Separate caller finding: [`SoundcloudStreamLinkHandlerFactory.getId`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L47)
+uses group 1 of its API-URL pattern, which captures the resource kind rather
+than group 2's identifier. A standalone local probe returned `tracks` for
+`getId("https://api-v2.soundcloud.com/tracks/123/")`. The same probe found
+`acceptUrl` false and `fromUrl` rejecting that URL before ID extraction.
+This is a suspected direct-call ID-selection defect, not a nullability issue
+or evidence of an affected normal app flow. No HTTP request was made. The
+branch is unchanged; the probe source/output remain in
+`/tmp/pvcpipe-parser-contract/SoundcloudIdProbe.java` and
+`/tmp/pvcpipe-parser-contract/soundcloud-id-probe.log`.
+
+Adversarial self-review checked all overloads, null versus empty captures,
+first-match and pattern-order behavior, both regex-array overloads, exception
+ordering, consumer type checking and the complete source diff. A second pass
+checked the 24-call inventory, required-capture assumptions, source/binary
+compatibility distinctions, offline test selection and contradictory comments.
+There is no new null-to-empty normalization or caller fallback. These are
+self-reviews, not independent review, live-service tests or device evidence.
+No dependency, build value, service pattern, caller, UI string, legal notice or
+repository/device safety rule changed.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-parser-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection, along with Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds. |
+| JVM results | All 1,136 app tests and 663 offline extractor tests completed with no failures or errors; 3 extractor tests were skipped. The unchanged 3-test build-logic result was reused. The 12 new parser regressions passed both before and after the annotation correction. |
+| Consumer/API checks | The Kotlin probe rejected all five unsafe dereferences after the correction and successfully ran the null-aware client. Compiled instructions and method descriptors remained unchanged. Final Javadoc passed with 100 reported warnings in untouched sources; Android lint passed with zero errors and 59 existing warnings. |
+| Documentation and scope | All 223 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both parser/test source hashes matched through the passing gate. No APK was installed and no device, emulator or live streaming service was exercised. |

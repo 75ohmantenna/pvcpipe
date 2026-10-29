@@ -29,13 +29,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Regular-expression helpers using {@link Matcher#find()}, rather than whole-input matching.
  * <p>
- * Group helpers delegate to {@link Matcher#group(int)}. An unmatched optional group currently
- * yields null despite their {@code Nonnull} annotations, and an invalid group number propagates
- * {@link IndexOutOfBoundsException}; neither case is converted to {@link RegexException}.
+ * Group helpers delegate to {@link Matcher#group(int)}. An unmatched optional group yields null,
+ * and an empty participating group yields an empty string. An invalid group number propagates
+ * {@link IndexOutOfBoundsException} rather than {@link RegexException}.
  */
 public final class Parser {
 
@@ -69,10 +70,10 @@ public final class Parser {
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
-     * @return The matching group as a string.
+     * @return the matched group, or null if the optional capture did not participate
      * @throws RegexException if the pattern has no match in the input
      */
-    @Nonnull
+    @Nullable
     public static String matchGroup1(final String pattern, final String input)
             throws RegexException {
         return matchGroup(pattern, input, 1);
@@ -84,10 +85,10 @@ public final class Parser {
      *
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
-     * @return The matching group as a string.
+     * @return the matched group, or null if the optional capture did not participate
      * @throws RegexException if the pattern has no match in the input
      */
-    @Nonnull
+    @Nullable
     public static String matchGroup1(final Pattern pattern, final String input)
             throws RegexException {
         return matchGroup(pattern, input, 1);
@@ -100,10 +101,10 @@ public final class Parser {
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
      * @param group   zero for the whole match, or a positive capture-group number
-     * @return The matching group as a string.
+     * @return the matched group, or null if the optional capture did not participate
      * @throws RegexException if the pattern has no match in the input
      */
-    @Nonnull
+    @Nullable
     public static String matchGroup(final String pattern, final String input, final int group)
             throws RegexException {
         return matchGroup(Pattern.compile(pattern), input, group);
@@ -116,10 +117,10 @@ public final class Parser {
      * @param pattern The regex pattern to match.
      * @param input   The input string to match against.
      * @param group   zero for the whole match, or a positive capture-group number
-     * @return The matching group as a string.
+     * @return the matched group, or null if the optional capture did not participate
      * @throws RegexException if the pattern has no match in the input
      */
-    @Nonnull
+    @Nullable
     public static String matchGroup(@Nonnull final Pattern pattern,
                                     final String input,
                                     final int group)
@@ -129,6 +130,7 @@ public final class Parser {
 
     /**
      * Returns group 1 of the first pattern with a match in the input.
+     * A null capture from that match does not cause later patterns to be tried.
      *
      * @param patterns The array of regex patterns to match.
      * @param input    The input string to match against.
@@ -136,6 +138,7 @@ public final class Parser {
      *         optional group
      * @throws RegexException If no patterns match the input or if {@code patterns} is empty.
      */
+    @Nullable
     public static String matchGroup1MultiplePatterns(final Pattern[] patterns, final String input)
             throws RegexException {
         return matchMultiplePatterns(patterns, input).group(1);
