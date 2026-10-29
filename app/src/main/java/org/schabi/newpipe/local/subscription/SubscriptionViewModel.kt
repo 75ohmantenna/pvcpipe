@@ -17,7 +17,6 @@ import org.schabi.newpipe.local.subscription.item.FeedGroupCardGridItem
 import org.schabi.newpipe.local.subscription.item.FeedGroupCardItem
 import org.schabi.newpipe.local.subscription.item.Header
 import org.schabi.newpipe.util.DEFAULT_THROTTLE_TIMEOUT
-import org.schabi.newpipe.util.ServiceHelper
 import org.schabi.newpipe.util.ThemeHelper.getItemViewMode
 
 class SubscriptionViewModel(application: Application) : AndroidViewModel(application) {
@@ -60,7 +59,7 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
             buildList<Group> {
                 subscriptions.groupByTo(sortedMapOf()) { it.serviceId }
                     .forEach { (serviceId, channels) ->
-                        add(Header(ServiceHelper.getNameOfServiceById(serviceId)))
+                        add(Header(serviceId))
                         channels.forEach { entity ->
                             add(ChannelItem(entity.toChannelInfoItem(), entity.uid, ChannelItem.ItemVersion.MINI))
                         }

@@ -143,9 +143,18 @@ removes its heading.
 
 These are presentation sections, not new database records or custom feed
 groups. Custom groups can still contain channels from multiple services.
-Subscriptions from retired services remain grouped by their original IDs,
-with `<unknown>` headings; different retired IDs remain separate even though
-their labels match. The empty list retains its import/export hint.
+Subscriptions from retired or unknown services remain grouped by their original
+IDs. Their headings use the translatable format **Unavailable service (ID %1$d)**
+with the actual stored ID, so different unavailable services remain distinguishable.
+The new format has a default-English resource; its number is formatted using the
+bound view's UI resource locale. Supported services retain their registered names.
+The shared service-name helper's `<unknown>` fallback in other screens is unchanged.
+
+Headers resolve service labels when bound, expose accessibility-heading metadata
+through AndroidX compatibility APIs, and wrap without a two-line ellipsis limit.
+The same heading metadata applies to the general Subscriptions section title.
+These changes affect presentation only; section ordering, channel IDs and stored
+subscription data are unchanged. The empty list retains its import/export hint.
 
 ## Subscription import and export
 
