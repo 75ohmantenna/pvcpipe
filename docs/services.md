@@ -157,6 +157,18 @@ Comments addresses are still constructed as track addresses. These are parser
 and routing behaviors, not evidence that a remote ID exists or an endpoint is
 currently available.
 
+Host separators are literal dots in the stream, API-ID, channel, playlist and
+charts patterns. Their factory acceptance and `fromUrl` paths reject lookalike
+hosts, foreign subdomains, user-info authorities, explicit ports and trailing
+host dots before downloader access. Existing path and case-handling rules still
+apply; this is not general URL normalization. Framework Google redirect wrappers
+are unwrapped before the resulting SoundCloud target is validated.
+
+The widget resolver recognizes the literal `on.soundcloud.com` short-link
+host for HEAD lookup. It remains a resolution utility, not a URL acceptance
+gate; direct callers must validate their inputs. These checks do not impose an
+allowlist on HTTP redirect destinations or change downloader redirect policy.
+
 ## BitChute
 
 - Links: video, embed, torrent, channel and public playlist addresses on

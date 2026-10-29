@@ -18,7 +18,7 @@ public final class SoundcloudChartsLinkHandlerFactory extends ListLinkHandlerFac
             new SoundcloudChartsLinkHandlerFactory();
 
     private static final String URL_PATTERN =
-            "^https?://(www\\.|m\\.)?soundcloud.com/charts(/top|/new)?/?([#?].*)?$";
+            "^https?://(www\\.|m\\.)?soundcloud\\.com/charts(/top|/new)?/?([#?].*)?$";
 
     private SoundcloudChartsLinkHandlerFactory() {
     }

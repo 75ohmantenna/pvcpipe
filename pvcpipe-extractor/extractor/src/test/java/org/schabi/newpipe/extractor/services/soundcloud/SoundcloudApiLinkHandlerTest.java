@@ -10,13 +10,18 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.StreamingService.LinkType;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudCommentsLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudChannelLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudChartsLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudPlaylistLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.soundcloud.linkHandler.SoundcloudStreamLinkHandlerFactory;
 
 import javax.annotation.Nonnull;
@@ -26,6 +31,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,6 +50,9 @@ class SoundcloudApiLinkHandlerTest {
     private static final String MOBILE = "https://m.soundcloud.com/discover";
     private static final String WIDGET = "https://api-widget.soundcloud.com/resolve?url="
             + "https%3A%2F%2Fsoundcloud.com%2Ffixture-artist%2Ffixture-track"
+            + "&format=json&client_id=" + CLIENT_ID;
+    private static final String WIDGET_HTTP = "https://api-widget.soundcloud.com/resolve?url="
+            + "http%3A%2F%2Fsoundcloud.com%2Ffixture-artist%2Ffixture-track"
             + "&format=json&client_id=" + CLIENT_ID;
     private static final String EMBED = "https://w.soundcloud.com/player/?url="
             + "https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F123";
@@ -81,6 +90,7 @@ class SoundcloudApiLinkHandlerTest {
                                 + "</script>";
                         break;
                     case WIDGET:
+                    case WIDGET_HTTP:
                         if (widgetFailure != null) {
                             throw widgetFailure;
                         }
@@ -215,6 +225,138 @@ class SoundcloudApiLinkHandlerTest {
         assertSame(widgetFailure, error.getCause());
         assertFalse(comments.acceptUrl(PUBLIC));
         assertEquals(List.of(MOBILE, WIDGET, WIDGET), requests);
+    }
+
+    @ParameterizedTest
+    @MethodSource("untrustedUrls")
+    void untrustedHostsAreRejectedByFactoriesBeforeAnyRequest(final String url) throws Exception {
+        final var channels = SoundcloudChannelLinkHandlerFactory.getInstance();
+        final var playlists = SoundcloudPlaylistLinkHandlerFactory.getInstance();
+        final var charts = SoundcloudChartsLinkHandlerFactory.getInstance();
+        assertFalse(streams.acceptUrl(url));
+        assertFalse(comments.acceptUrl(url));
+        assertFalse(channels.acceptUrl(url));
+        assertFalse(playlists.acceptUrl(url));
+        assertFalse(charts.acceptUrl(url));
+        assertEquals(LinkType.NONE, SoundCloud.getLinkTypeByUrl(url));
+        assertThrows(ParsingException.class, () -> streams.getId(url));
+        assertThrows(ParsingException.class, () -> comments.getId(url));
+        assertThrows(ParsingException.class, () -> channels.getId(url));
+        assertThrows(ParsingException.class, () -> playlists.getId(url));
+        assertThrows(ParsingException.class, () -> streams.fromUrl(url));
+        assertThrows(ParsingException.class, () -> comments.fromUrl(url));
+        assertThrows(ParsingException.class, () -> channels.fromUrl(url));
+        assertThrows(ParsingException.class, () -> playlists.fromUrl(url));
+        assertThrows(ParsingException.class, () -> charts.fromUrl(url));
+        assertTrue(requests.isEmpty());
+    }
+
+    private static Stream<String> untrustedUrls() {
+        final Stream<String> web = Stream.of(
+                "soundcloudXcom", "www.soundcloudXcom", "m.soundcloud-com",
+                "soundcloud/com", "soundcloud?com", "soundcloud#com",
+                "soundcloud.com.evil.invalid", "evil.soundcloud.com",
+                "soundcloud.com@evil.invalid", "evil.invalid@soundcloud.com",
+                "soundcloud.com:443", "soundcloud.com.", "soundcloud%2ecom",
+                "soundcloud\u3002com")
+                .flatMap(authority -> Stream.of("/fixture-artist/fixture-track", "/fixture-artist",
+                        "/fixture-artist/sets/fixture-list", "/charts/new")
+                        .map(path -> "https://" + authority + path));
+        final Stream<String> api = Stream.of(
+                "api-v2.soundcloudXcom", "api-v2.soundcloud-com", "api-v2.soundcloud/com",
+                "api-v2.soundcloud?com", "api-v2.soundcloud#com",
+                "api-v2.soundcloud.com.evil.invalid", "api-v2.soundcloud.com@evil.invalid",
+                "evil.invalid@api-v2.soundcloud.com", "api-v2.soundcloud.com:443",
+                "api-v2.soundcloud.com.", "api-v2.soundcloud%2ecom", "api-v2.soundcloud\u3002com")
+                .map(authority -> "https://" + authority + "/tracks/123/");
+        final Stream<String> shortLinks = Stream.of(
+                "onXsoundcloud.com", "on.soundcloudXcom", "on-soundcloud.com",
+                "on.soundcloud.com.evil.invalid", "on.soundcloud.com@evil.invalid",
+                "evil.invalid@on.soundcloud.com", "on.soundcloud.com:443", "on.soundcloud.com.")
+                .map(authority -> "https://" + authority + "/Test123");
+        return Stream.concat(Stream.concat(web, api), shortLinks);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            PUBLIC, "http://soundcloud.com/fixture-artist/fixture-track",
+            "https://www.soundcloud.com/fixture-artist/fixture-track",
+            "https://m.soundcloud.com/fixture-artist/fixture-track",
+            "http://m.soundcloud.com/fixture-artist/fixture-track",
+            "HTTPS://WWW.SOUNDCLOUD.COM/FIXTURE-ARTIST/FIXTURE-TRACK"
+    })
+    void legitimateStreamHostsStillResolve(final String url) throws Exception {
+        assertTrue(streams.acceptUrl(url));
+        final var handler = streams.fromUrl(url);
+        assertEquals("123", handler.getId());
+        assertEquals(url, handler.getOriginalUrl());
+        assertEquals(PUBLIC, handler.getUrl());
+        assertEquals(List.of(MOBILE, url.startsWith("http:") ? WIDGET_HTTP : WIDGET, EMBED),
+                requests);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://soundcloud.com", "http://soundcloud.com",
+            "https://www.soundcloud.com", "https://m.soundcloud.com"})
+    void legitimateChannelPlaylistAndChartHostsRemainAccepted(final String base) throws Exception {
+        final String profile = base + "/fixture-artist";
+        final String playlist = base + "/fixture-artist/sets/fixture-list";
+        assertTrue(SoundcloudChannelLinkHandlerFactory.getInstance().acceptUrl(profile));
+        assertTrue(SoundcloudPlaylistLinkHandlerFactory.getInstance().acceptUrl(playlist));
+        assertTrue(SoundcloudChartsLinkHandlerFactory.getInstance().acceptUrl(base + "/charts/new"));
+        assertEquals(LinkType.CHANNEL, SoundCloud.getLinkTypeByUrl(profile));
+        assertEquals(LinkType.PLAYLIST, SoundCloud.getLinkTypeByUrl(playlist));
+        assertTrue(requests.isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://soundcloudXcom/fixture-artist/fixture-track",
+            "https://api-v2.soundcloudXcom/tracks/123/"})
+    void frameworkRedirectUnwrappingDoesNotBypassHostChecks(final String target) throws Exception {
+        final String wrapper = "https://www.google.com/url?sa=fixture&url="
+                + org.schabi.newpipe.extractor.utils.Utils.encodeUrlUtf8(target);
+        assertThrows(ParsingException.class, () -> streams.fromUrl(wrapper));
+        assertThrows(ParsingException.class, () -> comments.fromUrl(wrapper));
+        assertEquals(LinkType.NONE, SoundCloud.getLinkTypeByUrl(wrapper));
+        assertTrue(requests.isEmpty());
+    }
+
+    @Test
+    void legitimateFrameworkRedirectStillResolves() throws Exception {
+        final String wrapper = "https://www.google.com/url?sa=fixture&url="
+                + org.schabi.newpipe.extractor.utils.Utils.encodeUrlUtf8(PUBLIC);
+        final var handler = streams.fromUrl(wrapper);
+        assertEquals("123", handler.getId());
+        assertEquals(PUBLIC, handler.getUrl());
+        assertEquals(List.of(MOBILE, WIDGET, EMBED), requests);
+    }
+
+    @Test
+    void foreignTextInQueriesAndFragmentsDoesNotChangeTheHost() throws Exception {
+        assertTrue(streams.acceptUrl(PUBLIC + "?next=https://evil.invalid"));
+        assertTrue(streams.acceptUrl(PUBLIC + "#soundcloudXcom"));
+        final String api = API + "?next=https://evil.invalid";
+        assertEquals("123", streams.getId(api));
+        assertTrue(comments.acceptUrl(api));
+        assertTrue(requests.isEmpty());
+    }
+
+    @Test
+    void rawWidgetHelperDoesNotIssueHeadToALookalikeShortHost() throws Exception {
+        final List<Request> attempted = new ArrayList<>();
+        final IOException stopped = new IOException("controlled transport stop");
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws IOException {
+                attempted.add(request);
+                throw stopped;
+            }
+        });
+        final IOException error = assertThrows(IOException.class, () ->
+                SoundcloudParsingHelper.resolveIdWithWidgetApi("https://onXsoundcloudYcom/Test123"));
+        assertSame(stopped, error);
+        assertFalse(attempted.isEmpty());
+        assertTrue(attempted.stream().noneMatch(request -> "HEAD".equals(request.httpMethod())));
     }
 
     private Field save(final Class<?> owner, final String name) throws Exception {

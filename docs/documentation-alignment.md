@@ -1571,15 +1571,16 @@ does not establish comments support for those other resources. Stream `fromUrl`
 still rejects the API URLs tested here. Web comments acceptance still performs
 widget resolution and returns false for the controlled widget failure.
 
-Separate unresolved finding: the inherited API and ordinary web host patterns
-in [`SoundcloudStreamLinkHandlerFactory`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L17)
-leave the separator before `com` unescaped. A local probe parsed an ID from
+Separate finding at the API-ID checkpoint: the [former API and ordinary web host patterns](https://github.com/75ohmantenna/pvcpipe/blob/b91712f9771774000177c4571f8792b8636e7bce/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L17)
+left the separator before `com` unescaped. A local probe parsed an ID from
 `https://api-v2.soundcloudXcom/tracks/123/`, found comments acceptance true for
 that URL, and found stream acceptance true for
-`https://soundcloudXcom/fixture-artist/fixture-track`. This is a suspected
+`https://soundcloudXcom/fixture-artist/fixture-track`. This was a suspected
 host-validation defect, not intended support for those hosts. The patterns
-remain unchanged; there was no network request to either hostname. Probe
-source/output remain in `/tmp/pvcpipe-soundcloud-id-probes`.
+were unchanged by that correction; there was no network request to either
+hostname. Probe source/output remain in `/tmp/pvcpipe-soundcloud-id-probes`.
+The separately authorized [SoundCloud host follow-up below](#soundcloud-host-follow-up--2026-10-29)
+corrects the host literals and adds factory/service-routing regressions.
 
 Adversarial self-review checked capture participation and group numbering,
 direct versus inherited factory entry points, both acceptance paths, the app/
@@ -1597,3 +1598,76 @@ notice or repository/device safety rule changed.
 | JVM results | All 1,136 app tests and 688 offline extractor tests completed with no failures or errors; 3 extractor cases were skipped. The unchanged 3-test build-logic result was reused. All 25 new cases passed after the correction; the 9 baseline failures remain recorded separately. |
 | Lint | Zero errors and 59 existing warnings. No reported issue points to either changed Java file. |
 | Documentation and scope | All 225 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both implementation/test source hashes matched through the passing gate. No APK was installed and no device, emulator or live streaming service was exercised. The lookalike-host finding above remains unresolved. |
+
+### SoundCloud host follow-up — 2026-10-29
+
+Started from clean `master` at `b91712f9771774000177c4571f8792b8636e7bce`,
+on branch `fix-soundcloud-host-validation`. Current host behavior and its
+boundaries are described in [Services](services.md#soundcloud).
+
+The stream factory's ordinary/API patterns used wildcard dots inside hostnames.
+The channel, playlist and charts patterns had the same ordinary-host issue;
+leaving them unchanged would still let SoundCloud service detection select a
+route for some lookalikes. The widget resolver's short-link classifier also
+used wildcard dots. Its three production callers validate through the stream,
+channel or playlist factories first. Channel-tab routing delegates to the
+channel factory. These call paths were traced from implementation.
+
+Six patterns in five production files now use literal dots. No captures,
+identifier rules, path expressions, schemes, case-handling flags, client-ID
+discovery, request builders or service IDs changed. The stream factory's
+short-link predicate already had literal dots; the resolver's classifier now
+agrees on the hostname spelling. This does not add general URL normalization
+or new support for ports, trailing host dots or additional subdomains.
+
+The offline factory suite was extended from 25 to 116 cases. Before production
+edits, 37 failed and 79 passed, with no errors or skips. The failing cases exposed
+lookalike/reserved-separator acceptance, decoded wrapper targets reaching
+resolution and a raw lookalike short hostname triggering HEAD classification.
+The baseline log/XML remain at `/tmp/pvcpipe-soundcloud-host-baseline.log` and
+`/tmp/pvcpipe-soundcloud-host-baseline.xml`. After the literal-dot changes all
+116 cases passed, with Checkstyle; log `/tmp/pvcpipe-soundcloud-host-focused.log`.
+The original 25 ID/routing cases and their assertions are retained.
+
+The added matrix includes 76 untrusted web/API/short-shaped inputs. It checks
+stream, comments, channel, playlist and charts acceptance, the SoundCloud
+service's link-type selection, direct ID extraction where it validates input,
+and each factory's inherited `fromUrl` path. Rejected cases leave the strict
+synthetic downloader's request list empty. Coverage includes wildcard
+substitutions, path/query/fragment separators in authority-shaped text,
+userinfo, misleading prefixes/suffixes, explicit ports, trailing dots and
+encoded/Unicode separators. Framework wrapper cases also check the decoded
+target before resolution.
+
+Positive controls cover HTTP/HTTPS, bare/www/mobile web hosts, ordinary mixed
+case, channel/playlist/charts acceptance, legitimate framework wrappers,
+foreign text in a valid host's query/fragment, and the existing API-ID and
+short-link resolution paths. The fixture adds an explicit HTTP widget response;
+every other original response and request-sequence assertion is retained.
+Downloader, localization/country and client-ID cache state are saved/restored
+around each test, including the controlled transport-stop case.
+
+The raw widget resolver remains a resolution utility, not a factory acceptance
+gate. Its added classifier test supplies a transport that records and throws
+before I/O: it checks that a lookalike does not trigger HEAD, not that the raw
+utility rejects all foreign input before service lookup. The no-request
+rejection claims above apply to factory entry points and service routing.
+HTTP redirect destinations and downloader redirect policy are unchanged; no
+redirect allowlist or live network/HTTP transport was tested. No account,
+Android device, emulator or UI flow was exercised.
+
+Adversarial self-review compared all hostname literals, capture counts and path
+expressions, then checked each validator and delegated route against its
+callers. A second pass reviewed wrapper unwrapping, user-info and separator
+tricks, valid-host controls, fixture request accounting and exact global-state
+restoration. It also checked the distinction between factory rejection and raw
+resolver/transport behavior. These are self-reviews, not independent review.
+Only host separators change in production; no interface, ID rule, dependency,
+build value, UI string, legal notice or repository/device safety rule changed.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-soundcloud-host-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | All 1,136 app cases passed. The offline extractor suite reported 779 cases: 776 passed and 3 were skipped, with no failures or errors. This includes all 116 focused routing cases. The unchanged 3-test build-logic result was reused. The 37 failing baseline cases remain recorded separately above. |
+| Lint | Zero errors and 59 existing warnings. No reported issue points to a changed Java source file. |
+| Documentation and scope | All 226 local Markdown links and 9 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. All six implementation/test source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no external URL availability, live service, HTTP transport, device, emulator or receiver was tested. |
