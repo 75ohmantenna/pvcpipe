@@ -706,7 +706,7 @@ otherwise, they are source-level findings without a new Android reproduction.
 | Orphan cleanup omitted permanent-thumbnail references at the audited revision | The [former `StreamDAO.deleteOrphans`](https://github.com/75ohmantenna/pvcpipe/blob/0c7df4bd8210883f22c0e7d3465808029a55328d/app/src/main/java/org/schabi/newpipe/database/stream/dao/StreamDAO.kt#L110) checked history, playlist contents and feed only. [`PlaylistEntity`](../app/src/main/java/org/schabi/newpipe/database/playlist/model/PlaylistEntity.kt#L27) stores a thumbnail stream ID without a foreign key; [`getPlaylistMetadata`](../app/src/main/java/org/schabi/newpipe/database/playlist/dao/PlaylistStreamDAO.kt#L99) looks the image up in that stream row. The audit's synthetic SQLite probe removed a row referenced only by a permanent thumbnail, making the image lookup null; that was SQL-boundary evidence, not an Android/Room or rendered-image test. The [thumbnail-retention follow-up below](#thumbnail-retention-follow-up--2026-10-28) adds the missing reference check and behavioral regressions. |
 | Parser nullability did not match annotations at the audited revision | The [former `Parser.matchGroup`](https://github.com/75ohmantenna/pvcpipe/blob/ce6f17429af09ee9478631e04c3eb3169deb9e4d/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/utils/Parser.java#L122) delegated to `Matcher.group`. The audit's JVM probe returned null for an unmatched optional capture, accepted group zero and propagated `IndexOutOfBoundsException` for a nonexistent group. That documentation-only pass changed no signatures or callers. The separately authorized [parser nullability follow-up below](#parser-nullability-follow-up--2026-10-29) corrects the return annotations while preserving matching behavior. |
 | SAF exception cleanup could stop early at the audited revision | The [former `FileStreamSAF.close`](https://github.com/75ohmantenna/pvcpipe/blob/3115e79a2c71a73db910a4797bd858c10ff1f0d3/app/src/main/java/us/shandian/giga/io/FileStreamSAF.java#L110) grouped all closes in one try and marked disposed first. An early IOException skipped later explicit closes; the audit did not test actual descriptor/provider consequences. The separately authorized [SAF close follow-up below](#saf-close-follow-up--2026-10-29) adds failure-safe cleanup and regression coverage. |
-| Seek-option error path has no label fallback | [`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L135) adds a value before plural lookup but appends no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android. |
+| Seek-option label fallback was missing at the audited revision | The [former `VideoAudioSettingsFragment.updateSeekOptions`](https://github.com/75ohmantenna/pvcpipe/blob/235aa1fba0942e11255790d03972a8c23c6cd24e/app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java#L133) added a value before plural lookup but appended no label on `NotFoundException`. Bundled default plurals exist; the comment formerly promising an English fallback was inaccurate. A resource failure could leave the arrays misaligned, but was not reproduced on Android during that audit. The separately authorized [seek-label follow-up below](#seek-duration-label-follow-up--2026-10-29) reproduces the error path with controlled resource failures under Robolectric and adds the static-label fallback. |
 
 The separate inherited cast initial-source-start concerns under
 [active-cast checkpoint attribution](playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23)
@@ -1750,3 +1750,74 @@ device safety rule changed.
 | JVM results | All 1,136 app cases passed. The offline extractor suite reported 810 cases: 807 passed and 3 were skipped, with no failures or errors. This includes all 147 focused routing cases. The unchanged 3-test build-logic result was reused. The 25 failing baseline cases remain recorded separately above. |
 | Lint | Zero errors and 59 existing warnings. No reported issue points to either changed Java file. |
 | Documentation and scope | All 231 local Markdown links and 12 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both implementation/test source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no external URL availability, live service, HTTP transport, device, emulator or receiver was tested. |
+
+### Seek-duration label follow-up — 2026-10-29
+
+Started from clean `master` at `235aa1fba0942e11255790d03972a8c23c6cd24e`,
+on branch `fix-seek-duration-label-fallback`. Current settings behavior is
+covered in [Playback](playback.md#seek-interval-settings).
+
+`VideoAudioSettingsFragment.updateSeekOptions` appended a duration value before
+resolving its plural label, then swallowed `Resources.NotFoundException` without
+appending a label. A missing label therefore shifted later labels relative to
+their values, or left an empty label array while the value array stayed populated.
+The settings XML initially supplies the static descriptions and values; the
+update runs during preference creation and after inexact-seek changes. The
+player reads the saved duration through `PlayerHelper`; its seek routing and
+decoder policy were inspected but are unchanged by this correction.
+
+The new `SeekDurationOptionsTest` invokes the actual private update method with
+controlled `Resources` results under Robolectric on API 26. AndroidX
+`ListPreference`, `PreferenceManager` and an isolated Android preference store
+are real within that environment. The fragment is a spy with resource, context,
+manager and preference lookup supplied by the fixture. This is a method-level
+regression, not full settings-screen inflation or real resource/locale failure.
+
+Before production edits, 10 cases ran: 3 passed and 7 failed, with no errors or
+skips. Failures showed missing/shifted labels for first, middle, last and all
+plural failures, including filtered choices and selection replacement. The
+baseline log/XML remain at `/tmp/pvcpipe-seek-label-baseline.log` and
+`/tmp/pvcpipe-seek-label-baseline.xml`. An initial harness compile error and two
+later Checkstyle line-length errors were corrected separately; those logs remain
+at `/tmp/pvcpipe-seek-label-harness-compile.log` and
+`/tmp/pvcpipe-seek-label-style-first.log`. They are harness/style failures, not
+additional runtime defect reproductions.
+
+The update now uses the existing `seek_duration_description` entry at the
+original source index when plural lookup throws `NotFoundException`. It keeps
+that source index across filtering, so retained 10/20/30-second values receive
+their corresponding labels. The static array is read only on the error path;
+normal plural lookup and formatting are unchanged. The resource array comment
+now describes its fallback role. Its values, all other resource text and XML
+attributes remain unchanged, verified by comparing parsed XML with the base.
+All six maintained labels pair with the six values. This relies on that paired
+configuration; it does not introduce recovery for a missing or malformed
+static array or for unrelated formatting exceptions.
+
+All 10 focused cases then passed with Checkstyle; log/XML remain at
+`/tmp/pvcpipe-seek-label-focused.log` and `/tmp/pvcpipe-seek-label-focused.xml`.
+
+Coverage includes successful plural lookup, individual and total label failures,
+inexact filtering with localized and fallback labels, skipped label lookups for
+filtered values, preservation of valid saved selections, the existing 15-to-20
+and 25-to-30-second persistence changes, and rebuilding both arrays when toggling
+modes. The actual `ListPreference.getEntry` result is checked against the stored
+value. Toast text is observed through Robolectric's shadow; the fixture supplies
+its text and the labels, so these cases do not validate packaged translations
+or rendered UI. No emulator, device, receiver or live service was exercised.
+
+Adversarial self-review checked source versus filtered indices, exception scope,
+partial and total failure, real preference persistence, repeated updates and
+successful-label controls. A second pass compared the full production/resource
+diff, confirmed that static labels are loaded only on the failure path, and
+checked the current guide against callers and defaults. These are self-reviews,
+not independent review. No dependency, build value, service ID, preference key,
+resource text, legal notice or repository/device safety rule changed.
+
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-seek-label-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | All 1,146 app cases passed, including all 10 focused regressions. Gradle reused the unchanged offline extractor result: 810 cases, 807 passed and 3 skipped, with no failures or errors. The unchanged 3-test build-logic result was also reused. The 7 failing baseline cases remain recorded separately above. |
+| Lint | Zero errors and 59 existing warnings. No reported issue points to a changed implementation, test or resource file. |
+| Documentation and scope | All 233 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Parsed resource XML retained all values and attributes. All three implementation/test/resource source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no device, emulator, receiver or live service was exercised. |

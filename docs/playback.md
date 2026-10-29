@@ -26,6 +26,22 @@ stream types do not need rebuilding merely to toggle video. Preloading the
 queue, expiring loaded items and managing the timeline belong to
 `MediaSourceManager`, not here.
 
+## Seek interval settings
+
+Video/audio settings offer 5–30 seconds in 5-second steps, with a 10-second
+default. Inexact seek is off by default. When enabled, the settings screen
+filters out 5, 15 and 25 seconds and advances a selected filtered value by
+5 seconds, saving the replacement and showing the existing toast.
+This filter is an inherited workaround, not a measurement of decoder accuracy.
+
+[`VideoAudioSettingsFragment.updateSeekOptions`](../app/src/main/java/org/schabi/newpipe/settings/VideoAudioSettingsFragment.java)
+prefers labels from `R.plurals.seconds`. If plural lookup throws
+`Resources.NotFoundException`, it uses the corresponding static label from
+`seek_duration_description`, indexed before filtering. The maintained static
+labels are English and are paired with `seek_duration_value`; normal Android
+locale fallback still happens within resource lookup. Preference values,
+defaults and player seek routing are unchanged by this label fallback.
+
 ## Media3 sessions and service
 
 The app uses AndroidX Media3 ExoPlayer and one `MediaLibrarySession` hosted by
