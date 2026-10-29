@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity
+            android:name="org.schabi.newpipe.local.subscription.SubscriptionHeaderRenderingActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <activity
             android:name="org.schabi.newpipe.error.ReportingGrantReceiverActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />

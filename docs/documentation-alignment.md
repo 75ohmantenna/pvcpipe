@@ -123,8 +123,11 @@ addresses its raw progress interpolation with a complete translatable format and
 UI-locale numbers. Subscription headers still receive
 an untranslated `<unknown>` for retired IDs through `ServiceHelper`, and
 `subscription_header.xml` / `Header.kt` do not mark them as accessibility headings.
-Distinct fallback names and heading navigation need a focused design and TalkBack
-check; accessibility impact is inferred, not a device observation from this pass.
+Distinct fallback names and heading navigation needed a focused design and TalkBack
+check; accessibility impact was inferred, not a device observation from this pass.
+The separately authorized [subscription-heading follow-up below](#subscription-headings--2026-10-29)
+adds distinguishable resource labels and heading metadata; its verification is
+reported separately from this older audit.
 
 ## Validation boundaries
 
@@ -722,7 +725,7 @@ comments were corrected.
 | Surface | Proposal and status |
 | --- | --- |
 | Report-prompt setting wording | The [former title and summary](https://github.com/75ohmantenna/pvcpipe/blob/d3341d61a6acd2b9c5ac272cecc2c06a8d9410fc/app/src/main/res/values/strings.xml#L912) implied a broader collection switch than [`ErrorUtil`](../app/src/main/java/org/schabi/newpipe/error/ErrorUtil.kt#L204) implements. The audit proposed describing hidden screens/notifications, independent local capture/ACRA collection, and removing the generic risk warning in a separately scoped UI change. The authorized [report-prompt wording follow-up below](#report-prompt-setting-wording--2026-10-29) now applies that correction. |
-| [`ServiceHelper.getNameOfServiceById`](../app/src/main/java/org/schabi/newpipe/util/ServiceHelper.kt#L102) and [`subscription_header.xml`](../app/src/main/res/layout/subscription_header.xml) | The existing untranslated `<unknown>` heading for retired services remains. Consider localized, distinguishable retired-service labels and accessibility heading semantics, with a dedicated rendering/TalkBack check. |
+| Subscription service headings | The [former header binding](https://github.com/75ohmantenna/pvcpipe/blob/1f255eaf28243638dc8fd2d7c0b2e81cafb31dfb/app/src/main/java/org/schabi/newpipe/local/subscription/SubscriptionViewModel.kt#L63) used the shared helper's untranslated `<unknown>` fallback for retired IDs. The [subscription-heading follow-up below](#subscription-headings--2026-10-29) adds distinguishable resource labels and heading metadata specifically for these sections. Other callers of `ServiceHelper.getNameOfServiceById` retain their existing fallback. |
 
 ### Verification of this follow-up
 
@@ -1887,3 +1890,152 @@ debug and release inspections then passed. The probe remains at
 | Lint | Zero errors and 59 existing warnings. No reported issue points to the three edited strings. |
 | Packaged resources | AAPT2 verified both APKs' title, summary, updated notice clause and unchanged stored key. The switch binds to those resources and retains a false default. All inspected string values have only the default configuration. This is compiled-resource inspection, not UI rendering or collection/presentation-flow execution. |
 | Documentation and scope | All 234 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Parsed XML verified exactly three changed string contents, with every resource name/attribute and all other values preserved. A separate comparison verified that only the setting-reference clause changed within the reporting notice. The resource source hash matched its staged blob and working file through the passing gate and APK inspections. |
+
+### Subscription headings — 2026-10-29
+
+Started from clean `master` at `1f255eaf28243638dc8fd2d7c0b2e81cafb31dfb`,
+on branch `fix-unavailable-subscription-headings`. The FCast source-start concern
+remains deferred. Current subscription presentation is described in
+[Library data](library-data.md#subscriptions-tab).
+
+The subscription view model grouped records by their persistent service ID but
+passed the shared helper's `<unknown>` text into each unavailable-service header.
+Different retired IDs therefore produced separate sections with identical raw,
+untranslated labels. The header view was bold but had no heading metadata, and
+its two-line ellipsis limit could hide the identifying suffix in constrained
+layouts. These observations came from implementation, not the old audit alone.
+
+Service sections now pass the original ID into `Header`. At binding time it
+retains registered names for supported services, or uses the complete
+`subscription_unavailable_service` resource with that ID. Resource formatting
+uses the bound view's UI locale. The new format has a default-English resource;
+no new prose translations are claimed. It says unavailable rather than assigning
+invented service names to arbitrary unknown IDs. `Header` also keeps its string
+constructor for the existing general Subscriptions section title. Both forms
+set heading metadata with `ViewCompat`, and the layout wraps without the former
+two-line/ellipsis limit. The shared `ServiceHelper` and its other callers are
+unchanged. Service registration, retired IDs, grouping/sorting and database
+entities, schemas and writes are unchanged.
+
+`SubscriptionHeadingTest` runs the real view model's reactive grouping and the
+real header binding under Robolectric API 26. Manager construction and resource
+labels are controlled doubles; it does not open a subscription database or load
+the packaged header XML. Ten baseline cases ran before production edits: four
+passed and six failed, with no errors or skips. Failures covered retired and
+arbitrary unknown labels, bound-view locale/rebinding, recycled labels and
+heading metadata. The baseline log/XML remain at
+`/tmp/pvcpipe-subscription-heading-baseline.log` and
+`/tmp/pvcpipe-subscription-heading-baseline.xml`. An initial harness compile error
+was corrected separately; its log is
+`/tmp/pvcpipe-subscription-heading-harness-compile.log`.
+
+The final focused suite has eleven passing cases, including the additional
+existing string-constructor regression. It checks all registered names, retired
+IDs 2/3/4, unknown/negative/maximum IDs, sorted sections and original channel UIDs,
+unchanged entity snapshots, last-channel removal, the empty case, resource locale
+on rebind, view recycling and API 26 compatibility-node heading metadata. The
+focused log/XML remain at `/tmp/pvcpipe-subscription-heading-focused-final.log`
+and `/tmp/pvcpipe-subscription-heading-focused.xml`. The focused command also
+passed Checkstyle/ktlint and built the debug and instrumentation APKs. Initial
+line-length issues in the new rendering fixture were corrected separately;
+`/tmp/pvcpipe-subscription-heading-style-first.log` preserves that failed check.
+
+Emulator checks use the standard `AndroidJUnitRunner` through direct, selected
+instrumentation. No Gradle connected-test installation/cleanup task is used.
+`SubscriptionHeaderDeviceTest` requires emulator hardware, the debug package and
+an explicit host marker. It inflates production resources and checks native
+nodes, UI-locale formatting and constrained large-font layout without database
+writes. Its optional focus assertion requires an expected heading and keeps
+TalkBack enabled rather than suppressing accessibility services. The native-node
+check waits for the rendered package and label, excluding the launcher's YouTube
+icon. The optional focus probe emits `WAITING_FOR_TALKBACK_HEADING` and waits for
+host-driven navigation; starting instrumentation can close the test-APK host, so
+the host launches that fixture after the readiness message.
+
+`SubscriptionHeaderRenderingActivity` lives only in the test APK and rejects
+physical hardware. Because that APK runs in a separate process, the fixture
+loads the production header and binding through the installed debug APK's class
+loader. It renders the actual header/layout, with synthetic channel rows, rather
+than copying the implementation. It is a rendering fixture, not the full
+Subscriptions screen, a database migration test or a live service observation.
+
+The Android CLI created a fresh `small_phone` AVD from its official API 36.1
+Google Play profile. Its initial cold boot did not become ready within the CLI
+wait while Gradle builds were active; it was stopped. The second boot followed
+the first release gate, with that newly created AVD configured for 2 GiB RAM and
+two virtual CPUs. The attached physical Pixel is excluded from all installation and
+instrumentation commands. No cause of the initial emulator readiness failure
+is claimed as an application defect.
+
+Adversarial self-review traced every header constructor caller, preserved the
+general section title, kept the global helper outside this change, and checked
+persistent IDs, ordering, locale rebinding and compatibility-node metadata. A
+second pass checked resource formatting, recycling, long-label truncation and
+the emulator/runner/data isolation boundaries. These are self-reviews, not
+independent review. No dependency, build value, preference key, service ID,
+license/attribution or repository/device safety rule changed.
+
+The second cold boot also exceeded the CLI's readiness wait, but the emulator
+subsequently reached `sys.boot_completed=1`. First-boot OS/startup ANRs included
+an initial target-process bind-application ANR before any tests ran. The failed
+instrumentation log remains at
+`/tmp/pvcpipe-subscription-heading-device-tests.log`; it is not a test pass.
+Later harness iterations exposed detached-node inspection, a launcher-icon
+text collision, package filtering and fixture-start timing. They also exposed
+an active CLI layout-inspector automation connection blocking another
+`UiAutomation` registration. The corrected checks inspect window-backed nodes,
+wait for the fixture, and stop only the emulator's CLI inspector before direct
+instrumentation. These harness failures remain in the
+`/tmp/pvcpipe-subscription-heading-*.log` files. No application fix was made to
+hide them. Two attempted ktlint task names were absent; the configured
+`runKtlint` task was then used. A subsequent wrapping failure was corrected
+before the instrumentation APK was rebuilt.
+
+Screenshot inspection verified default labels, Arabic-locale numeric IDs and
+the complete maximum integer ID wrapping onto three lines at 200% font size
+and 220 dp width. The Arabic case verifies numeric formatting with an English
+fallback, not an Arabic prose translation or full RTL screen behavior. The
+artifacts include `/tmp/pvcpipe-subscription-heading-arabic.png` and
+`/tmp/pvcpipe-subscription-heading-large-id.png`. Earlier screenshots captured
+first-boot OS ANR dialogs; those remain observations of that emulator session.
+The installed debug APK's SHA-256 matched the built debug APK. The test host
+was excluded from both main APK manifests.
+
+On this API 36.1 emulator, preinstalled TalkBack 16.0.0.777931756 ran with its
+Headings reading control selected. Hardware-level touchscreen gestures through
+the emulator console moved from the general title through YouTube to ID 2 in
+two gestures, and to ID 3 in three gestures in a separate run. These moves
+skipped the intervening channel rows.
+Injected ADB input and keyboard attempts did not establish that navigation;
+the gesture sequence and focus assertions did. Separate synchronized probe
+runs passed for `Unavailable service (ID 2)` and `Unavailable service (ID 3)`.
+Each required enabled TalkBack, the fixture package, matching accessibility
+focus text and native-node heading metadata. Logs are
+`/tmp/pvcpipe-subscription-heading-talkback-id2-synchronized.log`,
+`/tmp/pvcpipe-subscription-heading-talkback-id3-synchronized.log` and
+`/tmp/pvcpipe-subscription-heading-talkback-focus-evidence.txt`. An earlier
+snapshot probe read TalkBack settings after instrumentation closed the fixture;
+its failure remains at `/tmp/pvcpipe-subscription-heading-talkback-id2-test.log`.
+
+The emulator's interactive accessibility timeout was temporarily increased to
+keep the reading-control overlay visible during screenshot inspection. That
+setting, the original disabled TalkBack state and the empty per-test-app locale
+list are restored after validation. The unrelated screenshot-description consent
+dialog was canceled. The owned AVD is stopped after testing. The connected physical Pixel was not targeted. This evidence covers
+the production header and XML in a synthetic test host, not a full Subscriptions
+screen, actual subscription persistence, speech quality, another Android engine
+or physical hardware/service behavior.
+
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | Final `make ci` passed; log `/tmp/pvcpipe-subscription-heading-final-ci.log`. All 12 sanitizer tests passed and all 685 fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | Final gate reused unchanged reports: all 1,157 app cases passed, including the 11 focused heading cases; the offline extractor suite reported 810 cases, 807 passed and 3 skipped; all 3 build-logic cases passed. No failures or errors. These counts are JVM evidence, not device results. |
+| Lint | Zero errors and 59 existing warnings. No issue points to the new string or edited code; existing warnings elsewhere in `strings.xml` remain. |
+| Emulator assertions | The final instrumentation APK passed all four selected packaged-label, UI-locale, window-backed-node and constrained-font tests. Log `/tmp/pvcpipe-subscription-heading-device-tests-final.log`. Two separately selected synchronized TalkBack focus probes also passed, one each for IDs 2 and 3. The final fixture build passed Checkstyle/ktlint and `assembleDebugAndroidTest`; log `/tmp/pvcpipe-subscription-heading-synchronized-focus-build.log`. No connected-test Gradle task, package uninstall or app-data clear was used. |
+| Packaged resources | AAPT2 verified the new format and absence of the former header `maxLines`/`ellipsize` attributes in both main APKs, resolving the optimized release layout through its resource table. The rendering activity is absent from both main manifests. The final gate reused those unchanged APK outputs. These compiled-resource checks complement the emulator fixture; they do not establish full-screen/device coverage. |
+| Documentation and scope | All 235 local Markdown links and 9 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. XML comparison verified exactly one appended string and only the two intended layout-attribute removals, plus the final newline. All eight source/resource/test hashes match their working files and staged blobs through the final gate; the two documentation files record the scope and evidence. |
+
+The final review found no additional product defect within this change. The
+shared service helper's fallback elsewhere remains outside this presentation
+change, and the FCast source-start concern remains explicitly deferred.
