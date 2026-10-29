@@ -16,13 +16,13 @@ public final class SoundcloudStreamLinkHandlerFactory extends LinkHandlerFactory
     private static final String ON_URL_PATTERN = "^https?://on\\.soundcloud\\.com/[0-9a-zA-Z]+$";
     private static final Pattern URL_PATTERN = Pattern.compile(
         "^https?://(?:www\\.|m\\.)?"
-        + "soundcloud.com/[0-9a-z_-]+"
+        + "soundcloud\\.com/[0-9a-z_-]+"
         + "/(?!(?:tracks|albums|sets|reposts|followers|following)/?$)[0-9a-z_-]+/?(?:[#?].*)?$"
         + "|" + ON_URL_PATTERN
         );
 
     private static final Pattern API_URL_PATTERN = Pattern.compile(
-        "^https?://api-v2\\.soundcloud.com"
+        "^https?://api-v2\\.soundcloud\\.com"
         + "/(tracks|albums|sets|reposts|followers|following)/([0-9a-z_-]+)/"
         );
 

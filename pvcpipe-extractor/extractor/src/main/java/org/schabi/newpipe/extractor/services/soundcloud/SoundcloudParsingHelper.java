@@ -93,7 +93,7 @@ public final class SoundcloudParsingHelper {
     public static final String SOUNDCLOUD_API_V2_URL = "https://api-v2.soundcloud.com/";
 
     private static final Pattern ON_URL_PATTERN = Pattern.compile(
-        "^https?://on.soundcloud.com/[0-9a-zA-Z]+$"
+        "^https?://on\\.soundcloud\\.com/[0-9a-zA-Z]+$"
     );
 
     private SoundcloudParsingHelper() {

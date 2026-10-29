@@ -17,7 +17,7 @@ import javax.annotation.Nullable;
 public final class SoundcloudPlaylistLinkHandlerFactory extends ListLinkHandlerFactory {
     private static final SoundcloudPlaylistLinkHandlerFactory INSTANCE =
             new SoundcloudPlaylistLinkHandlerFactory();
-    private static final String URL_PATTERN = "^https?://(www\\.|m\\.)?soundcloud.com/[0-9a-z_-]+"
+    private static final String URL_PATTERN = "^https?://(www\\.|m\\.)?soundcloud\\.com/[0-9a-z_-]+"
             + "/sets/[0-9a-z_-]+/?([#?].*)?$";
 
     private SoundcloudPlaylistLinkHandlerFactory() {
