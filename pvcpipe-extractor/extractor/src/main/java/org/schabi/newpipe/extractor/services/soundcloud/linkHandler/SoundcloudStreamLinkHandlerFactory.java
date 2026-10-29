@@ -23,7 +23,7 @@ public final class SoundcloudStreamLinkHandlerFactory extends LinkHandlerFactory
 
     private static final Pattern API_URL_PATTERN = Pattern.compile(
         "^https?://api-v2\\.soundcloud\\.com"
-        + "/(tracks|albums|sets|reposts|followers|following)/([0-9a-z_-]+)/"
+        + "/tracks/([0-9a-z_-]+)/"
         );
 
     private SoundcloudStreamLinkHandlerFactory() {
@@ -46,8 +46,7 @@ public final class SoundcloudStreamLinkHandlerFactory extends LinkHandlerFactory
     @Override
     public String getId(final String url) throws ParsingException, UnsupportedOperationException {
         if (Parser.isMatch(API_URL_PATTERN, url)) {
-            // Group 1 is the resource kind; group 2 is its identifier.
-            return Parser.matchGroup(API_URL_PATTERN, url, 2);
+            return Parser.matchGroup1(API_URL_PATTERN, url);
         }
         Utils.checkUrl(URL_PATTERN, url);
 

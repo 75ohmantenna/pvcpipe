@@ -1571,6 +1571,10 @@ does not establish comments support for those other resources. Stream `fromUrl`
 still rejects the API URLs tested here. Web comments acceptance still performs
 widget resolution and returns false for the controlled widget failure.
 
+The later [resource-kind follow-up](#soundcloud-api-resource-follow-up--2026-10-29)
+rejects non-track API resources. The results and limitations above describe the
+earlier API-ID checkpoint; its failures and inherited behavior remain historical.
+
 Separate finding at the API-ID checkpoint: the [former API and ordinary web host patterns](https://github.com/75ohmantenna/pvcpipe/blob/b91712f9771774000177c4571f8792b8636e7bce/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L17)
 left the separator before `com` unescaped. A local probe parsed an ID from
 `https://api-v2.soundcloudXcom/tracks/123/`, found comments acceptance true for
@@ -1671,3 +1675,78 @@ build value, UI string, legal notice or repository/device safety rule changed.
 | JVM results | All 1,136 app cases passed. The offline extractor suite reported 779 cases: 776 passed and 3 were skipped, with no failures or errors. This includes all 116 focused routing cases. The unchanged 3-test build-logic result was reused. The 37 failing baseline cases remain recorded separately above. |
 | Lint | Zero errors and 59 existing warnings. No reported issue points to a changed Java source file. |
 | Documentation and scope | All 226 local Markdown links and 9 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. All six implementation/test source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no external URL availability, live service, HTTP transport, device, emulator or receiver was tested. |
+
+### SoundCloud API resource follow-up — 2026-10-29
+
+Started from clean `master` at `db41fa8aa3e515065fbf4bf538bb4bbd5b0246fc`,
+on branch `fix-soundcloud-api-resources`. Current behavior is described in
+[Services](services.md#soundcloud).
+
+The [former API-ID branch](https://github.com/75ohmantenna/pvcpipe/blob/db41fa8aa3e515065fbf4bf538bb4bbd5b0246fc/pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L24)
+accepted `albums`, `sets`, `reposts`, `followers` and `following`, as well as
+`tracks`. The [comments factory](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudCommentsLinkHandlerFactory.java#L35)
+delegates ID extraction to that branch but always constructs a track-comments
+address. An album input could therefore select a different resource's track ID.
+The [service's URL overload](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/StreamingService.java#L305)
+passes through `fromUrl`, including Google-wrapper unwrapping, before creating
+the comments extractor. The app's `ExtractorHelper.getCommentsInfo` calls
+`CommentsInfo.getInfo(service, url)`, which uses that same service overload.
+These callers were traced from implementation; no UI flow was run.
+
+With the new negative cases and additional track-URL controls, the unchanged
+implementation reported 146 cases: 121 passed and 25 failed, with no errors or
+skips. Twenty failures covered direct, suffix, nested-path and Google-wrapped
+non-track inputs across the five inherited resource kinds. The other five ran
+the service's extractor through `getInitialPage`: each reached the synthetic
+mobile client-ID response and then `/tracks/123/comments`, although its input
+was a non-track resource. The fixture returned an empty comments collection and
+no exception. This demonstrates offline routing to a track address, not that a
+real album or track exists or that the live endpoint would return comments.
+The baseline log/XML remain at `/tmp/pvcpipe-soundcloud-resource-baseline.log`
+and `/tmp/pvcpipe-soundcloud-resource-baseline.xml`.
+
+The [API-ID branch](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/SoundcloudStreamLinkHandlerFactory.java#L24)
+now requires literal `tracks`. Removing the resource-kind
+capture leaves one required capture containing the identifier; extraction now
+uses `Parser.matchGroup1`. The comments factory's existing delegation then
+rejects the non-track API inputs before client-ID discovery or other downloader
+access. No comments request builder, stream acceptance method, web/short-link
+resolver, hostname rule or transport redirect policy changed. Raw `fromId` and
+prebuilt link handlers still trust their supplied IDs; this correction validates
+the URL entry points rather than adding resource provenance to raw identifiers.
+
+The final focused suite has 147 cases, all passing with Checkstyle; log/XML
+`/tmp/pvcpipe-soundcloud-resource-focused.log` and
+`/tmp/pvcpipe-soundcloud-resource-focused.xml`. The earlier tests expecting
+non-track IDs and comments acceptance were replaced with track-only controls;
+all six original ID spellings still have positive coverage. The 25 new negative
+cases assert rejection before any downloader request, through direct getters,
+acceptance, `fromUrl` and the service where applicable. An additional positive
+Google-wrapped track-API case verifies canonical comments routing. Six valid
+track forms exercise the service through an empty initial page, preserving
+HTTP/HTTPS, comments suffixes, query strings and fragments. Existing host,
+web/short-link, controlled-failure and global-state-restoration coverage remains.
+The downloader fixture and responses are unchanged.
+
+The API pattern still requires a slash after the identifier and accepts a
+prefix before additional path components; this is not complete suffix
+validation or general URL normalization. Existing identifier grammar and case
+handling remain. The tests use the real parser, factories, service and comments
+extractor with a strict synthetic downloader, not a live HTTP transport.
+No device, emulator, receiver, account or live-service observation is claimed.
+
+Adversarial self-review checked the removed capture against the selected group,
+all callers of the shared getter, factory acceptance versus direct getters,
+wrapper unwrapping, nested paths and the early no-request rejection boundary.
+A second pass compared the production diff and test expectations, checked valid
+track and existing web/short-link controls, and separated the current guide from
+the preserved historical evidence. These are self-reviews, not independent review.
+No dependency, build value, service ID, UI string, legal notice or repository/
+device safety rule changed.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-soundcloud-resource-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | All 1,136 app cases passed. The offline extractor suite reported 810 cases: 807 passed and 3 were skipped, with no failures or errors. This includes all 147 focused routing cases. The unchanged 3-test build-logic result was reused. The 25 failing baseline cases remain recorded separately above. |
+| Lint | Zero errors and 59 existing warnings. No reported issue points to either changed Java file. |
+| Documentation and scope | All 231 local Markdown links and 12 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Both implementation/test source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no external URL availability, live service, HTTP transport, device, emulator or receiver was tested. |

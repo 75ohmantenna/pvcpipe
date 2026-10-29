@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.schabi.newpipe.extractor.NewPipe;
@@ -118,12 +117,10 @@ class SoundcloudApiLinkHandlerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"tracks,123", "albums,456", "sets,abc_123-z", "reposts,789",
-            "followers,42", "following,99"})
-    void existingApiKindsReturnTheirIdentifierThroughBothFactories(final String kind,
-                                                                  final String id)
+    @ValueSource(strings = {"123", "456", "abc_123-z", "789", "42", "99"})
+    void trackApiIdsAreReturnedThroughBothFactories(final String id)
             throws Exception {
-        final String url = "https://api-v2.soundcloud.com/" + kind + "/" + id + "/";
+        final String url = "https://api-v2.soundcloud.com/tracks/" + id + "/";
         assertEquals(id, streams.getId(url));
         assertEquals(id, comments.getId(url));
         assertTrue(requests.isEmpty());
@@ -138,14 +135,24 @@ class SoundcloudApiLinkHandlerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"tracks", "albums", "sets", "reposts", "followers", "following"})
-    void existingApiAcceptanceDiffersBetweenStreamAndCommentsFactories(final String kind)
+    @MethodSource("validTrackApiUrls")
+    void trackApiAcceptanceStillDiffersBetweenStreamAndCommentsFactories(final String url)
             throws Exception {
-        final String url = "https://api-v2.soundcloud.com/" + kind + "/123/";
         assertFalse(streams.acceptUrl(url));
         assertThrows(ParsingException.class, () -> streams.fromUrl(url));
         assertTrue(comments.acceptUrl(url));
         assertTrue(requests.isEmpty());
+    }
+
+    @Test
+    void wrappedTrackApiStillBuildsTheCorrectCommentsPath() throws Exception {
+        final String wrapper = "https://www.google.com/url?sa=fixture&url="
+                + org.schabi.newpipe.extractor.utils.Utils.encodeUrlUtf8(API);
+        final var handler = comments.fromUrl(wrapper);
+        assertEquals("123", handler.getId());
+        assertEquals(API, handler.getOriginalUrl());
+        assertEquals(COMMENTS, handler.getUrl());
+        assertEquals(List.of(MOBILE), requests);
     }
 
     @Test
@@ -157,9 +164,10 @@ class SoundcloudApiLinkHandlerTest {
         assertEquals(List.of(MOBILE), requests);
     }
 
-    @Test
-    void serviceCommentsExtractorFetchesTheCorrectTrackPath() throws Exception {
-        final var extractor = SoundCloud.getCommentsExtractor(API);
+    @ParameterizedTest
+    @MethodSource("validTrackApiUrls")
+    void serviceCommentsExtractorFetchesTheCorrectTrackPath(final String url) throws Exception {
+        final var extractor = SoundCloud.getCommentsExtractor(url);
         assertEquals("123", extractor.getId());
         assertEquals(COMMENTS, extractor.getUrl());
         extractor.fetchPage();
@@ -168,6 +176,48 @@ class SoundcloudApiLinkHandlerTest {
         assertTrue(page.getErrors().isEmpty());
         assertFalse(page.hasNextPage());
         assertEquals(List.of(MOBILE, COMMENTS), requests);
+    }
+
+    private static Stream<String> validTrackApiUrls() {
+        return Stream.of(API, "http://api-v2.soundcloud.com/tracks/123/",
+                API + "comments?limit=5", API + "comments/?limit=5",
+                API + "?client_id=fixture", API + "comments#fixture");
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonTrackApiUrls")
+    void nonTrackApiUrlsAreRejectedBeforeResolution(final String url) throws Exception {
+        assertThrows(ParsingException.class, () -> streams.getId(url));
+        assertThrows(ParsingException.class, () -> comments.getId(url));
+        assertFalse(streams.acceptUrl(url));
+        assertFalse(comments.acceptUrl(url));
+        assertThrows(ParsingException.class, () -> streams.fromUrl(url));
+        assertThrows(ParsingException.class, () -> comments.fromUrl(url));
+        assertThrows(ParsingException.class, () -> SoundCloud.getCommentsExtractor(url));
+        assertEquals(LinkType.NONE, SoundCloud.getLinkTypeByUrl(url));
+        assertTrue(requests.isEmpty());
+    }
+
+    private static Stream<String> nonTrackApiUrls() {
+        return Stream.of("albums", "sets", "reposts", "followers", "following")
+                .flatMap(kind -> {
+                    final String base = "https://api-v2.soundcloud.com/" + kind + "/123/";
+                    return Stream.of(base, base + "comments?limit=5", base + "tracks/456/",
+                            "https://www.google.com/url?sa=fixture&url="
+                                    + org.schabi.newpipe.extractor.utils.Utils.encodeUrlUtf8(base));
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"albums", "sets", "reposts", "followers", "following"})
+    void nonTrackApiCannotFetchUnrelatedTrackComments(final String kind) throws Exception {
+        final String url = "https://api-v2.soundcloud.com/" + kind + "/123/";
+        assertThrows(ParsingException.class, () -> {
+            final var extractor = SoundCloud.getCommentsExtractor(url);
+            extractor.fetchPage();
+            extractor.getInitialPage();
+        }, () -> "Requests made for non-track input: " + requests);
+        assertTrue(requests.isEmpty());
     }
 
     @Test
