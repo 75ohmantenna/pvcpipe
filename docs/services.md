@@ -143,19 +143,21 @@ in memory. A mobile-page socket timeout allows the desktop fallback; other
 interrupted I/O stops discovery. A subscription import takes a SoundCloud
 profile address and imports the channels that profile follows.
 
-The stream link factory's direct API-URL ID branch returns the identifier,
-not the resource kind. Its ordinary `fromUrl` path still rejects API URLs.
-The comments link factory delegates ID extraction to that branch and can build
-`/tracks/<id>/comments` addresses from matching API URLs. Web/short stream links
+The stream link factory's direct API-URL ID branch accepts only
+`api-v2.soundcloud.com/tracks/<id>/` prefixes and returns the track identifier.
+Its ordinary `fromUrl` path still rejects API URLs. The comments link factory
+delegates ID extraction to that branch and builds `/tracks/<id>/comments`
+addresses from matching API URLs. Non-track API resources are rejected before
+downloader access, including when a framework Google wrapper is unwrapped by
+`fromUrl` or the service's comments-extractor entry point. Web/short stream links
 still resolve through the widget/embed paths. Comments acceptance for web URLs
 can perform widget resolution and can fail when that resolution fails.
 
-The inherited API pattern requires a slash after the ID and can match a prefix
-before another path component. It also recognizes non-track resource kinds;
-the correction does not establish comments support for those resources.
-Comments addresses are still constructed as track addresses. These are parser
-and routing behaviors, not evidence that a remote ID exists or an endpoint is
-currently available.
+The API pattern still requires a slash after the ID and matches a prefix before
+further path components, including `comments`. It does not validate the entire
+suffix or normalize API URLs. The ID grammar, HTTP/HTTPS and existing case
+handling are unchanged. These are parser and routing behaviors, not evidence
+that a remote ID exists or an endpoint is currently available.
 
 Host separators are literal dots in the stream, API-ID, channel, playlist and
 charts patterns. Their factory acceptance and `fromUrl` paths reject lookalike
