@@ -21,6 +21,8 @@ import java.nio.channels.FileChannel;
  * on the document provider. The capability methods report the adapter's operations, not a
  * successful probe of the provider. {@code setLength} truncates and does not extend a file.
  * Reads and writes share the descriptor position. Concurrent access requires caller ordering.
+ * Closing attempts every wrapper and the owning descriptor, logging I/O failures. The closed
+ * flag records a close attempt, not proof that every resource released successfully.
  */
 public class FileStreamSAF extends SharpStream {
 
@@ -40,7 +42,7 @@ public class FileStreamSAF extends SharpStream {
             throw new IOException("Cannot get the ParcelFileDescriptor for " + fileUri);
         }
 
-        // Separate streams for reading and writing (bidirectional)
+        // These wrappers borrow the descriptor; the ParcelFileDescriptor owns it.
         in = new FileInputStream(file.getFileDescriptor());
         out = new FileOutputStream(file.getFileDescriptor());
         channel = out.getChannel(); // Channel for seek & truncate
@@ -108,13 +110,10 @@ public class FileStreamSAF extends SharpStream {
 
     @Override
     public void close() {
-        try {
-            disposed = true;
-
+        disposed = true;
+        // Reverse declaration order keeps the owning descriptor last, even after failure.
+        try (file; out; in) {
             channel.close();
-            in.close();
-            out.close();
-            file.close();
         } catch (IOException e) {
             Log.e("FileStreamSAF", "close() error", e);
         }
