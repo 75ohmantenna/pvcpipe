@@ -36,8 +36,15 @@ logging toolkit, not a guarantee of an exact 30-second recording. The shared
 keep-last-files cleanup configuration uses threshold 10; it is not a fixed
 retention period or a guarantee that at most ten files exist at every instant.
 
-**Disable error reporting** gates reporting activity/notification presentation.
-It does not disable constructor-triggered capture or ACRA initialization.
+**Hide error report prompts** stops new reporting screens, notifications and
+snackbars routed through `ErrorUtil`. It does not dismiss already-visible reports
+or notifications, disable constructor-triggered capture, or turn off ACRA
+initialization/crash collection. The saved `disable_error_reports` key and its
+default (`false`) are unchanged; this is a presentation preference, not a
+collection switch.
+Previously created notification or snackbar actions are not revoked and can
+still open a report.
+
 `App.initACRA` retains ACRA's default collection configuration rather than a
 stack-trace-only collection allowlist. Depending on its collectors, ACRA's local
 stored crash data can include device/build/configuration data, an installation

@@ -719,9 +719,9 @@ implemented protocol policy.
 No user-facing text or translation was changed, including in XML files whose
 comments were corrected.
 
-| Surface | Proposed follow-up |
+| Surface | Proposal and status |
 | --- | --- |
-| [`disable_error_reports_title` / `disable_error_reports_summary`](../app/src/main/res/values/strings.xml#L912) | Describe hiding report screens **and notifications**, and state that local capture/ACRA collection remain enabled separately. The title “Disable error reporting” can imply a broader collection switch than [`ErrorUtil`](../app/src/main/java/org/schabi/newpipe/error/ErrorUtil.kt#L204) implements. Remove unsupported generic risk language only in a separately scoped UI change. |
+| Report-prompt setting wording | The [former title and summary](https://github.com/75ohmantenna/pvcpipe/blob/d3341d61a6acd2b9c5ac272cecc2c06a8d9410fc/app/src/main/res/values/strings.xml#L912) implied a broader collection switch than [`ErrorUtil`](../app/src/main/java/org/schabi/newpipe/error/ErrorUtil.kt#L204) implements. The audit proposed describing hidden screens/notifications, independent local capture/ACRA collection, and removing the generic risk warning in a separately scoped UI change. The authorized [report-prompt wording follow-up below](#report-prompt-setting-wording--2026-10-29) now applies that correction. |
 | [`ServiceHelper.getNameOfServiceById`](../app/src/main/java/org/schabi/newpipe/util/ServiceHelper.kt#L102) and [`subscription_header.xml`](../app/src/main/res/layout/subscription_header.xml) | The existing untranslated `<unknown>` heading for retired services remains. Consider localized, distinguishable retired-service labels and accessibility heading semantics, with a dedicated rendering/TalkBack check. |
 
 ### Verification of this follow-up
@@ -1821,3 +1821,69 @@ resource text, legal notice or repository/device safety rule changed.
 | JVM results | All 1,146 app cases passed, including all 10 focused regressions. Gradle reused the unchanged offline extractor result: 810 cases, 807 passed and 3 skipped, with no failures or errors. The unchanged 3-test build-logic result was also reused. The 7 failing baseline cases remain recorded separately above. |
 | Lint | Zero errors and 59 existing warnings. No reported issue points to a changed implementation, test or resource file. |
 | Documentation and scope | All 233 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Parsed resource XML retained all values and attributes. All three implementation/test/resource source hashes matched their staged blobs and working files through the passing gate. No APK was installed; no device, emulator, receiver or live service was exercised. |
+
+
+### Report-prompt setting wording — 2026-10-29
+
+Started from clean `master` at `d3341d61a6acd2b9c5ac272cecc2c06a8d9410fc`,
+on branch `fix-error-report-prompts-wording`. The separately reported FCast
+source-start concern remains deferred. Current reporting behavior is described
+in [Error report diagnostics](error-reporting.md#local-collection-is-separate-from-attachment-consent).
+
+The old setting title, **Disable error reporting**, implied a broader switch
+than the implementation provides. Its summary mentioned screens only and added
+an unsupported generic warning about unexpected behavior. The title is now
+**Hide error report prompts**. The summary is **Stop showing new error report
+screens, notifications and snackbars. Does not disable local log capture or
+crash collection.** The in-app reporting notice uses the same setting name and
+names those presentation surfaces. Every other sentence in that notice remains
+unchanged, including its scope, collection, sharing and retention qualifications.
+
+Source review traced `ErrorUtil.openActivity`, `createNotification` and
+`showSnackbar` to the same preference check. Its sole production read is there;
+`extra_settings.xml` retains the same switch, `disable_error_reports` saved key
+and false default. `ErrorInfo` constructors trigger capture before presentation;
+`PvcLogcatDumper` reads the independent logcat preference, defaulting to true.
+`App.attachBaseContext` initializes ACRA without consulting the presentation
+switch, and `AcraReportSender` constructs ErrorInfo before calling `ErrorUtil`.
+No initialization, capture, display or sender implementation changed.
+
+The switch checks new presentation requests. It does not close an existing
+report or withdraw an existing notification/snackbar. Their previously created
+actions still open the report without rechecking the switch. These are observed
+source boundaries, not newly implemented revocation behavior or a broader
+privacy/collection guarantee. Existing dated references to the old title remain
+historical, linked to this current guide and follow-up.
+
+Only three default-English resource contents change: the setting title, summary
+and its setting-reference sentence in `reporting_notice_body`. No localized
+overrides for those three names were found in the checkout, and no new
+translations are claimed. Parsed XML comparison with the base verified that all
+resource names/attributes and every other value are unchanged. The preference
+XML and saved key/default are unchanged. No test assertion, dependency, build
+value, service ID, attribution or repository/device safety rule changed.
+
+Adversarial self-review checked presentation versus collection, the false
+default and existing stored key, already-created actions, the other reporting
+notice qualifications, and all locale/resource references. A second pass
+reviewed the complete resource/documentation diff for stale duplicate names,
+unsupported warnings and stronger privacy claims. These are self-reviews, not
+independent review. This text-only correction adds no tests that repeat the
+resource literals; existing checks and packaged-resource inspection provide the
+validation. No reporting/share flow was invoked and no report or captured log
+was sent. No emulator/device rendering or collection behavior was exercised.
+
+The temporary AAPT2 inspection initially failed to find the source XML path in
+the optimized release APK. Resolving `xml/extra_settings` through each APK's
+resource table corrected the probe; no application change was needed. Both
+debug and release inspections then passed. The probe remains at
+`/tmp/pvcpipe-report-prompts-check-apk.py`; resource/XML dumps remain under
+`/tmp/pvcpipe-report-prompts-{debug,release}-{resources,settings}.txt`.
+
+| Final verification | Result |
+| --- | --- |
+| Release gate | `make ci` passed; log `/tmp/pvcpipe-report-prompts-ci.log`. All 12 sanitizer tests passed and all 685 recorded fixtures passed privacy inspection. Checkstyle, ktlint, dependency ordering, lint and debug/release APK builds passed. |
+| JVM results | Gradle reused all unchanged JVM results: 1,146 app cases passed; the offline extractor suite reported 810 cases, 807 passed and 3 skipped, with no failures or errors; all 3 build-logic cases passed. No new tests or assertions were added for this text-only correction. |
+| Lint | Zero errors and 59 existing warnings. No reported issue points to the three edited strings. |
+| Packaged resources | AAPT2 verified both APKs' title, summary, updated notice clause and unchanged stored key. The switch binds to those resources and retains a false default. All inspected string values have only the default configuration. This is compiled-resource inspection, not UI rendering or collection/presentation-flow execution. |
+| Documentation and scope | All 234 local Markdown links and 10 source-line bounds passed across 21 tracked Markdown files. Changed-file spelling and diff whitespace checks passed. Parsed XML verified exactly three changed string contents, with every resource name/attribute and all other values preserved. A separate comparison verified that only the setting-reference clause changed within the reporting notice. The resource source hash matched its staged blob and working file through the passing gate and APK inspections. |
