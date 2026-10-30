@@ -149,9 +149,12 @@ class ErrorInfo private constructor(
     ) :
         this(throwables, userAction, request, info?.serviceId, info?.url)
 
+    /** Diagnostic value retained by JSON/Markdown exports; display code uses the context overload. */
     fun getServiceName(): String {
         return getServiceName(serviceId)
     }
+
+    fun getServiceName(context: Context): String = serviceNameForDisplay(getServiceName(), ContextCompat.getContextForLanguage(context))
 
     fun getMessage(context: Context): CharSequence {
         return message.getText(context)
@@ -162,7 +165,8 @@ class ErrorInfo private constructor(
         class ErrorMessage(
             @StringRes
             private val stringRes: Int,
-            private vararg val formatArgs: String
+            private vararg val formatArgs: String,
+            private val serviceNameFirst: Boolean = false
         ) : Parcelable {
             fun getText(context: Context): CharSequence {
                 // Ensure locale aware context via ContextCompat.getContextForLanguage() (just in case context is not AppCompatActivity)
@@ -170,9 +174,18 @@ class ErrorInfo private constructor(
                 return if (formatArgs.isEmpty()) {
                     ctx.getText(stringRes)
                 } else {
-                    // ContextCompat.getString() with formatArgs does not exist, so we just
-                    // replicate its source code but with formatArgs
-                    ctx.resources.getText(stringRes, *formatArgs)
+                    // Preserve the existing HTML formatter for styled text and links.
+                    // Resolve the service label now, rather than storing a translation.
+                    // Only the service slot is a label. Reasons and other arguments may contain
+                    // the diagnostic token too, and must retain their existing formatting.
+                    val args = if (serviceNameFirst) {
+                        formatArgs.mapIndexed { index, value ->
+                            if (index == 0) serviceNameForDisplay(value, ctx) else value
+                        }.toTypedArray()
+                    } else {
+                        formatArgs
+                    }
+                    ctx.resources.getText(stringRes, *args)
                 }
             }
         }
@@ -181,10 +194,10 @@ class ErrorInfo private constructor(
 
         const val YOUTUBE_IP_BAN_FAQ_URL = "https://newpipe.net/FAQ/#ip-banned-youtube"
 
-        private fun getServiceName(serviceId: Int?) = // not using getNameOfServiceById since we want to accept a nullable serviceId and we
-            // want to default to SERVICE_NONE
-            ServiceList.all().firstOrNull { it.serviceId == serviceId }?.serviceInfo?.name
-                ?: SERVICE_NONE
+        private fun getServiceName(serviceId: Int?) = ServiceList.all().firstOrNull { it.serviceId == serviceId }?.serviceInfo?.name
+            ?: SERVICE_NONE
+
+        private fun serviceNameForDisplay(name: String, context: Context): String = if (name == SERVICE_NONE) context.getString(R.string.unknown_service) else name
 
         // The hosts whose captcha the app can do something about: ReCaptchaActivity keeps
         // only YouTube's cookies, and DownloaderImpl sends them only to YouTube.
@@ -268,7 +281,8 @@ class ErrorInfo private constructor(
                             ErrorMessage(
                                 R.string.account_terminated_service_provides_reason,
                                 getServiceName(serviceId),
-                                reason
+                                reason,
+                                serviceNameFirst = true
                             )
                         }
                         ?: ErrorMessage(R.string.account_terminated)
@@ -298,7 +312,8 @@ class ErrorInfo private constructor(
                     ErrorMessage(
                         R.string.sign_in_confirm_not_bot_error,
                         getServiceName(serviceId),
-                        YOUTUBE_IP_BAN_FAQ_URL
+                        YOUTUBE_IP_BAN_FAQ_URL,
+                        serviceNameFirst = true
                     )
 
                 throwable is ContentNotAvailableException ->
@@ -313,7 +328,7 @@ class ErrorInfo private constructor(
                     if (solvableCaptchaUrl(throwable) != null) {
                         ErrorMessage(R.string.recaptcha_request_toast)
                     } else {
-                        ErrorMessage(R.string.too_many_requests, getServiceName(serviceId))
+                        ErrorMessage(R.string.too_many_requests, getServiceName(serviceId), serviceNameFirst = true)
                     }
 
                 // test this at the end as many exceptions could be a subclass of IOException

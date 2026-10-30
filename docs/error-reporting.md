@@ -90,6 +90,21 @@ clock; this change does not reconstruct missing historical event times.
 
 ## Report formatting and boundaries
 
+User-facing error messages and the report screen's Service field use the
+translatable `unknown_service` resource when the service ID is missing, retired
+or unsupported. Its default text is **Unknown service**. There are no bundled
+non-English overrides, so other locales currently use Android's English fallback.
+Supported service names are unchanged. [`ErrorInfo`](../app/src/main/java/org/schabi/newpipe/error/ErrorInfo.kt)
+resolves the fallback from the display context when rendering, including after
+parcel transport; constructing an error does not freeze a translated label.
+
+The no-argument `ErrorInfo.getServiceName()` remains the diagnostic name used by
+JSON and Markdown: unknown services still export `<unknown_service>`. The context
+overload is for display. The service argument in request-refusal, account-reason
+and sign-in messages is marked separately from other formatting arguments;
+exception reasons and unrelated arguments retain their existing HTML formatting.
+This is not general escaping or sanitization of exception text.
+
 Markdown includes Service once. JSON retains its single `service` field.
 Both formats retain user comments and report metadata. Public ErrorInfo
 constructors bound exception text through `PvcErrorInfoHelper`; JSON bounds it

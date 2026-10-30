@@ -101,8 +101,9 @@ below identify subsequent fixes. Resource keys refer to
 | `import_subscriptions_skipped` (plurals) | `SubscriptionImportWorker`; formerly started with “Imported.” even when no supported source entries were processed | Corrected in the [subscription-import follow-up](#subscription-import-presentation--corrected-2026-10-23): “Import finished.” plus the pluralized unsupported-service explanation; processed entries are not necessarily new subscriptions |
 
 Preserve `%1$s` as a positional service-name placeholder. The existing
-`<unknown_service>` fallback in `ErrorInfo.getServiceName` needs a separately
-localized fallback decision, not an English-only replacement. The subscription-import
+`<unknown_service>` fallback in `ErrorInfo.getServiceName` was left for a separate
+localized-fallback decision. The [2026-10-30 follow-up](#unknown-service-display-label--2026-10-30)
+adds the display resource while preserving the exported diagnostic value. The subscription-import
 follow-up preserves the skipped-entry quantity selection and uses positional `%1$d`;
 future translations need each locale's required plural forms. The proposed deletion
 message introduces `%1$s` for the filename
@@ -2592,3 +2593,135 @@ Final spelling, XML parsing, diff whitespace and local-link checks passed (251
 links and 10 source-line bounds across 21 tracked Markdown files). The frozen
 application/test inputs still match the tested build. Existing test assertions,
 legal notices and repository/device safety rules are unchanged.
+
+## Unknown-service display label — 2026-10-30
+
+This follow-up started from clean `master` at
+`348c9d4ee9ba3c482488de65512395bcfa00eb34`. Current behavior is described in
+[the error-reporting guide](error-reporting.md#report-formatting-and-boundaries).
+The change adds the translatable default-English `unknown_service` resource and
+a display-context overload of `ErrorInfo.getServiceName`. The report screen's
+Service field uses that overload; JSON and Markdown retain the no-argument
+diagnostic getter and `<unknown_service>` value. Missing, retired and unsupported
+IDs remain unchanged in the error data. No service IDs or supported names change.
+
+The three service-bearing formatted messages mark their first argument as a
+service label. It is resolved at rendering time, without mutating stored format
+arguments. Parcelable transport carries that marker; current-build round trips
+are tested, not cross-version parcel compatibility. Reasons and other arguments
+retain the existing HTML-formatting policy. No non-English resource overrides
+are bundled, so the actual French-context check uses Android's English fallback;
+the JVM's distinct locale labels below are controlled test resources, not
+translations.
+
+The first JVM harness could not load application resources under this checkout's
+Robolectric configuration. It was corrected to use controlled templates while
+retaining the actual HTML formatter. A known-name expectation also initially
+selected Android's `getText(id, default)` overload instead of the project's
+formatting extension; its call now uses an explicit argument-array spread.
+The final unchanged-code baseline produced three failures for omitted nullable
+service labels and one passing supported-name control. Logs and XML for these
+distinct attempts remain under `/tmp/pvcpipe-unknown-service-20261030/` as
+`red*`; the earlier harness failures are not behavioral baseline evidence.
+
+All nine focused JVM cases then passed. They cover each service-bearing message
+with null, negative, retired IDs 2/3/4 and unsupported IDs; all six supported names;
+unchanged diagnostic names and IDs; delayed English/French-context rebinding;
+parcel transport; a reason equal to the diagnostic token; and an unmarked
+non-service argument. These tests construct already-captured ErrorInfo fixtures
+without starting log capture. Their resources are controlled doubles and do not
+establish packaged text, activity rendering or export-builder behavior.
+The native tests cover those separate boundaries.
+
+Three guarded native methods passed on the owned AOSP AVD
+`pvcpipe_layout_api26_20261030`, Android 8.0/API 26, using the normal
+AndroidJUnitRunner and production DebugApp:
+
+| Native check | Observed result and limit |
+| --- | --- |
+| Missing, retired and invalid IDs after parcel transport | Seven synthetic errors reached the real report activity. Its message and Service field showed Unknown service; JSON and Markdown still contained the exact `<unknown_service>` diagnostic service value. The original nullable/integer IDs survived the parcel. |
+| Account reason and sign-in FAQ | The packaged account message retained the supplied reason, and the sign-in message retained its FAQ URL span. These are controlled exception fixtures, not live service failures. |
+| French context | The requested resource configuration was French; with no bundled translation, both label and message used the packaged default-English fallback. No actual French translation or saved per-app locale-switch journey was tested. |
+| Supported services | YouTube and Kick retained their names in the displayed field, message and both exports. JVM tests separately cover all six current services. |
+| Unmarked manual message | A manually supplied message resource survived the same native parcel path without acquiring a service formatting argument. |
+
+The native helper invokes the actual report builders and reads live activity
+views; it does not copy/share anything and rejects unexpected outgoing activity
+intents. Capture was disabled temporarily for these synthetic errors. Each method
+restored and checked the saved capture, report-prompt and background booleans.
+The fixtures require an explicit disposable argument, an exact debug/test package
+pair, emulator hardware, API 26 and a matching private host nonce marker. Debug
+and test APK updates verified their installed signing certificates before `-r`;
+the final installed SHA-256 values matched the tested artifacts:
+
+- Debug: `11b160ef6fd9596f7c272edfc8124c1166e4e7062a913bda0e87ece5577aa0f3`.
+- Test: `d4ff59b6b9a7ca40f922ffdda72bd876895586910650aae0e0d085b32df6fe1b`.
+
+Evidence is `/tmp/pvcpipe-unknown-service-20261030/native.log` and
+`native-result.json`. These are debug-APK emulator results, not physical-device,
+minified-device, TalkBack, screenshot/layout or live-service observations.
+
+To reproduce after building
+`./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest` and
+installing the matching pair in a [verified disposable environment](building.md#tests),
+use the actual owned AVD name and serial. Expect three passing tests and no skips;
+an ADB exit code alone is not a JUnit result.
+
+```sh
+set -e
+unknown_serial=emulator-5554
+unknown_avd=pvcpipe_layout_api26_20261030
+test "$(adb -s "$unknown_serial" emu avd name | tr -d '\r' | head -n 1)" = "$unknown_avd"
+test "$(adb -s "$unknown_serial" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+test "$(adb -s "$unknown_serial" shell getprop ro.build.version.sdk | tr -d '\r')" = 26
+unknown_nonce=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+adb -s "$unknown_serial" shell run-as org.seventyfiveohmantenna.pvcpipe.debug mkdir -p files
+printf '%s' "$unknown_nonce" | adb -s "$unknown_serial" shell run-as \
+  org.seventyfiveohmantenna.pvcpipe.debug tee files/unknown-service-label-allow
+adb -s "$unknown_serial" shell am instrument -w -r \
+  -e class org.schabi.newpipe.error.ErrorServiceLabelEmulatorTest \
+  -e serviceLabelDisposable true -e serviceLabelNonce "$unknown_nonce" \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Adversarial self-review traced message callers in the report activity, error
+panels, notifications, snackbars and router, plus both export builders. It checked
+that only the service argument is substituted, that rendering never caches a
+translation, and that current parcel transport preserves both marked and unmarked
+messages. An initial Kotlin test could not refer directly to the generated
+`CREATOR`; the fixtures now use platform parcel write/read transport. Ktlint
+reported expression-body layout/indentation issues, which were corrected.
+
+Final `make ci` passed: 12 sanitizer cases and 685 recorded fixtures needing no
+replacements, Checkstyle/ktlint/dependency-order checks, JVM tests, lint and both
+APK assemblies. The full app JVM task executed 1,208 passing cases with no
+failures or skips. The unchanged cached extractor reports have 807 passes and
+three skips; build logic has three cached passes. Lint reports zero errors and
+the same 59 warnings. The separate native APK build and all three selected native
+methods passed; the Makefile does not run instrumentation.
+
+Static inspection of the signed/minified release APK found the production
+application ID and the retained `unknown_service` resource with value Unknown
+service, and no test provider/instrumentation declaration. Its SHA-256 is
+`4fb457966cca16da6cccb368622cd5fa2578e137a0db4c250c6612227bb5b4eb`.
+This is artifact inspection, not minified-device execution. The final source
+hashes and debug/test APK bytes still match the native-tested inputs.
+Changed-file spelling, XML parsing, diff whitespace, documented shell syntax,
+264 local links and eleven source-line bounds across 21 tracked Markdown files
+passed. Existing assertions, dependencies, SDK/application-ID/version values,
+legal notices and repository/device safety rules are unchanged.
+
+All nine saved display/accessibility/animation settings matched after testing.
+The disposable debug/test packages were force-stopped and Android CLI stopped the
+owned emulator. Test preferences were restored with their original presence and
+values; fixtures/logs remain local for review. No connected Gradle device task,
+uninstall, app-data clear, physical-device operation or remote report submission
+was used.
+
+Separate pre-existing finding: the
+[`Loader.UnexpectedLoaderException` extraction branch](../app/src/main/java/org/schabi/newpipe/error/ErrorInfo.kt#L256)
+calls `getMessage` again with the same outer exception. The identical self-call
+is present in the starting revision. Static inspection suggests unbounded
+recursion if that branch is reached; this label change neither reproduces its
+runtime reachability nor changes exception unwrapping. It needs a separate
+targeted regression and correction. FCast source-start remains deferred.
