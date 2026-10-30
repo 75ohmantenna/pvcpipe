@@ -266,11 +266,11 @@ python3 tools/subscriptions_release_fixture.py check-export \
 
 Inspect the real list/grid, large-font headings and TalkBack's Headings navigation.
 Select the channel layout in Appearance → List view mode; the nearby channel-group
-button only changes group presentation. Recreate the screen after changing the
-channel layout and verify the actual result. Unsubscribe from the fixture's only
-ID-99 channel through its long-press dialog, force-stop the smoke app, and use a
-normal launcher start **before** another export. Check that export with the same
-command plus `--removed-service 99`. The checker compares every surviving UID and
+button only changes group presentation. Return normally from Settings and verify
+that the channel layout changes without restarting the app. Unsubscribe from the
+fixture's only ID-99 channel through its long-press dialog, force-stop the smoke
+app, and use a normal launcher start **before** another export. Check that export
+with the same command plus `--removed-service 99`. The checker compares every surviving UID and
 stored subscription field, checks other library tables remain empty, and runs
 SQLite `quick_check`, foreign-key and schema-metadata checks. It does not inspect
 private app files or deserialize the legacy Java settings entry.
@@ -282,7 +282,9 @@ native heading assertions in the debug suite. Restore the emulator's original
 display/accessibility/network settings, and never use uninstall or data clearing
 on an existing user installation. See the
 [dated release result](documentation-alignment.md#uninstrumented-release-subscriptions--2026-10-29)
-for tested artifacts, environment failures and limits.
+for tested artifacts, environment failures and limits, and the
+[layout-settings follow-up](documentation-alignment.md#subscriptions-layout-settings-return--2026-10-30)
+for the return-from-Settings correction.
 
 ## Versions
 
