@@ -26,7 +26,7 @@ make ci                      # checks and debug/release APKs
 
 [Build guide](docs/building.md) · [Documentation](docs/README.md)
 
-**Device tests can erase app data.** Follow the [safety procedure](docs/local-playlist-mutations.md#testing-on-an-existing-installation).
+**Device tests can erase app data.** Follow the [safety procedure](docs/building.md#testing-on-an-existing-installation).
 
 Forked from [BravePipe](https://github.com/bravepipeproject/BravePipe),
 based on [NewPipe](https://github.com/TeamNewPipe/NewPipe).

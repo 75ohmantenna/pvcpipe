@@ -49,7 +49,7 @@ public final class DownloaderImpl extends Downloader {
 
     /**
      * Supplies Odysee's website referrer for odysee.live and odycdn.com, including subdomains.
-     * See docs/odysee-observations.md for the media-host responses behind this policy.
+     * See docs/services.md#odysee for the policy and dated media-host evidence.
      *
      * @param url the address of a media request
      * @return the configured referrer, or {@code null} for other or invalid URLs

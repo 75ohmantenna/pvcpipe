@@ -50,7 +50,7 @@ the correction.
 
 The Room instrumentation tests live in
 `app/src/androidTest/java/org/schabi/newpipe/local/playlist/`. Follow
-[the device-safety procedure](local-playlist-mutations.md) before running them.
+[the device-safety procedure](building.md#testing-on-an-existing-installation) before running them.
 
 ## Bookmarks
 
@@ -80,18 +80,6 @@ IDs do not identify the same bookmark.
   recreated. This is process-local state: a failed draft is not stored for
   recovery after full fragment destruction or process death. Other remote
   playlist operations retain their own scheduling and metadata-update behavior.
-
-The focused JVM tests under
-`app/src/test/java/org/schabi/newpipe/local/bookmark/` distinguish actual Room
-transactions with native host SQLite from fragment-method tests with controlled
-adapters, rendering and persistence. They do not establish device lifecycle or
-storage durability guarantees.
-
-The separate [bookmark emulator suite](building.md#disposable-bookmark-validation)
-uses real views, fragment transitions and Android SQLite, with controlled queue
-gates and SQL failures. Its synthetic metadata uses local images. Dated results
-in [the alignment record](documentation-alignment.md) identify the tested revision
-and emulator; they do not establish physical-device or process-death durability.
 
 ## Feed refresh
 
@@ -312,98 +300,12 @@ Process-interruption tests and host filesystem syncs do not establish survival
 of arbitrary device power loss or storage failure. Future app migrations may
 also change compatibility.
 
-## Tests
+## Validation
 
-Unit tests, run by `make ci`:
-[`FeedRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedRefreshTest.kt),
-[`FeedErrorContextTest`](../app/src/test/java/org/schabi/newpipe/local/feed/service/FeedErrorContextTest.kt),
-[`SubscriptionTransferTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferTest.kt),
-[`BackupRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreTest.kt),
-[`BackupRestoreFailureTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupRestoreFailureTest.kt),
-[`BackupValidationTest`](../app/src/test/java/org/schabi/newpipe/settings/BackupValidationTest.kt),
-[`PendingDatabaseRestoreTest`](../app/src/test/java/org/schabi/newpipe/settings/PendingDatabaseRestoreTest.java),
-[`RestoreTransactionTest`](../app/src/test/java/org/schabi/newpipe/settings/export/RestoreTransactionTest.java)
-and [`RestoreStartupTest`](../app/src/test/java/org/schabi/newpipe/settings/RestoreStartupTest.kt).
-
-Instrumentation tests on a device, not in `make ci`:
-[`FeedRefreshDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/feed/service/FeedRefreshDatabaseTest.kt),
-[`SubscriptionTransferDatabaseTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/workers/SubscriptionTransferDatabaseTest.kt),
-[`BackupRestoreIntegrationTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreIntegrationTest.java)
-and
-[`BackupRestoreDialogTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/BackupRestoreDialogTest.java).
-The dialog tests use the real settings fragment, isolated archive/database files
-and preferences, and a counting restart callback rather than restarting the app.
-The archive/dialog workflow fixtures inject a no-op database validator for their
-text placeholders. `BackupValidationTest` separately exercises the production
-validator, Room migrations and native host SQLite under Robolectric API 26,
-with real files/preferences and controlled restart/report callbacks. Its version
-2–9 fixtures use exported Room schemas; the version-1 fixture is constructed from
-the inputs consumed by migration 1 → 2, since schema 1 is not exported.
-[building.md](building.md) says where it is safe to run them.
-
-`RestoreTransactionTest` uses actual host files, a controlled text-database
-validator and typed disk preferences. Child JVMs halt without cleanup at selected
-publication, activation, rollback and retirement checkpoints, then another JVM
-recovers the same files. `RestoreStartupTest` separately exercises production
-`App.attachBaseContext`, SQLite validation and Android preferences under
-Robolectric API 26; it uses controlled process-role/ACRA hooks and suppresses main-process
-`onCreate` initialization; its helper test calls the production early-return path. Its interrupted-commit case injects an `Error` in the
-same JVM. Neither suite establishes Android process scheduling, physical storage
-durability or hardware behavior.
-
-[`RestoreEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/settings/RestoreEmulatorTest.kt)
-adds host-driven Android phases with real SQLite databases, preferences and
-committed WAL-only data. The two restore choices use the production backup
-workflow, real settings dialog/system document picker and ProcessPhoenix restart,
-driven using Android CLI outside target instrumentation. Controlled filesystem checkpoints hold
-activation and rollback until the host sends SIGKILL; a fresh normal debug App
-then runs the inherited production startup recovery. A separate guarded fixture
-runner prevents startup from consuming those journals before the selected fault
-point. These tests replace the default database/preferences and require a new
-disposable emulator. They are separate from `make ci`; see
-[the build guide](building.md#disposable-restore-validation) for commands and
-the [dated record](documentation-alignment.md#restore-emulator-validation--2026-10-28)
-for observed results and limits.
-
-These tests exercise controlled workflow failures and local persistence.
-The feed and subscription Room tests supply extraction results rather than
-contacting services; they do not establish live extractor/network behavior
-or survival after Android kills the process.
-
-[`SubscriptionScreenEmulatorTest`](../app/src/androidTest/java/org/schabi/newpipe/local/subscription/SubscriptionScreenEmulatorTest.kt)
-and the guarded
-[`subscriptions_screen_validation.py`](../tools/subscriptions_screen_validation.py)
-driver exercise the production Subscriptions screen against the default on-disk
-Room database in an empty disposable emulator. They check list/grid rendering,
-heading metadata, constrained large-font text, host-driven TalkBack navigation,
-the real unsubscribe dialog and surviving records after fresh process starts.
-This suite seeds controlled local records; it supplies no extraction results or
-network/service evidence. It changes the selected emulator's library and three
-preferences, removes only its nonce-tagged records on cleanup, and restores the
-overrides. Do not run it on an existing user installation. Build/install the
-debug and standard-runner test APKs separately with Android CLI; use the driver's
-`--help` for required target/acknowledgement arguments and visual checkpoints.
-Observed results and limits belong to the
-[dated screen-validation record](documentation-alignment.md#production-subscriptions-screen--2026-10-29),
-separate from the earlier synthetic heading host.
-
-For a release journey without an application test runner, use the
-[uninstrumented subscriptions smoke procedure](building.md#uninstrumented-subscriptions-release-smoke).
-The host-only [`subscriptions_release_fixture.py`](../tools/subscriptions_release_fixture.py)
-prepares a controlled schema-9 backup and compares normal UI exports with its
-snapshot, including every stored subscription field and UID. Importing it
-replaces the selected installation's database/settings; use a fresh separate
-release package on a disposable emulator. The journey covers actual release
-rendering, visual TalkBack heading navigation, unsubscribe and export comparison
-after a normal cold launcher start. It does not inspect private database/WAL
-files or establish power-loss durability. Results and environment failures are
-kept in the [dated release record](documentation-alignment.md#uninstrumented-release-subscriptions--2026-10-29).
-
-[`SubscriptionLayoutRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/SubscriptionLayoutRefreshTest.kt)
-calls the production fragment's resume and data-rendering paths with real
-RecyclerView/Groupie objects, a minimal binding and controlled theme readings.
-It covers layout transitions, one-column grids, changed grid widths, unchanged
-resumes and data arriving before/after a mode change. This JVM test does not
-launch Settings or assert real-device layout; the normal minified release
-return-from-Settings journey is recorded in the
-[dated layout-settings follow-up](documentation-alignment.md#subscriptions-layout-settings-return--2026-10-30).
+`make ci` includes JVM tests for local data operations; some use real Room/native
+host SQLite, while fragment/rendering and persistence adapters may be controlled
+substitutes. Native suites and host drivers remain separate; see
+[building.md](building.md#controlled-validation-tools) and inspect isolation before
+execution. Backups do not include downloaded media or pending/finished download
+state, and neither process-interruption tests nor host filesystem sync establish
+arbitrary device power-loss durability.

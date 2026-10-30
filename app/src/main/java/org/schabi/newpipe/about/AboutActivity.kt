@@ -108,7 +108,7 @@ class AboutActivity : AppCompatActivity() {
          * project (for example AndroidX or LeakCanary) are represented by one entry. Copyright
          * dates come from the resolved version's notices/source headers, never the current year.
          * An empty date means no project-wide copyright date was established for this version.
-         * Evidence and exact artifact versions: docs/license-audit.json (2026-10-26).
+         * Evidence and exact artifact versions: docs/README.md#history (2026-10-26 audit).
          */
         private val SOFTWARE_COMPONENTS = arrayListOf(
             SoftwareComponent("ACRA", "2013", "Kevin Gaudin", "https://github.com/ACRA/acra", StandardLicenses.APACHE2, noticeFilename = "third_party/acra_notice.txt"),

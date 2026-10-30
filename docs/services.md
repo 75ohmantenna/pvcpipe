@@ -2,8 +2,8 @@
 
 A service is a website PVCPipe can browse and play from. This guide describes
 implemented extraction capabilities and their limits. Dated responses and
-live checks are recorded separately in [odysee-observations.md](odysee-observations.md)
-and [service-protocol-observations.md](service-protocol-observations.md).
+live checks are recorded separately in [odysee-observations.md](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/odysee-observations.md)
+and [service-protocol-observations.md](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/service-protocol-observations.md).
 
 ## How a service is put together
 
@@ -106,70 +106,22 @@ as `RumbleFiltersTest` and `OdyseeFiltersTest`, pin both.
 
 ## YouTube
 
-YouTube's general `Trending` page is no longer offered in the kiosk selector.
-YouTube [announced its retirement in July 2025](https://support.google.com/youtube/thread/356702168/changes-to-discovering-trending-content-on-youtube?hl=en).
-Live and the category feeds remain available as main-page tabs; the English
-movies-and-shows label is shortened to "Trending movies/shows".
-Settings migration 9 → 10 removes any dedicated YouTube `Trending` tabs that
-were added after the earlier retirement migration. Other tabs keep their
-order, including Odysee's `Trending`; if no custom tabs remain, the default
-main-page tabs are restored.
-
-`YoutubeStreamExtractor.onFetchPage` asks YouTube's Android client for a
-video first. If that client says the video is age-restricted, it asks the
-embedded web client. It then asks the visionOS client, and the iOS client if
-that is switched on. The app supplies proof tokens only through the
-web-client provider, not the embedded-web, Android or iOS providers
-(see [playback.md](playback.md)). If no client returns a player response,
-a restriction that one client reported is shown in preference to another
-client's network error.
-
-The app shows "YouTube refused to provide data and requires you to sign in"
-when the extractor throws `SignInConfirmNotBotException`. That happens when a
-player response says `login_required` with a reason that mentions "a bot"
-(`YoutubeStreamExtractor.checkPlayabilityStatus`).
-
-`YoutubeStreamInfoItemLockupExtractor` reads channel-card view counts from
-the metadata part marked `PLAY_ARROW_OUTLINED`, so creator credits before
-that part do not become the count. Cards without the marker use the older
-positional layout.
+YouTube's general Trending kiosk is retired; live and category feeds remain.
+Settings migration 9 → 10 removes dedicated general-Trending tabs, preserving
+other tabs and restoring defaults only when none remain.
+`YoutubeStreamExtractor` tries Android, an embedded-web fallback for age
+restriction, visionOS, and optionally iOS. The app supplies proof tokens only
+through the web-client provider; see [playback.md](playback.md#youtube-proof-tokens).
+A `login_required` response mentioning a bot becomes `SignInConfirmNotBotException`.
 
 ## SoundCloud
 
-SoundCloud is audio only. Client-id discovery first reads the mobile discovery
-page's `__NEXT_DATA__.runtimeConfig.clientId`; if that is absent or unavailable,
-it searches the desktop site's JavaScript assets. The discovered id is cached
-in memory. A mobile-page socket timeout allows the desktop fallback; other
-interrupted I/O stops discovery. A subscription import takes a SoundCloud
-profile address and imports the channels that profile follows.
-
-The stream link factory's direct API-URL ID branch accepts only
-`api-v2.soundcloud.com/tracks/<id>/` prefixes and returns the track identifier.
-Its ordinary `fromUrl` path still rejects API URLs. The comments link factory
-delegates ID extraction to that branch and builds `/tracks/<id>/comments`
-addresses from matching API URLs. Non-track API resources are rejected before
-downloader access, including when a framework Google wrapper is unwrapped by
-`fromUrl` or the service's comments-extractor entry point. Web/short stream links
-still resolve through the widget/embed paths. Comments acceptance for web URLs
-can perform widget resolution and can fail when that resolution fails.
-
-The API pattern still requires a slash after the ID and matches a prefix before
-further path components, including `comments`. It does not validate the entire
-suffix or normalize API URLs. The ID grammar, HTTP/HTTPS and existing case
-handling are unchanged. These are parser and routing behaviors, not evidence
-that a remote ID exists or an endpoint is currently available.
-
-Host separators are literal dots in the stream, API-ID, channel, playlist and
-charts patterns. Their factory acceptance and `fromUrl` paths reject lookalike
-hosts, foreign subdomains, user-info authorities, explicit ports and trailing
-host dots before downloader access. Existing path and case-handling rules still
-apply; this is not general URL normalization. Framework Google redirect wrappers
-are unwrapped before the resulting SoundCloud target is validated.
-
-The widget resolver recognizes the literal `on.soundcloud.com` short-link
-host for HEAD lookup. It remains a resolution utility, not a URL acceptance
-gate; direct callers must validate their inputs. These checks do not impose an
-allowlist on HTTP redirect destinations or change downloader redirect policy.
+SoundCloud is audio only. Client-ID discovery tries the mobile runtime config
+then desktop scripts; a mobile socket timeout permits fallback, other interrupted
+I/O stops it. The result is cached in memory. Account import reads public follows.
+API-ID extraction accepts track prefixes; non-track API resources and lookalike
+hosts are rejected before downloader access. Web/short links can require widget
+resolution. Read [the soundcloud implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/) before changing URL acceptance.
 
 ## BitChute
 
@@ -215,260 +167,52 @@ allowlist on HTTP redirect destinations or change downloader redirect policy.
 
 ## Odysee
 
-Odysee is a website on top of the LBRY network. Everything on it is a claim: a
-video, an audio file, a livestream page, a channel, a playlist or a repost.
-The extractor makes the requests the website makes for a visitor who is not
-signed in. They are all in
-[`OdyseeApi`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/odysee/OdyseeApi.java).
+`OdyseeApi` and the service's extractors use LBRY claims and Odysee endpoints;
+channel and stream URLs, listing results and playable media are distinct data.
+The implementation handles canonical/share addresses and resolves a claim before
+playback. A successful listing or resolve does not guarantee playable content.
 
-| Request | Host | Used for |
-| --- | --- | --- |
-| `resolve`, `claim_search`, `get` | `api.na-backend.odysee.com` | claims by address or id, lists, the media address |
-| `search` | `lighthouse.odysee.tv` | search, suggestions, fallback related videos |
-| `search` | `recsys.odysee.tv` | anonymous related videos |
-| `comment.List`, `reaction.List` | `comments.odysee.tv` | comments and their likes |
-| `reaction/list` | `api.odysee.com` | likes and dislikes of a video |
-| `user/new`, `file/view_count`, `subscription/sub_count` | `api.odysee.com` | the visitor token, view counts, follower counts |
-| `livestream/is_live`, `livestream/all` | `api.odysee.live` | who is on air |
-| `$/api/content/v2/get` | `odysee.com` | the channels behind the Featured kiosk |
+Live media and ordinary file media use different host paths. Stream selection,
+redirects, range handling and host-specific headers remain defined by the
+extractor/downloader rather than inferred from a web page. Paid/member content
+can be marked or filtered; metadata does not grant access. Optional viewer/follower
+count lookups register an anonymous visitor token, so local subscriptions should
+not be described as having no service-side requests. Counts can be unavailable.
 
-The implementation uses the request shapes in `OdyseeApi`. The development
-records describe the external references and live checks used to establish
-those shapes; they are evidence for the implementation, not an API contract.
+`DownloaderImpl.getMediaReferer` supplies Odysee's website referrer for
+`odysee.live` and `odycdn.com`, including their subdomains, not arbitrary hosts.
 
-The read-only `resolve` lookup retries once after a socket timeout, unless
-the thread is interrupted. A second timeout, other I/O failures and API or
-HTTP errors reach the caller. This does not change downloader timeouts or
-add retries to other Odysee operations. A persistently slow lookup can take
-two request timeouts before failing. When the retry fails, its exception
-retains the first timeout as suppressed diagnostic context (unless both
-attempts threw the same exception object).
-
-### Addresses
-
-[`OdyseeUrl`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/odysee/OdyseeUrl.java)
-reads addresses on `odysee.com`, `www.odysee.com`, `lbry.tv` and
-`open.lbry.com`: videos, channels, embed and download links, and playlists.
-
-A video's id is its website path, such as `@channel:c/video:a`. The API wants
-the same thing as `lbry://@channel#c/video#a`. The part after the colon is
-one to forty hexadecimal characters from the start of a claim id, or it may
-be missing, so one claim has several addresses. Lists use the address Odysee
-calls canonical. A channel that was opened by another address takes its
-canonical one once it is loaded, so that a subscription is the same whichever
-link it was made from. A video keeps the address it was opened with.
-
-### What is listed and played
-
-- A video offers the uploaded file and, where Odysee has transcoded it, its
-  HLS renditions. An audio claim offers its file as an audio stream.
-  Documents and images are not listed and do not open. There are no
-  subtitles.
-- An HLS master playlist states the peak bitrate of each rendition. The app
-  estimates the size of an HLS download from the bitrate, so a rendition is
-  given the average if the playlist states one and 85% of the peak otherwise,
-  the factor the Rumble extractor uses.
-- A stream claim without a file is a livestream page. It plays only while its
-  channel is on air with that claim. Otherwise the app says it is not
-  available. Once the publisher attaches a recording, the claim has a file
-  and is an ordinary video. A channel keeps the page of every livestream it ever announced,
-  so lists leave livestream pages out unless they are known to be on air. The
-  Live kiosk and a channel's Livestreams tab list them. Search and related
-  videos do not. A livestream shows how many are watching it.
-- A channel has Videos, Livestreams and Playlists tabs.
-- The Featured kiosk is the website's own featured row: recent uploads of a
-  list of channels that the website's homepage names. Trending is the
-  site-wide trending order. Both leave out mature and paid content.
-- Suggestions are titles from the first search results.
-- Related videos first use `recsys.odysee.tv` with the current claim id, title,
-  `free_only=true` and `nsfw=false`. A network, extraction or JSON-parsing
-  failure falls back to Lighthouse search. Cancellation stops the request.
-  Returned claim ids are resolved before the usual content filtering.
-- A repost counts as the claim it reposts.
-
-### Who published a claim
-
-A claim names its channel and carries a signature. The API marks a claim
-whose signature does not hold with `is_channel_signature_valid: false`.
-`OdyseeClaim.channel` treats such a claim as published by "Anonymous" and
-does not show it under the channel it names.
-
-### Paid, members-only and unlisted content
-
-Content requiring purchase, rental or membership is identified by tags
-(`c:purchase`, `c:rental`, `c:members-only`), an LBC fee or an authentication
-error from `get`. A livestream can also be marked protected in its live
-state. PVCPipe reports these as paid content. Kiosks omit them; search and
-channel lists show them
-unless "Hide paid content videos" is on.
-
-The publisher of an unlisted video shares it as a link that carries
-`signature` and `signature_ts`. The extractor passes both to `get`. The app
-stores a video's address without its query, so a video reopened from history
-has no signature, and the app then says the video opens only from its signed
-link.
-
-### View counts and follower counts
-
-`api.odysee.com` answers `file/view_count` and `subscription/sub_count` only
-for a request that carries an `auth_token`. The website gets one by
-registering an anonymous visitor for everyone who is not signed in, and
-[`OdyseeAuth`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/odysee/OdyseeAuth.java)
-does the same when `OdyseeSettings.SHOW_COUNTS` is on. Registering takes no
-name, address or password.
-
-- "Show Odysee view and follower counts" in the PVCPipe settings is on by
-  default. Switching it off deletes the token and stops the requests. A token
-  that comes back from a registration under way at that moment is discarded.
-- One token is registered when a count is first asked for. The app keeps it
-  in its preferences under `pvc_odysee_visitor_token_key`, so it does not
-  register a new visitor at every start. Like the rest of the preferences it
-  is part of a settings export.
-- The token is sent in the body of a `POST`, never in an address.
-- A token that Odysee refuses is replaced once. `OdyseeApi.callAccountApi`
-  identifies an authentication-error envelope, including in a 401 or 403
-  response. A 403 from something in front of Odysee that does not identify an
-  authentication error leaves the token alone.
-- If the new token is refused too, or registering fails, nothing more is
-  registered for ten minutes, and for twice as long after each further
-  failure, up to about ten hours. A registration that was abandoned because
-  the user left the page does not count as a failure.
-- Successful view and follower counts share a memory-only cache of at most
-  512 entries, keyed by endpoint and claim id. Entries expire five minutes
-  after insertion using a monotonic clock; reads do not extend their life.
-  Requests contain only cache misses, up to 100 distinct valid claim ids.
-  Clearing caches, forgetting the visitor token or replacing its store
-  invalidates entries and prevents earlier requests from repopulating them.
-- Each uncached list page requests view counts for its videos and follower
-  counts for its channels in separate batches. A video page asks for its own
-  views and its channel's followers. Uncancelled I/O, extraction or parsing
-  failures suppress count lookups for a minute, including cache reads. A
-  failed request for missing counts returns no counts for that call, even
-  if some were cached.
-- With the token Odysee can tell that the requests of one installation belong
-  together. Counts are an extra. A page opens the same without them, with the
-  numbers missing.
-
-### A video page
-
-`OdyseeStreamExtractor.onFetchPage` resolves the claim and checks that it is
-playable and free. A file claim then needs the media address from `get`.
-For video files, `fetchTranscodedStreams` follows a `HEAD` request and reads
-an HLS master if one is found; failure of that optional lookup leaves the
-uploaded file available. Audio files do not need that rendition lookup.
-A livestream instead needs its current live state and media address.
-
-Likes, the view count and the follower count are requested concurrently
-after the claim (and, for a livestream, its live state) is available. The
-page waits for those tasks as well as media preparation, so a slow optional
-request can delay it. A failure in an optional task leaves its numbers
-unknown rather than failing the page.
-
-### Media hosts
-
-The app supplies `Referer: https://odysee.com/` for media requests to
-`odycdn.com` and `odysee.live`, including their subdomains
-(`DownloaderImpl.getMediaReferer`). This covers the observed uploaded-media
-host `player.odycdn.com` and live-media host `cloud.odysee.live`, from the
-player, the downloader and the extractor downloader. The extractor downloader
-preserves an explicitly supplied referrer.
-
-The extractor uses `HEAD` on `player.odycdn.com` to discover HLS renditions:
-with the referrer, an uploaded file may redirect to a transcoded HLS master
-instead of describing the original file. The app therefore avoids `HEAD` for
-size probes on `odycdn.com` and its subdomains unless the URL path ends in
-`.ts` or `.m3u8`, ignoring case (`DownloaderImpl.isHeadUnusable`):
-
-- Where the downloader would use `HEAD`, it asks with `GET`. Where that
-  request would have asked for everything from a position on, it asks for one
-  byte, whose `Content-Range` gives the total
-  (`DownloadMission.openConnection`).
-- The size shown in the download dialog comes from the same kind of request
-  (`PvcDownloaderImplUtils.getContentLengthViaGet`).
-- URLs with `.m3u8` or `.ts` paths retain the ordinary `HEAD` size probe.
-
-An external player receives the media URL without PVCPipe's referrer header.
-[odysee-observations.md](odysee-observations.md) records what the hosts
-answered with and without it, and the HTTP 429 answers that kept uncached
-files from being checked.
+Read [the odysee implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/odysee/) for URL forms, claim/channel identity, pagination,
+visibility/count handling and media-host selection. The [baseline service guide](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/services.md#odysee)
+and [dated host observations](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/odysee-observations.md) preserve the detailed
+protocol findings; they do not establish current live availability.
 
 ## Kick
 
-Kick supports public live broadcasts and retained VODs without a service
-account. Channel search requests up to 50 results; suggestions request up to
-ten names. Channels expose Videos and Livestreams tabs and support local
-subscriptions. Featured is a single live-discovery list. These extractors
-do not create continuation pages when the endpoint supplies none.
+Kick supports public live broadcasts, retained VODs, channel search/suggestions,
+Featured discovery and local subscriptions. Channels have Videos and Livestreams
+tabs. `KickApi` defines the channel, fresh live playback URL, VOD, legacy-video,
+search and featured endpoints; extractors do not invent continuation pages.
 
-[`KickApi`](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/KickApi.java)
-uses the following public resources:
+Plain channel links open the current broadcast; channel `/videos` and `/about`
+links open the channel. Channel-scoped VOD links and older `/video/{uuid}` links
+are supported. Channel-scoped VOD lookup falls back to the legacy API only for
+404. Nonnegative VOD `t` offsets are read before canonicalization; invalid values
+fall back to zero and live playback ignores those recording offsets.
+Broadcast-specific `live` markers prevent an old feed/history entry from becoming
+a different broadcast. Subscription URLs remain channel Videos URLs.
 
-| Host and path | Purpose |
-| --- | --- |
-| `kick.com/api/v2/channels/{slug}` | channel metadata and current broadcast state |
-| `kick.com/api/v2/channels/{slug}/playback-url` | fresh signed live HLS master |
-| `web.kick.com/api/v1/channels/{id}/videos` | retained VOD list |
-| `web.kick.com/api/v1/channels/{id}/videos/{uuid}` | current VOD metadata and recording URL |
-| `kick.com/api/v1/video/{uuid}` | older shared VOD UUIDs |
-| `search.kick.com/api/v1/channels/search` | channel search and suggestions |
-| `web.kick.com/api/v1/livestreams/featured?language=en` | Featured |
+The internal live player uses the HLS master. External playback and VOD download
+selection can use combined HLS renditions. Ongoing recordings switch to live
+playback rather than being offered as finished downloads. Metadata/source caches
+are limited to one minute because live tokens expire quickly. A playback URL
+alone is not proof of live state; hidden or unknown viewer counts are omitted.
+Ordinary 403 responses are not challenges without challenge markers.
 
-Plain `kick.com/{slug}` links open the current broadcast; `/{slug}/videos`
-and `/{slug}/about` open the channel. VOD links use
-`/{slug}/videos/{uuid}`; older `/video/{uuid}` links are also understood.
-Some real legacy channel slugs begin with `@`; that character is preserved.
-Channel-scoped VOD lookup falls back to the older UUID API only after HTTP 404,
-not after a private, expired, blocked or malformed response. Older
-`/video/{uuid}` links use the legacy API directly.
-VOD links can include a nonnegative `?t=<seconds>` start offset. Extraction
-reads it from the original URL before canonicalization. Invalid or oversized
-values and encoded parameter-boundary lookalikes default to zero. Live playback
-ignores recording offsets.
-
-Live feed items and extracted live streams use
-`/{slug}?live={start-time-in-UTC-seconds}` as a broadcast-specific identity.
-The extractor preserves this marker and rejects a marked link when the
-current broadcast has a different start time. This keeps successive
-broadcasts distinct in feed/history storage. Subscription URLs remain
-`/{slug}/videos`. Reloading a channel's Livestreams tab fetches its current
-broadcast even when the tab handler is reused; the tab does not retain an old
-broadcast snapshot. Live start dates are retained for feed notification eligibility.
-
-Both live and VOD extraction expose combined audio/video HLS renditions,
-including URLs usable by the external-player chooser. The internal live
-player uses the master playlist. VOD download selections use rendition
-playlists, not the master. Ongoing broadcasts are omitted from the VOD tab;
-opening an ongoing recording link switches to live playback instead of
-offering an incomplete recording as a finished download.
-
-Kick information and loaded-source caching is limited to one minute because
-live playback tokens expire quickly. A playback URL alone does not prove
-that a channel is live. Viewer counts are omitted when visibility is false
-or unknown; legacy channel responses do not carry that visibility flag.
-Ordinary HTTP 403 errors are not treated as challenges without a challenge
-header or HTML markers.
-
-Artwork metadata follows known CDN URL conventions:
-
-- Live thumbnail filenames provide height, not width.
-- Converted uploader avatars provide width: 150 pixels for `medium`, 350 for
-  `fullsize`. Height stays unknown because avatars need not be square.
-- Current VOD previews receive an estimated **High** quality label without
-  inventing exact dimensions.
-- Original and unrecognized image URLs keep unknown dimensions and quality.
-
-This metadata requires no extra image requests. In the Description tab, `?`
-means an unknown image dimension, not a failed image load.
-
-Channel banners use the shared channel header: they fill its width without
-stretching and are center-cropped to fit the height cap. This also applies to
-other services, not just Kick.
-
-Clips, playlists, comments, live chat, subtitles and importing a Kick account's
-followed channels are not implemented. PVCPipe has no live-chat surface.
-Playback does not depend on a Pusher or Centrifugo connection. See the
-[dated protocol checks](service-protocol-observations.md#kick-follow-up--2026-10-18)
-for the observed transport negotiation and verification limits.
+Clips, playlists, comments, live chat, subtitles and account-follows import are
+not implemented. Playback has no Pusher/Centrifugo dependency. See
+[the kick implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/) and the [dated protocol record](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/service-protocol-observations.md#kick-follow-up--2026-10-18)
+for source/image details and the limits of earlier transport observations.
 
 ## Removed services
 
@@ -488,7 +232,7 @@ Database rows that carry a retired id are not deleted. This is what the app
 does with them:
 
 - Subscriptions, history entries, playlist entries and bookmarked playlists
-  stay listed, with `<unknown>` where the service name goes. Opening one shows
+  stay listed. Subscription headings identify the unavailable ID. Opening one shows
   "PVCPipe does not support this content yet", because `NewPipe.getService`
   throws `ContentNotSupportedException` for an id without a service.
 - A feed refresh leaves such subscriptions out (`FeedLoadManager`), so they

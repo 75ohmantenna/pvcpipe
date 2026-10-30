@@ -74,7 +74,7 @@ and `proxy` commands need no rewrite.
   task's installation and cleanup behavior, the test runner, and test database/data
   isolation. Do not assume `connectedDebugAndroidTest` preserves installations:
   in this repository it was observed uninstalling both the debug app and its test
-  package after testing. See `docs/local-playlist-mutations.md`.
+  package after testing. See `docs/building.md#testing-on-an-existing-installation`.
 - On an existing user installation, never run a test path that uninstalls packages
   or clears app data. If an update is needed, verify the installed package and
   signing compatibility before `adb -s <serial> install -r`; use targeted direct
