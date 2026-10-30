@@ -85,6 +85,7 @@ import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.StateSaver;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.views.FocusOverlayView;
+import org.schabi.newpipe.views.StatusBarBackground;
 
 import java.util.Objects;
 
@@ -161,6 +162,7 @@ public class MainActivity extends AppCompatActivity {
                 .getHeaderView(0));
         toolbarLayoutBinding = mainBinding.toolbarLayout;
         setContentView(mainBinding.getRoot());
+        StatusBarBackground.install(this);
         applyWindowInsets();
         getOnBackPressedDispatcher().addCallback(this, backCallback);
 
@@ -869,8 +871,8 @@ public class MainActivity extends AppCompatActivity {
             contentParams.setMargins(bars.left, toolbarHeight + bars.top, bars.right,
                     Math.max(bars.bottom, ime.bottom));
             mainBinding.fragmentHolder.setLayoutParams(contentParams);
-            drawerLayoutBinding.navigation.setPadding(bars.left, bars.top, bars.right,
-                    bars.bottom);
+            // NavigationView applies the top and bottom insets to its header and menu itself.
+            drawerLayoutBinding.navigation.setPadding(bars.left, 0, bars.right, 0);
             // The player container stays full bleed and handles its own insets.
             return windowInsets;
         });

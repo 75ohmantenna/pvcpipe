@@ -37,6 +37,7 @@ import org.schabi.newpipe.util.Localization
 import org.schabi.newpipe.util.ThemeHelper
 import org.schabi.newpipe.util.external_communication.ShareUtils
 import org.schabi.newpipe.util.text.setTextWithLinks
+import org.schabi.newpipe.views.StatusBarBackground
 
 /**
  * This activity is used to show error details and allow reporting them in various ways.
@@ -81,6 +82,7 @@ class ErrorActivity : PvcErrorActivity() {
 
         binding = ActivityErrorBinding.inflate(layoutInflater)
         setContentView(binding.getRoot())
+        StatusBarBackground.install(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val safe = insets.getInsets(

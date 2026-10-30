@@ -39,6 +39,7 @@ import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.KeyboardUtil;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.views.FocusOverlayView;
+import org.schabi.newpipe.views.StatusBarBackground;
 
 import java.util.concurrent.TimeUnit;
 
@@ -112,6 +113,7 @@ public class SettingsActivity extends AppCompatActivity implements
         final SettingsLayoutBinding settingsLayoutBinding =
                 SettingsLayoutBinding.inflate(getLayoutInflater());
         setContentView(settingsLayoutBinding.getRoot());
+        StatusBarBackground.install(this);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         ViewCompat.setOnApplyWindowInsetsListener(settingsLayoutBinding.getRoot(), (v, insets) -> {
             final var safe = insets.getInsets(WindowInsetsCompat.Type.systemBars()

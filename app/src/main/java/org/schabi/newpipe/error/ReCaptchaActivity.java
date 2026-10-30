@@ -19,6 +19,9 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NavUtils;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.DownloaderImpl;
@@ -27,6 +30,7 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.ActivityRecaptchaBinding;
 import org.schabi.newpipe.extractor.utils.Utils;
 import org.schabi.newpipe.util.ThemeHelper;
+import org.schabi.newpipe.views.StatusBarBackground;
 
 /*
  * Created by beneth <bmauduit@beneth.fr> on 06.12.16.
@@ -74,6 +78,15 @@ public class ReCaptchaActivity extends AppCompatActivity {
 
         recaptchaBinding = ActivityRecaptchaBinding.inflate(getLayoutInflater());
         setContentView(recaptchaBinding.getRoot());
+        StatusBarBackground.install(this);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        ViewCompat.setOnApplyWindowInsetsListener(recaptchaBinding.getRoot(), (v, insets) -> {
+            final var safe = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                    | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
+            v.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
+        ViewCompat.requestApplyInsets(recaptchaBinding.getRoot());
         setSupportActionBar(recaptchaBinding.toolbar);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override

@@ -50,6 +50,7 @@ import org.schabi.newpipe.util.PermissionHelper;
 import org.schabi.newpipe.util.ServiceBinding;
 import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.ThemeHelper;
+import org.schabi.newpipe.views.StatusBarBackground;
 
 import java.util.List;
 import java.util.Optional;
@@ -94,6 +95,7 @@ public final class PlayQueueActivity extends AppCompatActivity
 
         queueControlBinding = ActivityPlayerQueueControlBinding.inflate(getLayoutInflater());
         setContentView(queueControlBinding.getRoot());
+        StatusBarBackground.install(this);
 
         setSupportActionBar(queueControlBinding.toolbar);
         if (getSupportActionBar() != null) {

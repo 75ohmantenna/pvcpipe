@@ -16,6 +16,7 @@ import org.schabi.newpipe.databinding.ActivityDownloaderBinding;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.ThemeHelper;
 import org.schabi.newpipe.views.FocusOverlayView;
+import org.schabi.newpipe.views.StatusBarBackground;
 
 import us.shandian.giga.service.DownloadManagerService;
 import us.shandian.giga.ui.fragment.MissionsFragment;
@@ -38,6 +39,7 @@ public class DownloadActivity extends AppCompatActivity {
         final ActivityDownloaderBinding downloaderBinding =
                 ActivityDownloaderBinding.inflate(getLayoutInflater());
         setContentView(downloaderBinding.getRoot());
+        StatusBarBackground.install(this);
 
         setSupportActionBar(downloaderBinding.toolbarLayout.toolbar);
 

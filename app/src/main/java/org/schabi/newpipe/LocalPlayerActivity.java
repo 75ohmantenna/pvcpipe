@@ -11,6 +11,8 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
@@ -31,9 +33,16 @@ public class LocalPlayerActivity extends AppCompatActivity implements Player.Lis
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
+        ThemeHelper.setTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_local_player);
-        ThemeHelper.setTheme(this);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.local_player_root),
+                (view, insets) -> {
+                    final var safe = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+                    view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                    return insets;
+                });
 
         hideSystemUi(isLandscape());
 

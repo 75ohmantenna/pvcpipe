@@ -16,6 +16,7 @@ import org.schabi.newpipe.databinding.ActivityAboutBinding
 import org.schabi.newpipe.databinding.FragmentAboutBinding
 import org.schabi.newpipe.util.ThemeHelper
 import org.schabi.newpipe.util.external_communication.ShareUtils
+import org.schabi.newpipe.views.StatusBarBackground
 
 class AboutActivity : AppCompatActivity() {
 
@@ -26,6 +27,7 @@ class AboutActivity : AppCompatActivity() {
 
         val aboutBinding = ActivityAboutBinding.inflate(layoutInflater)
         setContentView(aboutBinding.root)
+        StatusBarBackground.install(this)
         setSupportActionBar(aboutBinding.aboutToolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
