@@ -147,6 +147,9 @@ mini rows, Grid/Card use grid rows, and Auto follows the screen configuration.
 The existing layout manager restores its scroll anchor when the layout changes.
 The channel-group toggle controls group presentation separately and keeps its
 selection during this refresh. An unchanged resume does not invalidate the rows.
+Its accessibility label describes the next action: **Show channel groups as grid**
+when groups use a list, or **Show channel groups as list** when they use a grid.
+Both labels currently have default-English resources.
 
 These are presentation sections, not new database records or custom feed
 groups. Custom groups can still contain channels from multiple services.

@@ -556,6 +556,8 @@
     <string name="wifi_only">Only on Wi-Fi</string>
     <string name="never">Never</string>
     <string name="list_view_mode">List view mode</string>
+    <string name="show_channel_groups_as_grid">Show channel groups as grid</string>
+    <string name="show_channel_groups_as_list">Show channel groups as list</string>
     <string name="list">List</string>
     <string name="grid">Grid</string>
     <string name="card">Card</string>

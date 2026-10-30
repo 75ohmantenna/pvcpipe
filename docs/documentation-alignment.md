@@ -2306,6 +2306,9 @@ description in
 while changing groups only; a proposed UI-text correction is a group-specific
 description. Neither behavior nor runtime text was changed here.
 
+Subsequent 2026-10-30 follow-ups address the [layout refresh](#subscriptions-layout-settings-return--2026-10-30)
+and [toggle labels](#channel-group-toggle-accessibility-label--2026-10-30).
+
 All saved font, window-size, animation, accessibility and network setting values
 were restored and compared. The smoke app was stopped with its seven controlled
 records retained for reinspection; existing debug/test packages remained
@@ -2491,3 +2494,101 @@ Markdown files; changed-file spelling and diff whitespace checks passed.
 Schemas, dependencies, version/build values, existing test assertions, runtime
 UI text/translations, existing legal notices and repository/device safety rules
 are unchanged.
+
+## Channel-group toggle accessibility label — 2026-10-30
+
+Follow-up to the generic toggle label observed in the
+[release subscriptions record](#uninstrumented-release-subscriptions--2026-10-29)
+and left separate by the [layout refresh](#subscriptions-layout-settings-return--2026-10-30).
+Work began on clean `master` at `64016f4ec0bbd4ffbf6f486fbfa15ee753258fcf`.
+The previously installed release's native hierarchy still exposed **List view
+mode** on `header_toggle_view_mode`, the same wording as the Appearance setting.
+
+`GroupsHeader.updateIcons` now resolves the next-action description from the
+bound root's UI context alongside the icon. When groups use a list it exposes
+**Show channel groups as grid**; when they use a grid it exposes **Show channel
+groups as list**. Full binds, recycled binds and `PAYLOAD_UPDATE_ICONS` all use
+this path. The XML default describes the default list mode's action. The two
+new resources currently have default-English text; the Appearance setting's
+label is unchanged. No click handler, group state, channel layout,
+persistence, database schema, dependency or build value changed.
+
+The four-case `GroupsHeaderTest` uses real binding and click methods with
+controlled label resources and suppressed drawable loading. It checks both full
+bind states, partial updates in both directions, recycled labels/callbacks and
+separation from the sort callback. An initial fixture compilation failed because
+this Robolectric version's `getApplication()` takes no type argument; that call
+was corrected. All four tests then failed on label assertions before the
+production binding change and all four passed afterward. This JVM fixture does
+not inflate the packaged layout, load real drawables, navigate the Settings UI or
+exercise a screen reader. Local evidence is in `/tmp/pvcpipe-group-label-20261030/`.
+
+After correcting two ktlint wrapping errors in the new fixture, `make ci` passed:
+12 sanitizer tests; 685 recorded fixtures needing no replacements; style and
+dependency-order checks; 1,167 passing app JVM cases; lint with zero errors and
+59 warnings (none on the changed header); and debug plus signed, minified release
+assembly. The unchanged extractor results were accepted as up to date: 807 passes
+and three skips. The three build-logic tests were also up to date. The initial
+format failure is retained as `ci-format-failure.log`; the final gate is `ci.log`.
+
+The production APK is `org.seventyfiveohmantenna.pvcpipe`, version 0.2.4/code
+1000204, min SDK 26/target 37, without debuggability or an app instrumentation
+declaration. Its SHA-256 is
+`3edb65a5963256070903d5852c95f4143d3373053b4a485528abd7982b341687`;
+the signing certificate SHA-256 is
+`14a4e83570c8d32855ad271c8eec1f5822ba225673c11111c4f653dc0bf996bb`.
+The pulled installed APK matches this artifact. Host setup guards initially used
+the wrong AAPT SDK field name and treated `pm path`'s absent-package exit status
+as an error. Both stopped before installation and were corrected using the
+actual badging output and an exact package-list check.
+
+The owned AOSP API 26 AVD `pvcpipe_layout_api26_20261030` was reused at 480×800,
+240 dpi. The production package was absent and installed separately from the
+existing smoke package. The previous seven-record export was verified on the
+host, copied to public Downloads and imported through the normal system picker
+and Restore with settings action. No private-file injection or app-targeted
+runner was used. Initial Live content was fetched before seeding; background
+traffic was not audited, so this is not offline or general service evidence.
+
+Seven native hierarchy states verified four group toggles, first with channel
+rows in List and then in Grid, plus normal Appearance round-trips to Grid and
+back to List. Both next-action labels matched the actual group geometry; the
+built-in NEW/All controls changed between vertical rows and adjacent grid cells.
+Channel title widths remained 353 pixels in List and 204 in Grid across group
+toggles. Inspected screenshots corroborate both icons and layouts. PID 4729
+remained unchanged throughout. The final post-Back capture contained only system
+bars and stopped the Settings helper's active-window guard; a fresh capture
+without another UI action found the expected List screen, the same PID and
+RecyclerView identity `b408937`. The early capture remains in `phases/07-final-list/`;
+`ui-matrix-summary.json` includes the successful re-query separately.
+
+Normal Export database produced `post-toggle-export.zip`. The host checker
+accepted all seven records with every UID and stored subscription field intact,
+no records in other library tables, matching schema/Room metadata, and successful
+SQLite `quick_check` and foreign-key checks. Exported channel mode was `list`
+and saved tabs remained subscriptions-only. As in the earlier fixture run,
+`--removed-service 99` describes the already-removed seed record; no unsubscribe
+was performed here.
+
+Two adversarial self-reviews checked reversed labels, full/partial/recycled
+binding paths, callback replacement, sort independence, the unchanged Appearance
+label, resource retention, fixture limitations and native capture timing. These
+are self-reviews. Native hierarchy values and screenshots establish the labels
+and controlled layouts, not speech quality, hardware results, other Android
+versions or arbitrary user libraries. FCast source-start remains deferred.
+
+Cleanup found `secure/accessibility_enabled` at 1 versus its saved value of 0.
+The first cleanup command stopped the AVD before restoring that value; the AVD
+was restarted, the app/smoke/CLI-inspector processes were force-stopped and the
+saved value was restored. All nine saved display/accessibility/animation/network
+values then matched, and process checks found all three packages stopped.
+`dumpsys activity instrumentation` is unsupported on this API 26 image and is
+not evidence of active-runner state; the package list identifies the CLI runner
+as targeting its own inspector package. The owned emulator is stopped with both
+controlled installations retained. No package was uninstalled, no app data was
+cleared and the physical Pixel was never targeted.
+
+Final spelling, XML parsing, diff whitespace and local-link checks passed (251
+links and 10 source-line bounds across 21 tracked Markdown files). The frozen
+application/test inputs still match the tested build. Existing test assertions,
+legal notices and repository/device safety rules are unchanged.

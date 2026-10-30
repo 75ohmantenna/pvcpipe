@@ -267,7 +267,10 @@ python3 tools/subscriptions_release_fixture.py check-export \
 Inspect the real list/grid, large-font headings and TalkBack's Headings navigation.
 Select the channel layout in Appearance → List view mode; the nearby channel-group
 button only changes group presentation. Return normally from Settings and verify
-that the channel layout changes without restarting the app. Unsubscribe from the
+that the channel layout changes without restarting the app. Check that the group
+button announces **Show channel groups as grid** when groups use a list and **Show
+channel groups as list** when they use a grid. Toggle it both ways and verify that
+channel rows keep their selected layout. Unsubscribe from the
 fixture's only ID-99 channel through its long-press dialog, force-stop the smoke
 app, and use a normal launcher start **before** another export. Check that export
 with the same command plus `--removed-service 99`. The checker compares every surviving UID and
