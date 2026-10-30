@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.LayoutInflater;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -61,14 +62,14 @@ public final class PlaylistCreationDialog extends PlaylistDialog {
             return super.onCreateDialog(savedInstanceState);
         }
 
+        final Builder dialogBuilder = new Builder(requireContext(),
+                ThemeHelper.getDialogTheme(requireContext()));
         final DialogEditTextBinding dialogBinding =
-                DialogEditTextBinding.inflate(getLayoutInflater());
-        dialogBinding.getRoot().getContext().setTheme(ThemeHelper.getDialogTheme(requireContext()));
+                DialogEditTextBinding.inflate(LayoutInflater.from(dialogBuilder.getContext()));
         dialogBinding.dialogEditText.setHint(R.string.name);
         dialogBinding.dialogEditText.setInputType(InputType.TYPE_CLASS_TEXT);
 
-        final Builder dialogBuilder = new Builder(requireContext(),
-                ThemeHelper.getDialogTheme(requireContext()))
+        dialogBuilder
                 .setTitle(R.string.create_playlist)
                 .setView(dialogBinding.getRoot())
                 .setCancelable(true)
