@@ -48,7 +48,11 @@ static/build-logic checks, JVM tests, Android lint, the debug APK, then the rele
 APK. Each invocation uses `--no-daemon` so compiler and lint memory is released
 between stages.
 
-Run builds serially; `gradle.properties` defines worker and memory limits.
+Run builds serially. `make ci` explicitly passes `--max-workers=1` in every
+Gradle invocation so user-home `gradle.properties` cannot raise the gate's
+worker count. Project `gradle.properties` defines the default worker and memory
+limits for ordinary builds, but user-home properties take precedence over those
+defaults; the gate does not override heap or metaspace settings.
 
 The sanitizer discovers identifiers across every recording on each invocation.
 Only a discovery pass with no replacement variants and no noncanonical cookies
@@ -61,8 +65,8 @@ a static response cache. The SoundCloud privacy regression reuses downloaders
 by parent directory only within its test method; it still exercises all 13
 recordings and compares against the replay map's selected response.
 
-On 2026-10-30, a local warm/no-change comparison (second `make ci` run per
-revision, existing caches retained, no `clean`) measured:
+Before the explicit CI worker flag was added, a local comparison on 2026-10-30
+(second `make ci` run per revision, existing caches retained, no `clean`) measured:
 
 | Observation | Before | After |
 | --- | ---: | ---: |
@@ -71,9 +75,10 @@ revision, existing caches retained, no `clean`) measured:
 
 These are incremental host observations, not cold-build or executed-test
 speedups. The forced SoundCloud replay request passed before and after but
-did not improve in elapsed time; it also reruns Gradle prerequisites. All five
-Gradle process boundaries, task coverage and project resource settings remain
-unchanged. Both APK variants passed assembly; no device test was run.
+did not improve in elapsed time; it also reruns Gradle prerequisites. That
+comparison kept all five Gradle process boundaries, task coverage and project
+resource settings unchanged. Both APK variants passed assembly; no device test
+was run.
 
 | Task | What it does |
 | --- | --- |

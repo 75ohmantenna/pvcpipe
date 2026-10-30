@@ -4,10 +4,11 @@ ci:
 	python3 tools/rebuild_hls_converter.py --verify
 	python3 -m unittest discover -s tools -p test_sanitize_recorded_mocks.py
 	python3 tools/sanitize_recorded_mocks.py pvcpipe-extractor/extractor/src/test/resources/mocks
-	./gradlew --no-daemon --no-continue :buildSrc:test :app:runCheckstyle :app:runKtlint \
+	./gradlew --no-daemon --no-continue --max-workers=1 \
+		:buildSrc:test :app:runCheckstyle :app:runKtlint \
 		:app:checkDependenciesOrder :pvcpipe-extractor:extractor:checkstyleMain
-	./gradlew --no-daemon --no-continue :app:testDebugUnitTest \
+	./gradlew --no-daemon --no-continue --max-workers=1 :app:testDebugUnitTest \
 		:pvcpipe-extractor:extractor:forkCiTest
-	./gradlew --no-daemon --no-continue :app:lintDebug
-	./gradlew --no-daemon --no-continue :app:assembleDebug
-	./gradlew --no-daemon --no-continue :app:assembleRelease
+	./gradlew --no-daemon --no-continue --max-workers=1 :app:lintDebug
+	./gradlew --no-daemon --no-continue --max-workers=1 :app:assembleDebug
+	./gradlew --no-daemon --no-continue --max-workers=1 :app:assembleRelease
