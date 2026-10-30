@@ -45,6 +45,9 @@ class GroupsHeader(
         viewBinding.headerToggleViewMode.setImageResource(
             if (listViewMode) R.drawable.ic_apps else R.drawable.ic_list
         )
+        viewBinding.headerToggleViewMode.contentDescription = viewBinding.root.context.getString(
+            if (listViewMode) R.string.show_channel_groups_as_grid else R.string.show_channel_groups_as_list
+        )
         viewBinding.headerSort.isVisible = showSortButton
     }
 }

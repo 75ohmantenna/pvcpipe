@@ -25,7 +25,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/list_view_mode"
+        android:contentDescription="@string/show_channel_groups_as_grid"
         android:padding="8dp"
         tools:src="@drawable/ic_apps" />
 
