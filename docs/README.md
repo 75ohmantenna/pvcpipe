@@ -38,6 +38,22 @@ work or authorize changes to capture defaults, translations or release publicati
   is restricted to `github.com/75ohmantenna/pvcpipe`; this plan creates no GitHub
   issues, PRs, tags or releases.
 
+## Closed: UI audit of 2026-10-30
+
+The 15 audit findings were fixed in #162 to #166. Evidence is from a Pixel 6a on
+API 37 with 3-button navigation, an API 26 emulator, and `make ci` on each branch.
+
+Open boundaries:
+
+- Not run: gesture navigation, split-screen, TalkBack itself (names were read from
+  the accessibility tree), a real CAPTCHA page, the local player with a real
+  download, and a 360dp-wide window.
+- The popup player shares `player.xml`, so controls it shows keep their old size.
+  The pitch semitone step buttons are also still 24dp wide.
+- On API 27 to 34 the local player's navigation area shows the window background.
+- In landscape, the toolbar's cutout-side inset shows the window background.
+- Fixed-height text at large font sizes remains a runtime check.
+
 ## Current guides
 
 | Guide | Scope |
