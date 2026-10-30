@@ -67,6 +67,10 @@ Native libraries use legacy packaging (`useLegacyPackaging` in
 executes `libffmpeg.so` from the app's native library directory. Leaving that
 binary inside the APK prevents this processing step.
 `FfmpegPackagingTest` checks the packaging requirement on a device.
+The checked-in converter AAR supplies MPEG-TS and MP4 input plus the H.264
+framing filter needed by concat. `make ci` checks its pinned checksum; the
+[native build recipe](../app/libs/README.md) records source revisions, NDK,
+enabled components and per-ABI hashes. Ordinary builds do not require an NDK.
 
 APKs are written under `app/build/outputs/apk/`:
 

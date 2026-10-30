@@ -232,6 +232,21 @@ in this follow-up: no device was attached and no emulator binary/KVM was availab
 Host conversion is not Android decoder or receiver evidence. Generated fixture
 commands and timestamp origins are in `app/src/androidTest/assets/media3-engine/README.txt`.
 
+### Android converter integration review — 2026-10-30
+
+A later disposable API 26 emulator run reached the real mission workers and
+bundled binary. The fMP4/map case failed with FFmpeg status 183: the bundled
+minimal build had no MOV/MP4 demuxer. Enabling it exposed the additional H.264
+framing filter required by concat, which had also been disabled (status 8).
+The [vendored converter and source-pinned recipe](../app/libs/README.md) now
+enable both components for all four ABIs and verify the artifact in `make ci`.
+Its Java wrapper and metadata remain unchanged. A controlled run of the rebuilt
+Android executable produced an 8.000313s MP4 containing both video and audio.
+The packaged app then passed all four `HlsDownloadIntegrationTest` cases on the
+disposable emulator, including restored fMP4 missions and decoded reopening;
+the combined native-player/download selection passed 21 tests. This is controlled
+Android evidence, separate from the earlier host-only run and real hardware.
+
 
 ## Sharing or opening a finished file
 

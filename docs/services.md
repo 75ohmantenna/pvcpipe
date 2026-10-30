@@ -195,7 +195,9 @@ related items and local subscriptions. Channels have Videos, Livestreams and
 Clips tabs. Videos/Live and search do not invent pagination. Clips use the
 server's opaque `cursor`; Featured uses `pagination.next_cursor` as **`after`**,
 not `page` or `cursor`. Continuation pages are scoped to the exact channel/filter
-or localized discovery URL and rebuilt internally before requests.
+or localized discovery URL and rebuilt internally before requests. Consumed cursor
+history travels with each page so cycles also stop when the app or queue creates
+a fresh extractor for the next request.
 
 Plain channel links open the current broadcast. Channel `/videos`, `/about` and
 `/clips` collections open the channel; subscriptions always retain `/videos`.
@@ -224,8 +226,10 @@ Native Kick HLS video loads the original master while selecting the requested
 video rendition and compatible audio/subtitle groups. High-frame-rate qualities
 remain distinct, such as `720p` and `720p60`. Native HLS captions are not progressive
 VTT sidecars. Audio mode uses a genuine audio rendition when provided; a muxed
-fallback does not imply audio-only transfer savings. Missing selected renditions
-remain visible playback errors. External players/downloads retain actual media
+fallback does not imply audio-only transfer savings. Missing selected video/audio
+renditions remain playback errors. A selected caption's HTTP failure can report a
+Media3 load-error event while video and audio continue; this does not promise
+caption error feedback in the app UI. External players/downloads retain actual media
 playlist URLs; direct MP4 clips never fetch their media as playlist text.
 Video-only HLS and live/ongoing streams are rejected before download destination
 effects. HLS audio/subtitle downloads remain excluded. Receiver caption selection
@@ -234,10 +238,11 @@ is not newly promised; the main player remains the only cast playback-control pa
 Thumbnails retain actual deduplicated candidates and filename-derived dimensions,
 not inaccurate srcset descriptors. Channel biography/ownership remains authoritative,
 including clips created by another user. Category, tags, language, counts and
-membership availability are exposed when supplied. Subscriber-only recordings
-raise a paid-content error before media access; public media URLs do not override
-explicit restrictions. Related failures are optional `StreamInfo` errors rather
-than media-fetch failures or silently empty successes. Source caches remain limited
+membership availability are exposed when supplied. Subscriber-only clips,
+recordings and broadcasts raise a paid-content error before media access.
+Explicit restrictions in either status or privacy metadata take precedence over
+public aliases and retained media URLs. Related failures are optional `StreamInfo`
+errors rather than media-fetch failures or silently empty successes. Source caches remain limited
 to one minute; hidden or unknown live viewer counts are not invented.
 
 Playlists, comments, live chat, account management and account-follows import are
@@ -274,6 +279,44 @@ The host's composite-build lock script raised `OverlappingFileLockException`;
 verification used a temporary Gradle home reusing the existing caches, with the
 same global file lock held once around each invocation. Host configuration was
 not changed. No APK was installed and no application data was cleared.
+
+### Integration review follow-up — 2026-10-30
+
+Reviewing the integration on current `master` reproduced six failing regression
+cases: Clips and Featured could follow multi-page cursor cycles when consumers
+created fresh extractors; clip extraction ignored deleted/pruned/banned statuses
+and could ignore subscriber-only privacy when a public status was also present.
+Continuation pages now retain cursor history. Listings and direct playback use
+the same restriction predicates, including legacy recording metadata.
+All 202 Kick offline regression cases passed after those corrections.
+
+Two further controller regressions reproduced Clips choices reverting to date/all
+after parent refresh or saved-state reconstruction. The parent now captures a
+lightweight handler before clearing metadata and saves it independently of child
+fragments. Both tests exercise the real refresh/selection methods with controlled
+metadata and child destruction; they are not device UI or process-death evidence.
+
+The integration-review environment had a disposable API 26 x86_64 emulator.
+It exposed two assumptions missed by host-only conversion and compilation:
+the original bundled FFmpeg lacked MOV/MP4 input, and concat additionally needed
+the H.264 MP4-to-Annex-B filter. The converter now includes both for all four
+ABIs, with its wrapper/metadata unchanged and 16 KiB alignment retained for the
+64-bit binaries. See [the pinned build recipe](../app/libs/README.md).
+The rebuilt Android executable produced an 8.000313s MP4 with audio and video
+from the mapped fixture in a controlled binary-level check.
+
+The selected-caption failure test had incorrectly required `Player.onPlayerError`.
+The native engine instead reported the actual caption HTTP 404 through its load
+listener while audio/video decoding continued. That case now checks both the load
+failure and continued decoding; master/video failure assertions remain fatal.
+
+After the native corrections, the packaged app passed all **21 tests** in
+`Media3SourceEngineIntegrationTest` and `HlsDownloadIntegrationTest` on that
+disposable emulator. This includes TS/fMP4 mission completion, restored plans,
+decoded reopening, native captions, quality changes and genuine error paths.
+The JVM suites passed **1,250 app cases** and **935 extractor cases** with three
+pre-existing extractor skips and no failures. The phone installation was not
+used. These controlled results do not establish live-site or receiver behavior.
 
 ## Removed services
 
