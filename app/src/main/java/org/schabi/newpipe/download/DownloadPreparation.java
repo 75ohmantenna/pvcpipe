@@ -20,6 +20,7 @@ import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.streams.io.StoredDirectoryHelper;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.SponsorBlockSegment;
+import org.schabi.newpipe.util.StreamTypeUtil;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -530,6 +531,12 @@ final class DownloadPreparation {
                     || (primary.getDeliveryMethod() != PROGRESSIVE_HTTP
                     && !(selected.kind == Kind.VIDEO && primary.getDeliveryMethod() == HLS))) {
                 throw new IllegalArgumentException("Unsupported stream format or delivery");
+            }
+            if (StreamTypeUtil.isLiveStream(selected.info.getStreamType())
+                    || primary.getDeliveryMethod() == HLS
+                    && ((VideoStream) primary).isVideoOnly()) {
+                throw new IllegalArgumentException(
+                        "Downloads require completed media and combined HLS video");
             }
             if (selected.secondary != null && (selected.kind != Kind.VIDEO
                     || primary.getDeliveryMethod() == HLS
