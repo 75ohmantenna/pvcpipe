@@ -107,12 +107,36 @@ public class DownloadPreparationTest {
 
     @Test
     public void hlsVideoSelectsRemuxer() throws Exception {
-        select(DownloadPreparation.Kind.VIDEO, video(MediaFormat.MPEG_4, DeliveryMethod.HLS),
-                null, 100, 0);
+        select(DownloadPreparation.Kind.VIDEO, combinedHls(), null, 100, 0);
         final DownloadPreparation.Launch launch = submitDocument();
         assertEquals(Postprocessing.ALGORITHM_PVC_HLS_REMUXER, launch.psName);
         assertEquals('v', launch.kind);
         assertEquals(1, launch.urls.length);
+    }
+
+    @Test
+    public void videoOnlyHlsAndLiveMediaFailBeforePickerOrStorageEffects() throws Exception {
+        Files.writeString(environment.output, "existing recording");
+        select(DownloadPreparation.Kind.VIDEO, video(MediaFormat.MPEG_4, DeliveryMethod.HLS),
+                null, 100, 0);
+        preparation.save("recording", DownloadPreparation.Destination.askDocument(), environment);
+        final StreamInfo live = new StreamInfo(8, "https://kick.com/example",
+                "https://kick.com/example", StreamType.LIVE_STREAM, "example", "live", 0);
+        selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.VIDEO, combinedHls(),
+                MediaFormat.MPEG_4, null, 100, 0, 5, live, segments);
+        preparation.save("live", DownloadPreparation.Destination.askDocument(), environment);
+        selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.AUDIO,
+                audio(MediaFormat.M4A), MediaFormat.M4A, null, 100, 0, 5, live, segments);
+        preparation.save("live audio", DownloadPreparation.Destination.askDocument(), environment);
+        assertEquals(3, environment.failures.size());
+        assertTrue(environment.failures.stream().allMatch(failure ->
+                failure.reason == DownloadPreparation.FailureReason.INVALID_SELECTION));
+        assertNull(environment.location);
+        assertEquals("existing recording", Files.readString(environment.output));
+        assertTrue(environment.launches.isEmpty());
+        assertTrue(environment.forgotten.isEmpty());
+        assertEquals(0, environment.resolutions);
+        assertEquals(0, environment.submissions);
     }
 
     @Test
@@ -745,6 +769,13 @@ public class DownloadPreparationTest {
                 .setContent("https://example.com/audio/" + format.name(), true)
                 .setMediaFormat(format).setDeliveryMethod(DeliveryMethod.PROGRESSIVE_HTTP)
                 .setAverageBitrate(128).build();
+    }
+
+    private static VideoStream combinedHls() {
+        return new VideoStream.Builder().setId("combined")
+                .setContent("https://example.com/video/playlist.m3u8", true)
+                .setMediaFormat(MediaFormat.MPEG_4).setDeliveryMethod(DeliveryMethod.HLS)
+                .setIsVideoOnly(false).setResolution("720p").build();
     }
 
     private static VideoStream video(final MediaFormat format, final DeliveryMethod delivery) {

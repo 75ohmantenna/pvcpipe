@@ -37,6 +37,13 @@ final class KickFixtures extends Downloader {
     private final Map<String, Integer> statuses = new LinkedHashMap<>();
     private final Map<String, Map<String, List<String>>> headers = new LinkedHashMap<>();
 
+    KickFixtures() {
+        on(VIDEOS_API, "{\"data\":[]}");
+        on(KickApi.livestreamsUrl("en", 24, null, null), "{\"data\":{\"livestreams\":[]}}");
+        on("https://web.kick.com/api/v1/channels/42/clips?sort=date&time=all",
+                "{\"data\":{\"clips\":[]}}");
+    }
+
     KickFixtures on(final String url, final String body) {
         bodies.put(url, body);
         statuses.put(url, 200);

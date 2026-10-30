@@ -167,15 +167,26 @@ for the tested boundaries.
 
 ## HLS downloads
 
-An HLS media playlist is downloaded segment by segment, then remuxed with
-the bundled ffmpeg by `PvcFromHlsRemuxer`. `PvcHlsPreProcessor` rejects master
-playlists: the selected download must identify a rendition. The detail screen
-hides the download action for livestreams, including BitChute and Kick live
-broadcasts.
+Completed combined HLS video is prepared with Media3's `HlsPlaylistParser` and
+remuxed by `PvcFromHlsRemuxer` with the bundled FFmpeg. Master playlists remain
+selection errors. Live/ongoing media and video-only HLS are rejected before
+destination/picker effects; HLS audio/subtitle downloads are not offered.
 
-- `PvcHlsPreProcessor` reads the playlist and replaces the mission's one
-  address with the addresses of the segments. It fetches playlists and
-  encryption keys as bytes, because a key is binary.
+- `PvcHlsPreProcessor` parses the streamed successful response against its
+  effective URL after redirects. It retains Media3-resolved byte ranges,
+  initialization maps, key URLs and explicit/sequence-derived AES IVs.
+  Unencrypted and AES-128 media are supported; unsupported DRM/SAMPLE-AES fails
+  before mission mutation. Encryption keys remain binary bytes.
+- `HlsDownloadPlan` persists ordered logical segment/map windows over
+  insertion-ordered, URL-deduplicated **physical** resources. Workers download
+  each physical object in full using the existing resume/integrity architecture.
+  Reused objects are not downloaded once per window. This can transfer unused
+  edge bytes; it is not a minimal-range network downloader.
+- Remuxing slices non-owning windows before decryption, prepends each segment's
+  initialization map, and finishes all input reads before in-place output copying.
+  Invalid/truncated windows and nonzero FFmpeg exits fail rather than produce
+  successful partial output. Concat timing uses parsed HLS segment durations:
+  absolute fMP4 decode times must not become extra gaps.
 - Each conversion works in a directory of its own under `ffmpeg_temp` and
   attempts to remove it when it ends, also after a failure. Several HLS
   downloads can be converted at the same time. A conversion that starts while
@@ -187,10 +198,55 @@ broadcasts.
   for HLS: it can only find a whole progressive file again. A retry asks for
   the same segment addresses, so it does not help once they have expired.
   Reading the playlist again is not implemented.
+- Existing serialized dependency-segment lists migrate once to whole-object
+  windows with identity resource mapping. Their URLs, offsets, recovery entries
+  and worker checkpoints are not deduplicated or discarded. The remuxer's old
+  serialization UID remains pinned so those missions can still deserialize.
+  Old encrypted checkpoints with **implicit IVs** did not retain media-sequence
+  identity; they fail with an explicit-IV error rather than invent a sequence.
+  Explicit-IV encrypted and unencrypted legacy checkpoints remain supported.
 
 WebM Opus-to-Ogg conversion rejects block-laced input. `WebMReader` does not
 split laced blocks into packets, so treating a whole block as one packet
 would produce an invalid output file.
+
+### Controlled HLS conversion follow-up — 2026-10-30
+
+The pinned dependency consumed whole resources where the three logical windows
+required `ABCD`, `XYZ` and `12`. The new production-path consumer regressions
+verify those exact bytes, shared-stream ownership, restored plans, legacy
+checkpoints, sequence-300 AES, encrypted maps, truncation and failure atomicity.
+
+Generated eight-second TS and fragmented-MP4/map fixtures were parsed through the
+real preprocessor and remuxed through the same converter with a host FFmpeg
+executor. `ffprobe` found both video and audio: TS output was **8.000000s** and
+fragmented MP4 **8.000313s**, within the 0.25s acceptance window. The earlier
+untimed fMP4 concat produced 14.112917s; that failing regression was retained and
+corrected, not relaxed. Nonzero real FFmpeg conversion also failed without
+overwriting the output.
+
+`HlsDownloadIntegrationTest` additionally covers real mission workers, Android
+`RunFFmpeg`, restored missions and decoded reopening; the native player harness
+covers rendition/caption behavior. Both compile, but were **not device-executed**
+in this follow-up: no device was attached and no emulator binary/KVM was available.
+Host conversion is not Android decoder or receiver evidence. Generated fixture
+commands and timestamp origins are in `app/src/androidTest/assets/media3-engine/README.txt`.
+
+### Android converter integration review — 2026-10-30
+
+A later disposable API 26 emulator run reached the real mission workers and
+bundled binary. The fMP4/map case failed with FFmpeg status 183: the bundled
+minimal build had no MOV/MP4 demuxer. Enabling it exposed the additional H.264
+framing filter required by concat, which had also been disabled (status 8).
+The [vendored converter and source-pinned recipe](../app/libs/README.md) now
+enable both components for all four ABIs and verify the artifact in `make ci`.
+Its Java wrapper and metadata remain unchanged. A controlled run of the rebuilt
+Android executable produced an 8.000313s MP4 containing both video and audio.
+The packaged app then passed all four `HlsDownloadIntegrationTest` cases on the
+disposable emulator, including restored fMP4 missions and decoded reopening;
+the combined native-player/download selection passed 21 tests. This is controlled
+Android evidence, separate from the earlier host-only run and real hardware.
+
 
 ## Sharing or opening a finished file
 

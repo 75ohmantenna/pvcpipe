@@ -31,6 +31,7 @@ import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeOtfDashManifestCreator;
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubePostLiveStreamDvrDashManifestCreator;
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeProgressiveDashManifestCreator;
+import org.schabi.newpipe.player.datasource.KickHlsPlaylistParserFactory;
 import org.schabi.newpipe.player.datasource.NonUriHlsDataSourceFactory;
 import org.schabi.newpipe.player.datasource.YoutubeHttpDataSource;
 
@@ -149,6 +150,16 @@ public class PlayerDataSource {
         }
 
         return new HlsMediaSource.Factory(cacheDataSourceFactory);
+    }
+
+    public HlsMediaSource.Factory getKickHlsMediaSourceFactory(
+            @Nullable final String selectedVideoPlaylistUrl,
+            @Nullable final String selectedAudioPlaylistUrl,
+            final boolean live) {
+        final HlsMediaSource.Factory factory = live
+                ? getLiveHlsMediaSourceFactory() : getHlsMediaSourceFactory(null);
+        return factory.setPlaylistParserFactory(new KickHlsPlaylistParserFactory(
+                selectedVideoPlaylistUrl, selectedAudioPlaylistUrl));
     }
 
     public DashMediaSource.Factory getDashMediaSourceFactory() {

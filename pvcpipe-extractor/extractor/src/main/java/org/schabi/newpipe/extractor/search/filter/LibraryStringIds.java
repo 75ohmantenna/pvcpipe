@@ -90,4 +90,5 @@ public enum LibraryStringIds {
     SEARCH_FILTERS_SENSITIVITY_NSFW,  /* Nsfw */
     SEARCH_FILTERS_SENSITIVITY_NSFL,  /* Nsfl */
     SEARCH_FILTERS_SENSITIVITY, /* Sensitivity */
+    CHANNEL_TAB_CLIPS, /* Clips */
 }

@@ -159,7 +159,7 @@ class AboutActivity : AppCompatActivity() {
             SoftwareComponent("RxJava", "2016 - present", "RxJava Contributors", "https://github.com/ReactiveX/RxJava", StandardLicenses.APACHE2),
             SoftwareComponent("SearchPreference", "2018", "ByteHamster", "https://github.com/ByteHamster/SearchPreference", StandardLicenses.MIT),
             SoftwareComponent("JSR-305", "", "FindBugs contributors and Brian Goetz", "https://github.com/findbugsproject/findbugs", StandardLicenses.JSR305),
-            SoftwareComponent("slimhls-converter", "", "evermind-zz and PVCPipe contributors", "https://github.com/75ohmantenna/slimhls-converter/tree/7e7f373dbf", StandardLicenses.GPL3),
+            SoftwareComponent("slimhls-converter", "", "evermind-zz and PVCPipe contributors", "https://github.com/75ohmantenna/pvcpipe/tree/master/app/libs", StandardLicenses.GPL3),
             SoftwareComponent("Wire", "2013 - 2024", "Square, Inc.", "https://github.com/square/wire", StandardLicenses.APACHE2),
             SoftwareComponent("challengeFloatsAway", "", "evermind-zz", "https://github.com/evermind-zz/challengeFloatsAway", StandardLicenses.GPL3),
             SoftwareComponent("desugar_jdk_libs", "", "Oracle, Google and OpenJDK contributors", "https://github.com/google/desugar_jdk_libs", StandardLicenses.GPL2_CLASSPATH)

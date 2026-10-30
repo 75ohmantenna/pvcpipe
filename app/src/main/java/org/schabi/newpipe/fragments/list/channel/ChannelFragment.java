@@ -35,8 +35,11 @@ import org.schabi.newpipe.databinding.FragmentChannelBinding;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
+import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.fragments.BaseStateFragment;
@@ -87,6 +90,9 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         state.putString("name" + STATE_SUFFIX, name);
         state.putInt("serviceId" + STATE_SUFFIX, serviceId);
         state.putString("url" + STATE_SUFFIX, url);
+        state.putBoolean("InitialKickTabApplied", initialKickTabApplied);
+        retainKickClipFilters();
+        state.putSerializable("KickClipTab" + STATE_SUFFIX, retainedKickClips);
     }
 
     @Override
@@ -101,6 +107,8 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         if (state.containsKey("url" + STATE_SUFFIX)) {
             url = state.getString("url" + STATE_SUFFIX);
         }
+        initialKickTabApplied = state.getBoolean("InitialKickTabApplied", false);
+        retainedKickClips = (ListLinkHandler) state.getSerializable("KickClipTab" + STATE_SUFFIX);
     }
 
     private ChannelInfo currentInfo;
@@ -109,6 +117,8 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     private Disposable subscribeButtonMonitor;
     private SubscriptionManager subscriptionManager;
     private int lastTab;
+    private boolean initialKickTabApplied;
+    private ListLinkHandler retainedKickClips;
     private boolean channelContentNotSupported = false;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -485,7 +495,34 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     // Init
     //////////////////////////////////////////////////////////////////////////*/
 
+    private void retainKickClipFilters() {
+        if (serviceId == ServiceList.Kick.getServiceId() && currentInfo != null) {
+            for (final androidx.fragment.app.Fragment child
+                    : getChildFragmentManager().getFragments()) {
+                if (child instanceof ChannelTabFragment) {
+                    final ListLinkHandler handler = ((ChannelTabFragment) child).tabHandler;
+                    if (handler != null && handler.getId().equals(currentInfo.getId())
+                            && handler.getContentFilters().contains(ChannelTabs.CLIPS)) {
+                        try {
+                            // Retain only the lightweight selection, not a raw channel snapshot.
+                            retainedKickClips = ServiceList.Kick.getChannelTabLHFactory().fromQuery(
+                                    handler.getId(), handler.getContentFilters(),
+                                    handler.getSortFilter());
+                        } catch (final ParsingException e) {
+                            Log.w(TAG, "Could not retain Kick clip filters", e);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     private void updateTabs() {
+        retainKickClipFilters();
+        if (initialKickTabApplied && tabAdapter.getCount() > 0) {
+            lastTab = binding.tabLayout.getSelectedTabPosition();
+        }
         tabAdapter.clearAllItems();
 
         if (currentInfo != null && !channelContentNotSupported) {
@@ -493,11 +530,36 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             final SharedPreferences preferences = PreferenceManager
                     .getDefaultSharedPreferences(context);
 
+            ListLinkHandler initialClips = null;
+            if (!initialKickTabApplied && serviceId == ServiceList.Kick.getServiceId()) {
+                try {
+                    final ListLinkHandler requested = ServiceList.Kick.getChannelTabLHFactory()
+                            .fromUrl(currentInfo.getOriginalUrl());
+                    if (requested.getContentFilters().contains(ChannelTabs.CLIPS)) {
+                        initialClips = requested;
+                        retainedKickClips = requested;
+                    }
+                } catch (final ParsingException e) {
+                    Log.w(TAG, "Could not resolve initial Kick channel tab", e);
+                }
+                initialKickTabApplied = true;
+            }
+
             for (final ListLinkHandler linkHandler : currentInfo.getTabs()) {
                 final FilterItem tab = linkHandler.getContentFilters().get(0);
                 if (ChannelTabHelper.showChannelTab(context, preferences, tab)) {
+                    final ListLinkHandler selected;
+                    if (tab.equals(ChannelTabs.CLIPS) && initialClips != null) {
+                        selected = initialClips;
+                        lastTab = tabAdapter.getCount();
+                    } else if (tab.equals(ChannelTabs.CLIPS) && retainedKickClips != null
+                            && retainedKickClips.getId().equals(currentInfo.getId())) {
+                        selected = retainedKickClips;
+                    } else {
+                        selected = linkHandler;
+                    }
                     final ChannelTabFragment channelTabFragment =
-                            ChannelTabFragment.getInstance(serviceId, linkHandler, name);
+                            ChannelTabFragment.getInstance(serviceId, selected, name);
                     channelTabFragment.useAsFrontPage(useAsFrontPage);
                     tabAdapter.addFragment(channelTabFragment,
                             context.getString(ChannelTabHelper.getTranslationKey(tab)));
@@ -579,6 +641,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     public void startLoading(final boolean forceLoad) {
         super.startLoading(forceLoad);
 
+        retainKickClipFilters();
         currentInfo = null;
         updateTabs();
         if (currentWorker != null) {

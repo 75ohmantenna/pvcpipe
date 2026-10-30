@@ -67,6 +67,10 @@ Native libraries use legacy packaging (`useLegacyPackaging` in
 executes `libffmpeg.so` from the app's native library directory. Leaving that
 binary inside the APK prevents this processing step.
 `FfmpegPackagingTest` checks the packaging requirement on a device.
+The checked-in converter AAR supplies MPEG-TS and MP4 input plus the H.264
+framing filter needed by concat. `make ci` checks its pinned checksum; the
+[native build recipe](../app/libs/README.md) records source revisions, NDK,
+enabled components and per-ABI hashes. Ordinary builds do not require an NDK.
 
 APKs are written under `app/build/outputs/apk/`:
 
@@ -200,6 +204,27 @@ Verify the result, installed packages and preserved data afterwards. An ADB exit
 code alone is not a JUnit result. If signing, isolation or cleanup is uncertain,
 use a separate disposable environment. Do not assume older successful runs make
 an expanded suite safe.
+
+### Isolated native HLS/download scenarios
+
+The debug variant permits cleartext **only for `127.0.0.1`** through
+`debug_network_security_config.xml`, enabling the isolated loopback peers on
+older Android versions. Non-loopback cleartext remains denied; release does not
+include this debug-only policy. This is not permission to install or clear data.
+
+After inspecting the current harness lifecycles and verifying a disposable,
+compatible debug installation, run the selected classes directly:
+
+```sh
+adb -s '<verified-emulator-serial>' shell am instrument -w \
+  -e class org.schabi.newpipe.player.resolver.Media3SourceEngineIntegrationTest,us.shandian.giga.postprocessing.HlsDownloadIntegrationTest \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+These harnesses use temporary media/cache/storage and no application database.
+They still require the installation/signing checks above. Compilation, host
+FFmpeg conversion and controlled HTTP tests do not establish decoded Android
+playback, caption selection or real receiver behavior.
 
 ## Controlled validation tools
 

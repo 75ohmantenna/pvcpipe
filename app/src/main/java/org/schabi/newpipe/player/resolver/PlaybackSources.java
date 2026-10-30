@@ -64,11 +64,17 @@ public final class PlaybackSources {
         if (audioPlayer) {
             return resolveAudio(info, selection);
         }
+        final VideoSelection kickVideo = info.getServiceId() == ServiceList.Kick.getServiceId()
+                ? selectVideo(info, selection) : null;
+        if (kickVideo != null && PlaybackResolver.isKickNativeVideoMaster(
+                info, kickVideo.video, kickVideo.tag)) {
+            return audioOnly ? resolveAudio(info, selection) : buildVideo(info, kickVideo);
+        }
         final MediaSource live = resolveLiveVideo(info);
         if (live != null) {
             return live;
         }
-        final VideoSelection video = selectVideo(info, selection);
+        final VideoSelection video = kickVideo == null ? selectVideo(info, selection) : kickVideo;
         return audioOnly && !video.separateAudio
                 ? buildAudio(info, selection) : buildVideo(info, video);
     }
@@ -122,6 +128,11 @@ public final class PlaybackSources {
     @Nullable
     private MediaSource resolveAudio(@NonNull final StreamInfo info,
                                      @NonNull final Settings selection) {
+        if (info.getServiceId() == ServiceList.Kick.getServiceId()
+                && (!environment.audioStreams(info).isEmpty()
+                || !environment.audioFallbackStreams(info).isEmpty())) {
+            return buildAudio(info, selection);
+        }
         final MediaSource liveSource = environment.liveSource(info, null,
                 StreamInfoTag.of(info).withSourceType(SourceType.LIVE_STREAM));
         return liveSource == null ? buildAudio(info, selection) : liveSource;
@@ -173,13 +184,19 @@ public final class PlaybackSources {
             videoIndex = qualityResolver.getOverrideResolutionIndex(videos, selection.quality);
         }
         final int audioIndex = environment.audioIndex(audios, selection.audioTrack);
-        final StreamInfoTag tag = StreamInfoTag.of(info, videos, videoIndex, audios, audioIndex);
+        StreamInfoTag tag = StreamInfoTag.of(info, videos, videoIndex, audios, audioIndex);
         final VideoStream video = tag.getMaybeQuality()
                 .map(MediaItemTag.Quality::getSelectedVideoStream).orElse(null);
+        final boolean nativeKick = PlaybackResolver.isKickNativeVideoMaster(info, video, tag);
+        if (nativeKick && selection.audioTrack == null) {
+            // Let the native master choose among compatible defaults, not an unrelated group's
+            // first extractor audio entry. Explicit user selections remain in the source tag.
+            tag = StreamInfoTag.of(info, videos, videoIndex, audios, -1);
+        }
         final AudioStream audio = tag.getMaybeAudioTrack()
                 .map(MediaItemTag.AudioTrack::getSelectedAudioStream).orElse(null);
-        final boolean separateAudio = audio != null && (video == null || video.isVideoOnly()
-                || selection.audioTrack != null);
+        final boolean separateAudio = !nativeKick && audio != null
+                && (video == null || video.isVideoOnly() || selection.audioTrack != null);
         return new VideoSelection(video, audio, separateAudio, tag.withSourceType(separateAudio
                 ? SourceType.VIDEO_WITH_SEPARATED_AUDIO
                 : SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY));
@@ -197,7 +214,8 @@ public final class PlaybackSources {
                 return null;
             }
         }
-        if (selection.separateAudio) {
+        if (selection.separateAudio && !PlaybackResolver.isKickNativeVideoMaster(
+                info, selection.video, selection.tag)) {
             try {
                 sources.add(environment.streamSource(info, selection.audio, selection.tag));
             } catch (final ResolverException error) {

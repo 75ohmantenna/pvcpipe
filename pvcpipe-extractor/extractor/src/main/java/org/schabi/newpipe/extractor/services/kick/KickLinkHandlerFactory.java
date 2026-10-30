@@ -7,12 +7,12 @@ import org.schabi.newpipe.extractor.linkhandler.LinkHandlerFactory;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandlerFactory;
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory;
-import org.schabi.newpipe.extractor.search.filter.BaseSearchFilters;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
-import org.schabi.newpipe.extractor.search.filter.LibraryStringIds;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -77,31 +77,59 @@ public final class KickLinkHandlerFactory {
         public ListLinkHandler fromUrl(final String url, final String baseUrl)
                 throws ParsingException {
             final String id = getId(url);
-            final String path = URI.create(url).getPath();
+            final URI uri = URI.create(url);
+            final String path = uri.getPath();
             final boolean videos = path.endsWith("/videos") || path.endsWith("/videos/")
                     || path.endsWith("/about") || path.endsWith("/about/");
-            final FilterItem tab = videos ? ChannelTabs.VIDEOS : ChannelTabs.LIVESTREAMS;
+            final boolean clips = path.endsWith("/clips") || path.endsWith("/clips/");
+            final FilterItem tab = clips ? ChannelTabs.CLIPS
+                    : videos ? ChannelTabs.VIDEOS : ChannelTabs.LIVESTREAMS;
             final List<FilterItem> filters = List.of(tab);
-            return new ListLinkHandler(url, getUrl(id, filters, List.of()), id, filters, List.of());
+            final List<FilterItem> sort = clips ? clipFilters(uri) : List.of();
+            return new ListLinkHandler(url, getUrl(id, filters, sort), id, filters, sort);
+        }
+
+        @Override
+        public ListLinkHandler fromQuery(final String id, final List<FilterItem> content,
+                                         final List<FilterItem> sort) throws ParsingException {
+            final List<FilterItem> tabs = content.isEmpty() ? List.of(ChannelTabs.VIDEOS) : content;
+            final List<FilterItem> selectedSort = tabs.get(0).equals(ChannelTabs.CLIPS)
+                    ? KickClipFilters.fromValues(KickClipFilters.sort(sort),
+                            KickClipFilters.time(sort)) : List.of();
+            final String slug = KickUrl.slug(id);
+            final String url = getUrl(slug, tabs, selectedSort);
+            return new ListLinkHandler(url, url, slug, tabs, selectedSort);
         }
 
         @Override
         public String getUrl(final String id, @Nonnull final List<FilterItem> content,
                              @Nullable final List<FilterItem> sort) throws ParsingException {
+            if (content.size() > 1) {
+                throw new ParsingException("Kick channel tab requires one tab choice");
+            }
             final FilterItem tab = content.isEmpty() ? ChannelTabs.VIDEOS : content.get(0);
             if (!tabs().containsKey(tab)) {
                 throw new UnsupportedTabException(tab);
+            }
+            if (tab.equals(ChannelTabs.CLIPS)) {
+                return KickUrl.BASE + "/" + KickUrl.slug(id) + "/clips?sort="
+                        + KickClipFilters.sort(sort) + "&range=" + KickClipFilters.time(sort);
             }
             return KickUrl.BASE + "/" + KickUrl.slug(id) + tabs().get(tab);
         }
 
         @Override
         public boolean onAcceptUrl(final String url) throws ParsingException {
-            return CHANNEL.onAcceptUrl(url);
+            try {
+                fromUrl(url);
+                return true;
+            } catch (final ParsingException e) {
+                return false;
+            }
         }
     };
     public static final SearchQueryHandlerFactory SEARCH = new SearchQueryHandlerFactory(
-            new ChannelFilters()) {
+            new KickSearchFilters()) {
         @Override
         public String getUrl(final String query, @Nonnull final List<FilterItem> content,
                              @Nullable final List<FilterItem> sort) {
@@ -137,6 +165,7 @@ public final class KickLinkHandlerFactory {
         final Map<FilterItem, String> tabs = new LinkedHashMap<>();
         tabs.put(ChannelTabs.VIDEOS, "/videos");
         tabs.put(ChannelTabs.LIVESTREAMS, "");
+        tabs.put(ChannelTabs.CLIPS, "/clips?sort=date&range=all");
         TABS = Collections.unmodifiableMap(tabs);
     }
 
@@ -147,17 +176,40 @@ public final class KickLinkHandlerFactory {
         return TABS;
     }
 
-    private static final class ChannelFilters extends BaseSearchFilters {
-        @Override
-        protected void init() {
-            groupsFactory.addFilterItem(
-                    new FilterItem(1, LibraryStringIds.SEARCH_FILTERS_CHANNELS));
-            addContentFilterGroup(groupsFactory.createFilterGroup(0, null, true, 1, null, 1));
+    private static List<FilterItem> clipFilters(final URI uri) throws ParsingException {
+        String sort = null;
+        String range = null;
+        final String query = uri.getRawQuery();
+        if (query != null) {
+            for (final String pair : query.split("&", -1)) {
+                final int equals = pair.indexOf('=');
+                final String name;
+                final String value;
+                try {
+                    name = URLDecoder.decode(equals < 0 ? pair : pair.substring(0, equals),
+                            StandardCharsets.UTF_8);
+                    value = URLDecoder.decode(equals < 0 ? "" : pair.substring(equals + 1),
+                            StandardCharsets.UTF_8);
+                } catch (final IllegalArgumentException e) {
+                    throw new ParsingException("Invalid Kick clip filter encoding", e);
+                }
+                if (name.indexOf('\uFFFD') >= 0 || value.indexOf('\uFFFD') >= 0) {
+                    throw new ParsingException("Invalid Kick clip filter encoding");
+                }
+                if ("sort".equals(name)) {
+                    if (sort != null) {
+                        throw new ParsingException("Duplicate Kick clip sort order");
+                    }
+                    sort = "view".equals(value) ? "views" : value;
+                } else if ("range".equals(name)) {
+                    if (range != null) {
+                        throw new ParsingException("Duplicate Kick clip time range");
+                    }
+                    range = value;
+                }
+            }
         }
-
-        @Override
-        public String evaluateSelectedFilters(@Nullable final String query) {
-            return "";
-        }
+        return KickClipFilters.fromValues(sort, range);
     }
+
 }

@@ -29,6 +29,7 @@ public final class ChannelTabHelper {
                 || tab.equals(ChannelTabs.LIKES)
                 || tab.equals(ChannelTabs.PODCASTS)
                 || tab.equals(ChannelTabs.SHORTS)
+                || tab.equals(ChannelTabs.CLIPS)
                 || tab.equals(ChannelTabs.LIVESTREAMS);
     }
 
@@ -67,6 +68,8 @@ public final class ChannelTabHelper {
             return R.string.show_channel_tabs_likes;
         } else if (tab.equals(ChannelTabs.PODCASTS)) {
             return R.string.show_channel_tabs_podcasts;
+        } else if (tab.equals(ChannelTabs.CLIPS)) {
+            return R.string.show_channel_tabs_clips;
         }
         return -1;
     }
@@ -85,6 +88,8 @@ public final class ChannelTabHelper {
             return R.string.fetch_channel_tabs_likes;
         } else if (tab.equals(ChannelTabs.PODCASTS)) {
             return R.string.fetch_channel_tabs_podcasts;
+        } else if (tab.equals(ChannelTabs.CLIPS)) {
+            return R.string.fetch_channel_tabs_clips;
         }
         return -1;
     }
@@ -109,6 +114,8 @@ public final class ChannelTabHelper {
             return R.string.channel_tab_likes;
         } else if (tab.equals(ChannelTabs.PODCASTS)) {
             return R.string.channel_tab_podcasts;
+        } else if (tab.equals(ChannelTabs.CLIPS)) {
+            return R.string.channel_tab_clips;
         }
         return R.string.unknown_content;
     }

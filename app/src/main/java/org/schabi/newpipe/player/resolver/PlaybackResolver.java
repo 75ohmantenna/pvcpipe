@@ -233,7 +233,9 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                 }
                 break;
             case C.CONTENT_TYPE_HLS:
-                factory = dataSource.getLiveHlsMediaSourceFactory();
+                factory = metadata.getServiceId() == ServiceList.Kick.getServiceId()
+                        ? dataSource.getKickHlsMediaSourceFactory(null, null, true)
+                        : dataSource.getLiveHlsMediaSourceFactory();
                 break;
             default:
                 throw new ResolverException("Unsupported type: " + type);
@@ -262,6 +264,23 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             return createYoutubeMediaSource(stream, streamInfo, dataSource, cacheKey, metadata);
         }
 
+        if (isKickNativeVideoMaster(streamInfo, stream, metadata)) {
+            final AudioStream audio = metadata.getMaybeAudioTrack()
+                    .map(MediaItemTag.AudioTrack::getSelectedAudioStream).orElse(null);
+            final boolean live = StreamTypeUtil.isLiveStream(streamInfo.getStreamType());
+            final MediaItem.Builder item = new MediaItem.Builder()
+                    .setTag(metadata)
+                    .setUri(Uri.parse(streamInfo.getHlsUrl()))
+                    .setCustomCacheKey(cacheKey);
+            if (live) {
+                item.setLiveConfiguration(new MediaItem.LiveConfiguration.Builder()
+                        .setTargetOffsetMs(LIVE_STREAM_EDGE_GAP_MILLIS).build());
+            }
+            return dataSource.getKickHlsMediaSourceFactory(stream.getContent(),
+                    audio != null && audio.isUrl()
+                            && audio.getDeliveryMethod() == DeliveryMethod.HLS
+                            ? audio.getContent() : null, live).createMediaSource(item.build());
+        }
         final DeliveryMethod deliveryMethod = stream.getDeliveryMethod();
         switch (deliveryMethod) {
             case PROGRESSIVE_HTTP:
@@ -273,6 +292,21 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             default:
                 throw new ResolverException("Unsupported delivery type: " + deliveryMethod);
         }
+    }
+
+    /*
+     * Audio-mode combined fallbacks deliberately have no quality selection: they must keep using
+     * their actual media playlist instead of loading a video master.
+     */
+    static boolean isKickNativeVideoMaster(final StreamInfo info,
+                                          @Nullable final Stream stream,
+                                          final MediaItemTag metadata) {
+        return info.getServiceId() == ServiceList.Kick.getServiceId()
+                && stream instanceof VideoStream && stream.isUrl()
+                && stream.getDeliveryMethod() == DeliveryMethod.HLS
+                && info.getHlsUrl() != null && !info.getHlsUrl().isBlank()
+                && metadata.getMaybeQuality()
+                .map(MediaItemTag.Quality::getSelectedVideoStream).orElse(null) == stream;
     }
 
     private static ProgressiveMediaSource buildProgressiveMediaSource(

@@ -334,7 +334,8 @@ dependencies {
     implementation(libs.squareup.okhttp.urlconnection)
     // HLS parsing, downloading and remuxing shared by supported services
     implementation(libs.evermind.hlsdownloader)
-    implementation(libs.pvcpipe.slimhls.converter)
+    // Pinned minimal FFmpeg with MPEG-TS and MOV/MP4 input; see libs/README.md.
+    implementation(files("libs/slimhls-converter-7e7f373dbf-mov.aar"))
     // Logcat toolkit
     implementation(libs.evermind.logcattoolkit)
     // Cloudflare challenge helper

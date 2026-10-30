@@ -958,7 +958,11 @@ public class DownloadDialog extends DialogFragment
 
     private static List<VideoStream> withHlsStreams(final StreamInfo info,
                                                     final List<VideoStream> videoStreams) {
-        videoStreams.addAll(getStreamsOfSpecifiedDelivery(info.getVideoStreams(), HLS));
+        for (final VideoStream stream : info.getVideoStreams()) {
+            if (stream.getDeliveryMethod() == HLS && !stream.isVideoOnly()) {
+                videoStreams.add(stream);
+            }
+        }
         return videoStreams;
     }
 
