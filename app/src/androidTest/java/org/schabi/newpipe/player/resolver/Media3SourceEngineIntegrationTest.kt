@@ -12,7 +12,10 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.video.PlaceholderSurface
@@ -33,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -63,6 +67,7 @@ class Media3SourceEngineIntegrationTest {
     private lateinit var data: PlayerDataSource
     private lateinit var player: ExoPlayer
     private val engineError = AtomicReference<Throwable>()
+    private val loadErrors = CopyOnWriteArrayList<IOException>()
     private lateinit var isolatedContext: Context
     private lateinit var preferenceName: String
     private var videoSurface: PlaceholderSurface? = null
@@ -92,6 +97,17 @@ class Media3SourceEngineIntegrationTest {
 
                 override fun onCues(cueGroup: CueGroup) {
                     cues.addAll(cueGroup.cues.mapNotNull { it.text?.toString() })
+                }
+            })
+            player.addAnalyticsListener(object : AnalyticsListener {
+                override fun onLoadError(
+                    eventTime: AnalyticsListener.EventTime,
+                    loadEventInfo: LoadEventInfo,
+                    mediaLoadData: MediaLoadData,
+                    error: IOException,
+                    wasCanceled: Boolean
+                ) {
+                    loadErrors.add(error)
                 }
             })
         }
@@ -352,8 +368,24 @@ class Media3SourceEngineIntegrationTest {
     }
 
     @Test
-    fun kickSelectedCaptionFailureSurfacesAsAnActualEngineError() {
-        kickFailure("/text/en/first.vtt", "en")
+    fun kickSelectedCaptionFailureReportsLoadErrorWhileAudioAndVideoContinue() {
+        withKickFixture { fixture ->
+            fixture.missing = "/text/en/first.vtt"
+            selectText("en")
+            prepareKick(kickSources(), fixture.info(), "180p")
+            await {
+                loadErrors.any { error ->
+                    generateSequence<Throwable>(error) { it.cause }
+                        .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+                        .any { it.responseCode == 404 && it.dataSpec.uri.path == fixture.missing }
+                }
+            }
+            awaitDecodedAudioVideo(180)
+            await { player.currentPosition > 5500 }
+            assertTrue("Selected caption was actually requested", fixture.count(fixture.missing!!) > 0)
+            assertFalse(cues.contains("Kick English first"))
+            assertNull("Optional caption failure must not stop audio/video", engineError.get())
+        }
     }
 
     @Test
