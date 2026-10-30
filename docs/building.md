@@ -201,6 +201,27 @@ code alone is not a JUnit result. If signing, isolation or cleanup is uncertain,
 use a separate disposable environment. Do not assume older successful runs make
 an expanded suite safe.
 
+### Isolated native HLS/download scenarios
+
+The debug variant permits cleartext **only for `127.0.0.1`** through
+`debug_network_security_config.xml`, enabling the isolated loopback peers on
+older Android versions. Non-loopback cleartext remains denied; release does not
+include this debug-only policy. This is not permission to install or clear data.
+
+After inspecting the current harness lifecycles and verifying a disposable,
+compatible debug installation, run the selected classes directly:
+
+```sh
+adb -s '<verified-emulator-serial>' shell am instrument -w \
+  -e class org.schabi.newpipe.player.resolver.Media3SourceEngineIntegrationTest,us.shandian.giga.postprocessing.HlsDownloadIntegrationTest \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+These harnesses use temporary media/cache/storage and no application database.
+They still require the installation/signing checks above. Compilation, host
+FFmpeg conversion and controlled HTTP tests do not establish decoded Android
+playback, caption selection or real receiver behavior.
+
 ## Controlled validation tools
 
 Host drivers under `tools/` document their required fixtures, APKs and arguments;

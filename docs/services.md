@@ -62,18 +62,18 @@ saved playlists, history and queues are stored locally
 (see [library-data.md](library-data.md)). Optional Odysee count lookups register
 an anonymous visitor token; see [Odysee](#odysee).
 
-`DownloaderImpl` reports every HTTP 429 as a `ReCaptchaException`. The app
-can only do something about a captcha from YouTube: `ReCaptchaActivity` keeps
-YouTube's cookies and `DownloaderImpl` sends them back to YouTube only. So
-`ErrorInfo.solvableCaptchaUrl` offers the captcha screen for YouTube and
-Google-related hosts in its explicit allowlist. For other hosts it offers
-the service-specific “is not accepting requests right now” message rather
-than a challenge it cannot use. This classification does not establish the
-cause or scope of the refusal; Kick security blocks also use `ReCaptchaException`.
+`DownloaderImpl` translates HTTP 429 to `ReCaptchaException` only when the
+**final response URL** passes `ErrorInfo.isCaptchaSupportedUrl`. The shared
+YouTube/Google host allowlist also controls whether `solvableCaptchaUrl` offers
+the challenge screen. Other services receive the intact status, headers and
+body so their extractor can classify the response. YouTube cookies remain
+YouTube-only. Kick reports ordinary 429 as rate limiting and ordinary 403 as
+refusal; explicit security-challenge headers/HTML remain challenge errors.
+Neither classification bypasses a challenge or adds retries.
 
 "Hide paid content videos" in the PVCPipe settings sets a switch in the
-extractor for YouTube, Rumble and Odysee (`PvcExtractorSettings`). When enabled,
-their lists filter out content identified as requiring membership or payment.
+extractor for YouTube, Rumble, Odysee and Kick (`PvcExtractorSettings`). When
+enabled, their lists omit content identified as requiring membership or payment.
 
 Online video lists, grids, cards and compact related-video rows show a purple **PAID**
 thumbnail badge when the extractor reports membership or payment restrictions.
@@ -97,7 +97,7 @@ app shows them.
 | BitChute | videos, channels |
 | Rumble | videos, channels |
 | Odysee | all, videos, tracks, channels |
-| Kick | channels |
+| Kick | all, live, channels |
 
 Rumble, SoundCloud and Odysee build the sort part of a search address with
 `QuerySortFilterItem`. When changing a filter class, check the displayed order
@@ -189,30 +189,91 @@ protocol findings; they do not establish current live availability.
 
 ## Kick
 
-Kick supports public live broadcasts, retained VODs, channel search/suggestions,
-Featured discovery and local subscriptions. Channels have Videos and Livestreams
-tabs. `KickApi` defines the channel, fresh live playback URL, VOD, legacy-video,
-search and featured endpoints; extractors do not invent continuation pages.
+Kick supports account-free public live broadcasts, retained VODs and clips,
+All/Live/Channels search, channel suggestions, localized Featured discovery,
+related items and local subscriptions. Channels have Videos, Livestreams and
+Clips tabs. Videos/Live and search do not invent pagination. Clips use the
+server's opaque `cursor`; Featured uses `pagination.next_cursor` as **`after`**,
+not `page` or `cursor`. Continuation pages are scoped to the exact channel/filter
+or localized discovery URL and rebuilt internally before requests.
 
-Plain channel links open the current broadcast; channel `/videos` and `/about`
-links open the channel. Channel-scoped VOD links and older `/video/{uuid}` links
-are supported. Channel-scoped VOD lookup falls back to the legacy API only for
-404. Nonnegative VOD `t` offsets are read before canonicalization; invalid values
-fall back to zero and live playback ignores those recording offsets.
-Broadcast-specific `live` markers prevent an old feed/history entry from becoming
-a different broadcast. Subscription URLs remain channel Videos URLs.
+Plain channel links open the current broadcast. Channel `/videos`, `/about` and
+`/clips` collections open the channel; subscriptions always retain `/videos`.
+Clips accept both `/<slug>/clips/<clip_id>` and `/<slug>?clip=<clip_id>`, preserving
+clip-ID case in the canonical path URL. Ambiguous/duplicate/conflicting selectors
+and clip selectors on recording/item paths are rejected, not treated as live.
+Channel-scoped VOD links and older `/video/{uuid}` links remain supported, with
+legacy fallback only for 404. Nonnegative VOD `t` offsets are read before
+canonicalization; invalid offsets become zero and live playback ignores them.
 
-The internal live player uses the HLS master. External playback and VOD download
-selection can use combined HLS renditions. Ongoing recordings switch to live
-playback rather than being offered as finished downloads. Metadata/source caches
-are limited to one minute because live tokens expire quickly. A playback URL
-alone is not proof of live state; hidden or unknown viewer counts are omitted.
-Ordinary 403 responses are not challenges without challenge markers.
+Clips have Views/Upload date and day/week/month/all-time controls above the list,
+including empty/error results. Choices belong to the tab handler's explicit
+`?sort=...&range=...` URL, survive handler/queue reconstruction, and are not global
+defaults. An initial external Clips collection selects its actual visible tab
+with those filters; explicitly hidden tabs remain hidden. Feeds use date/all,
+independent of transient browsing choices. Explicit saved tab/feed sets remain
+authoritative; absent sets enable recognized tabs.
 
-Clips, playlists, comments, live chat, subtitles and account-follows import are
+Broadcast-specific `?live=<epoch-seconds>` identities prevent an old feed/history
+entry from becoming a different broadcast. An ongoing VOD can use fresh live
+playback only when its normalized start identity matches the current broadcast;
+missing identity is a parsing error and ended/mismatched broadcasts are unavailable.
+UUIDs and legacy numeric livestream IDs are not compared for ownership.
+
+Native Kick HLS video loads the original master while selecting the requested
+video rendition and compatible audio/subtitle groups. High-frame-rate qualities
+remain distinct, such as `720p` and `720p60`. Native HLS captions are not progressive
+VTT sidecars. Audio mode uses a genuine audio rendition when provided; a muxed
+fallback does not imply audio-only transfer savings. Missing selected renditions
+remain visible playback errors. External players/downloads retain actual media
+playlist URLs; direct MP4 clips never fetch their media as playlist text.
+Video-only HLS and live/ongoing streams are rejected before download destination
+effects. HLS audio/subtitle downloads remain excluded. Receiver caption selection
+is not newly promised; the main player remains the only cast playback-control panel.
+
+Thumbnails retain actual deduplicated candidates and filename-derived dimensions,
+not inaccurate srcset descriptors. Channel biography/ownership remains authoritative,
+including clips created by another user. Category, tags, language, counts and
+membership availability are exposed when supplied. Subscriber-only recordings
+raise a paid-content error before media access; public media URLs do not override
+explicit restrictions. Related failures are optional `StreamInfo` errors rather
+than media-fetch failures or silently empty successes. Source caches remain limited
+to one minute; hidden or unknown live viewer counts are not invented.
+
+Playlists, comments, live chat, account management and account-follows import are
 not implemented. Playback has no Pusher/Centrifugo dependency. See
-[the kick implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/) and the [dated protocol record](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/service-protocol-observations.md#kick-follow-up--2026-10-18)
-for source/image details and the limits of earlier transport observations.
+[the Kick implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/kick/)
+and the [dated protocol record](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/service-protocol-observations.md#kick-follow-up--2026-10-18).
+Earlier transport observations do not verify newer code or real receivers.
+
+### Public extraction follow-up — 2026-10-30
+
+A temporary `KickPublicSmokeTest` used `DownloaderTestImpl` directly with
+`-Ddownloader=REAL`, not recorded/mock responses. Search `xqc`, channel metadata,
+Videos/Clips, a distinct second Clips cursor page and a distinct second
+Featured `after` page succeeded. Selected public content:
+
+- VOD: `https://kick.com/xqc/videos/01a18946-1d20-7dc3-ba54-8b71a4c0a844`.
+  Extraction exposed five video qualities and five subtitle playlists; master,
+  a video media playlist and a subtitle playlist were fetched successfully.
+- Clip: `https://kick.com/xqc/clips/clip_01M66HHJD5N91Z25HG2V10XM6Y`.
+  Extraction and its HLS media playlist succeeded, with one combined video stream.
+
+Signed media URLs/tokens are intentionally not recorded. The temporary harness
+was removed after execution. This is public HTTP/extractor evidence, not Android
+decoded playback, in-app UI, completed device download or real FCast receiver proof.
+The native caption/download instrumentation classes compile but were not run:
+no Android device was attached, and this host had no emulator binary or KVM.
+Host/controller checks covered filter transitions, external collection visible-tab
+selection and hidden-tab preference precedence; they do not substitute for device UI.
+
+The integrated `make ci` gate passed: fixture sanitation, build-source tests,
+style/dependency-order checks, complete app JVM/extractor offline suites,
+Android lint, and debug/release assembly. `assembleDebugAndroidTest` also passed.
+The host's composite-build lock script raised `OverlappingFileLockException`;
+verification used a temporary Gradle home reusing the existing caches, with the
+same global file lock held once around each invocation. Host configuration was
+not changed. No APK was installed and no application data was cleared.
 
 ## Removed services
 
