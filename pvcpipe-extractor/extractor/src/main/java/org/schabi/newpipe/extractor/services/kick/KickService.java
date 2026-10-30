@@ -19,10 +19,12 @@ import org.schabi.newpipe.extractor.playlist.PlaylistExtractor;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickChannelExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickChannelTabExtractor;
+import org.schabi.newpipe.extractor.services.kick.extractors.KickClipExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickKioskExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickSearchExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickStreamExtractor;
 import org.schabi.newpipe.extractor.services.kick.extractors.KickSuggestionExtractor;
+import org.schabi.newpipe.extractor.services.kick.settings.KickSettings;
 import org.schabi.newpipe.extractor.settings.ServiceSettings;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.subscription.SubscriptionExtractor;
@@ -117,6 +119,9 @@ public final class KickService extends StreamingService {
 
     @Override
     public StreamExtractor getStreamExtractor(final LinkHandler handler) {
+        if (KickUrl.isClip(handler.getId())) {
+            return new KickClipExtractor(this, handler);
+        }
         return new KickStreamExtractor(this, handler);
     }
 
@@ -127,6 +132,6 @@ public final class KickService extends StreamingService {
 
     @Override
     public ServiceSettings getServiceSettings() {
-        return null;
+        return KickSettings.getInstance();
     }
 }

@@ -8,6 +8,7 @@ import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.services.kick.KickApi;
 import org.schabi.newpipe.extractor.services.kick.KickUrl;
 import org.schabi.newpipe.extractor.stream.StreamInfoItemExtractor;
+import org.schabi.newpipe.extractor.stream.ContentAvailability;
 import org.schabi.newpipe.extractor.stream.StreamType;
 
 import java.util.List;
@@ -40,7 +41,7 @@ public final class KickStreamInfoItemExtractor implements StreamInfoItemExtracto
 
     @Override
     public List<Image> getThumbnails() {
-        return KickApi.images(KickApi.image(stream, "thumbnail"));
+        return KickApi.thumbnails(stream);
     }
 
     @Override
@@ -92,5 +93,10 @@ public final class KickStreamInfoItemExtractor implements StreamInfoItemExtracto
     @Override
     public DateWrapper getUploadDate() throws ParsingException {
         return KickApi.date(getTextualUploadDate());
+    }
+
+    @Override
+    public ContentAvailability getContentAvailability() {
+        return KickApi.availability(stream);
     }
 }

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
@@ -33,11 +34,15 @@ import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
+import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
+import org.schabi.newpipe.extractor.search.filter.FilterItem;
+import org.schabi.newpipe.extractor.search.filter.LibraryStringIds;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
+import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
@@ -82,7 +87,6 @@ class KickExtractorTest {
             "https://kick.com/example/videos/not-a-uuid", "https://kick.com/example/clips/123",
             "https://kick.com/example/extra", "https://kick.com/%65xample",
             "https://kick.com/example%2Fvideos%2F" + CURRENT_UUID,
-            "https://kick.com/example?clip=clip_123", "https://kick.com/example?%63lip=clip_123",
             "https://kick.com/", "https://kick.com",
             "https://kick.com/example?live=0", "https://kick.com/example?live=-1",
             "https://kick.com/example?live=9999999999999999999",
@@ -145,6 +149,41 @@ class KickExtractorTest {
         assertEquals(2400000, info.getVideoStreams().get(0).getBitrate());
         assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
         assertTrue(downloader.requests.stream().noneMatch(r -> r.url().contains("/api/v1/video/")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void liveAndRecordingExposeCachedAudioAndCaptionGroups(final boolean live) throws Exception {
+        if (live) {
+            downloader.channel(true).on(CHANNEL_API + "/playback-url",
+                    "{\"data\":\"" + MASTER_URL + "\"}");
+        } else {
+            downloader.recording();
+        }
+        downloader.on(MASTER_URL, "#EXTM3U\n"
+                + "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"a\",NAME=\"Original\","
+                + "LANGUAGE=\"fr\",URI=\"audio.m3u8\"\n"
+                + "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"s\",NAME=\"French\","
+                + "LANGUAGE=\"fr\",URI=\"text.m3u8\"\n"
+                + "#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720,"
+                + "CODECS=\"avc1.4d401f,mp4a.40.2\",AUDIO=\"a\",SUBTITLES=\"s\"\n"
+                + "video.m3u8?signature=keep\n");
+        final StreamExtractor extractor = Kick.getStreamExtractor(
+                live ? "https://kick.com/example" : VIDEO_URL);
+        extractor.fetchPage();
+        assertEquals(MASTER_URL, extractor.getHlsUrl());
+        assertTrue(extractor.getVideoStreams().isEmpty());
+        assertEquals(1, extractor.getVideoOnlyStreams().size());
+        assertTrue(extractor.getVideoOnlyStreams().get(0).isVideoOnly());
+        assertEquals(extractor.getVideoOnlyStreams().get(0).getContent(),
+                extractor.getVideoOnlyStreams().get(0).getManifestUrl());
+        assertEquals(1, extractor.getAudioStreams().size());
+        assertEquals(MASTER_URL, extractor.getAudioStreams().get(0).getManifestUrl());
+        assertEquals("fr", extractor.getSubtitlesDefault().get(0).getLanguageTag());
+        assertEquals(extractor.getSubtitlesDefault(), extractor.getSubtitles(MediaFormat.VTT));
+        assertTrue(extractor.getSubtitles(MediaFormat.SRT).isEmpty());
+        assertEquals(1, downloader.requests.stream()
+                .filter(request -> MASTER_URL.equals(request.url())).count());
     }
 
     @Test
@@ -279,7 +318,9 @@ class KickExtractorTest {
         final String result = "{\"data\":[" + JsonWriter.string(channel) + "]}";
         downloader.on("https://search.kick.com/api/v1/channels/search?query=a%26b&limit=50", result)
                 .on("https://search.kick.com/api/v1/channels/search?query=a%26b&limit=10", result);
-        final SearchInfo search = SearchInfo.getInfo(Kick, Kick.getSearchQHFactory().fromQuery("a&b"));
+        final SearchInfo search = SearchInfo.getInfo(Kick, Kick.getSearchQHFactory().fromQuery(
+                "a&b", List.of(new FilterItem(KickSearchFilters.CHANNELS,
+                        LibraryStringIds.SEARCH_FILTERS_CHANNELS)), List.of()));
         assertEquals(1, search.getRelatedItems().size());
         final ChannelInfoItem first = (ChannelInfoItem) search.getRelatedItems().get(0);
         assertEquals(CHANNEL_URL, first.getUrl());
@@ -295,7 +336,8 @@ class KickExtractorTest {
 
     @Test
     void featuredLiveDiscoveryLeadsToPlayback() throws Exception {
-        downloader.on(KickApi.FEATURED, "{\"data\":{\"livestreams\":[{\"title\":\"Featured live\","
+        downloader.on(KickApi.livestreamsUrl("en", 24, null, null),
+                "{\"data\":{\"livestreams\":[{\"title\":\"Featured live\","
                 + "\"show_view_count\":false,\"viewer_count\":999,"
                 + "\"start_time\":\"2026-10-18T12:00:00Z\","
                 + "\"thumbnail\":{\"src\":\"https://images.example/featured.webp\"},"
@@ -359,6 +401,26 @@ class KickExtractorTest {
         final ChannelInfo info = ChannelInfo.getInfo(Kick, CHANNEL_URL);
         assertEquals(bio, info.getDescription());
         assertTrue(info.getErrors().isEmpty(), info.getErrors().toString());
+    }
+
+    @Test
+    void subscriberOnlyRecordingsNeverFetchSuppliedMedia() {
+        final JsonObject video = KickFixtures.videoData();
+        video.put("status", "sub_only");
+        downloader.channel(false).on(VIDEOS_API + "/" + CURRENT_UUID,
+                "{\"data\":" + JsonWriter.string(video) + "}");
+        final PaidContentException error = assertThrows(PaidContentException.class,
+                () -> StreamInfo.getInfo(Kick, VIDEO_URL));
+        assertEquals("This Kick recording requires a channel subscription", error.getMessage());
+        assertTrue(downloader.requests.stream().noneMatch(r -> r.url().equals(MASTER_URL)));
+        final JsonObject legacy = KickFixtures.json("{\"uuid\":\"" + LEGACY_UUID
+                + "\",\"status\":\"sub_only\",\"source\":\"" + MASTER_URL + "\"}");
+        video.put("channel", KickFixtures.channelData(false));
+        legacy.put("livestream", video);
+        downloader.on("https://kick.com/api/v1/video/" + LEGACY_UUID, JsonWriter.string(legacy));
+        assertThrows(PaidContentException.class,
+                () -> StreamInfo.getInfo(Kick, "https://kick.com/video/" + LEGACY_UUID));
+        assertTrue(downloader.requests.stream().noneMatch(r -> r.url().equals(MASTER_URL)));
     }
 
     @Test
@@ -443,6 +505,7 @@ class KickExtractorTest {
     void ongoingRecordingLinkRoutesToLivePlaybackRatherThanPartialDownload() throws Exception {
         final JsonObject ongoing = KickFixtures.videoData();
         ongoing.put("is_live", true);
+        ongoing.put("start_time", "2026-10-18T12:00:00Z");
         ongoing.put("recording_url", "");
         downloader.channel(true).on(VIDEOS_API + "/" + CURRENT_UUID,
                 "{\"data\":" + JsonWriter.string(ongoing) + "}")
@@ -461,7 +524,8 @@ class KickExtractorTest {
     @Test
     void ongoingLegacyRecordingLoadsFullChannelBeforeLivePlayback() throws Exception {
         final JsonObject nestedChannel = KickFixtures.json("{\"slug\":\"example\"}");
-        final JsonObject ongoing = KickFixtures.json("{\"is_live\":true,\"duration\":0}");
+        final JsonObject ongoing = KickFixtures.json("{\"is_live\":true,\"duration\":0,"
+                + "\"start_time\":\"2026-10-18T12:00:00Z\"}");
         ongoing.put("channel", nestedChannel);
         final JsonObject legacy = KickFixtures.json("{\"uuid\":\"" + LEGACY_UUID + "\"}");
         legacy.put("livestream", ongoing);
@@ -473,6 +537,25 @@ class KickExtractorTest {
         assertEquals(StreamType.LIVE_STREAM, info.getStreamType());
         assertEquals("Live title", info.getName());
         assertEquals(MASTER_URL, info.getHlsUrl());
+    }
+
+    @Test
+    void ongoingRecordingCannotPlayADifferentOrMissingBroadcast() {
+        final JsonObject ongoing = KickFixtures.videoData();
+        ongoing.put("is_live", true);
+        downloader.channel(true).on(VIDEOS_API + "/" + CURRENT_UUID,
+                "{\"data\":" + JsonWriter.string(ongoing) + "}");
+        final ContentNotAvailableException ended = assertThrows(ContentNotAvailableException.class,
+                () -> StreamInfo.getInfo(Kick, VIDEO_URL));
+        assertEquals("This Kick broadcast has ended", ended.getMessage());
+        ongoing.remove("start_time");
+        downloader.on(VIDEOS_API + "/" + CURRENT_UUID,
+                "{\"data\":" + JsonWriter.string(ongoing) + "}");
+        final ParsingException missing = assertThrows(ParsingException.class,
+                () -> StreamInfo.getInfo(Kick, VIDEO_URL));
+        assertEquals("Kick recording has no broadcast identity", missing.getMessage());
+        assertTrue(downloader.requests.stream().noneMatch(
+                r -> r.url().contains("playback-url") || r.url().equals(MASTER_URL)));
     }
 
     @Test
@@ -515,8 +598,9 @@ class KickExtractorTest {
 
     @Test
     void legacyAtSignChannelsRemainBrowsableFromCurrentSearch() throws Exception {
-        downloader.on("https://search.kick.com/api/v1/channels/search?query=legacy&limit=50",
-                "{\"data\":[{\"id\":42,\"slug\":\"@legacy\",\"username\":\"@Legacy\"}]}");
+        downloader.on("https://search.kick.com/api/v1/search/enriched?query=legacy",
+                "{\"data\":{\"livestreams\":[],\"channels\":[{\"id\":42,"
+                        + "\"slug\":\"@legacy\",\"username\":\"@Legacy\"}]}}");
         final JsonObject channel = KickFixtures.channelData(false);
         channel.put("slug", "@legacy");
         downloader.on("https://kick.com/api/v2/channels/@legacy", JsonWriter.string(channel));

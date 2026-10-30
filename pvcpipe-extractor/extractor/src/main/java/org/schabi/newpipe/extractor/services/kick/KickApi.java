@@ -14,21 +14,27 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
+import org.schabi.newpipe.extractor.services.kick.settings.KickSettings;
+import org.schabi.newpipe.extractor.stream.ContentAvailability;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.IllformedLocaleException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nullable;
+
 public final class KickApi {
-    public static final String FEATURED =
-            "https://web.kick.com/api/v1/livestreams/featured?language=en";
     private static final Map<String, List<String>> HEADERS = Map.of(
             "Accept", List.of("application/json"),
             "Referer", List.of(KickUrl.BASE + "/"),
@@ -180,10 +186,50 @@ public final class KickApi {
         data.put("duration", data.getLong("duration", 0) / 1000);
         data.put("recording_url", legacy.getString("source", ""));
         data.put("views", legacy.getLong("views", -1));
-        data.put("status", legacy.getString("status", ""));
-        data.put("is_private", legacy.getBoolean("is_private"));
-        data.put("is_pruned", legacy.getBoolean("is_pruned"));
-        data.put("deleted_at", legacy.get("deleted_at"));
+        final String status = legacy.getString("status", data.getString("status", ""));
+        final String nestedStatus = data.getString("status", "");
+        data.put("status", "private".equals(status) || "private".equals(nestedStatus)
+                ? "private" : "sub_only".equals(status) || "sub_only".equals(nestedStatus)
+                ? "sub_only" : status);
+        data.put("is_private", legacy.getBoolean("is_private") || data.getBoolean("is_private"));
+        data.put("is_pruned", legacy.getBoolean("is_pruned") || data.getBoolean("is_pruned"));
+        data.put("deleted_at", legacy.get("deleted_at") == null
+                ? data.get("deleted_at") : legacy.get("deleted_at"));
+        return data;
+    }
+
+    public static JsonObject clip(final String clipId) throws IOException, ExtractionException {
+        final String id = KickUrl.clipId(clipId);
+        final JsonObject clip = child(object(KickUrl.BASE + "/api/v2/clips/" + id), "clip");
+        if (clip.isEmpty()) {
+            throw new ContentNotAvailableException("This Kick clip is unavailable");
+        }
+        if (!id.equals(clip.getString("id"))) {
+            throw new ParsingException("Kick returned a different clip");
+        }
+        final JsonObject channel = child(clip, "channel");
+        KickUrl.slug(channel.getString("slug", ""));
+        if (channel.getLong("id", 0) <= 0) {
+            throw new ParsingException("Kick clip has no channel identity");
+        }
+        return clip;
+    }
+
+    public static JsonObject clips(final long channelId, final String sort,
+                                   final String timeRange, @Nullable final String cursor)
+            throws IOException, ExtractionException {
+        if (channelId <= 0) {
+            throw new ParsingException("Kick channel has no numeric ID");
+        }
+        KickClipFilters.fromValues(sort, timeRange);
+        final String url = "https://web.kick.com/api/v1/channels/" + channelId
+                + "/clips?sort=" + sort + "&time=" + timeRange
+                + (cursor == null || cursor.isBlank() ? ""
+                : "&cursor=" + Utils.encodeUrlUtf8(cursor));
+        final JsonObject data = child(object(url), "data");
+        if (!(data.get("clips") instanceof JsonArray)) {
+            throw new ParsingException("Kick clips response has no clip list");
+        }
         return data;
     }
 
@@ -195,6 +241,38 @@ public final class KickApi {
             throw new ParsingException("Kick search response has no channel list");
         }
         return result.getArray("data");
+    }
+
+    public static JsonObject enrichedSearch(final String query)
+            throws IOException, ExtractionException {
+        return child(object("https://search.kick.com/api/v1/search/enriched?query="
+                + Utils.encodeUrlUtf8(query)), "data");
+    }
+
+    public static String livestreamsUrl(final String language, final int limit,
+                                       @Nullable final Long categoryId,
+                                       @Nullable final String after) {
+        final String normalized = language == null || language.isBlank()
+                ? "en" : language.toLowerCase(Locale.ROOT);
+        if (limit <= 0 || categoryId != null && categoryId <= 0) {
+            throw new IllegalArgumentException("Kick discovery requires positive limit/category");
+        }
+        return "https://web.kick.com/api/v1/livestreams?limit=" + limit
+                + "&sort=featured_home&language=" + Utils.encodeUrlUtf8(normalized)
+                + (categoryId == null ? "" : "&category_id=" + categoryId)
+                + (after == null || after.isBlank() ? "" : "&after=" + Utils.encodeUrlUtf8(after));
+    }
+
+    public static JsonObject livestreams(final String language, final int limit,
+                                        @Nullable final Long categoryId,
+                                        @Nullable final String after)
+            throws IOException, ExtractionException {
+        final JsonObject data = child(object(livestreamsUrl(language, limit, categoryId, after)),
+                "data");
+        if (!(data.get("livestreams") instanceof JsonArray)) {
+            throw new ParsingException("Kick discovery response has no livestream list");
+        }
+        return data;
     }
 
     public static JsonObject child(final JsonObject value, final String key) {
@@ -257,6 +335,105 @@ public final class KickApi {
             return ((JsonObject) image).getString("src", ((JsonObject) image).getString("url", ""));
         }
         return "";
+    }
+
+    public static List<Image> thumbnails(final JsonObject item) {
+        final Set<String> urls = new LinkedHashSet<>();
+        final Object thumbnail = item.get("thumbnail");
+        if (thumbnail instanceof JsonObject) {
+            final JsonObject image = (JsonObject) thumbnail;
+            thumbnailCandidates(urls, image.get("srcSet"));
+            thumbnailCandidates(urls, image.get("srcset"));
+            urls.add(image.getString("src", ""));
+            urls.add(image.getString("url", ""));
+        } else if (thumbnail instanceof String) {
+            urls.add((String) thumbnail);
+        }
+        urls.add(item.getString("thumbnail_url", ""));
+        final List<Image> result = new ArrayList<>();
+        for (final String url : urls) {
+            result.addAll(images(url));
+        }
+        return result;
+    }
+
+    private static void thumbnailCandidates(final Set<String> urls, final Object candidates) {
+        if (candidates instanceof String) {
+            for (final String candidate : ((String) candidates).split(",")) {
+                final String url = candidate.trim().split("\\s+", 2)[0];
+                if (!url.isEmpty()) {
+                    urls.add(url);
+                }
+            }
+        } else if (candidates instanceof JsonArray) {
+            for (final Object candidate : (JsonArray) candidates) {
+                thumbnailCandidates(urls, candidate);
+            }
+        }
+    }
+
+    public static String category(final JsonObject item) {
+        final String singular = child(item, "category").getString("name", "").trim();
+        if (!singular.isEmpty()) {
+            return singular;
+        }
+        final JsonArray categories = item.getArray("categories");
+        if (categories != null) {
+            for (final Object category : categories) {
+                if (category instanceof JsonObject) {
+                    final String name = ((JsonObject) category).getString("name", "").trim();
+                    if (!name.isEmpty()) {
+                        return name;
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    public static List<String> tags(final JsonObject item) {
+        final Set<String> result = new LinkedHashSet<>();
+        final JsonArray tags = item.getArray("tags");
+        if (tags != null) {
+            for (final Object tag : tags) {
+                if (tag instanceof String && !((String) tag).isBlank()) {
+                    result.add(((String) tag).trim());
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    @Nullable
+    public static Locale language(final JsonObject item) {
+        final String language = item.getString("language", "").trim();
+        try {
+            final Locale locale = new Locale.Builder().setLanguageTag(language).build();
+            return locale.getLanguage().isEmpty() || "und".equals(locale.getLanguage())
+                    ? null : locale;
+        } catch (final IllformedLocaleException e) {
+            return null;
+        }
+    }
+
+    public static ContentAvailability availability(final JsonObject item) {
+        final String status = item.getString("status", item.getString("privacy", ""));
+        if ("sub_only".equals(status)) {
+            return ContentAvailability.MEMBERSHIP;
+        }
+        return "public".equals(status) ? ContentAvailability.AVAILABLE
+                : ContentAvailability.UNKNOWN;
+    }
+
+    public static boolean listable(final JsonObject item) {
+        final String status = item.getString("status", "");
+        return !item.getBoolean("is_banned") && !item.getBoolean("is_private")
+                && !item.getBoolean("is_pruned") && !item.getBoolean("is_deleted")
+                && item.get("deleted_at") == null && !"private".equals(status)
+                && !"deleted".equals(status) && !"pruned".equals(status) && !"banned".equals(status)
+                && !"private".equals(item.getString("privacy"))
+                && !(availability(item) == ContentAvailability.MEMBERSHIP
+                && KickSettings.getInstance().isSettingEnabled(KickSettings.HIDE_PAID_STREAMS));
     }
 
     public static long followers(final JsonObject channel) {

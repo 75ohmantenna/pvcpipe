@@ -120,5 +120,6 @@ abstract class PvcServiceHelper {
         LibraryStringIds.CHANNEL_TAB_ALBUMS -> LibraryStringIds.CHANNEL_TAB_ALBUMS.name
         LibraryStringIds.CHANNEL_TAB_LIKES -> LibraryStringIds.CHANNEL_TAB_LIKES.name
         LibraryStringIds.CHANNEL_TAB_PODCASTS -> LibraryStringIds.CHANNEL_TAB_PODCASTS.name
+        LibraryStringIds.CHANNEL_TAB_CLIPS -> context.getString(R.string.channel_tab_clips)
     }
 }
