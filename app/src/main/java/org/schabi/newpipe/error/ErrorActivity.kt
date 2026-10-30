@@ -327,7 +327,7 @@ class ErrorActivity : PvcErrorActivity() {
             contentLanguageString + "\n" +
             contentCountryString + "\n" +
             appLanguage + "\n" +
-            info.getServiceName() + "\n" +
+            info.getServiceName(this) + "\n" +
             currentTimeStamp + "\n" +
             packageName + "\n" +
             BuildConfig.VERSION_NAME + "\n" +

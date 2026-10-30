@@ -725,6 +725,7 @@
     <string name="private_content">This content is private, so it cannot be streamed or downloaded by PVCPipe.</string>
     <string name="youtube_music_premium_content">This video is available only to YouTube Music Premium members, so it cannot be streamed or downloaded by PVCPipe.</string>
     <string name="account_terminated">Account terminated</string>
+    <string name="unknown_service">Unknown service</string>
     <string name="account_terminated_service_provides_reason">Account terminated\n\n%1$s provides this reason: %2$s</string>
     <string name="paid_video">Paid</string>
     <string name="paid_content">This content is only available to users who have paid, so it cannot be streamed or downloaded by PVCPipe.</string>

@@ -22,7 +22,7 @@ A guide describes the code as it is now and names the classes to read.
 | [playback.md](playback.md) | Source selection, FCast setup and limits, queue control, audio focus, history, errors and YouTube proof tokens |
 | [library-data.md](library-data.md) | Local playlists, bookmarks, service-grouped subscriptions, feed refresh, subscription transfers, backup and restore |
 | [download-preparation.md](download-preparation.md) | Download selection and submission, checkpoints, deletion retries and process-death evidence, HLS processing and finished-file sharing |
-| [error-reporting.md](error-reporting.md) | Pagination diagnostics, report timestamp provenance, formatting and remaining exposure |
+| [error-reporting.md](error-reporting.md) | Pagination diagnostics, report timestamp provenance, service display labels, formatting and remaining exposure |
 | [../GLOSSARY.md](../GLOSSARY.md) | The terms the code and these pages use |
 
 ## Records
