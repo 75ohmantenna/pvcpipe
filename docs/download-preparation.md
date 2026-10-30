@@ -616,7 +616,10 @@ form a transaction across media, checkpoints, receipts and the finished database
 If media removal succeeds but saving its receipt fails, the current process keeps
 the result in memory for retry; process death in that gap cannot establish the
 removed-file state on the next launch. Restoring provider access or durable storage
-may still be necessary. Old app builds do not understand these deletion receipts.
+may still be necessary. The [process-death follow-up](#deletion-process-death-verification-2026-10-30)
+reproduces that uncertainty and verifies recovery after provider access is restored;
+it does not remove the cross-provider transaction gap. Old app builds do not
+understand these deletion receipts.
 
 "Delete entry" keeps the file and is offered only for finished downloads.
 `DownloadManager.deleteMission` also refuses entry-only removal for unfinished
@@ -890,3 +893,121 @@ links. Version/SDK/application-ID values, dependencies, database schemas, existi
 test assertions, legal notices and repository/device safety rules are unchanged.
 Local links, anchors, paths, symbol references and the documented shell syntax
 were checked; no new external URL verification or physical-device test was claimed.
+
+## Deletion process-death verification, 2026-10-30
+
+This follow-up tests actual host-delivered `SIGKILL`, separately from the earlier
+same-process manager reload. Production code is unchanged from `41a6c292f`; the
+additions are test fixtures, a host driver and documentation. The final run used
+the owned `pvcpipe_layout_api26_20261030` AOSP emulator on Android 8.0/API 26.
+No physical device was targeted.
+
+[`DownloadDeletionCrashTest`](../app/src/androidTest/java/us/shandian/giga/service/DownloadDeletionCrashTest.java)
+uses the normal AndroidJUnitRunner and production `DebugApp`, with a new nonce
+and isolated download files/database context for each case. Its pending missions
+are idle fixtures, not active network transfers. The test APK's separate
+DocumentsProvider process supplies two host-released barriers: before media
+removal and after removal but before returning success. The before-removal case
+deliberately aborts the outstanding provider operation after caller death; it does
+not establish that arbitrary providers cancel a request when their caller dies.
+
+[`tools/download_deletion_crashes.py`](../tools/download_deletion_crashes.py)
+requires explicit disposable acknowledgement, an emulator serial, the exact AVD
+name, API 26 and matching installed debug/test APK hashes. A host nonce must match
+the private fixture marker. Before each kill it reads `/proc/<pid>/cmdline` under
+the debug UID and requires the exact debug main-process name. Verification runs
+in a different PID. Native phases held for destruction are expected to terminate
+without a JUnit pass; the driver counts only successful prepare/verify phases.
+
+The final eight cases passed, with eight confirmed `SIGKILL`s and sixteen normal
+prepare/verify JUnit completions:
+
+| Boundary, tested for both finished and pending downloads | Observed result |
+| --- | --- |
+| Provider blocked before removal, then aborted | Original media bytes and persisted grant survived the kill. The entry retained its URI. Restoring provider service let Delete finish. Pending deletion intent blocked Start, recovery, queueing and finished publication. |
+| Media removed, provider reply withheld | After the kill and provider reply, Android revoked the document grant. No receipt existed. The new process retained the URI/entry and refused another unconfirmed deletion. The owner activity restored access without recreating media; a real empty provider query then established absence, and Delete completed. |
+| Receipt saved, bookkeeping refused | A native SQLite trigger rejected deletion of the finished fixture row; a nonempty `.new` directory blocked pending checkpoint cleanup. The receipt survived process death. Removing only the fixture's trigger/blocker let the new process finish cleanup without restoring the revoked URI grant. |
+| Deletion already committed | The new process found no target entry/checkpoint. The provider's media remained absent. |
+
+Every case also retains unrelated finished and pending download entries and media.
+Before killing, the driver hashes those media files, the unrelated pending
+checkpoint, and a separate native SQLite sentinel database with a committed WAL
+held open. It compares all five files before and after `SIGKILL`, before another
+process opens the database. The verification phase reads the WAL-backed sentinel
+row, checks unrelated download fields and bytes, and the host compares the two
+unrelated media files and checkpoint again. The sentinel is an isolated fixture,
+not the app's normal Room database or evidence about every SQLite configuration.
+
+The earlier native provider-refusal/SQLite/checkpoint regression method also
+passed against the new test APK. Final matrix evidence is
+`/tmp/pvcpipe-deletion-crash-20261030/native-final/`, with per-phase logs, PID and
+hash events, and `result.json`. The existing native regression is recorded in
+`native-existing/` under the same evidence root. The installed APK SHA-256 values
+were:
+
+- Debug: `0038b7c5d44cb71177b6ada426a4dade321f30136417abd21a7fe3b1b8d58ebb`.
+- Test: `c00846d8018bcb242f021929642f1efdbbeb0b9430b1901ac8d1755449df7a6f`.
+
+The first matrix run passed both finished-provider barriers, then failed its
+receipt-boundary assertion: Android reopened the fixture's cached read-only
+SQLite connection for writing, so the intended failure did not occur. That run
+is preserved in `native-run-01/`, not counted as a complete pass. The corrected
+fixture uses the native trigger above and removes it only during verification.
+Two earlier style runs rejected long lines; the reviewed fixture build and
+Checkstyle then passed. Negative host probes rejected a physical-style serial,
+the wrong AVD name and a mismatched APK before marker or process mutations.
+Adversarial review also found the host could publish a passing result before
+checking package cleanup. The driver now requires successful cleanup before
+writing `result.json`; four local host-driver tests cover failed cleanup, failed
+native phases, unvalidated targets and successful completion. They use controlled
+command responses and provide no Android behavioral evidence. The earlier full
+matrix in `native-run-02/` remains separate from the final driver rerun.
+
+To reproduce, build with
+`./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest`, then
+install matching APKs on a [verified disposable emulator](building.md#tests).
+Android CLI can start the owned AVD and install the APKs; verify an existing
+installation's package/signing compatibility before an `-r` update. With the
+actual serial and exact AVD name, run:
+
+```sh
+set -e
+deletion_evidence=$(mktemp -d /tmp/pvcpipe-deletion-crashes.XXXXXX)
+python3 tools/download_deletion_crashes.py \
+  --serial emulator-5554 --avd-name pvcpipe_layout_api26_20261030 \
+  --allow-disposable \
+  --app-apk app/build/outputs/apk/debug/app-debug.apk \
+  --test-apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+  --output "$deletion_evidence/run"
+```
+
+Run the host-driver safety regressions separately with
+`python3 -m unittest discover -s tools -p test_download_deletion_crashes.py`.
+The Makefile's sanitizer-test selection does not include them.
+
+The driver performs no installation, uninstall, app-data clear or Gradle device
+task. It force-stops only the validated disposable debug/test packages on exit and
+retains fixtures and logs. These controlled debug-APK results do not establish
+arbitrary provider behavior, physical hardware/power-loss behavior, interruption
+inside every AtomicFile write, minified-device serialization or normal Downloads
+screen interactions. No production behavior was changed to turn an inaccessible
+URI into proof of deletion. The no-receipt gap remains a measured limitation;
+FCast source-start stays deferred.
+
+`make ci` passed for the final fixture sources: 12 sanitizer tests, 685 recorded
+fixtures needing no replacements, style/dependency checks, JVM tasks, lint and
+debug/release assembly. JVM tasks were up to date: their unchanged reports contain
+1,199 app passes, 807 extractor passes with three skips, and three build-logic
+passes. They are supporting prior JVM evidence, separate from the newly executed
+native phases and four host-driver tests. Lint has zero errors and 59 existing
+warnings. The explicit AndroidTest assembly and Checkstyle run passed separately;
+`make ci` does not assemble or run these native tests. Changed-file spelling,
+259 local links and ten source-line bounds across 21 tracked Markdown files,
+new shell-command syntax and diff whitespace checks passed.
+
+The installed debug APK was unchanged; the test APK update checked signing
+compatibility and used `-r`. Final installed hashes matched the tested artifacts.
+All nine saved display/accessibility/animation settings were unchanged, the
+debug/test processes were stopped, and Android CLI stopped the owned emulator.
+Fixtures and logs remain for review. No package uninstall, app-data clear,
+connected Gradle device task, physical-device operation or FCast test was used.

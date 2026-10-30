@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
+import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsProvider;
 
@@ -62,7 +63,8 @@ public class DeletionDocumentsProvider extends DocumentsProvider {
             } else if ("set-policy".equals(method)) {
                 final String policy = extras.getString("policy");
                 if (!dir.isDirectory() || !("allow".equals(policy)
-                        || "refuse".equals(policy) || "unavailable".equals(policy))) {
+                        || "refuse".equals(policy) || "unavailable".equals(policy)
+                        || "hold-before".equals(policy) || "hold-after".equals(policy))) {
                     throw new IllegalArgumentException("Invalid fixture policy");
                 }
                 Files.write(new File(dir, "policy").toPath(),
@@ -126,13 +128,38 @@ public class DeletionDocumentsProvider extends DocumentsProvider {
     }
 
     @Override public void deleteDocument(final String id) throws FileNotFoundException {
-        if (!"allow".equals(policy(id))) {
+        final String mode = policy(id);
+        if ("hold-before".equals(mode)) {
+            barrier(id);
+            // This case models a provider aborting the outstanding request after caller death.
+            throw new SecurityException("Controlled abort before media removal");
+        }
+        if (!"allow".equals(mode) && !"hold-after".equals(mode)) {
             throw new SecurityException("Controlled deletion refusal");
         }
         try {
             Files.delete(new File(directory(id), "media.bin").toPath());
         } catch (final IOException e) {
             throw new FileNotFoundException("Fixture already absent");
+        }
+        if ("hold-after".equals(mode)) {
+            barrier(id);
+        }
+    }
+
+    private void barrier(final String id) throws FileNotFoundException {
+        final File dir = directory(id);
+        try {
+            Files.write(new File(dir, "entered").toPath(), BYTES);
+            final long deadline = SystemClock.uptimeMillis() + 120_000;
+            while (!new File(dir, "release").isFile()) {
+                if (SystemClock.uptimeMillis() >= deadline) {
+                    throw new FileNotFoundException("Host did not release provider barrier");
+                }
+                SystemClock.sleep(50);
+            }
+        } catch (final IOException e) {
+            throw new FileNotFoundException("Provider barrier failed: " + e);
         }
     }
 
