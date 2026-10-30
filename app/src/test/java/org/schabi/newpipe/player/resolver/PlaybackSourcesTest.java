@@ -15,7 +15,10 @@ import androidx.media3.exoplayer.source.MediaSource;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
@@ -334,6 +337,104 @@ public class PlaybackSourcesTest {
     public void embeddedAudioWithoutSeparateAudioDoesNotNeedReload() {
         final MediaSource source = sources.resolve(muxed("muxed", false), false, false);
         assertFalse(sources.requiresReload(tag(source), true));
+    }
+
+    @Test
+    public void kickLiveVideoRetainsQualityAndNativeAudioOwnership() {
+        final StreamInfo current = kick(StreamType.LIVE_STREAM, true);
+        environment.liveInfos.add(current);
+
+        final MediaSource source = sources.resolve(current, false, false);
+
+        assertEquals(current.getVideoOnlyStreams(), environment.streams);
+        assertTrue(environment.liveManifests.isEmpty());
+        assertTrue(environment.merges.isEmpty());
+        assertSame(current.getVideoOnlyStreams().get(0), tag(source).getMaybeQuality()
+                .orElseThrow().getSelectedVideoStream());
+        assertNull(tag(source).getMaybeAudioTrack().orElseThrow().getSelectedAudioStream());
+        assertTrue(sources.requiresReload(tag(source), true));
+    }
+
+    @Test
+    public void kickExplicitAudioStaysInNativeVideoTagWithoutDuplicateMerge() {
+        final StreamInfo current = kick(StreamType.VIDEO_STREAM, true);
+        sources.setAudioTrack("kick-audio");
+
+        final MediaSource source = sources.resolve(current, false, false);
+
+        assertEquals(current.getVideoOnlyStreams(), environment.streams);
+        assertTrue(environment.merges.isEmpty());
+        assertSame(current.getAudioStreams().get(0), tag(source).getMaybeAudioTrack()
+                .orElseThrow().getSelectedAudioStream());
+        assertTrue(PlaybackResolver.isKickNativeVideoMaster(current,
+                current.getVideoOnlyStreams().get(0), tag(source)));
+    }
+
+    @Test
+    public void kickAudioModesPreferRealAudioBeforeTheLiveMaster() {
+        final StreamInfo current = kick(StreamType.LIVE_STREAM, true);
+        environment.liveInfos.add(current);
+        for (final boolean audioPlayer : List.of(false, true)) {
+            environment.streams.clear();
+            final MediaSource source = sources.resolve(current, audioPlayer, true);
+
+            assertEquals(current.getAudioStreams(), environment.streams);
+            assertFalse(tag(source).getMaybeQuality().isPresent());
+            assertTrue(environment.liveManifests.isEmpty());
+        }
+    }
+
+    @Test
+    public void kickMuxedAudioFallbackDoesNotClaimNativeVideoOrSeparateAudio() {
+        final StreamInfo current = kick(StreamType.LIVE_STREAM, false);
+        environment.liveInfos.add(current);
+
+        final MediaSource source = sources.resolve(current, true, true);
+
+        assertEquals(current.getVideoStreams(), environment.streams);
+        assertFalse(tag(source).getMaybeQuality().isPresent());
+        assertFalse(PlaybackResolver.isKickNativeVideoMaster(current,
+                current.getVideoStreams().get(0), tag(source)));
+        assertTrue(environment.liveManifests.isEmpty());
+        assertFalse(sources.requiresReload(tag(source), true));
+    }
+
+    @Test
+    public void kickProgressiveAndMissingMasterStillMergeRequiredAudio() {
+        for (final boolean progressive : List.of(false, true)) {
+            final StreamInfo current = kick(StreamType.VIDEO_STREAM, true);
+            if (progressive) {
+                current.setVideoOnlyStreams(List.of(video("progressive", "720p", true)));
+            } else {
+                current.setHlsUrl("");
+            }
+            environment.streams.clear();
+            assertNotNull(sources.resolve(current, false, false));
+            assertEquals(2, environment.streams.size());
+            assertSame(current.getAudioStreams().get(0), environment.streams.get(1));
+        }
+    }
+
+    private static StreamInfo kick(final StreamType type, final boolean externalAudio) {
+        final String url = "https://kick.com/channel/videos/recording";
+        final StreamInfo current = new StreamInfo(ServiceList.Kick.getServiceId(),
+                url, url, type, "recording", "Recording", 0);
+        current.setHlsUrl("https://media.example/master.m3u8");
+        final VideoStream rendition = new VideoStream.Builder().setId("kick-video")
+                .setContent("https://media.example/video.m3u8", true)
+                .setMediaFormat(MediaFormat.MPEG_4).setDeliveryMethod(DeliveryMethod.HLS)
+                .setResolution("720p60").setIsVideoOnly(externalAudio).build();
+        if (externalAudio) {
+            current.setVideoOnlyStreams(List.of(rendition));
+            current.setAudioStreams(List.of(new AudioStream.Builder().setId("kick-audio")
+                    .setContent("https://media.example/audio.m3u8", true)
+                    .setMediaFormat(MediaFormat.M4A).setDeliveryMethod(DeliveryMethod.HLS)
+                    .setAverageBitrate(AudioStream.UNKNOWN_BITRATE)
+                    .setAudioTrackId("kick-audio").build()));
+        } else {
+            current.setVideoStreams(List.of(rendition));
+        }
+        return current;
     }
 
     private static StreamInfo separated(final String id) {

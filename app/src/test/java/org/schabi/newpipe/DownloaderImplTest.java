@@ -14,6 +14,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.schabi.newpipe.error.ReCaptchaActivity;
+import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
+import org.schabi.newpipe.extractor.services.kick.KickApi;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -270,6 +274,41 @@ public class DownloaderImplTest {
         when(chain.request()).thenReturn(request);
         new DownloaderImpl.YoutubeCookieInterceptor().intercept(chain);
         verify(chain).proceed(request);
+    }
+
+    @Test
+    public void productionResponsesReachKickClassificationWithoutLeakingCookies() throws Exception {
+        final java.lang.reflect.Field clientField = DownloaderImpl.class.getDeclaredField("client");
+        clientField.setAccessible(true);
+        final OkHttpClient previousClient = downloader.getClient();
+        final Downloader previousDownloader = NewPipe.getDownloader();
+        try {
+            NewPipe.init(downloader);
+            for (final int status : new int[]{429, 403}) {
+                clientField.set(downloader, new OkHttpClient.Builder().addInterceptor(chain -> {
+                    assertNull(chain.request().header("Cookie"));
+                    return new Response.Builder().request(chain.request())
+                            .protocol(Protocol.HTTP_1_1).code(status).message("Refused")
+                            .body(ResponseBody.create("{}", null)).build();
+                }).build());
+                final IOException error = assertThrows(IOException.class,
+                        () -> KickApi.object("https://kick.com/api/v2/channels/example"));
+                assertTrue(error.getMessage(), error.getMessage().contains(
+                        status == 429 ? "rate-limited" : "HTTP 403"));
+            }
+            clientField.set(downloader, new OkHttpClient.Builder().addInterceptor(chain ->
+                    new Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                            .code(429).message("Challenge").header("cf-mitigated", "challenge")
+                            .body(ResponseBody.create("<html>challenge</html>", null))
+                            .build()).build());
+            assertThrows(ReCaptchaException.class,
+                    () -> KickApi.object("https://kick.com/api/v2/channels/example"));
+            assertThrows(ReCaptchaException.class,
+                    () -> downloader.get("https://www.youtube.com/watch?v=id"));
+        } finally {
+            clientField.set(downloader, previousClient);
+            NewPipe.init(previousDownloader);
+        }
     }
 
     private static List<String> serveRedirect(final ServerSocket server) throws Exception {

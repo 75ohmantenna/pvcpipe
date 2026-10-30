@@ -210,11 +210,17 @@ class ErrorInfo private constructor(
             "googlevideo.com"
         )
 
+        @JvmStatic
+        fun isCaptchaSupportedUrl(url: String?): Boolean {
+            val host = url?.toHttpUrlOrNull()?.host ?: return false
+            return CAPTCHA_DOMAINS.any { host == it || host.endsWith(".$it") }
+        }
+
         /**
          * Offers a challenge URL only for a [ReCaptchaException] on the explicit host allowlist.
-         * The downloader uses this exception for every HTTP 429, and Kick also uses it for
-         * security blocks. The exception alone does not establish a solvable challenge or a
-         * rate limit. Other hosts receive refusal feedback without opening the challenge screen.
+         * Kick also uses this exception for security blocks. The exception alone does not
+         * establish a solvable challenge or a rate limit. Other hosts receive refusal feedback
+         * without opening the challenge screen.
          *
          * @return the address to open in the captcha screen, or `null` if [throwable] is not a
          * captcha the app can solve
@@ -222,8 +228,7 @@ class ErrorInfo private constructor(
         @JvmStatic
         fun solvableCaptchaUrl(throwable: Throwable?): String? {
             val url = (throwable as? ReCaptchaException)?.url ?: return null
-            val host = url.toHttpUrlOrNull()?.host ?: return null
-            return url.takeIf { CAPTCHA_DOMAINS.any { host == it || host.endsWith(".$it") } }
+            return url.takeIf(::isCaptchaSupportedUrl)
         }
 
         fun throwableToStringList(throwable: Throwable) = arrayOf(throwable.stackTraceToString())

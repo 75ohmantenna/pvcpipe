@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
+import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ReCaptchaActivity;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
@@ -244,8 +245,9 @@ public final class DownloaderImpl extends Downloader {
         try (
                 okhttp3.Response response = client.newCall(requestBuilder.build()).execute()
         ) {
-            if (response.code() == 429) {
-                throw new ReCaptchaException("reCaptcha Challenge requested", url);
+            final String latestUrl = response.request().url().toString();
+            if (response.code() == 429 && ErrorInfo.isCaptchaSupportedUrl(latestUrl)) {
+                throw new ReCaptchaException("reCaptcha Challenge requested", latestUrl);
             }
 
             String responseBodyToReturn = null;
@@ -253,7 +255,6 @@ public final class DownloaderImpl extends Downloader {
                 responseBodyToReturn = body.string();
             }
 
-            final String latestUrl = response.request().url().toString();
             return new Response(
                     response.code(),
                     response.message(),
