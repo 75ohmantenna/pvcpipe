@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dynamic ThemeHelper lookups; the shrinker uses normalized R names, not dotted XML names. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@style/LightTheme_YouTube,
+        @style/DarkTheme_YouTube,
+        @style/BlackTheme_YouTube,
+        @style/LightTheme_SoundCloud,
+        @style/DarkTheme_SoundCloud,
+        @style/BlackTheme_SoundCloud,
+        @style/LightTheme_BitChute,
+        @style/DarkTheme_BitChute,
+        @style/BlackTheme_BitChute,
+        @style/LightTheme_Rumble,
+        @style/DarkTheme_Rumble,
+        @style/BlackTheme_Rumble,
+        @style/LightTheme_Odysee,
+        @style/DarkTheme_Odysee,
+        @style/BlackTheme_Odysee,
+        @style/LightTheme_Kick,
+        @style/DarkTheme_Kick,
+        @style/BlackTheme_Kick" />
