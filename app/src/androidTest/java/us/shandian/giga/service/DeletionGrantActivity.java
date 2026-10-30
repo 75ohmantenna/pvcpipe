@@ -9,6 +9,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
 
+import java.io.File;
+
 /** Grants only this test provider's existing nonce fixture to the disposable debug app. */
 public class DeletionGrantActivity extends Activity {
     @Override protected void onCreate(final Bundle state) {
@@ -19,8 +21,14 @@ public class DeletionGrantActivity extends Activity {
         if (!getPackageName().equals("org.seventyfiveohmantenna.pvcpipe.debug.test")) {
             throw new SecurityException("Wrong fixture package");
         }
-        getContentResolver().call(DocumentsContract.buildDocumentUri(
-                getPackageName() + ".download-delete", id), "create-fixture", id, null);
+        if (getIntent().getBooleanExtra("regrant", false)) {
+            if (!new File(getFilesDir(), "download-delete/" + id + "/policy").isFile()) {
+                throw new SecurityException("Existing fixture required");
+            }
+        } else {
+            getContentResolver().call(DocumentsContract.buildDocumentUri(
+                    getPackageName() + ".download-delete", id), "create-fixture", id, null);
+        }
         grantUriPermission("org.seventyfiveohmantenna.pvcpipe.debug",
                 DocumentsContract.buildDocumentUri(getPackageName() + ".download-delete", id),
                 Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
