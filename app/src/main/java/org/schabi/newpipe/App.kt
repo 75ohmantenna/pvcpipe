@@ -40,6 +40,7 @@ import org.schabi.newpipe.settings.NewPipeSettings
 import org.schabi.newpipe.settings.export.PendingDatabaseRestore
 import org.schabi.newpipe.util.Localization
 import org.schabi.newpipe.util.StateSaver
+import org.schabi.newpipe.util.ThemeHelper
 import org.schabi.newpipe.util.image.ImageStrategy
 import org.schabi.newpipe.util.image.PreferredImageQuality
 import org.schabi.newpipe.util.potoken.PoTokenProviderImpl
@@ -116,6 +117,8 @@ open class App :
 
         // Initialize settings first because other initializations can use its values
         NewPipeSettings.initSettings(this)
+        // A restored activity can be the first one created, and only some activities set this.
+        ThemeHelper.setDayNightMode(this)
 
         NewPipe.init(
             getDownloader(),

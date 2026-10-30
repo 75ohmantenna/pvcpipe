@@ -256,8 +256,10 @@ currently supported.
 - Themes resolved by `ThemeHelper` through `getIdentifier` need an explicit
   [resource keep file](https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep)
   under `res/raw/`, with `tools:keep` on its root `<resources>` element.
-  Kick uses normalized R names such as `@style/LightTheme_Kick` in
-  `pvcpipe_kick_keep.xml`, not the dotted XML style names. Inspect the shrunk
+  Add the service's three themes to `pvcpipe_theme_keep.xml` with normalized R
+  names such as `@style/LightTheme_Kick`, not the dotted XML style names.
+  `tools:keep` on an individual style has no effect. `ServiceThemeKeepTest`
+  fails if a service's theme is missing from either file. Inspect the shrunk
   APK's resource table: a working debug theme does not prove release retention.
 - Tests are in
   `pvcpipe-extractor/extractor/src/test/java/org/schabi/newpipe/extractor/services/`,

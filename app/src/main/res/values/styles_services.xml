@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <!-- YouTube -->
-    <style name="LightTheme.YouTube" parent="LightTheme" tools:keep="@style/LightTheme_YouTube">
+    <style name="LightTheme.YouTube" parent="LightTheme">
         <item name="colorPrimaryDark">@color/light_youtube_primary_color</item>
     </style>
 
-    <style name="DarkTheme.YouTube" parent="DarkTheme" tools:keep="@style/DarkTheme_YouTube">
+    <style name="DarkTheme.YouTube" parent="DarkTheme">
         <item name="colorPrimaryDark">@color/dark_youtube_primary_color</item>
     </style>
 
-    <style name="BlackTheme.YouTube" parent="BlackTheme" tools:keep="@style/BlackTheme_YouTube">
+    <style name="BlackTheme.YouTube" parent="BlackTheme">
         <item name="colorPrimaryDark">@color/dark_youtube_primary_color</item>
     </style>
 
     <!-- SoundCloud -->
-    <style name="LightTheme.SoundCloud" parent="LightTheme" tools:keep="@style/LightTheme_SoundCloud">
+    <style name="LightTheme.SoundCloud" parent="LightTheme">
         <item name="colorPrimary">@color/light_soundcloud_primary_color</item>
         <item name="colorPrimaryDark">@color/light_soundcloud_primary_color</item>
         <item name="colorAccent">@color/light_soundcloud_accent_color</item>
@@ -22,7 +22,7 @@
         </item>
     </style>
 
-    <style name="DarkTheme.SoundCloud" parent="DarkTheme" tools:keep="@style/DarkTheme_SoundCloud">
+    <style name="DarkTheme.SoundCloud" parent="DarkTheme">
         <item name="colorPrimary">@color/dark_soundcloud_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_soundcloud_primary_color</item>
         <item name="colorAccent">@color/dark_soundcloud_accent_color</item>
@@ -30,7 +30,7 @@
         </item>
     </style>
 
-    <style name="BlackTheme.SoundCloud" parent="BlackTheme" tools:keep="@style/BlackTheme_SoundCloud">
+    <style name="BlackTheme.SoundCloud" parent="BlackTheme">
         <item name="colorPrimary">@color/dark_soundcloud_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_soundcloud_primary_color</item>
         <item name="colorAccent">@color/dark_soundcloud_accent_color</item>
@@ -38,47 +38,47 @@
         </item>
     </style>
 
-    <style name="LightTheme.BitChute" parent="LightTheme" tools:keep="@style/LightTheme_BitChute">
+    <style name="LightTheme.BitChute" parent="LightTheme">
         <item name="colorPrimary">@color/light_bitchute_primary_color</item>
         <item name="colorPrimaryDark">@color/light_bitchute_primary_color</item>
         <item name="colorAccent">@color/light_bitchute_accent_color</item>
     </style>
-    <style name="DarkTheme.BitChute" parent="DarkTheme" tools:keep="@style/DarkTheme_BitChute">
+    <style name="DarkTheme.BitChute" parent="DarkTheme">
         <item name="colorPrimary">@color/dark_bitchute_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_bitchute_primary_color</item>
         <item name="colorAccent">@color/dark_bitchute_accent_color</item>
     </style>
-    <style name="BlackTheme.BitChute" parent="BlackTheme" tools:keep="@style/BlackTheme_BitChute">
+    <style name="BlackTheme.BitChute" parent="BlackTheme">
         <item name="colorPrimary">@color/dark_bitchute_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_bitchute_primary_color</item>
         <item name="colorAccent">@color/dark_bitchute_accent_color</item>
     </style>
-    <style name="LightTheme.Rumble" parent="LightTheme" tools:keep="@style/LightTheme_Rumble">
+    <style name="LightTheme.Rumble" parent="LightTheme">
         <item name="colorPrimary">@color/light_rumble_primary_color</item>
         <item name="colorPrimaryDark">@color/light_rumble_primary_color</item>
         <item name="colorAccent">@color/light_rumble_accent_color</item>
     </style>
-    <style name="DarkTheme.Rumble" parent="DarkTheme" tools:keep="@style/DarkTheme_Rumble">
+    <style name="DarkTheme.Rumble" parent="DarkTheme">
         <item name="colorPrimary">@color/dark_rumble_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_rumble_primary_color</item>
         <item name="colorAccent">@color/dark_rumble_accent_color</item>
     </style>
-    <style name="BlackTheme.Rumble" parent="BlackTheme" tools:keep="@style/BlackTheme_Rumble">
+    <style name="BlackTheme.Rumble" parent="BlackTheme">
         <item name="colorPrimary">@color/dark_rumble_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_rumble_primary_color</item>
         <item name="colorAccent">@color/dark_rumble_accent_color</item>
     </style>
-    <style name="LightTheme.Odysee" parent="LightTheme" tools:keep="@style/LightTheme_Odysee">
+    <style name="LightTheme.Odysee" parent="LightTheme">
         <item name="colorPrimary">@color/light_odysee_primary_color</item>
         <item name="colorPrimaryDark">@color/light_odysee_primary_color</item>
         <item name="colorAccent">@color/light_odysee_accent_color</item>
     </style>
-    <style name="DarkTheme.Odysee" parent="DarkTheme" tools:keep="@style/DarkTheme_Odysee">
+    <style name="DarkTheme.Odysee" parent="DarkTheme">
         <item name="colorPrimary">@color/dark_odysee_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_odysee_primary_color</item>
         <item name="colorAccent">@color/dark_odysee_accent_color</item>
     </style>
-    <style name="BlackTheme.Odysee" parent="BlackTheme" tools:keep="@style/BlackTheme_Odysee">
+    <style name="BlackTheme.Odysee" parent="BlackTheme">
         <item name="colorPrimary">@color/dark_odysee_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_odysee_primary_color</item>
         <item name="colorAccent">@color/dark_odysee_accent_color</item>
