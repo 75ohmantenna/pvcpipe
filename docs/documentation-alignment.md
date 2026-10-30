@@ -2297,7 +2297,7 @@ One UI finding remains separate from the passing rendering checks: changing
 Appearance → List view mode to Grid and returning left the existing Subscriptions
 view in list layout (`channel-grid-top.json`); a cold restart applied Grid
 (`channel-grid-cold.json`).
-[`SubscriptionFragment.initViews`](../app/src/main/java/org/schabi/newpipe/local/subscription/SubscriptionFragment.kt#L202)
+[`SubscriptionFragment.initViews`](../app/src/main/java/org/schabi/newpipe/local/subscription/SubscriptionFragment.kt)
 configures the adapter/span count. Review whether settings return should rebuild
 that view; do not treat delayed application as an intentional guarantee.
 The nearby channel-group toggle also advertises the generic List view mode
@@ -2342,3 +2342,152 @@ fixture, application or APK, and the emulator journey was not repeated for it.
 | Repository gate | `make ci` passed; log `/tmp/pvcpipe-release-subscriptions-ci.log`. All 12 sanitizer cases and inspection of 685 recorded fixtures passed. App/extractor style checks, dependency ordering, lint and debug/release builds passed. |
 | JVM and lint limits | Gradle reused the unchanged JVM reports: 1,157 app cases passed; 810 offline extractor cases, 807 passed and 3 skipped; all 3 build-logic cases passed. Lint reports zero errors and 59 warnings. These reports are separate from the normal release UI journey. |
 | Documentation and scope | All 244 local Markdown links and 11 source-line bounds passed across 21 tracked Markdown files; changed-file spelling and diff whitespace checks passed. Changes are limited to the host fixture/checker, build/library guides and this dated follow-up. No application source, schema, resource value, build definition, existing test assertion, legal notice or safety rule changed. |
+
+## Subscriptions layout settings return — 2026-10-30
+
+This follow-up corrects the delayed channel-layout application observed in the
+earlier uninstrumented release run above. Work started on 2026-10-29 from clean
+`master` at
+`e76b9389601da10cbfefbcc7170991da5574c5b3`, on branch
+`fix-subscriptions-layout-refresh`. The prior observation remains historical.
+Its source link now omits an obsolete line anchor after the lifecycle code moved.
+
+`SubscriptionFragment.onResume` resolves the channel mode and grid width again.
+If either the channel item version or span count changes, it updates the existing
+Groupie adapter and GridLayoutManager together, changes current channel row
+types, notifies only the nested subscriptions section and restores the manager's
+saved scroll state.
+Headers and channel order/IDs are retained. Future database emissions use the
+applied item version, avoiding grid rows in a still-list-shaped manager if a
+preference changes while paused. An unchanged resume does not invalidate rows.
+The independently selected channel-group layout is not reset by this refresh.
+The nearby KDoc also now describes Auto's configuration-based resolution and
+allows one-column grids; its former Auto/`> 1` table was inaccurate.
+
+The initial `SubscriptionLayoutRefreshTest` version failed five of six cases
+against the unchanged implementation; unchanged resume passed. The correction
+then passed all six, and ktlint passed. The final fixture also checks adapter/
+manager identity, delivery of the saved scroll state and no save/invalidation
+on unchanged resume. It covers List ↔ Grid, a one-column grid, changed grid
+width, Card mapping, data arriving before/after resume and initially empty data.
+These are JVM/Robolectric API-26 checks of real fragment resume/rendering and
+RecyclerView/Groupie objects, with a minimal binding and controlled theme
+readings. They do not launch Settings, inflate the production row layouts or
+assert actual viewport pixels. Initial red and subsequent green reports are
+retained under `/tmp/pvcpipe-layout-refresh-01`; build logs use
+`/tmp/pvcpipe-layout-refresh-*.log`.
+
+Self-review found that the initial whole-adapter notification produced a new
+`NotifyDataSetChanged` lint warning and needlessly included the group controls.
+The first gate was interrupted before completion; its log is retained as
+`/tmp/pvcpipe-layout-refresh-ci-initial.log`. The implementation now uses Groupie's
+nested section notification, whose observers translate it into a range change
+for the subscription rows only. The strengthened fixture verifies that range,
+asserts no whole-adapter invalidation and no observer calls on unchanged
+resume. All six cases and ktlint passed again before the final gate/builds.
+
+The final `make ci` passed: 12 sanitizer cases, inspection of 685 recorded
+fixtures, app/extractor style checks, dependency ordering, all 1,163 app JVM
+cases, lint and debug/release builds. The unchanged offline extractor reports
+were reused (810 cases: 807 passed, 3 skipped), as were the three passing
+build-logic cases. Final lint reports zero errors and the previous 59 warnings;
+there is no finding in the changed fragment. The signed production release
+build took 10m 13s. The separate
+`./gradlew --no-daemon -DpackageSuffix=.smoke :app:assembleRelease` passed in
+10m 1s, with R8 and resource shrinking enabled. Its APK SHA-256 is
+`2e478e0099429156723e0b4923f5dc15f9dcc970baef74784fc8bc947a9ad809`.
+It is the non-debuggable `org.seventyfiveohmantenna.pvcpipe.smoke`, version
+0.2.4/code 1000204, with no instrumentation declaration and the same release
+certificate recorded above. Both APKs, shrinker outputs, build-input hashes,
+manifest and certificate results are retained under `/tmp/pvcpipe-layout-refresh-01`.
+
+The first device attempt used the existing API-36.1 `small_phone` AVD. Its
+installed old APK hash/certificate were checked, the user reached
+`RUNNING_UNLOCKED`, and Android CLI updated only `.smoke` with `-r`. The installed
+APK hash then matched the new artifact. However, the following manual package
+precompilation failed with PackageManager's Broken pipe/status 224 before the
+launcher command was reached. Android restarted system_server from PID 747 to
+3416, then 4752; its watchdog reported a main-thread handler blocked for 66s.
+A later window-service preparation command also failed with Broken pipe. These
+are retained setup failures, not passing UI evidence or an isolated diagnosis
+of their cause. Original display, animation, accessibility and network settings
+were restored and compared, and the AVD was stopped without uninstall or data
+clearing. Its library could not be read back through the unavailable UI, so this
+run does not certify the existing API-36.1 installation's library or rendering.
+
+A fresh owned AOSP API-26 x86_64 AVD, `pvcpipe_layout_api26_20261030`, supplied the
+successful journey. SDK `avdmanager` selected the installed image because Android
+CLI creation exposes predefined profiles; Android CLI started and inspected the
+device. An optional hardware edit was attempted before creation finished and
+failed without writing a file. The completed AVD then used CLI defaults; its
+actual `hardware-qemu.ini` was inspected and preserved: Android 8.0.0, 480×800,
+240 dpi, one core, 1,536 MB RAM and Lavapipe. The smoke package was absent before
+installation. The same verified APK reached the normal MainActivity in 2356 ms,
+without manual precompilation or animation changes on this device.
+
+The prior run's public `post-restart-export.zip`, containing seven controlled
+records, was copied to public Downloads and selected through the real system
+document picker. Production Restore with settings validated it and restarted
+the app into its subscriptions-only tab. This uses the normal backup workflow,
+not private-file injection, root access, an in-memory database or a substitute
+application/activity. The already-removed ID-99 record was not reintroduced and
+no unsubscribe was performed in this follow-up. Initial default Live content
+was fetched before seeding; the layout journey then used local controlled
+records. Background traffic was not audited and this is not offline or service-
+availability evidence.
+
+Five normal Settings → Appearance → List view mode → Back round-trips passed:
+List → Grid, Grid → List after scrolling, List → Card, Card → Auto and Auto →
+explicit List. Every phase retained PID 3471 and the same printed RecyclerView
+identity `5a24636`, before and after Settings. The real grid had two channel
+columns while group controls retained list presentation; List/portrait Auto
+used mini rows, and Card used grid rows. CLI title bounds were 204 pixels wide
+in Grid/Card and 353 in List/Auto, corroborating the inspected screenshots.
+Scrolled returns did not jump back to the group controls at the top; row-height
+changes naturally changed visible pixel positions. Each phase preserves its
+UI actions, native hierarchy and before/after Activity dumps under `phases/`.
+`ui-matrix-summary.json` checks process/view identities and those bounds.
+
+The normal Export database action and system save picker produced
+`api26-post-layout-export.zip`. The host checker accepted exactly seven records,
+every original UID and stored subscription field unchanged, no records in other
+library tables, schema/Room metadata intact, and successful SQLite `quick_check`
+and foreign-key checks. Saved tabs remained subscriptions-only and the exported
+mode was `list`. The check used the earlier eight-record seed snapshot with
+`--removed-service 99` to describe the already-removed fixture record, not a new
+deletion. Its full result is `api26-export-check.json`.
+
+This is an uninstrumented application journey. Android CLI installed its own
+external inspector. A post-run guard incorrectly required an active inspector
+entry after it had become inactive; that guard failure is retained separately.
+The inspector APK's manifest independently confirms that its instrumentation
+targets `com.android.cli.interact.instrumentation` itself, and the installed
+smoke APK hash still matches the release artifact. No app-targeted runner was
+used. This ownership check does not turn the CLI's instrumentation into native
+assertions inside the smoke app.
+
+The two self-review passes covered mode/spans changing together, same-span
+view-type changes, nested notification offsets, late/empty data, no-op resumes,
+group independence, scroll restoration, APK/device ownership, real UI versus
+JVM evidence and export provenance. These are self-reviews, not independent
+reviews. Data interleavings and changed grid widths remain controlled JVM
+evidence; the native Auto check is for this portrait phone. Physical hardware,
+other screen configurations, arbitrary user libraries, live services, speech
+quality and power-loss durability are not established here. The generic
+channel-group toggle description remains the separate UI-text follow-up above.
+FCast source-start remains explicitly deferred.
+
+The fresh AVD's original display, accessibility, animation and network settings
+were compared and restored, its smoke/inspector processes were stopped, and the
+seven controlled records were retained for reinspection. Both owned AVDs are
+stopped. The physical Pixel was never targeted. No package was uninstalled and
+no app data was cleared.
+
+Final review covers the production fragment and its nearby KDoc, the new six-case
+JVM fixture, the build/library guides, documentation index and dated evidence.
+The frozen application/test source hashes still match the tested build inputs.
+All 247 local Markdown links and 10 source-line bounds passed across 21 tracked
+Markdown files; changed-file spelling and diff whitespace checks passed.
+Schemas, dependencies, version/build values, existing test assertions, runtime
+UI text/translations, existing legal notices and repository/device safety rules
+are unchanged.

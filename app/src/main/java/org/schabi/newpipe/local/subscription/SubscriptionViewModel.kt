@@ -94,18 +94,8 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     companion object {
 
         /**
-         * Returns whether to use GridLayout mode for Subscription Fragment.
-         *
-         * ### Current mapping:
-         *
-         *  | ItemViewMode | ItemVersion | Span count |
-         *  |---|---|---|
-         *  | AUTO | MINI | 1 |
-         *  | LIST | MINI | 1 |
-         *  | CARD | GRID | > 1 (ThemeHelper defined) |
-         *  | GRID | GRID | > 1 (ThemeHelper defined) |
-         *
-         *  @see [SubscriptionViewModel.shouldUseGridForSubscription] to modify Layout Manager
+         * Grid and Card use grid channel rows with at least one span; List uses mini rows.
+         * [getItemViewMode] resolves Auto from the current screen configuration.
          */
         fun shouldUseGridForSubscription(context: Context): Boolean {
             val itemViewMode = getItemViewMode(context)

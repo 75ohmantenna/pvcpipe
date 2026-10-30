@@ -65,6 +65,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     private lateinit var feedGroupsCarousel: FeedGroupCarouselItem
     private lateinit var feedGroupsSortMenuItem: GroupsHeader
     private val subscriptionsSection = Section()
+    private var subscriptionItemVersion = ChannelItem.ItemVersion.MINI
 
     var itemsListState: Parcelable? = null
 
@@ -108,6 +109,30 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         super.onPause()
         itemsListState = binding.itemsList.layoutManager?.onSaveInstanceState()
         feedGroupsCarouselState = feedGroupsCarousel.onSaveInstanceState()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshSubscriptionLayout()
+    }
+
+    private fun refreshSubscriptionLayout() {
+        val useGrid = SubscriptionViewModel.shouldUseGridForSubscription(requireContext())
+        val itemVersion = if (useGrid) ChannelItem.ItemVersion.GRID else ChannelItem.ItemVersion.MINI
+        val spanCount = if (useGrid) getGridSpanCountChannels(requireContext()) else 1
+        val layoutManager = binding.itemsList.layoutManager as GridLayoutManager
+        if (subscriptionItemVersion == itemVersion && layoutManager.spanCount == spanCount) return
+
+        val state = layoutManager.onSaveInstanceState()
+        subscriptionItemVersion = itemVersion
+        groupAdapter.spanCount = spanCount
+        layoutManager.spanCount = spanCount
+        for (position in 0 until subscriptionsSection.itemCount) {
+            (subscriptionsSection.getItem(position) as? ChannelItem)?.itemVersion = itemVersion
+        }
+        // Groupie cannot detect a view-type change by diffing these mutated items against themselves.
+        subscriptionsSection.notifyChanged()
+        layoutManager.onRestoreInstanceState(state)
     }
 
     override fun onDestroyView() {
@@ -203,7 +228,9 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         super.initViews(rootView, savedInstanceState)
         _binding = FragmentSubscriptionBinding.bind(rootView)
 
-        groupAdapter.spanCount = if (SubscriptionViewModel.shouldUseGridForSubscription(requireContext())) getGridSpanCountChannels(context) else 1
+        val useGrid = SubscriptionViewModel.shouldUseGridForSubscription(requireContext())
+        subscriptionItemVersion = if (useGrid) ChannelItem.ItemVersion.GRID else ChannelItem.ItemVersion.MINI
+        groupAdapter.spanCount = if (useGrid) getGridSpanCountChannels(requireContext()) else 1
         binding.itemsList.layoutManager = GridLayoutManager(requireContext(), groupAdapter.spanCount).apply {
             spanSizeLookup = groupAdapter.spanSizeLookup
         }
@@ -352,11 +379,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
                 result.subscriptions.forEach {
                     if (it is ChannelItem) {
                         it.gesturesListener = listenerChannelItem
-                        it.itemVersion = if (SubscriptionViewModel.shouldUseGridForSubscription(requireContext())) {
-                            ChannelItem.ItemVersion.GRID
-                        } else {
-                            ChannelItem.ItemVersion.MINI
-                        }
+                        it.itemVersion = subscriptionItemVersion
                     }
                 }
 

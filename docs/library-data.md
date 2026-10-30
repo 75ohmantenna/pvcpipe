@@ -141,6 +141,13 @@ Only services with subscriptions get a heading. Headings span the full width
 in both list and grid layouts; unsubscribing from a section's last channel
 removes its heading.
 
+Appearance → List view mode controls channel rows. Returning to Subscriptions
+applies the resolved mode and span count without restarting the app: List uses
+mini rows, Grid/Card use grid rows, and Auto follows the screen configuration.
+The existing layout manager restores its scroll anchor when the layout changes.
+The channel-group toggle controls group presentation separately and keeps its
+selection during this refresh. An unchanged resume does not invalidate the rows.
+
 These are presentation sections, not new database records or custom feed
 groups. Custom groups can still contain channels from multiple services.
 Subscriptions from retired or unknown services remain grouped by their original
@@ -388,3 +395,12 @@ rendering, visual TalkBack heading navigation, unsubscribe and export comparison
 after a normal cold launcher start. It does not inspect private database/WAL
 files or establish power-loss durability. Results and environment failures are
 kept in the [dated release record](documentation-alignment.md#uninstrumented-release-subscriptions--2026-10-29).
+
+[`SubscriptionLayoutRefreshTest`](../app/src/test/java/org/schabi/newpipe/local/subscription/SubscriptionLayoutRefreshTest.kt)
+calls the production fragment's resume and data-rendering paths with real
+RecyclerView/Groupie objects, a minimal binding and controlled theme readings.
+It covers layout transitions, one-column grids, changed grid widths, unchanged
+resumes and data arriving before/after a mode change. This JVM test does not
+launch Settings or assert real-device layout; the normal minified release
+return-from-Settings journey is recorded in the
+[dated layout-settings follow-up](documentation-alignment.md#subscriptions-layout-settings-return--2026-10-30).
