@@ -59,9 +59,8 @@
     <color name="duration_text_color">#EEFFFFFF</color>
     <color name="video_overlay_color">#64000000</color>
 
-    <color name="subscribe_text_color">#fff</color>
     <color name="subscribed_background_color">#d6d6d6</color>
-    <color name="subscribed_text_color">#717171</color>
+    <color name="subscribed_text_color">#5C5C5C</color>
 
     <color name="transparent_background_color">#00000000</color>
     <color name="selected_background_color">#96717171</color>
@@ -72,9 +71,9 @@
     <!-- GigaGet download Theme colors -->
     <color name="audio_left_to_load_color">#555555</color>
     <color name="audio_already_load_color">#000000</color>
-    <color name="video_left_to_load_color">#CD5656</color>
+    <color name="video_left_to_load_color">#C44E4E</color>
     <color name="video_already_load_color">#BC211D</color>
-    <color name="subtitle_left_to_load_color">#008ea4</color>
+    <color name="subtitle_left_to_load_color">#007F93</color>
     <color name="subtitle_already_load_color">#005a71</color>
 
     <!-- GigaGet Component colors -->
