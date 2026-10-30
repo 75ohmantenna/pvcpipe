@@ -29,15 +29,14 @@ class MockDownloader extends Downloader {
     public MockDownloader(@Nonnull final String path) {
         this.path = path;
         this.mocks = new HashMap<>();
+        final var gson = new GsonBuilder().create();
 
         try (final var directoryStream = Files.newDirectoryStream(Paths.get(path),
                 entry -> entry.getFileName().toString()
                         .startsWith(RecordingDownloader.FILE_NAME_PREFIX))) {
             for (final Path entry : directoryStream) {
                 try (final var reader = Files.newBufferedReader(entry)) {
-                    final var response = new GsonBuilder()
-                            .create()
-                            .fromJson(reader, TestRequestResponse.class);
+                    final var response = gson.fromJson(reader, TestRequestResponse.class);
                     mocks.put(response.getRequest(), response.getResponse());
                 }
             }

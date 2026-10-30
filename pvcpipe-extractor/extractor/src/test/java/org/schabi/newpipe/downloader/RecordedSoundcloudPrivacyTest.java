@@ -17,6 +17,7 @@ import org.schabi.newpipe.extractor.services.soundcloud.extractors.SoundcloudStr
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,6 +37,8 @@ class RecordedSoundcloudPrivacyTest {
         final var clientId = SoundcloudParsingHelper.class.getDeclaredField("clientId");
         clientId.setAccessible(true);
         final var oldClientId = clientId.get(null);
+        final var replays = new HashMap<Path, MockDownloader>();
+        final var gson = new Gson();
         int checked = 0;
         try (var paths = Files.walk(Path.of("src/test/resources/mocks/v1/org/schabi/"
                 + "newpipe/extractor/services/soundcloud"))) {
@@ -43,7 +46,7 @@ class RecordedSoundcloudPrivacyTest {
                     .startsWith("generated_mock_")).toList()) {
                 final TestRequestResponse recording;
                 try (var reader = Files.newBufferedReader(path)) {
-                    recording = new Gson().fromJson(reader, TestRequestResponse.class);
+                    recording = gson.fromJson(reader, TestRequestResponse.class);
                 }
                 final var expected = recording.getRequest();
                 final var url = expected.url();
@@ -55,7 +58,8 @@ class RecordedSoundcloudPrivacyTest {
                 assertTrue(query > 0, "Recorded transcoding request shape");
                 clientId.set(null, url.substring(query + "?client_id=".length(),
                         url.length() - marker.length()));
-                final var replay = new MockDownloader(path.getParent().toString());
+                final var replay = replays.computeIfAbsent(path.getParent(),
+                        parent -> new MockDownloader(parent.toString()));
                 final var calls = new AtomicInteger();
                 NewPipe.init(new Downloader() {
                     @Override

@@ -50,6 +50,31 @@ between stages.
 
 Run builds serially; `gradle.properties` defines worker and memory limits.
 
+The sanitizer discovers identifiers across every recording on each invocation.
+Only a discovery pass with no replacement variants and no noncanonical cookies
+skips the second transformation/revalidation pass. Short and empty cookie values
+still require rewriting; binary request bodies still fail the CLI review gate.
+No clean-corpus result or parsed recording is cached between invocations.
+
+Offline fixture replay constructs one Gson parser per `MockDownloader`, without
+a static response cache. The SoundCloud privacy regression reuses downloaders
+by parent directory only within its test method; it still exercises all 13
+recordings and compares against the replay map's selected response.
+
+On 2026-10-30, a local warm/no-change comparison (second `make ci` run per
+revision, existing caches retained, no `clean`) measured:
+
+| Observation | Before | After |
+| --- | ---: | ---: |
+| Complete gate | 185.401 s | 129.023 s |
+| Fixture scan, median of three | 84.401 s | 31.299 s |
+
+These are incremental host observations, not cold-build or executed-test
+speedups. The forced SoundCloud replay request passed before and after but
+did not improve in elapsed time; it also reruns Gradle prerequisites. All five
+Gradle process boundaries, task coverage and project resource settings remain
+unchanged. Both APK variants passed assembly; no device test was run.
+
 | Task | What it does |
 | --- | --- |
 | `:buildSrc:test` | version-code monotonicity and Android upper-bound regressions |

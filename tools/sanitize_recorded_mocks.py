@@ -51,6 +51,7 @@ def decoded_layers(value):
 def sanitize(root, write=False, statistics=None):
     files = sorted(Path(root).rglob("generated_mock_*.json"))
     replacements = {}
+    has_cookie_edits = False
     skipped_binary = 0
     unreplaced = 0
 
@@ -113,11 +114,13 @@ def sanitize(root, write=False, statistics=None):
         for name, values in data.get("response", {}).get("responseHeaders", {}).items():
             if name.lower() == "set-cookie":
                 for value in values:
-                    pair = value.partition(";")[0]
-                    _, equals, cookie_value = pair.partition("=")
-                    # Short/common cookie values cannot safely be replaced globally.
-                    if equals and len(cookie_value) >= 8:
-                        remember(cookie_value, "SYNTHETIC_COOKIE")
+                    pair, separator, attributes = value.partition(";")
+                    cookie_name, equals, cookie_value = pair.partition("=")
+                    if equals:
+                        has_cookie_edits |= value != cookie_name + "=SYNTHETIC_COOKIE" + separator + attributes
+                        # Short/common cookie values cannot safely be replaced globally.
+                        if len(cookie_value) >= 8:
+                            remember(cookie_value, "SYNTHETIC_COOKIE")
         payload = data.get("request", {}).get("dataToSend")
         if payload:
             try:
@@ -141,7 +144,7 @@ def sanitize(root, write=False, statistics=None):
         return replacement_pattern.sub(lambda m: canonical[canonical_percent(m[0])], value)
 
     changed = 0
-    for path in files:
+    for path in (files if replacements or has_cookie_edits else ()):
         original = path.read_text(encoding="utf-8")
         data = json.loads(original)
         request = data.get("request", {})

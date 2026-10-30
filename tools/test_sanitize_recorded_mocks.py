@@ -25,6 +25,25 @@ class SanitizeRecordedMocksTest(unittest.TestCase):
                 with patch("sys.argv", ["sanitizer", directory]):
                     self.assertEqual(2, main())
 
+    def test_short_cookie_requires_rewrite_without_global_identifier_replacements(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "generated_mock_0.json"
+            original = json.dumps({"response": {"responseHeaders": {
+                "Set-Cookie": ["s=x; Secure", "flag", "empty=; HttpOnly"]}}})
+            path.write_text(original)
+            statistics = {}
+            self.assertEqual((1, 1), sanitize(directory, statistics=statistics))
+            self.assertEqual(original, path.read_text())
+            self.assertEqual(0, statistics["replacement_variants"])
+            self.assertEqual(0, statistics["unreplaced_detected_identifiers"])
+            self.assertEqual((1, 1), sanitize(directory, write=True, statistics=statistics))
+            self.assertEqual(["s=SYNTHETIC_COOKIE; Secure", "flag",
+                              "empty=SYNTHETIC_COOKIE; HttpOnly"],
+                             json.loads(path.read_text())["response"]["responseHeaders"]["Set-Cookie"])
+            self.assertEqual(0, statistics["unreplaced_detected_identifiers"])
+            self.assertEqual((1, 0), sanitize(directory, statistics=statistics))
+            self.assertEqual(0, statistics["unreplaced_detected_identifiers"])
+
     def test_shared_cookie_visitor_marker_remains_synthetic_and_idempotent(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "generated_mock_0.json"
