@@ -2,6 +2,7 @@ package us.shandian.giga.service;
 
 import android.content.Context;
 import android.os.Handler;
+import android.net.Uri;
 import android.util.Log;
 
 import org.junit.Rule;
@@ -11,6 +12,7 @@ import org.mockito.MockedConstruction;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
 
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,10 +26,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +60,8 @@ public class DownloadManagerDeleteEntryTest {
              var utility = mockStatic(Utility.class);
              var files = mockStatic(StoredFileHelper.class);
              MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
             utility.when(() -> Utility.mkdir(checkpoint.getParentFile(), false)).thenReturn(true);
             utility.when(() -> Utility.<DownloadMission>readFromFile(checkpoint))
                     .thenReturn(mission);
@@ -80,11 +88,14 @@ public class DownloadManagerDeleteEntryTest {
     public void deletingAnUnfinishedEntryWithItsFileStillRemovesBoth() throws Exception {
         final File checkpoint = pendingCheckpoint();
         final DownloadMission mission = pendingMission();
+        when(mission.delete()).thenReturn(true);
 
         try (var logs = mockStatic(Log.class);
              var utility = mockStatic(Utility.class);
              var files = mockStatic(StoredFileHelper.class);
              MockedConstruction<FinishedMissionStore> stores = finishedStore()) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
             utility.when(() -> Utility.mkdir(checkpoint.getParentFile(), false)).thenReturn(true);
             utility.when(() -> Utility.<DownloadMission>readFromFile(checkpoint))
                     .thenReturn(mission);
@@ -108,6 +119,8 @@ public class DownloadManagerDeleteEntryTest {
         try (var logs = mockStatic(Log.class);
              var utility = mockStatic(Utility.class);
              MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
             utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
             final DownloadManager manager =
                     new DownloadManager(context(), mock(Handler.class), null, null);
@@ -118,6 +131,161 @@ public class DownloadManagerDeleteEntryTest {
             assertEquals(0, manager.getIterator().getOldListSize());
             verify(stores.constructed().get(0)).deleteMission(finished);
             verify(finished.storage, never()).delete();
+            verify(finished.storage, never()).deleteRetainingPermission();
+        }
+    }
+
+    @Test
+    public void failedFileDeletionKeepsFinishedEntryForRetry() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.deleteRetainingPermission()).thenReturn(false, true);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            assertFalse(manager.deleteMission(finished, true));
+            assertEquals(2, manager.getIterator().getOldListSize());
+            verify(stores.constructed().get(0), never()).deleteMission(finished);
+            assertTrue(manager.deleteMission(finished, true));
+            assertEquals(0, manager.getIterator().getOldListSize());
+            verify(stores.constructed().get(0)).deleteMission(finished);
+        }
+    }
+
+    @Test
+    public void providerExceptionKeepsFinishedEntry() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.deleteRetainingPermission())
+                .thenThrow(new SecurityException("denied"));
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            manager.deleteMission(finished, true);
+            assertEquals(2, manager.getIterator().getOldListSize());
+            verify(stores.constructed().get(0), never()).deleteMission(finished);
+        }
+    }
+
+    @Test
+    public void databaseExceptionKeepsFinishedEntry() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.deleteRetainingPermission()).thenReturn(true);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            doThrow(new IllegalStateException("database unavailable"))
+                    .when(stores.constructed().get(0)).deleteMission(finished);
+            assertFalse(manager.deleteMission(finished, true));
+            assertEquals(2, manager.getIterator().getOldListSize());
+            verify(finished.storage, never()).releasePermission();
+            doNothing().when(stores.constructed().get(0)).deleteMission(finished);
+            assertTrue(manager.deleteMission(finished, true));
+            verify(finished.storage).releasePermission();
+        }
+    }
+
+    @Test
+    public void failedPendingDeletionKeepsMissionAndCheckpoint() throws Exception {
+        final File checkpoint = pendingCheckpoint();
+        final DownloadMission mission = pendingMission();
+        when(mission.delete()).thenReturn(false);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             var files = mockStatic(StoredFileHelper.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore()) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(checkpoint.getParentFile(), false)).thenReturn(true);
+            utility.when(() -> Utility.<DownloadMission>readFromFile(checkpoint))
+                    .thenReturn(mission);
+            files.when(() -> StoredFileHelper.deserialize(mission.storage, context()))
+                    .thenReturn(mission.storage);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            manager.deleteMission(mission, true);
+            assertSame(mission, manager.findPendingMission(TIMESTAMP));
+            assertTrue(checkpoint.exists());
+        }
+    }
+
+    @Test
+    public void staleDeletionDoesNotDeleteAReplacementAtTheSameUri() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.deleteRetainingPermission()).thenReturn(true);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            assertTrue(manager.deleteMission(finished, true));
+            assertTrue(manager.deleteMission(finished, true));
+            verify(finished.storage, times(1)).deleteRetainingPermission();
+            verify(stores.constructed().get(0), times(1)).deleteMission(finished);
+        }
+    }
+
+    @Test
+    public void inaccessibleFinishedProviderIsNotForgottenAtLoadOrConflictCheck() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.existsAsFile()).thenReturn(false);
+        when(finished.storage.isAbsent()).thenReturn(false);
+        when(finished.storage.equals(finished.storage)).thenReturn(true);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            assertEquals(2, manager.getIterator().getOldListSize());
+            assertEquals(MissionState.Finished,
+                    manager.checkForExistingMission(finished.storage));
+            verify(stores.constructed().get(0), never()).deleteMission(finished);
+        }
+    }
+
+    @Test
+    public void receiptWriteFailureKeepsTheEntryAndDoesNotDeleteMediaTwice() throws Exception {
+        final File pending = folder.newFolder("pending_downloads");
+        final FinishedMission finished = finishedMission();
+        when(finished.storage.deleteRetainingPermission()).thenReturn(true);
+        try (var logs = mockStatic(Log.class);
+             var utility = mockStatic(Utility.class);
+             MockedConstruction<FinishedMissionStore> stores = finishedStore(finished)) {
+            utility.when(() -> Utility.mkdir(pending, false)).thenReturn(true);
+            final DownloadManager manager =
+                    new DownloadManager(context(), mock(Handler.class), null, null);
+            assertFalse(manager.deleteMission(finished, true));
+            assertTrue(finished.mediaDeleted);
+            assertEquals(2, manager.getIterator().getOldListSize());
+            verify(stores.constructed().get(0), never()).deleteMission(finished);
+            utility.when(() -> Utility.writeToFile(any(File.class), any(Serializable.class)))
+                    .thenReturn(true);
+            assertTrue(manager.deleteMission(finished, true));
+            verify(finished.storage, times(1)).deleteRetainingPermission();
         }
     }
 
@@ -149,6 +317,9 @@ public class DownloadManagerDeleteEntryTest {
         final FinishedMission finished = new FinishedMission();
         finished.timestamp = 1;
         finished.storage = mock(StoredFileHelper.class);
+        final Uri uri = mock(Uri.class);
+        when(uri.toString()).thenReturn("content://fixture/document/finished");
+        when(finished.storage.getUri()).thenReturn(uri);
         when(finished.storage.existsAsFile()).thenReturn(true);
         return finished;
     }

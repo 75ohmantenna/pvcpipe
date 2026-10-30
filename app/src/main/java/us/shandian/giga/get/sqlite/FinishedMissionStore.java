@@ -183,7 +183,9 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         mission.segmentsJson = cursor.getString(cursor.getColumnIndexOrThrow(KEY_SEGMENTS));
 
         try {
-            mission.storage = new StoredFileHelper(context, null, Uri.parse(path), "");
+            // Keep the URI even when the provider cannot currently supply its display name.
+            mission.storage = new StoredFileHelper(context, Uri.parse(path),
+                    StoredFileHelper.DEFAULT_MIME);
         } catch (Exception e) {
             Log.e("FinishedMissionStore", "failed to load the storage path of: " + path, e);
             mission.storage = new StoredFileHelper(null, path, "", "");

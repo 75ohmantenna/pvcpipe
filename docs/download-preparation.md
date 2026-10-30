@@ -59,8 +59,9 @@ unfinished downloads are not migrated.
   If the final write failed, only an earlier checkpoint is available; it
   does not necessarily describe the completed file.
 
-The media file, the checkpoint and the finished-downloads database are three
-separate things on disk. No transaction spans them.
+The media file, the checkpoint and the finished-downloads database are separate
+things on disk. Deletion also uses private receipts for removed finished media.
+No transaction spans them.
 
 ## Ranged response integrity and Start
 
@@ -579,13 +580,50 @@ places:
 
 ## Removing entries
 
-"Delete" removes an entry and requests deletion of its file. The manager
-does not check the file-deletion result, so a removed entry does not prove
-the file was erased. "Delete entry" keeps the file and is offered only for
-finished downloads. An unfinished mission can still own workers or a
-checkpoint; removing only its entry would not stop those workers or prevent
-checkpoint replay at the next start. `DownloadManager.deleteMission` refuses
-entry-only removal for unfinished missions, as well as the menu hiding it.
+"Delete" first hides an entry during its undo window. When deletion commits,
+`DownloadManager.deleteMission` checks file/checkpoint deletion before removing
+the entry, and catches provider/database runtime failures. A failure restores
+the row and reports how many entries were kept for retry. Bulk deletion continues
+past failed entries. Leaving the screen commits queued deletions through the same
+checked path; it does not turn a failure into a successful removal.
+
+For unfinished missions, deletion cancels queue/start intent and saves a
+`deletionPending` marker before removing media. Busy writers must exit before
+media deletion can proceed. After media removal, a second checkpoint records
+`mediaDeleted` before checkpoint cleanup. Startup retains marked checkpoints without recreating
+media or publishing a finished row; Start, queue, recovery and late completion
+cannot resume them. Their row says **Deletion incomplete** and offers Delete
+again. Checkpoint cleanup removes `.new`/`.bak` companions before the main file,
+so a companion-removal failure retains the current marker. If saving the marker
+fails, no media deletion is attempted, but a later restart can only use the older
+checkpoint: that failed write does not establish durable cancellation.
+
+The media file may already be gone when database/checkpoint cleanup fails. Retrying
+is safe for an already absent direct file or a SAF document whose provider returns
+an empty query result. A null, denied or failed provider query does not establish
+absence. Finished-history loading retains such inaccessible entries and their URI
+instead of treating them as missing. The app defers its own URI-grant release
+until entry/checkpoint removal succeeds, but a DocumentsProvider can revoke a
+grant automatically when it deletes a document. The saved `mediaDeleted` receipt
+lets remaining cleanup retry without querying that URI. Finished missions use
+private atomic receipts in `finished_download_deletions`, keyed by timestamp and
+URI, so this also works after a database failure and manager reload. Receipt
+cleanup after a successful database removal is best effort; new mission timestamps
+avoid existing receipt keys. Providers that cannot establish absence
+can leave an entry requiring a later retry; a generic provider error is not proof
+that the file was erased. These operations still run synchronously and do not
+form a transaction across media, checkpoints, receipts and the finished database.
+If media removal succeeds but saving its receipt fails, the current process keeps
+the result in memory for retry; process death in that gap cannot establish the
+removed-file state on the next launch. Restoring provider access or durable storage
+may still be necessary. Old app builds do not understand these deletion receipts.
+
+"Delete entry" keeps the file and is offered only for finished downloads.
+`DownloadManager.deleteMission` also refuses entry-only removal for unfinished
+missions, since their checkpoint could otherwise replay at startup. Old checkpoints
+without the deletion marker default to normal behavior; earlier app builds do not
+enforce the new marker. See the [dated deletion result](#deletion-failure-verification-2026-10-30)
+for the tested boundaries.
 
 ## HLS downloads
 
@@ -663,6 +701,12 @@ checkpoint-save failure, late errors, replacement offsets, and serialized
 full-response-only recovery.
 `DownloadManagerDeleteEntryTest` covers removing entries, and
 `FilenameUtilsTest` and `StoredFileNameContainmentTest` cover file names.
+`StoredFileDeletionTest`, `DownloadMissionDeletionTest`, `DownloadDeletionRecoveryTest`,
+`FinishedDeletionReceiptsTest`, `DownloadDeletionMessagesTest` and
+`DeletionPresentationTest` cover deletion refusals, checkpoint ordering/reload,
+blocked resume, URI grants, undo and single/bulk/screen-exit callbacks. These use
+host files and controlled provider/database/UI doubles; the recovery fixture runs
+the real checkpoint reader rather than an Android process restart.
 `FileStreamSAFCloseTest` executes the adapter's close method against controlled
 resources, covering individual/combined I/O failures, unchecked failure,
 exception reporting and repeated close. It does not run an Android provider.
@@ -690,3 +734,159 @@ HLS expiration.
 
 [pvcpipe-device-smoke.md](pvcpipe-device-smoke.md) records dated phone checks
 of download pause/resume behavior and media checksums.
+
+## Deletion failure verification, 2026-10-30
+
+Work began on clean `master` at `a384dbeb047e6f7a4e0cab03354f943c08cc07c1`.
+Four new manager regressions failed on the unchanged implementation while the
+four existing cases passed: refused file deletion, provider exception, database
+exception and failed pending deletion. The correction returns a checked result
+and retains the entry until its requested operations succeed. The existing
+pending-success fixture now explicitly stubs successful deletion; its assertions
+are unchanged. Other fixtures distinguish storage refusal from database failure.
+
+Adversarial review reproduced a second failure: on API 26, a nonempty `.new`
+companion let media deletion succeed but made checkpoint cleanup report failure
+after deleting the main checkpoint. `checkpointCompanionFailureKeepsDeletionMarker`
+failed at its retained-checkpoint assertion. Companion-first cleanup fixes that
+ordering. Review also found that releasing a SAF grant immediately after media
+deletion could break retry after a database/checkpoint failure; owning missions
+now defer their own grant release until entry/checkpoint commit succeeds. The
+separate native run below exposed provider-driven revocation as well.
+
+The pending deletion marker is serialized with the existing mission format;
+the serial version is unchanged and the existing R8 rule keeps non-transient
+serializable fields. The loader restores marked targets without querying away
+their saved URI. Start/queue/recovery and both late completion entry points are
+guarded. Within the owning manager, deleting an already removed mission is an
+idempotent operation, so that stale callback cannot delete a replacement at the
+same URI. These changes do not make the file, checkpoint, receipt and finished
+database one atomic transaction.
+
+Local logs and artifacts are under `/tmp/pvcpipe-delete-failures-20261030/`.
+The initial four-case failure is `red.log`/`red-results.xml`; the separately
+reproduced checkpoint-ordering failure is `adversarial-checkpoint-red.log`/`.xml`.
+The first style run reported long lines in the new fixtures; those were wrapped
+without changing the checks. The earlier 27-case focused run passed before the additional ordering and
+stale-callback regressions were added. A later fixture compile used a nested
+qualifier for the top-level `MissionState` enum; that was corrected. A lookup
+fixture also omitted the typed `StoredFileHelper.equals` result, so it could not
+match its own target; the mock was corrected without weakening its assertion.
+
+Service review reproduced one more bug: `mFailedDownloads.remove(indexOfValue(...))`
+used an array index as a notification key. The new service-message regression
+failed before the correction to guarded `removeAt(index)`. It also checks that
+late completion of a deletion-pending mission does not publish completion.
+
+### Controlled API 26 provider and SQLite check
+
+The test APK adds a protected DocumentsProvider and an owner activity that grants
+only newly created nonce fixtures to the debug app. Provider operations reject
+physical hardware and arbitrary IDs; provider initialization itself does not break
+unrelated test-APK activities. The instrumentation class requires API 26, emulator
+hardware, the exact debug/test packages, an explicit disposable argument and a
+matching host nonce marker. Its database context overrides both file and database
+opening paths into a unique fixture directory. It does not use the app's normal
+download database or pending-download folder.
+
+The first native run passed the refused-file and unavailable-metadata cases, but
+failed when it tried to query absence after successful pending-media deletion.
+Android's DocumentsProvider had automatically revoked that URI grant. That failure
+is retained in `native-initial/instrumentation.log`; it is not a passing reload
+result. The correction saves media-deletion receipts in pending checkpoints and
+the private finished-receipt directory. Grant deferral alone was insufficient.
+
+The final guarded native method passed on owned AOSP AVD
+`pvcpipe_layout_api26_20261030` (Android 8.0/API 26, 480×800):
+
+| Case | Observed result and limit |
+| --- | --- |
+| Refused provider deletion | Exact fixture bytes, persisted read/write grant and SQLite row survived; failure was returned and the entry remained. |
+| Unavailable provider metadata | A fresh manager retained the original URI and row; another refused deletion retained its grant. |
+| Read-only SQLite connection after media removal | Deletion returned failure with a saved receipt. The provider had revoked the URI grant. A fresh manager loaded the receipt and removed the row after a writable connection was restored, without querying the deleted URI. |
+| Nonempty checkpoint companion | The pending media was removed, while the main checkpoint and media receipt survived cleanup refusal. Reload did not recreate, resume, queue or finish the media. Removing the fixture's blocker let Delete complete. |
+| Already visible recoverable row | Real packaged row inflation/binding and the single-item commit changed its existing status from Error to Deletion incomplete. The probe invokes commit reflectively to bypass the undo timer; JVM tests separately drive that timer and Undo. |
+| Presentation resources | The native pending and finished rows exposed Deletion incomplete; singular/plural failure resources described retained entries. This is not a normal Downloads-screen gesture or screenshot journey. |
+
+One host follow-up could not execute `test` through `run-as`. Instead, absolute
+`/system/bin/ls` under the provider's UID enumerated both accessible fixture
+directories and found only their policy files, independently confirming that both
+media files were gone. The installed debug and test APK hashes matched the captured
+artifacts. Results and hashes are in `native-final/result.json`.
+
+Android CLI handled the owned emulator and APK installations. The debug and test
+packages were initially absent; later `-r` updates checked each installed signing
+certificate against the new APK. Direct instrumentation selected only this class.
+No connected Gradle test task, package uninstall, whole-app data clear or physical
+device operation was used. The production/smoke installations were not updated.
+All nine saved display/accessibility/animation/network values remained unchanged;
+the debug/test processes and owned emulator are stopped, with fixtures retained.
+
+To reproduce after installing matching debug/test APKs in a
+[verified disposable environment](building.md#tests), use a new nonce and the
+actual owned AVD name. Build the pair with
+`./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest`.
+These guards must pass before the marker is written:
+
+```sh
+set -e
+delete_serial=emulator-5554
+delete_avd=pvcpipe_layout_api26_20261030
+test "$(adb -s "$delete_serial" emu avd name | tr -d '\r' | head -n 1)" = "$delete_avd"
+test "$(adb -s "$delete_serial" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+delete_nonce=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+adb -s "$delete_serial" shell run-as org.seventyfiveohmantenna.pvcpipe.debug mkdir -p files
+printf '%s' "$delete_nonce" | adb -s "$delete_serial" shell run-as \
+  org.seventyfiveohmantenna.pvcpipe.debug tee files/download-delete-allow
+adb -s "$delete_serial" shell am instrument -w -r \
+  -e class us.shandian.giga.service.DownloadDeletionEmulatorTest \
+  -e deleteDisposable true -e deleteNonce "$delete_nonce" \
+  org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The 36 focused JVM cases and native method establish these controlled boundaries.
+They do not establish arbitrary document-provider behavior, physical storage faults,
+physical hardware results or process death at every receipt-write boundary. The
+native reload creates another manager in the same instrumentation process; it is
+not a SIGKILL test. Two adversarial self-review passes covered writer ownership,
+late callbacks, mutable row updates, grant revocation, receipt identity, undo,
+screen exit and preservation of unrelated installations. FCast source-start stays
+deferred.
+
+### Final gate and review
+
+`make ci` passed: 12 sanitizer cases, 685 recorded fixtures needing no replacements,
+Checkstyle/ktlint/dependency-order checks, JVM tests, lint and both APK assemblies.
+The app reports contain 1,199 passing cases with no failures or skips. The unchanged
+extractor reports contain 807 passes and three skips; build logic has three passes.
+The final gate reused these JVM results as up to date after comment-only
+clarifications. Lint reported zero errors and 59 existing warnings. The earlier
+gate was deliberately interrupted before release assembly to clarify comments
+that overstated grant retention; its log is `ci-pre-comment-clarification.log`.
+The completed gate is `ci.log`.
+
+The final debug/test APK bytes exactly match the native-tested artifacts after
+those comment clarifications. Their SHA-256 values are respectively
+`0038b7c5d44cb71177b6ada426a4dade321f30136417abd21a7fe3b1b8d58ebb` and
+`5e9699cf8abe544e55fe2a96ba9373fab9d499e0f1c303c0410853ebc2f056aa`.
+
+The signed, minified production APK is version 0.2.4/code 1000204, min SDK 26 and
+target SDK 37, package `org.seventyfiveohmantenna.pvcpipe`, without debuggability,
+app instrumentation, the test provider/activity or MANAGE_DOCUMENTS permission.
+Its SHA-256 is
+`b51d77bd9e3a218dccd52cdd9e6b5e9f9f8915eaaebb625a5a777a54a87b707b`;
+the release certificate remains
+`14a4e83570c8d32855ad271c8eec1f5822ba225673c11111c4f653dc0bf996bb`.
+The first mapping probe expected unchanged fields to be listed in R8's mapping;
+they were omitted there. Direct release-DEX inspection with `apkanalyzer` instead
+confirmed distinct Mission/DownloadMission/FinishedMission identities, unchanged
+serial UIDs 1/6, and retained `mediaDeleted`/`deletionPending` boolean fields.
+This is static release inspection, not minified-device serialization evidence.
+
+The reviewed scope covers storage deletion, pending lifecycle/checkpoints,
+finished-history receipts/database loading, service messages, single/bulk/exit UI
+paths, new English feedback, guarded fixtures and the current guide/index/history
+links. Version/SDK/application-ID values, dependencies, database schemas, existing
+test assertions, legal notices and repository/device safety rules are unchanged.
+Local links, anchors, paths, symbol references and the documented shell syntax
+were checked; no new external URL verification or physical-device test was claimed.

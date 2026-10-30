@@ -42,6 +42,7 @@ public class DownloadManager {
     private static final String DOWNLOADS_METADATA_FOLDER = "pending_downloads";
 
     private final FinishedMissionStore mFinishedMissionStore;
+    private final FinishedDeletionReceipts mFinishedDeletions;
 
     private final ArrayList<DownloadMission> mMissionsPending = new ArrayList<>();
     private final ArrayList<FinishedMission> mMissionsFinished;
@@ -75,6 +76,7 @@ public class DownloadManager {
         }
 
         mFinishedMissionStore = new FinishedMissionStore(context);
+        mFinishedDeletions = new FinishedDeletionReceipts(context.getFilesDir());
         mHandler = handler;
         mMainStorageAudio = storageAudio;
         mMainStorageVideo = storageVideo;
@@ -127,26 +129,31 @@ public class DownloadManager {
     }
 
     /**
-     * Loads finished missions from the data source and forgets finished missions whose file does
-     * not exist anymore.
+     * Loads finished missions and forgets files whose absence can be established. Inaccessible
+     * providers must not erase the only entry from which deletion can be retried.
      *
-     * @return the finished missions whose files still exist
+     * @return retained finished entries, including uncommitted missing-file cleanup
      */
     private ArrayList<FinishedMission> loadFinishedMissions() {
         final ArrayList<FinishedMission> finishedMissions =
                 mFinishedMissionStore.loadFinishedMissions();
 
-        // check if the files exists, otherwise, forget the download
+        // Preserve entries if provider availability or database cleanup is uncertain.
         for (int i = finishedMissions.size() - 1; i >= 0; i--) {
             final FinishedMission mission = finishedMissions.get(i);
 
-            if (!mission.storage.existsAsFile()) {
+            mission.mediaDeleted = mFinishedDeletions.contains(mission);
+            if (!mission.mediaDeleted && mission.storage.isAbsent()) {
                 if (DEBUG) {
                     Log.d(TAG, "downloaded file removed: " + mission.storage.getName());
                 }
 
-                mFinishedMissionStore.deleteMission(mission);
-                finishedMissions.remove(i);
+                try {
+                    mFinishedMissionStore.deleteMission(mission);
+                    finishedMissions.remove(i);
+                } catch (final RuntimeException e) {
+                    Log.w(TAG, "Unable to prune missing finished download", e);
+                }
             }
         }
 
@@ -196,6 +203,17 @@ public class DownloadManager {
             mis.restoreProgress();
             mis.metadata = checkpoint;
             mis.checkpointReady = true;
+
+            if (mis.isDeletionPending()) {
+                // A failed deletion must not recreate media or publish a late finished row.
+                mis.storage = mis.storage == null
+                        ? new StoredFileHelper(null, checkpoint.getName(), null, "")
+                        : StoredFileHelper.deserializeForDeletion(mis.storage, ctx);
+                mis.threads = new Thread[0];
+                mis.mHandler = mHandler;
+                mMissionsPending.add(mis);
+                continue;
+            }
 
             // Replaying a finished checkpoint after a crash is safe and retryable.
             if (mis.isFinished()) {
@@ -287,7 +305,8 @@ public class DownloadManager {
                 mission.metadata = new File(mPendingMissionsDir, String.valueOf(mission.timestamp));
                 if (!mission.metadata.exists()
                         && !new File(mission.metadata.getPath() + ".bak").exists()
-                        && !new File(mission.metadata.getPath() + ".new").exists()) {
+                        && !new File(mission.metadata.getPath() + ".new").exists()
+                        && !mFinishedDeletions.exists(mission)) {
                     try {
                         if (!mission.metadata.createNewFile()) {
                             throw new RuntimeException("Can't create download metadata file");
@@ -332,18 +351,20 @@ public class DownloadManager {
 
 
     public void resumeMission(final DownloadMission mission) {
-        if (mission.running) {
-            return;
-        }
-        if (!mission.checkpointReady) {
-            if (mission.metadata == null || !Utility.writeToFile(mission.metadata, mission)) {
-                mission.notifyError(DownloadMission.ERROR_FILE_CREATION,
-                        new IOException("Unable to save download checkpoint"));
+        synchronized (mission) {
+            if (mission.running || mission.isDeletionPending()) {
                 return;
             }
-            mission.checkpointReady = true;
+            if (!mission.checkpointReady) {
+                if (mission.metadata == null || !Utility.writeToFile(mission.metadata, mission)) {
+                    mission.notifyError(DownloadMission.ERROR_FILE_CREATION,
+                            new IOException("Unable to save download checkpoint"));
+                    return;
+                }
+                mission.checkpointReady = true;
+            }
+            mission.start();
         }
-        mission.start();
     }
 
     @Nullable
@@ -374,21 +395,44 @@ public class DownloadManager {
         return mission instanceof FinishedMission;
     }
 
-    public void deleteMission(final Mission mission, final boolean alsoDeleteFile) {
+    /**
+     * Removes the entry only after the requested file/checkpoint and database operations succeed.
+     *
+     * @param mission the entry to delete
+     * @param alsoDeleteFile whether to delete its file too
+     * @return whether deletion completed; a failure retains the entry for retry
+     */
+    public boolean deleteMission(final Mission mission, final boolean alsoDeleteFile) {
         synchronized (this) {
+            if (mission instanceof DownloadMission && !mMissionsPending.contains(mission)
+                    || mission instanceof FinishedMission && !mMissionsFinished.contains(mission)) {
+                return true; // An old callback must not delete a replacement at the same URI.
+            }
             if (!alsoDeleteFile && !canDeleteEntryOnly(mission)) {
                 Log.w(TAG, "Not forgetting the entry of an unfinished download");
-                return;
+                return false;
             }
-            if (mission instanceof DownloadMission) {
-                mMissionsPending.remove(mission);
-            } else if (mission instanceof FinishedMission) {
-                mMissionsFinished.remove(mission);
-                mFinishedMissionStore.deleteMission(mission);
-            }
-
-            if (alsoDeleteFile) {
-                mission.delete();
+            try {
+                if (alsoDeleteFile && !mission.delete()) {
+                    return false;
+                }
+                if (mission instanceof FinishedMission) {
+                    if (alsoDeleteFile && !mFinishedDeletions.save(mission)) {
+                        return false;
+                    }
+                    mFinishedMissionStore.deleteMission(mission);
+                    mMissionsFinished.remove(mission);
+                    mFinishedDeletions.remove(mission);
+                    if (alsoDeleteFile && mission.storage != null) {
+                        mission.storage.releasePermission();
+                    }
+                } else if (mission instanceof DownloadMission) {
+                    mMissionsPending.remove(mission);
+                }
+                return true;
+            } catch (final RuntimeException e) {
+                Log.e(TAG, "Unable to delete download: " + mission.timestamp, e);
+                return false;
             }
         }
     }
@@ -413,6 +457,9 @@ public class DownloadManager {
     }
 
     public void tryRecover(final DownloadMission mission) {
+        if (mission.isDeletionPending()) {
+            return;
+        }
         final StoredDirectoryHelper mainStorage = getMainStorage(mission.storage.getTag());
 
         if (!mission.storage.isInvalid() && mission.storage.create()) {
@@ -459,8 +506,8 @@ public class DownloadManager {
     /**
      * Get the index into {@link #mMissionsFinished} of a finished mission by its path, return
      * {@code -1} if there is no such mission. This function also checks if the matched mission's
-     * file exists, and, if it does not, the related mission is forgotten about (like in {@link
-     * #loadFinishedMissions()}) and {@code -1} is returned.
+     * file is confirmed absent or empty; that entry is forgotten (like in
+     * {@link #loadFinishedMissions()}) and {@code -1} is returned.
      *
      * @param storage where the file would be stored
      * @return the mission index or -1 if no such mission exists
@@ -471,7 +518,7 @@ public class DownloadManager {
                 // If the file does not exist the mission is not valid anymore. Also checking if
                 // length == 0 since the file picker may create an empty file before yielding it,
                 // but that does not mean the file really belonged to a previous mission.
-                if (!storage.existsAsFile() || storage.length() == 0) {
+                if (storage.isAbsent() || storage.existsAsFile() && storage.length() == 0) {
                     if (DEBUG) {
                         Log.d(TAG, "matched downloaded file removed: " + storage.getName());
                     }
@@ -547,6 +594,9 @@ public class DownloadManager {
      */
     boolean setFinished(final DownloadMission mission) {
         synchronized (this) {
+            if (mission.isDeletionPending()) {
+                return false;
+            }
             final String path;
             try {
                 path = mission.storage.getUri().toString();
@@ -690,7 +740,7 @@ public class DownloadManager {
     }
 
     public boolean canRecoverMission(final DownloadMission mission) {
-        if (mission == null) {
+        if (mission == null || mission.isDeletionPending()) {
             return false;
         }
 
@@ -885,7 +935,8 @@ public class DownloadManager {
 
             synchronized (DownloadManager.this) {
                 for (final DownloadMission mission : mMissionsPending) {
-                    if (hidden.contains(mission) || mission.isCorrupt()) {
+                    if (hidden.contains(mission) || mission.isDeletionPending()
+                            || mission.isCorrupt()) {
                         continue;
                     }
 

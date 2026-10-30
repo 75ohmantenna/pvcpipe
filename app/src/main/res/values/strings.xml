@@ -614,9 +614,14 @@
     <string name="confirm_prompt">Do you want to clear your download history or delete all downloaded files?</string>
     <string name="delete_downloaded_files">Delete downloaded files</string>
     <string name="delete_downloaded_files_confirm">Erase all downloaded files from disk?</string>
+    <string name="download_deletion_incomplete">Deletion incomplete</string>
+    <plurals name="download_deletion_failed">
+        <item quantity="one">Could not complete deletion of %1$d download. Its entry was kept. Try Delete again.</item>
+        <item quantity="other">Could not complete deletion of %1$d downloads. Their entries were kept. Try Delete again.</item>
+    </plurals>
     <plurals name="deleted_downloads_toast">
-        <item quantity="one">Deleted %1$s download</item>
-        <item quantity="other">Deleted %1$s downloads</item>
+        <item quantity="one">Marked %1$s download for deletion</item>
+        <item quantity="other">Marked %1$s downloads for deletion</item>
     </plurals>
     <string name="stop">Stop</string>
     <string name="max_retry_msg">Maximum retries</string>
