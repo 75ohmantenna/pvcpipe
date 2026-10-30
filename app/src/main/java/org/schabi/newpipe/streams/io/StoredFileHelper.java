@@ -3,6 +3,7 @@ package org.schabi.newpipe.streams.io;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.util.Log;
@@ -54,6 +55,7 @@ public class StoredFileHelper implements Serializable {
 
         this.context = context;
         this.srcType = mime;
+        this.srcName = uri.getLastPathSegment();
     }
 
     public StoredFileHelper(@Nullable final Uri parent, final String filename, final String mime,
@@ -191,6 +193,29 @@ public class StoredFileHelper implements Serializable {
         return instance;
     }
 
+    /**
+     * Restores a deletion target without discarding its URI when provider metadata is unavailable.
+     * This does not acquire permissions or prepare the target for writing.
+     *
+     * @param storage the saved deletion target
+     * @param context the resolver context
+     * @return the restored target, retaining its saved name and URI
+     */
+    public static StoredFileHelper deserializeForDeletion(@NonNull final StoredFileHelper storage,
+                                                          final Context context) {
+        if (storage.isInvalid()) {
+            return storage;
+        }
+        final StoredFileHelper restored = new StoredFileHelper(context,
+                Uri.parse(storage.source), storage.srcType);
+        if (storage.srcName != null) {
+            restored.srcName = storage.srcName;
+        }
+        restored.sourceTree = storage.sourceTree;
+        restored.tag = storage.tag;
+        return restored;
+    }
+
     public SharpStream getStream() throws IOException {
         assertValid();
 
@@ -250,20 +275,47 @@ public class StoredFileHelper implements Serializable {
     }
 
     public boolean delete() {
+        return delete(true);
+    }
+
+    /**
+     * Deletes media without requesting grant release. Providers can revoke access themselves.
+     *
+     * @return whether the target was deleted or confirmed absent
+     */
+    public boolean deleteRetainingPermission() {
+        return delete(false);
+    }
+
+    private boolean delete(final boolean releaseGrant) {
         if (source == null) {
             return true;
         }
         if (docFile == null) {
             try {
-                return Files.deleteIfExists(ioPath);
+                Files.deleteIfExists(ioPath);
+                return true;
             } catch (final IOException e) {
                 Log.e(TAG, "Exception while deleting " + ioPath, e);
                 return false;
             }
         }
 
-        final boolean res = docFile.delete();
+        if (!docFile.delete() && !isAbsent()) {
+            return false;
+        }
 
+        if (releaseGrant) {
+            releasePermission();
+        }
+        return true;
+    }
+
+    /** Releases a document grant after successful deletion of its owning entry/checkpoint. */
+    public void releasePermission() {
+        if (docFile == null || context == null) {
+            return;
+        }
         try {
             final int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
@@ -271,8 +323,34 @@ public class StoredFileHelper implements Serializable {
         } catch (final Exception ex) {
             // nothing to do
         }
+    }
 
-        return res;
+    /**
+     * Distinguishes confirmed absence from a denied or unavailable provider query.
+     *
+     * @return whether the filesystem or provider positively reports no target
+     */
+    public boolean isAbsent() {
+        if (source == null) {
+            return false;
+        }
+        if (ioPath != null) {
+            try {
+                return Files.notExists(ioPath);
+            } catch (final SecurityException e) {
+                return false;
+            }
+        }
+        if (docFile == null || context == null) {
+            return false;
+        }
+        try (Cursor cursor = context.getContentResolver().query(docFile.getUri(),
+                new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID}, null, null, null)) {
+            return cursor != null && cursor.getCount() == 0;
+        } catch (final Exception e) {
+            Log.w(TAG, "Unable to establish document absence", e);
+            return false;
+        }
     }
 
     public long length() {

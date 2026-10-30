@@ -122,19 +122,23 @@ public class Deleter {
         final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
 
         mIterator.unHide(mission);
-        mDownloadManager.deleteMission(mission, alsoDeleteFile);
+        final boolean deleted = mDownloadManager.deleteMission(mission, alsoDeleteFile);
 
-        if (mission instanceof FinishedMission) {
+        if (deleted && alsoDeleteFile && mission instanceof FinishedMission
+                && mission.storage != null && !mission.storage.isInvalid()) {
             mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
                     mission.storage.getUri()));
         }
 
         if (items.size() < 1) {
             pause();
-            return;
+        } else {
+            show();
         }
-
-        show();
+        mAdapter.applyChanges();
+        if (!deleted) {
+            mAdapter.reportDeletionFailures(1);
+        }
     }
 
     public void pause() {
@@ -160,11 +164,16 @@ public class Deleter {
 
         pause();
 
+        int failures = 0;
         for (final Pair<Mission, Boolean> missionAndAlsoDeleteFile : items) {
             final Mission mission = missionAndAlsoDeleteFile.getFirst();
             final boolean alsoDeleteFile = missionAndAlsoDeleteFile.getSecond();
-            mDownloadManager.deleteMission(mission, alsoDeleteFile);
+            mIterator.unHide(mission);
+            if (!mDownloadManager.deleteMission(mission, alsoDeleteFile)) {
+                failures++;
+            }
         }
-        items = null;
+        mAdapter.reportDeletionFailures(failures);
+        items.clear();
     }
 }

@@ -234,7 +234,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             h.date.setText("");
         } else {
             h.progress.setMarquee(false);
-            h.status.setText("100%");
+            if (item.mission.mediaDeleted) {
+                h.status.setText(R.string.download_deletion_incomplete);
+            } else {
+                h.status.setText("100%");
+            }
             h.progress.setProgress(1.0f);
             h.size.setText(Utility.formatBytes(item.mission.length));
 
@@ -262,6 +266,13 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         final DownloadMission mission = (DownloadMission) h.item.mission;
+        if (mission.isDeletionPending()) {
+            h.progress.setMarquee(false);
+            h.status.setText(R.string.download_deletion_incomplete);
+            h.size.setText(Utility.formatBytes(mission.getLength()));
+            h.resetSpeedMeasure();
+            return;
+        }
         final double done = mission.done;
         final long length = mission.getLength();
         final long now = System.currentTimeMillis();
@@ -722,15 +733,37 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             mSnackbar.dismiss();
         }
 
+        int failures = 0;
         final Iterator<Mission> i = mHidden.iterator();
         while (i.hasNext()) {
             final Mission mission = i.next();
             if (mission != null) {
-                mDownloadManager.deleteMission(mission, true);
-                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                        mission.storage.getUri()));
+                mIterator.unHide(mission);
+                if (mDownloadManager.deleteMission(mission, true)) {
+                    if (mission.storage != null && !mission.storage.isInvalid()) {
+                        mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                                mission.storage.getUri()));
+                    }
+                } else {
+                    failures++;
+                }
             }
             i.remove();
+        }
+        if (!destroyed) {
+            applyChanges();
+        }
+        reportDeletionFailures(failures);
+    }
+
+    public void reportDeletionFailures(final int count) {
+        if (count > 0) {
+            if (!destroyed) {
+                refreshMissionItems();
+                checkMasterButtonsVisibility();
+            }
+            Toast.makeText(mContext, mContext.getResources().getQuantityString(
+                    R.plurals.download_deletion_failed, count, count), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -743,6 +776,11 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         final int id = option.getItemId();
         final DownloadMission mission = h.item.mission instanceof DownloadMission
                 ? (DownloadMission) h.item.mission : null;
+
+        if ((mission != null && mission.isDeletionPending() || h.item.mission.mediaDeleted)
+                && id != R.id.delete && id != R.id.delete_entry && id != R.id.source) {
+            return true; // A menu opened before deletion must not resume or recreate its target.
+        }
 
         if (mission != null) {
             if (id == R.id.start) {
@@ -930,6 +968,10 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         onPaused();
         compositeDisposable.dispose();
         mDeleter.dispose();
+        mHandler.removeCallbacksAndMessages(DELETE);
+        if (!mHidden.isEmpty()) {
+            deleteFinishedDownloads();
+        }
     }
 
     public void onResume() {
@@ -1054,7 +1096,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             itemView.setHapticFeedbackEnabled(true);
 
             itemView.setOnClickListener(v -> {
-                if (item.mission instanceof FinishedMission) {
+                if (item.mission instanceof FinishedMission && !item.mission.mediaDeleted) {
                     openFinishedMission(item);
                 }
             });
@@ -1083,7 +1125,9 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                     ? (DownloadMission) item.mission : null;
 
             if (mission != null) {
-                if (mission.hasInvalidStorage()) {
+                if (mission.isDeletionPending()) {
+                    delete.setVisible(true);
+                } else if (mission.hasInvalidStorage()) {
                     retry.setVisible(true);
                     delete.setVisible(true);
                     showError.setVisible(true);
@@ -1114,10 +1158,10 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                     }
                 }
             } else {
-                open.setVisible(true);
+                open.setVisible(!item.mission.mediaDeleted);
                 delete.setVisible(true);
                 deleteEntry.setVisible(DownloadManager.canDeleteEntryOnly(item.mission));
-                checksum.setVisible(true);
+                checksum.setVisible(!item.mission.mediaDeleted);
             }
 
             if (item.mission.source != null && !item.mission.source.isEmpty()) {

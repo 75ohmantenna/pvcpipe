@@ -3,7 +3,6 @@ package us.shandian.giga.get;
 import android.os.Handler;
 import android.system.ErrnoException;
 import android.system.OsConstants;
-import android.util.AtomicFile;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -14,6 +13,7 @@ import org.schabi.newpipe.DownloaderImpl;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.io.InterruptedIOException;
 import java.io.Serializable;
 import java.net.ConnectException;
@@ -179,6 +179,9 @@ public class DownloadMission extends Mission {
     public transient volatile Thread init = null;
     private transient Thread starter;
     private transient boolean starting;
+
+    // Persist cancellation before removing bytes: failed checkpoint cleanup must not resume them.
+    private volatile boolean deletionPending;
     private transient long startGeneration;
     private transient boolean reinitialize;
 
@@ -540,6 +543,9 @@ public class DownloadMission extends Mission {
     }
 
     synchronized void notifyFinished() {
+        if (deletionPending) {
+            return;
+        }
         if (current < urls.length) {
             if (++finishCount < threads.length) {
                 return;
@@ -620,7 +626,7 @@ public class DownloadMission extends Mission {
      * Start downloading with multiple threads.
      */
     public synchronized void start() {
-        if (running || starting || isFinished() || urls.length < 1) {
+        if (deletionPending || running || starting || isFinished() || urls.length < 1) {
             return;
         }
 
@@ -816,22 +822,64 @@ public class DownloadMission extends Mission {
     }
 
     /**
-     * Removes the downloaded file and the meta file.
+     * Stops downloading and records deletion intent before removing media, then the checkpoint.
+     * Active writers and incomplete steps return false; retry follows saved deletion intent.
+     *
+     * @return whether both media and checkpoint deletion completed
      */
     @Override
-    public boolean delete() {
-        if (psAlgorithm != null) {
-            psAlgorithm.cleanupTemporalDir();
-        }
-
-        notify(DownloadManagerService.MESSAGE_DELETED);
-
-        final boolean res = deleteMetadata();
-
-        if (!super.delete()) {
+    public synchronized boolean delete() {
+        if (isPsRunning()) {
             return false;
         }
-        return res;
+        deletionPending = true;
+        enqueued = false;
+        pause();
+        if (metadata != null && !writeThisToFile()) {
+            return false;
+        }
+        boolean busy = init != null && init.isAlive();
+        if (busy) {
+            init.interrupt();
+        }
+        for (final Thread worker : threads) {
+            if (worker.isAlive()) {
+                worker.interrupt();
+                busy = true;
+            }
+        }
+        if (busy) {
+            return false;
+        }
+        if (!mediaDeleted) {
+            if (!super.delete()) {
+                return false;
+            }
+            // Document providers may already have revoked the grant. Keep a deletion receipt
+            // before attempting checkpoint cleanup, so a retry need not access the URI.
+            if (metadata != null && !writeThisToFile()) {
+                return false;
+            }
+        }
+        if (!deleteMetadata()) {
+            return false;
+        }
+        if (storage != null) {
+            storage.releasePermission();
+        }
+        if (psAlgorithm != null) {
+            try {
+                psAlgorithm.cleanupTemporalDir();
+            } catch (final RuntimeException e) {
+                Log.w(TAG, "Unable to remove temporary post-processing file", e);
+            }
+        }
+        notify(DownloadManagerService.MESSAGE_DELETED);
+        return true;
+    }
+
+    public boolean isDeletionPending() {
+        return deletionPending;
     }
 
 
@@ -971,7 +1019,10 @@ public class DownloadMission extends Mission {
      *
      * @param queue true to add to the queue, otherwise, false
      */
-    public void setEnqueued(final boolean queue) {
+    public synchronized void setEnqueued(final boolean queue) {
+        if (deletionPending) {
+            return;
+        }
         enqueued = queue;
         writeThisToFileAsync();
     }
@@ -1104,14 +1155,18 @@ public class DownloadMission extends Mission {
             if (metadata == null) {
                 return true;
             }
-            new AtomicFile(metadata).delete();
-            final boolean deleted = !metadata.exists()
-                    && !new File(metadata.getPath() + ".bak").exists()
-                    && !new File(metadata.getPath() + ".new").exists();
-            if (deleted) {
+            try {
+                // Keep the authoritative checkpoint until every companion can be removed.
+                // In particular a failed deletion must not replay an older .bak or lose its intent.
+                Files.deleteIfExists(new File(metadata.getPath() + ".new").toPath());
+                Files.deleteIfExists(new File(metadata.getPath() + ".bak").toPath());
+                Files.deleteIfExists(metadata.toPath());
                 metadata = null;
+                return true;
+            } catch (final IOException | SecurityException e) {
+                Log.w(TAG, "Unable to remove download checkpoint", e);
+                return false;
             }
-            return deleted;
         }
     }
 

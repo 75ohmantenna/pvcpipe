@@ -42,15 +42,21 @@ public abstract class Mission implements Serializable {
 
     public String segmentsJson;
 
+    // A provider may revoke access as soon as deletion succeeds. Retry the remaining bookkeeping
+    // without querying that URI again; pending checkpoints and finished receipts persist this fact.
+    public volatile boolean mediaDeleted;
+
     /**
      * Delete the downloaded file.
+     * The app defers grant release until commit; the provider can revoke earlier.
      *
-     * @return {@code true} when no storage is assigned, or the storage deletion result
+     * @return whether deletion completed or no target is assigned
      */
     public boolean delete() {
-        if (storage != null) {
-            return storage.delete();
+        if (!mediaDeleted && storage != null && !storage.deleteRetainingPermission()) {
+            return false;
         }
+        mediaDeleted = true;
         return true;
     }
 

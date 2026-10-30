@@ -294,6 +294,9 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         switch (msg.what) {
             case MESSAGE_FINISHED:
+                if (mission.isDeletionPending()) {
+                    break;
+                }
                 notifyMediaScanner(mission.storage.getUri());
                 notifyFinishedDownload(mission.storage.getName());
                 mManager.setFinished(mission);
@@ -314,7 +317,10 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         }
 
         if (msg.what != MESSAGE_ERROR) {
-            mFailedDownloads.remove(mFailedDownloads.indexOfValue(mission));
+            final int index = mFailedDownloads.indexOfValue(mission);
+            if (index >= 0) {
+                mFailedDownloads.removeAt(index);
+            }
         }
 
         for (final Callback observer : mEchoObservers) {
