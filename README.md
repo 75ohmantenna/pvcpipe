@@ -1,35 +1,44 @@
+<div align="center">
+
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="PVCPipe logo" width="112">
+
 # PVCPipe
 
-PVCPipe is a video and audio app for **Android 8.0+**. It stores subscriptions,
-playlists and history locally. No service account is required.
+**Watch and listen on Android without an account.**
 
-**Still in development.** Expect bugs and changes in site support.
+![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-C62828)](LICENSE)
 
-**Supported sites:** [YouTube](https://www.youtube.com/),
-[SoundCloud](https://soundcloud.com/), [BitChute](https://www.bitchute.com/),
-[Rumble](https://rumble.com/), [Odysee](https://odysee.com/) and [Kick](https://kick.com/).
+</div>
 
-Subscriptions are grouped by service in both list and grid layouts.
+PVCPipe stores your subscriptions, playlists and history on your device, and
+groups your subscriptions by site in a list or a grid. It is a fork of
+[BravePipe](https://github.com/bravepipeproject/BravePipe), which is based on
+[NewPipe](https://github.com/TeamNewPipe/NewPipe).
+
+> [!NOTE]
+> PVCPipe is still in development. Expect bugs and changes in site support.
+
+## Supported sites
+
+| Site | Video | Audio | Live |
+| :--- | :---: | :---: | :---: |
+| [YouTube](https://www.youtube.com/) | ✓ | ✓ | ✓ |
+| [SoundCloud](https://soundcloud.com/) | | ✓ | |
+| [BitChute](https://www.bitchute.com/) | ✓ | | ✓ |
+| [Rumble](https://rumble.com/) | ✓ | ✓ | ✓ |
+| [Odysee](https://odysee.com/) | ✓ | ✓ | ✓ |
+| [Kick](https://kick.com/) | ✓ | | ✓ |
 
 ## Casting
 
-Cast to [FCast](https://fcast.org/) receivers on your local network using
-the regular player controls. Use the cast button to connect, switch devices
-or disconnect. See [setup and limits](docs/playback.md#fcast-video-casting).
+Cast videos to [FCast](https://fcast.org/) receivers on your local network. Use
+the cast button to connect, switch devices or disconnect. The regular player
+controls then operate playback on the receiver. See
+[setup and limits](docs/playback.md#fcast-video-casting).
 
-## Build
+PVCPipe is independent of FUTO. FCast is a registered trademark of FUTO.
 
-```sh
-./gradlew :app:assembleDebug   # debug APK
-make ci                      # checks and debug/release APKs
-```
+## License
 
-[Build guide](docs/building.md) · [Documentation](docs/README.md)
-
-**Device tests can erase app data.** Follow the [safety procedure](docs/building.md#testing-on-an-existing-installation).
-
-Forked from [BravePipe](https://github.com/bravepipeproject/BravePipe),
-based on [NewPipe](https://github.com/TeamNewPipe/NewPipe).
-Licensed under [GPL-3.0-or-later](LICENSE).
-
-PVCPipe is independent of FUTO; FCast is FUTO's registered trademark.
+PVCPipe is licensed under [GPL-3.0-or-later](LICENSE).
