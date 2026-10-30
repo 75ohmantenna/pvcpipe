@@ -35,8 +35,11 @@ import org.schabi.newpipe.databinding.FragmentChannelBinding;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
+import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.fragments.BaseStateFragment;
@@ -87,6 +90,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         state.putString("name" + STATE_SUFFIX, name);
         state.putInt("serviceId" + STATE_SUFFIX, serviceId);
         state.putString("url" + STATE_SUFFIX, url);
+        state.putBoolean("InitialKickTabApplied", initialKickTabApplied);
     }
 
     @Override
@@ -101,6 +105,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         if (state.containsKey("url" + STATE_SUFFIX)) {
             url = state.getString("url" + STATE_SUFFIX);
         }
+        initialKickTabApplied = state.getBoolean("InitialKickTabApplied", false);
     }
 
     private ChannelInfo currentInfo;
@@ -109,6 +114,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     private Disposable subscribeButtonMonitor;
     private SubscriptionManager subscriptionManager;
     private int lastTab;
+    private boolean initialKickTabApplied;
     private boolean channelContentNotSupported = false;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -486,6 +492,23 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     //////////////////////////////////////////////////////////////////////////*/
 
     private void updateTabs() {
+        ListLinkHandler retainedClips = null;
+        if (initialKickTabApplied && tabAdapter.getCount() > 0) {
+            lastTab = binding.tabLayout.getSelectedTabPosition();
+        }
+        if (serviceId == ServiceList.Kick.getServiceId() && currentInfo != null) {
+            for (final androidx.fragment.app.Fragment child
+                    : getChildFragmentManager().getFragments()) {
+                if (child instanceof ChannelTabFragment) {
+                    final ListLinkHandler handler = ((ChannelTabFragment) child).tabHandler;
+                    if (handler != null && handler.getId().equals(currentInfo.getId())
+                            && handler.getContentFilters().contains(ChannelTabs.CLIPS)) {
+                        retainedClips = handler;
+                        break;
+                    }
+                }
+            }
+        }
         tabAdapter.clearAllItems();
 
         if (currentInfo != null && !channelContentNotSupported) {
@@ -493,11 +516,34 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             final SharedPreferences preferences = PreferenceManager
                     .getDefaultSharedPreferences(context);
 
+            ListLinkHandler initialClips = null;
+            if (!initialKickTabApplied && serviceId == ServiceList.Kick.getServiceId()) {
+                try {
+                    final ListLinkHandler requested = ServiceList.Kick.getChannelTabLHFactory()
+                            .fromUrl(currentInfo.getOriginalUrl());
+                    if (requested.getContentFilters().contains(ChannelTabs.CLIPS)) {
+                        initialClips = requested;
+                    }
+                } catch (final ParsingException e) {
+                    Log.w(TAG, "Could not resolve initial Kick channel tab", e);
+                }
+                initialKickTabApplied = true;
+            }
+
             for (final ListLinkHandler linkHandler : currentInfo.getTabs()) {
                 final FilterItem tab = linkHandler.getContentFilters().get(0);
                 if (ChannelTabHelper.showChannelTab(context, preferences, tab)) {
+                    final ListLinkHandler selected;
+                    if (tab.equals(ChannelTabs.CLIPS) && retainedClips != null) {
+                        selected = retainedClips;
+                    } else if (tab.equals(ChannelTabs.CLIPS) && initialClips != null) {
+                        selected = initialClips;
+                        lastTab = tabAdapter.getCount();
+                    } else {
+                        selected = linkHandler;
+                    }
                     final ChannelTabFragment channelTabFragment =
-                            ChannelTabFragment.getInstance(serviceId, linkHandler, name);
+                            ChannelTabFragment.getInstance(serviceId, selected, name);
                     channelTabFragment.useAsFrontPage(useAsFrontPage);
                     tabAdapter.addFragment(channelTabFragment,
                             context.getString(ChannelTabHelper.getTranslationKey(tab)));

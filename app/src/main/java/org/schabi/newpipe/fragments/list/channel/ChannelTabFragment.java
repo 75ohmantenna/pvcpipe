@@ -5,20 +5,25 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.PopupMenu;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.PlaylistControlBinding;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo;
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandlerFactory;
 import org.schabi.newpipe.extractor.linkhandler.ReadyChannelTabListLinkHandler;
+import org.schabi.newpipe.extractor.services.kick.KickClipFilters;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.fragments.list.BaseListInfoFragment;
 import org.schabi.newpipe.fragments.list.playlist.PlaylistControlViewHolder;
@@ -41,6 +46,8 @@ public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTa
 
     protected ListLinkHandler tabHandler;
     protected String channelName;
+    private TextView clipSort;
+    private TextView clipTimeRange;
 
     @Override
     protected void saveFragmentState(@NonNull final Bundle state) {
@@ -96,9 +103,116 @@ public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTa
     }
 
     @Override
+    protected void initViews(final View rootView, final Bundle savedInstanceState) {
+        super.initViews(rootView, savedInstanceState);
+        initClipFilters();
+    }
+
+    private void initClipFilters() {
+        final View row = requireView().findViewById(R.id.channel_tab_filters);
+        final boolean clips = serviceId == ServiceList.Kick.getServiceId()
+                && tabHandler.getContentFilters().contains(ChannelTabs.CLIPS);
+        row.setVisibility(clips ? View.VISIBLE : View.GONE);
+        if (!clips) {
+            return;
+        }
+        clipSort = row.findViewById(R.id.channel_tab_sort);
+        clipTimeRange = row.findViewById(R.id.channel_tab_time_range);
+        clipSort.setOnClickListener(this::showClipSortMenu);
+        clipTimeRange.setOnClickListener(this::showClipTimeRangeMenu);
+        updateClipFilterLabels();
+    }
+
+    private void showClipSortMenu(final View anchor) {
+        final PopupMenu menu = new PopupMenu(requireContext(), anchor);
+        try {
+            final String selected = KickClipFilters.sort(tabHandler.getSortFilter());
+            menu.getMenu().add(0, 0, 0, R.string.search_filters_views)
+                    .setChecked("views".equals(selected));
+            menu.getMenu().add(0, 1, 1, R.string.search_filters_upload_date)
+                    .setChecked("date".equals(selected));
+            menu.getMenu().setGroupCheckable(0, true, true);
+            menu.setOnMenuItemClickListener(item -> {
+                try {
+                    applyClipFilters(item.getItemId() == 0 ? "views" : "date",
+                            KickClipFilters.time(tabHandler.getSortFilter()));
+                } catch (final ParsingException e) {
+                    Log.e(TAG, "Invalid Kick clip filters", e);
+                }
+                return true;
+            });
+            menu.show();
+        } catch (final ParsingException e) {
+            Log.e(TAG, "Invalid Kick clip filters", e);
+        }
+    }
+
+    private void showClipTimeRangeMenu(final View anchor) {
+        final PopupMenu menu = new PopupMenu(requireContext(), anchor);
+        final String[] values = {"day", "week", "month", "all"};
+        final int[] labels = {R.string.search_filters_past_day, R.string.search_filters_past_week,
+                R.string.search_filters_past_month, R.string.search_filters_any_time};
+        try {
+            final String selected = KickClipFilters.time(tabHandler.getSortFilter());
+            for (int i = 0; i < values.length; i++) {
+                menu.getMenu().add(0, i, i, labels[i]).setChecked(values[i].equals(selected));
+            }
+            menu.getMenu().setGroupCheckable(0, true, true);
+            menu.setOnMenuItemClickListener(item -> {
+                try {
+                    applyClipFilters(KickClipFilters.sort(tabHandler.getSortFilter()),
+                            values[item.getItemId()]);
+                } catch (final ParsingException e) {
+                    Log.e(TAG, "Invalid Kick clip filters", e);
+                }
+                return true;
+            });
+            menu.show();
+        } catch (final ParsingException e) {
+            Log.e(TAG, "Invalid Kick clip filters", e);
+        }
+    }
+
+    private void applyClipFilters(final String sort, final String range) throws ParsingException {
+        if (sort.equals(KickClipFilters.sort(tabHandler.getSortFilter()))
+                && range.equals(KickClipFilters.time(tabHandler.getSortFilter()))) {
+            return;
+        }
+        tabHandler = ServiceList.Kick.getChannelTabLHFactory().fromQuery(tabHandler.getId(),
+                tabHandler.getContentFilters(), KickClipFilters.fromValues(sort, range));
+        url = tabHandler.getUrl();
+        currentNextPage = null;
+        updateClipFilterLabels();
+        startLoading(false);
+    }
+
+    private void updateClipFilterLabels() {
+        try {
+            final String sort = KickClipFilters.sort(tabHandler.getSortFilter());
+            final String range = KickClipFilters.time(tabHandler.getSortFilter());
+            clipSort.setText(getString(R.string.kick_clips_sort_selected, getString(
+                    "views".equals(sort) ? R.string.search_filters_views
+                            : R.string.search_filters_upload_date)));
+            final int rangeLabel;
+            switch (range) {
+                case "day": rangeLabel = R.string.search_filters_past_day; break;
+                case "week": rangeLabel = R.string.search_filters_past_week; break;
+                case "month": rangeLabel = R.string.search_filters_past_month; break;
+                default: rangeLabel = R.string.search_filters_any_time; break;
+            }
+            clipTimeRange.setText(getString(R.string.kick_clips_time_selected,
+                    getString(rangeLabel)));
+        } catch (final ParsingException e) {
+            Log.e(TAG, "Invalid Kick clip filters", e);
+        }
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
         playlistControlBinding = null;
+        clipSort = null;
+        clipTimeRange = null;
     }
 
     @Override

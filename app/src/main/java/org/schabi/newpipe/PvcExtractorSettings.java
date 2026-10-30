@@ -3,6 +3,7 @@ package org.schabi.newpipe;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.schabi.newpipe.extractor.services.kick.settings.KickSettings;
 import org.schabi.newpipe.extractor.services.odysee.OdyseeAuth;
 import org.schabi.newpipe.extractor.services.odysee.settings.OdyseeSettings;
 import org.schabi.newpipe.extractor.services.rumble.settings.RumbleSettings;
@@ -92,5 +93,6 @@ public class PvcExtractorSettings {
                 .setting(doHidePaidContent, RumbleSettings.HIDE_PREMIUM_STREAMS);
         OdyseeSettings.getInstance()
                 .setting(doHidePaidContent, OdyseeSettings.HIDE_PAID_STREAMS);
+        KickSettings.getInstance().setting(doHidePaidContent, KickSettings.HIDE_PAID_STREAMS);
     }
 }
