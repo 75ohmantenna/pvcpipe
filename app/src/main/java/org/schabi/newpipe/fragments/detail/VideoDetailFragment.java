@@ -45,6 +45,7 @@ import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.Toolbar;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -207,6 +208,7 @@ public final class VideoDetailFragment
 
     private BottomSheetBehavior<FrameLayout> bottomSheetBehavior;
     private BottomSheetBehavior.BottomSheetCallback bottomSheetCallback;
+    private int miniPlayerBottomInset = 0;
     private BroadcastReceiver broadcastReceiver;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -638,6 +640,7 @@ public final class VideoDetailFragment
                     WindowInsetsCompat.Type.navigationBars());
             final boolean statusBarsVisible = windowInsets.isVisible(
                     WindowInsetsCompat.Type.statusBars());
+            updateMiniPlayerInsets(windowInsets, displayCutout);
             final boolean useSafeInsets = !isFullscreen()
                     || (activity != null && DeviceUtils.isInMultiWindow(activity));
             binding.detailMainContent.setPadding(
@@ -1768,6 +1771,30 @@ public final class VideoDetailFragment
     // Player related utils
     //////////////////////////////////////////////////////////////////////////*/
 
+    /**
+     * The mini player is part of a full-bleed bottom sheet, so it has to stay clear of the bars.
+     *
+     * @param windowInsets  the current window insets
+     * @param displayCutout the display cutout insets
+     */
+    private void updateMiniPlayerInsets(final WindowInsetsCompat windowInsets,
+                                        final Insets displayCutout) {
+        // Ignoring visibility keeps the height stable while fullscreen hides the bars.
+        final var navigationBars = windowInsets.getInsetsIgnoringVisibility(
+                WindowInsetsCompat.Type.navigationBars());
+        binding.overlayLayout.setPadding(Math.max(navigationBars.left, displayCutout.left), 0,
+                Math.max(navigationBars.right, displayCutout.right), 0);
+        miniPlayerBottomInset = navigationBars.bottom;
+        if (bottomSheetBehavior != null && bottomSheetState != BottomSheetBehavior.STATE_HIDDEN) {
+            bottomSheetBehavior.setPeekHeight(getMiniPlayerPeekHeight());
+        }
+    }
+
+    private int getMiniPlayerPeekHeight() {
+        return getResources().getDimensionPixelSize(R.dimen.mini_player_height)
+                + miniPlayerBottomInset;
+    }
+
     private void showSystemUi() {
         if (DEBUG) {
             Log.d(TAG, "showSystemUi() called");
@@ -2019,13 +2046,14 @@ public final class VideoDetailFragment
 
         final FrameLayout bottomSheetLayout = activity.findViewById(R.id.fragment_player_holder);
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
+        // The peek height already includes the navigation bar, which covers the gesture area.
+        bottomSheetBehavior.setGestureInsetBottomIgnored(true);
         bottomSheetBehavior.setState(lastStableBottomSheetState);
         updateBottomSheetState(lastStableBottomSheetState);
 
-        final int peekHeight = getResources().getDimensionPixelSize(R.dimen.mini_player_height);
         if (bottomSheetState != BottomSheetBehavior.STATE_HIDDEN) {
             manageSpaceAtTheBottom(false);
-            bottomSheetBehavior.setPeekHeight(peekHeight);
+            bottomSheetBehavior.setPeekHeight(getMiniPlayerPeekHeight());
             if (bottomSheetState == BottomSheetBehavior.STATE_COLLAPSED) {
                 binding.overlayLayout.setAlpha(MAX_OVERLAY_ALPHA);
             } else if (bottomSheetState == BottomSheetBehavior.STATE_EXPANDED) {
@@ -2051,7 +2079,7 @@ public final class VideoDetailFragment
                         moveFocusToMainFragment(false);
                         manageSpaceAtTheBottom(false);
 
-                        bottomSheetBehavior.setPeekHeight(peekHeight);
+                        bottomSheetBehavior.setPeekHeight(getMiniPlayerPeekHeight());
                         // Disable click because overlay buttons located on top of buttons
                         // from the player
                         setOverlayElementsClickable(false);
@@ -2071,7 +2099,7 @@ public final class VideoDetailFragment
                         moveFocusToMainFragment(true);
                         manageSpaceAtTheBottom(false);
 
-                        bottomSheetBehavior.setPeekHeight(peekHeight);
+                        bottomSheetBehavior.setPeekHeight(getMiniPlayerPeekHeight());
 
                         // Re-enable clicks
                         setOverlayElementsClickable(true);
