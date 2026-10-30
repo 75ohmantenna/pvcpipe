@@ -164,12 +164,11 @@
 
         <ImageButton
             android:id="@+id/control_repeat"
+            android:padding="9dp"
             android:contentDescription="@string/notification_action_repeat"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginLeft="5dp"
-            android:layout_marginRight="5dp"
             android:layout_toLeftOf="@+id/control_backward"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
@@ -180,11 +179,11 @@
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/control_backward"
+            android:padding="8dp"
             android:contentDescription="@string/previous_stream"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginLeft="5dp"
             android:layout_toLeftOf="@+id/control_fast_rewind"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
@@ -195,11 +194,11 @@
 
         <ImageButton
             android:id="@+id/control_fast_rewind"
+            android:padding="4dp"
             android:contentDescription="@string/rewind"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginLeft="5dp"
             android:layout_toLeftOf="@id/control_play_pause"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
@@ -246,11 +245,11 @@
 
         <ImageButton
             android:id="@+id/control_fast_forward"
+            android:padding="4dp"
             android:contentDescription="@string/forward"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginRight="5dp"
             android:layout_toRightOf="@id/control_play_pause"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
@@ -261,11 +260,11 @@
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/control_forward"
+            android:padding="8dp"
             android:contentDescription="@string/next_stream"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginRight="5dp"
             android:layout_toRightOf="@+id/control_fast_forward"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
@@ -276,12 +275,11 @@
 
         <ImageButton
             android:id="@+id/control_shuffle"
+            android:padding="9dp"
             android:contentDescription="@string/notification_action_shuffle"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_centerVertical="true"
-            android:layout_marginLeft="5dp"
-            android:layout_marginRight="5dp"
             android:layout_toRightOf="@+id/control_forward"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
