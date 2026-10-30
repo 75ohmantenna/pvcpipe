@@ -71,6 +71,20 @@ class KickMetadataTest {
     }
 
     @Test
+    void explicitMembershipPrivacyControlsListingsAndPlayback() throws Exception {
+        final JsonObject video = videoData();
+        video.put("status", "public");
+        video.put("privacy", "sub_only");
+        assertEquals(ContentAvailability.MEMBERSHIP, KickApi.availability(video));
+        KickSettings.getInstance().setting(true, KickSettings.HIDE_PAID_STREAMS);
+        assertFalse(KickApi.listable(video));
+        downloader.channel(false).on(VIDEOS_API + "/" + CURRENT_UUID,
+                "{\"data\":" + JsonWriter.string(video) + "}");
+        assertThrows(PaidContentException.class, () -> StreamInfo.getInfo(Kick, VIDEO_URL));
+        assertFalse(downloader.requests.stream().anyMatch(r -> r.url().equals(MASTER_URL)));
+    }
+
+    @Test
     void membershipVisibilityDoesNotGrantPlaybackAndNestedLegacyRestrictionsSurvive() throws Exception {
         final JsonObject paid = videoData();
         paid.put("status", "sub_only");

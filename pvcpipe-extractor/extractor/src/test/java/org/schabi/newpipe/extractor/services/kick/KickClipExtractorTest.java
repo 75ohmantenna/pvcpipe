@@ -244,6 +244,26 @@ class KickClipExtractorTest {
     }
 
     @Test
+    void membershipPrivacyCannotBeOverriddenByPublicStatus() {
+        final JsonObject clip = clip();
+        clip.put("privacy", "sub_only");
+        clip.put("status", "public");
+        fixture(clip);
+        assertThrows(PaidContentException.class, () -> extract(CLIP_URL));
+        assertEquals(1, downloader.requests.size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"deleted", "pruned", "banned"})
+    void unavailableStatusFailsBeforeChannelOrMediaAccess(final String status) {
+        final JsonObject clip = clip();
+        clip.put("status", status);
+        fixture(clip);
+        assertThrows(ContentNotAvailableException.class, () -> extract(CLIP_URL));
+        assertEquals(1, downloader.requests.size());
+    }
+
+    @Test
     void privateSubscriberDeletedAndMissingMediaStayDistinct() {
         final JsonObject clip = clip();
         clip.put("privacy", "private");

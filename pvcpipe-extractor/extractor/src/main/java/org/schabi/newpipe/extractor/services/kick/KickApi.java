@@ -10,6 +10,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
@@ -180,6 +181,7 @@ public final class KickApi {
         if (!uuid.equals(legacy.getString("uuid", ""))) {
             throw new ParsingException("Kick returned a different legacy recording");
         }
+        requirePublicPlayback(legacy, "recording");
         final JsonObject data = child(legacy, "livestream");
         data.put("id", data.getString("vod_id", uuid));
         data.put("title", title(data));
@@ -417,23 +419,49 @@ public final class KickApi {
     }
 
     public static ContentAvailability availability(final JsonObject item) {
-        final String status = item.getString("status", item.getString("privacy", ""));
-        if ("sub_only".equals(status)) {
+        if (unavailable(item) || privateContent(item)) {
+            return ContentAvailability.UNKNOWN;
+        }
+        final String status = item.getString("status", "");
+        final String privacy = item.getString("privacy", "");
+        if ("sub_only".equals(status) || "sub_only".equals(privacy)) {
             return ContentAvailability.MEMBERSHIP;
         }
-        return "public".equals(status) ? ContentAvailability.AVAILABLE
+        return "public".equals(status) || "public".equals(privacy) ? ContentAvailability.AVAILABLE
                 : ContentAvailability.UNKNOWN;
     }
 
     public static boolean listable(final JsonObject item) {
-        final String status = item.getString("status", "");
-        return !item.getBoolean("is_banned") && !item.getBoolean("is_private")
-                && !item.getBoolean("is_pruned") && !item.getBoolean("is_deleted")
-                && item.get("deleted_at") == null && !"private".equals(status)
-                && !"deleted".equals(status) && !"pruned".equals(status) && !"banned".equals(status)
-                && !"private".equals(item.getString("privacy"))
+        return !unavailable(item) && !privateContent(item)
                 && !(availability(item) == ContentAvailability.MEMBERSHIP
                 && KickSettings.getInstance().isSettingEnabled(KickSettings.HIDE_PAID_STREAMS));
+    }
+
+    /** Explicit restrictions take precedence over a retained media URL or public alias. */
+    public static void requirePublicPlayback(final JsonObject item, final String kind)
+            throws ContentNotAvailableException {
+        if (item.isEmpty() || unavailable(item)) {
+            throw new ContentNotAvailableException("This Kick " + kind + " is unavailable");
+        }
+        if (privateContent(item)) {
+            throw new PrivateContentException("This Kick " + kind + " is private");
+        }
+        if (availability(item) == ContentAvailability.MEMBERSHIP) {
+            throw new PaidContentException("This Kick " + kind
+                    + " requires a channel subscription");
+        }
+    }
+
+    private static boolean unavailable(final JsonObject item) {
+        final String status = item.getString("status", "");
+        return item.getBoolean("is_banned") || item.getBoolean("is_pruned")
+                || item.getBoolean("is_deleted") || item.get("deleted_at") != null
+                || "deleted".equals(status) || "pruned".equals(status) || "banned".equals(status);
+    }
+
+    private static boolean privateContent(final JsonObject item) {
+        return item.getBoolean("is_private") || "private".equals(item.getString("status"))
+                || "private".equals(item.getString("privacy"));
     }
 
     public static long followers(final JsonObject channel) {

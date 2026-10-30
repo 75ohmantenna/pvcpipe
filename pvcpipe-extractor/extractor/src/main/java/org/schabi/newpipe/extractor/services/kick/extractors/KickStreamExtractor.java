@@ -9,9 +9,7 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
-import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.services.kick.KickApi;
@@ -52,18 +50,7 @@ public final class KickStreamExtractor extends StreamExtractor {
         boolean ongoingRecording = false;
         if (vod) {
             stream = KickApi.video(getId());
-            if (stream.isEmpty() || stream.getBoolean("is_pruned")
-                    || stream.get("deleted_at") != null) {
-                throw new ContentNotAvailableException(
-                        "This Kick recording expired or was deleted");
-            }
-            if (stream.getBoolean("is_private") || "private".equals(stream.getString("status"))) {
-                throw new PrivateContentException("This Kick recording is private");
-            }
-            if ("sub_only".equals(stream.getString("status"))) {
-                throw new PaidContentException(
-                        "This Kick recording requires a channel subscription");
-            }
+            KickApi.requirePublicPlayback(stream, "recording");
             channel = KickApi.child(stream, "channel");
             hls = stream.getString("recording_url", "");
             // The current video list also contains recordings of broadcasts still on air.
@@ -95,6 +82,7 @@ public final class KickStreamExtractor extends StreamExtractor {
                     && requestedStart != KickApi.startTime(stream)) {
                 throw new ContentNotAvailableException("This Kick broadcast has ended");
             }
+            KickApi.requirePublicPlayback(stream, "broadcast");
             hls = KickApi.object(KickUrl.BASE + "/api/v2/channels/"
                     + KickUrl.slug(channel.getString("slug")) + "/playback-url")
                     .getString("data", "");

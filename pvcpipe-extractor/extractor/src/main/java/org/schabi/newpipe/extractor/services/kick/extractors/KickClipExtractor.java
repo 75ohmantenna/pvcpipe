@@ -8,9 +8,7 @@ import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
-import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
 import org.schabi.newpipe.extractor.services.kick.KickApi;
@@ -55,16 +53,9 @@ public final class KickClipExtractor extends StreamExtractor {
         if (!slug.equals(KickUrl.slug(owner.getString("slug", "")))) {
             throw new ParsingException("Kick clip belongs to a different channel");
         }
-        if (clip.getBoolean("is_pruned") || clip.get("deleted_at") != null
-                || clip.getBoolean("is_deleted") || owner.getBoolean("is_banned")) {
+        KickApi.requirePublicPlayback(clip, "clip");
+        if (owner.getBoolean("is_banned")) {
             throw new ContentNotAvailableException("This Kick clip is unavailable");
-        }
-        if (clip.getBoolean("is_private") || "private".equals(clip.getString("privacy"))
-                || "private".equals(clip.getString("status"))) {
-            throw new PrivateContentException("This Kick clip is private");
-        }
-        if ("sub_only".equals(clip.getString("status"))) {
-            throw new PaidContentException("This Kick clip requires a channel subscription");
         }
         String media = "";
         for (final String field : List.of("playback_url", "clip_url", "video_url")) {
