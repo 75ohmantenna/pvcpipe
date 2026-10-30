@@ -21,6 +21,7 @@ import org.schabi.newpipe.extractor.utils.PvcPipeExtractorUtils;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import javax.annotation.Nonnull;
@@ -95,6 +96,10 @@ public final class KickChannelTabExtractor extends ChannelTabExtractor {
                 || page.getId() == null || page.getId().isBlank()) {
             throw new ParsingException("Invalid Kick clips continuation page");
         }
+        // The app and play queue construct a fresh extractor for every continuation.
+        if (page.getIds() != null) {
+            consumedClipCursors.addAll(page.getIds());
+        }
         if (consumedClipCursors.contains(page.getId())) {
             return new InfoItemsPage<>(new MultiInfoItemsCollector(getServiceId()), null);
         }
@@ -131,7 +136,8 @@ public final class KickChannelTabExtractor extends ChannelTabExtractor {
         final String nextCursor = data.getString("cursor");
         final Page next = nextCursor == null || nextCursor.isBlank()
                 || consumedClipCursors.contains(nextCursor)
-                ? null : new Page(clipTabUrl(), nextCursor);
+                ? null : new Page(clipTabUrl(), nextCursor,
+                        List.copyOf(consumedClipCursors), null, null);
         return new InfoItemsPage<>(collector, next);
     }
 }

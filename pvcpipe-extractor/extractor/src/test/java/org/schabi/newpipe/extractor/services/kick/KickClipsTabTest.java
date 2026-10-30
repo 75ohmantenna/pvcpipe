@@ -26,6 +26,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabExtractor;
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
@@ -200,6 +201,20 @@ class KickClipsTabTest {
         assertEquals(cursor, initial.getNextPage().getId());
         assertPage(extractor.getPage(initial.getNextPage()), "clip_Second");
         assertEquals(encoded, downloader.requests.get(2).url());
+    }
+
+    @Test
+    void cursorCyclesStopAcrossTheAppsFreshExtractors() throws Exception {
+        downloader.channel(false).on(CLIPS_API, response("a", clip("clip_First")))
+                .on(CLIPS_API + "&cursor=a", response("b", clip("clip_Second")))
+                .on(CLIPS_API + "&cursor=b", response("a", clip("clip_Third")));
+        final ListLinkHandler handler = KickLinkHandlerFactory.TAB.fromUrl(DEFAULT_URL);
+        final Page first = ChannelTabInfo.getInfo(Kick, handler).getNextPage();
+        final InfoItemsPage<InfoItem> second = ChannelTabInfo.getMoreItems(Kick, handler, first);
+        final InfoItemsPage<InfoItem> third = ChannelTabInfo.getMoreItems(
+                Kick, handler, second.getNextPage());
+        assertPage(third, "clip_Third");
+        assertNull(third.getNextPage());
     }
 
     @Test

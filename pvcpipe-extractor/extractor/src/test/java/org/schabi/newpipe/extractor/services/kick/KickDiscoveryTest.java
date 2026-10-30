@@ -72,6 +72,23 @@ class KickDiscoveryTest {
     }
 
     @Test
+    void discoveryCyclesStopAcrossFreshExtractors() throws Exception {
+        final String scope = KickApi.livestreamsUrl("en", 24, null, null);
+        downloader.on(scope, discovery("first", "a"))
+                .on(KickApi.livestreamsUrl("en", 24, null, "a"), discovery("second", "b"))
+                .on(KickApi.livestreamsUrl("en", 24, null, "b"), discovery("third", "a"));
+        final Page first = Kick.getKioskList().getDefaultKioskExtractor()
+                .getInitialPage().getNextPage();
+        final Page second = Kick.getKioskList().getDefaultKioskExtractor()
+                .getPage(first).getNextPage();
+        final KioskExtractor<StreamInfoItem> thirdExtractor =
+                Kick.getKioskList().getDefaultKioskExtractor();
+        final var third = thirdExtractor.getPage(second);
+        assertEquals("third", third.getItems().get(0).getName());
+        assertFalse(Page.isValid(third.getNextPage()));
+    }
+
+    @Test
     void discoveryUsesOpaqueAfterAndLanguageScopedPagesAndStopsRepeatedCursor() throws Exception {
         final String cursor = "opaque+/=&next";
         final String scope = KickApi.livestreamsUrl("fr", 24, null, null);

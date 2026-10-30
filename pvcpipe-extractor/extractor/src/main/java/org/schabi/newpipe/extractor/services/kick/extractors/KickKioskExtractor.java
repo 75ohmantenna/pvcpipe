@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItemsCollector;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -74,7 +75,7 @@ public final class KickKioskExtractor extends KioskExtractor<StreamInfoItem> {
         }
         final String cursor = KickApi.child(data, "pagination").getString("next_cursor");
         final Page next = cursor == null || cursor.isBlank() || consumedCursors.contains(cursor)
-                ? null : new Page(scope(), cursor);
+                ? null : new Page(scope(), cursor, List.copyOf(consumedCursors), null, null);
         return new InfoItemsPage<>(collector, next);
     }
 
@@ -84,6 +85,10 @@ public final class KickKioskExtractor extends KioskExtractor<StreamInfoItem> {
         if (page == null || !scope().equals(page.getUrl())
                 || page.getId() == null || page.getId().isBlank()) {
             throw new ParsingException("Invalid Kick discovery continuation page");
+        }
+        // Continuation state must survive KioskInfo constructing another extractor.
+        if (page.getIds() != null) {
+            consumedCursors.addAll(page.getIds());
         }
         if (consumedCursors.contains(page.getId())) {
             return new InfoItemsPage<>(new StreamInfoItemsCollector(getServiceId()), null);
