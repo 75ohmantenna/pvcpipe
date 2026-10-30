@@ -91,6 +91,8 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         state.putInt("serviceId" + STATE_SUFFIX, serviceId);
         state.putString("url" + STATE_SUFFIX, url);
         state.putBoolean("InitialKickTabApplied", initialKickTabApplied);
+        retainKickClipFilters();
+        state.putSerializable("KickClipTab" + STATE_SUFFIX, retainedKickClips);
     }
 
     @Override
@@ -106,6 +108,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             url = state.getString("url" + STATE_SUFFIX);
         }
         initialKickTabApplied = state.getBoolean("InitialKickTabApplied", false);
+        retainedKickClips = (ListLinkHandler) state.getSerializable("KickClipTab" + STATE_SUFFIX);
     }
 
     private ChannelInfo currentInfo;
@@ -115,6 +118,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     private SubscriptionManager subscriptionManager;
     private int lastTab;
     private boolean initialKickTabApplied;
+    private ListLinkHandler retainedKickClips;
     private boolean channelContentNotSupported = false;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -491,11 +495,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     // Init
     //////////////////////////////////////////////////////////////////////////*/
 
-    private void updateTabs() {
-        ListLinkHandler retainedClips = null;
-        if (initialKickTabApplied && tabAdapter.getCount() > 0) {
-            lastTab = binding.tabLayout.getSelectedTabPosition();
-        }
+    private void retainKickClipFilters() {
         if (serviceId == ServiceList.Kick.getServiceId() && currentInfo != null) {
             for (final androidx.fragment.app.Fragment child
                     : getChildFragmentManager().getFragments()) {
@@ -503,11 +503,25 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                     final ListLinkHandler handler = ((ChannelTabFragment) child).tabHandler;
                     if (handler != null && handler.getId().equals(currentInfo.getId())
                             && handler.getContentFilters().contains(ChannelTabs.CLIPS)) {
-                        retainedClips = handler;
+                        try {
+                            // Retain only the lightweight selection, not a raw channel snapshot.
+                            retainedKickClips = ServiceList.Kick.getChannelTabLHFactory().fromQuery(
+                                    handler.getId(), handler.getContentFilters(),
+                                    handler.getSortFilter());
+                        } catch (final ParsingException e) {
+                            Log.w(TAG, "Could not retain Kick clip filters", e);
+                        }
                         break;
                     }
                 }
             }
+        }
+    }
+
+    private void updateTabs() {
+        retainKickClipFilters();
+        if (initialKickTabApplied && tabAdapter.getCount() > 0) {
+            lastTab = binding.tabLayout.getSelectedTabPosition();
         }
         tabAdapter.clearAllItems();
 
@@ -523,6 +537,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                             .fromUrl(currentInfo.getOriginalUrl());
                     if (requested.getContentFilters().contains(ChannelTabs.CLIPS)) {
                         initialClips = requested;
+                        retainedKickClips = requested;
                     }
                 } catch (final ParsingException e) {
                     Log.w(TAG, "Could not resolve initial Kick channel tab", e);
@@ -534,11 +549,12 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                 final FilterItem tab = linkHandler.getContentFilters().get(0);
                 if (ChannelTabHelper.showChannelTab(context, preferences, tab)) {
                     final ListLinkHandler selected;
-                    if (tab.equals(ChannelTabs.CLIPS) && retainedClips != null) {
-                        selected = retainedClips;
-                    } else if (tab.equals(ChannelTabs.CLIPS) && initialClips != null) {
+                    if (tab.equals(ChannelTabs.CLIPS) && initialClips != null) {
                         selected = initialClips;
                         lastTab = tabAdapter.getCount();
+                    } else if (tab.equals(ChannelTabs.CLIPS) && retainedKickClips != null
+                            && retainedKickClips.getId().equals(currentInfo.getId())) {
+                        selected = retainedKickClips;
                     } else {
                         selected = linkHandler;
                     }
@@ -625,6 +641,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     public void startLoading(final boolean forceLoad) {
         super.startLoading(forceLoad);
 
+        retainKickClipFilters();
         currentInfo = null;
         updateTabs();
         if (currentWorker != null) {
