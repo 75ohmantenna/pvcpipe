@@ -112,5 +112,5 @@ again at serialization. The copy/share configuration preserves these builders
 and their formats; it does not sanitize arbitrary report inputs or redesign
 ACRA collection. It does not automatically send a report.
 
-See [documentation-alignment.md](documentation-alignment.md) for dated controlled
+See [documentation-alignment.md](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/documentation-alignment.md) for dated controlled
 before/after evidence and its limitations.
