@@ -147,14 +147,16 @@
 
         <ImageView
             android:id="@+id/pitchToogleControlModes"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_below="@id/separatorPitch"
             android:layout_alignParentEnd="true"
+            android:layout_marginTop="-13dp"
             android:clickable="true"
+            android:contentDescription="@string/pitch_control_options"
             android:focusable="true"
-            android:src="@drawable/ic_expand_more"
-            tools:ignore="ContentDescription" />
+            android:padding="13dp"
+            android:src="@drawable/ic_expand_more" />
 
         <LinearLayout
             android:id="@+id/pitchControlModeTabs"

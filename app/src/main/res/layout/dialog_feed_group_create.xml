@@ -25,10 +25,10 @@
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:layout_gravity="center"
+                android:contentDescription="@string/feed_group_choose_icon"
                 android:scaleType="centerInside"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
-                tools:ignore="ContentDescription"
                 tools:src="@drawable/ic_asterisk" />
 
             <com.google.android.material.textfield.TextInputLayout
@@ -191,11 +191,11 @@
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
+            android:contentDescription="@string/feed_group_delete"
             android:minWidth="0dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_delete"
             android:visibility="gone"
-            tools:ignore="ContentDescription"
             tools:visibility="visible" />
 
         <Button

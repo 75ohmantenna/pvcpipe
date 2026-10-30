@@ -22,10 +22,12 @@
         android:hint="@string/sponsor_block_api_url_hint"/>
     <androidx.appcompat.widget.AppCompatImageButton
         android:id="@+id/icon_api_url_help"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="center"
         android:clickable="true"
+        android:contentDescription="@string/sponsor_block_api_url_help_description"
+        android:padding="8dp"
         android:focusable="true"
         app:srcCompat="@drawable/ic_help"
         android:background="?attr/selectableItemBackground"

@@ -17,6 +17,8 @@ class PickerIconItem(
 
     override fun bind(viewBinding: PickerIconItemBinding, position: Int) {
         viewBinding.iconView.setImageResource(iconRes)
+        viewBinding.iconView.contentDescription =
+            viewBinding.root.context.getString(icon.nameResource)
     }
 
     override fun initializeViewBinding(view: View) = PickerIconItemBinding.bind(view)
