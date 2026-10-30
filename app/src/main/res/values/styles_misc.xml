@@ -4,7 +4,7 @@
     <!-- Follows service's primary color -->
     <style name="ServiceColoredButton" parent="Widget.AppCompat.Button.Colored">
         <item name="colorButtonNormal">?attr/colorPrimary</item>
-        <item name="android:textColor">@color/subscribe_text_color</item>
+        <item name="android:textColor">?attr/actionColor</item>
         <item name="colorControlHighlight">@color/dark_ripple_color</item>
     </style>
 
@@ -36,6 +36,7 @@
         <item name="popupTheme">@style/ToolbarPopupTheme</item>
         <item name="android:textColorPrimary">?attr/actionColor</item>
         <item name="android:textColorSecondary">?attr/actionColor</item>
+        <item name="android:textColorHint">@color/toolbar_hint_color</item>
         <item name="tint">?attr/actionColor</item>
         <item name="iconTint">?attr/actionColor</item>
     </style>

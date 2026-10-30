@@ -43,13 +43,17 @@
         <item name="border_color">@color/light_border_color</item>
         <item name="dashed_border">@drawable/dashed_border_light</item>
     </style>
-    <style name="LightTheme" parent="AppLightTheme" />
+    <!-- API 26 has no dark navigation icons. values-v27 replaces this style. -->
+    <style name="LightTheme" parent="AppLightTheme">
+        <item name="android:navigationBarColor">@color/black</item>
+    </style>
 
     <!-- Dark Theme -->
     <style name="AppDarkTheme" parent="Base">
         <item name="colorPrimary">@color/dark_youtube_primary_color</item>
         <item name="colorPrimaryDark">@color/dark_youtube_primary_color</item>
         <item name="colorAccent">@color/dark_youtube_accent_color</item>
+        <item name="colorControlActivated">?attr/colorAccent</item>
         <item name="android:windowBackground">@color/dark_background_color</item>
         <item name="windowBackground">@color/dark_background_color</item>
 
