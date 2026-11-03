@@ -10,6 +10,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.os.Build;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -32,6 +34,8 @@ import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -53,6 +57,10 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 public class DownloaderImplTest {
+    private static final String EXPECTED_RUMBLE_USER_AGENT =
+            "Rumble-AndroidTV/2.11.0.10198 (" + Build.MODEL + "; Android "
+                    + Build.VERSION.RELEASE + " " + Build.VERSION.SDK_INT + ") okhttp/5.1.0";
+
     @Test
     public void bitChuteSeedRequestsUseCompatibleMediaIdentity() {
         for (final String url : List.of("https://seed131b.bitchute.com/channel/video.mp4",
@@ -63,12 +71,29 @@ public class DownloaderImplTest {
     }
 
     @Test
-    public void mediaIdentityDoesNotChangeApiOrOtherWebsiteRequests() {
+    public void mediaIdentityDoesNotChangeOtherWebsiteOrUnapprovedRumbleRequests() {
         for (final String url : List.of("https://api.bitchute.com/api/beta/video/media",
-                "https://www.bitchute.com/video/id", "https://rumble.com/video.mp4",
+                "https://www.bitchute.com/video/id",
                 "https://seed131b.bitchute.com.evil.example/video.mp4",
-                "https://example.org/seed131b.bitchute.com/video.mp4", "not a URL")) {
+                "https://example.org/seed131b.bitchute.com/video.mp4",
+                "http://rumble.com/video.mp4", "http://www.rumble.com/video.mp4",
+                "http://hugh.cdn.rumble.cloud/video.mp4",
+                "https://rumble.com.evil.example/video.mp4", "https://notrumble.com/video.mp4",
+                "https://rumble.cloud/video.mp4", "https://other.cdn.rumble.cloud/video.mp4",
+                "https://sub.hugh.cdn.rumble.cloud/video.mp4",
+                "https://hugh.cdn.rumble.cloud.evil.example/video.mp4",
+                "https://example.org/rumble.com/video.mp4?url=https://rumble.com",
+                "https://rumble.com@example.org/video.mp4", "not a URL")) {
             assertEquals(DownloaderImpl.USER_AGENT, DownloaderImpl.getMediaUserAgent(url));
+        }
+    }
+
+    @Test
+    public void approvedHttpsRumbleHostsUseTheOfficialTvIdentity() {
+        for (final String url : List.of("https://rumble.com/service.php?name=media.details",
+                "https://WWW.RUMBLE.COM/embedJS/u3/", "https://media.edge.rumble.com/file.mp4",
+                "https://HUGH.CDN.RUMBLE.CLOUD/file.m3u8")) {
+            assertEquals(url, EXPECTED_RUMBLE_USER_AGENT, DownloaderImpl.getMediaUserAgent(url));
         }
     }
 
@@ -225,21 +250,8 @@ public class DownloaderImplTest {
     @Test
     public void crossHostRedirectDoesNotForwardSavedYoutubeCookies() throws Exception {
         // This self-signed fixture is trusted only by this local test client.
-        final KeyStore keys = KeyStore.getInstance("PKCS12");
-        try (InputStream input = getClass().getResourceAsStream("/cookie-test.p12")) {
-            assertNotNull(input);
-            keys.load(input, "test-only".toCharArray());
-        }
-        final KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(
-                KeyManagerFactory.getDefaultAlgorithm());
-        keyManagers.init(keys, "test-only".toCharArray());
-        final TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm());
-        trustManagers.init(keys);
-        final X509TrustManager trustManager =
-                (X509TrustManager) trustManagers.getTrustManagers()[0];
-        final SSLContext tls = SSLContext.getInstance("TLS");
-        tls.init(keyManagers.getKeyManagers(), trustManagers.getTrustManagers(), null);
+        final SSLContext tls = testTlsContext("/cookie-test.p12");
+        final X509TrustManager trustManager = testTrustManager("/cookie-test.p12");
         final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
         try (ServerSocket server = tls.getServerSocketFactory().createServerSocket(
                 0, 2, InetAddress.getLoopbackAddress())) {
@@ -277,6 +289,111 @@ public class DownloaderImplTest {
     }
 
     @Test
+    public void controlledTlsPeerObservesRumbleIdentityStatusesAndHeaderPrecedence()
+            throws Exception {
+        final SSLContext tls = testTlsContext("/rumble-request-test.p12");
+        final X509TrustManager trustManager = testTrustManager("/rumble-request-test.p12");
+        final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
+        final java.lang.reflect.Field clientField = DownloaderImpl.class.getDeclaredField("client");
+        clientField.setAccessible(true);
+        final OkHttpClient previousClient = downloader.getClient();
+        final List<String> hosts = List.of("rumble.com", "www.rumble.com",
+                "media.edge.rumble.com", "hugh.cdn.rumble.cloud",
+                "rumble.com.evil.example", "notrumble.com", "rumble.cloud",
+                "other.cdn.rumble.cloud", "sub.hugh.cdn.rumble.cloud",
+                "hugh.cdn.rumble.cloud.evil.example", "example.org", "seed125.bitchute.com");
+        final List<Integer> statuses = new ArrayList<>();
+        for (int host = 0; host < hosts.size(); host++) {
+            statuses.addAll(List.of(200, 403, 429));
+        }
+        statuses.add(200);
+        try (ServerSocket server = tls.getServerSocketFactory().createServerSocket(
+                0, 50, InetAddress.getLoopbackAddress())) {
+            server.setSoTimeout(5000);
+            final Future<List<Map<String, String>>> received = serverExecutor.submit(
+                    () -> serveResponses(server, statuses));
+            clientField.set(downloader, new OkHttpClient.Builder()
+                    .proxy(Proxy.NO_PROXY)
+                    .sslSocketFactory(tls.getSocketFactory(), trustManager)
+                    .dns(host -> Collections.singletonList(InetAddress.getLoopbackAddress()))
+                    .callTimeout(10, TimeUnit.SECONDS)
+                    .addNetworkInterceptor(new DownloaderImpl.YoutubeCookieInterceptor()).build());
+            for (final String host : hosts) {
+                final String url = "https://" + host + ":" + server.getLocalPort()
+                        + "/rumble.com/video.mp4?url=https://rumble.com";
+                for (final int status : new int[]{200, 403, 429}) {
+                    final org.schabi.newpipe.extractor.downloader.Response response =
+                            downloader.get(url);
+                    assertEquals(host, status, response.responseCode());
+                    assertEquals("{}", response.responseBody());
+                }
+            }
+            final String explicitUrl = "https://rumble.com:" + server.getLocalPort() + "/";
+            assertEquals(200, downloader.get(explicitUrl, Map.of(
+                    "user-agent", List.of("Rumble-test/explicit"),
+                    "Cookie", List.of("rumble=explicit"),
+                    "Referer", List.of("https://example.org/"))).responseCode());
+            final List<Map<String, String>> requests = received.get(10, TimeUnit.SECONDS);
+            for (int host = 0; host < hosts.size(); host++) {
+                final String expectedIdentity;
+                if (host < 4) {
+                    expectedIdentity = EXPECTED_RUMBLE_USER_AGENT;
+                } else if (host == hosts.size() - 1) {
+                    expectedIdentity = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) "
+                            + "Gecko/20100101 Firefox/128.0";
+                } else {
+                    expectedIdentity = DownloaderImpl.USER_AGENT;
+                }
+                for (int status = 0; status < 3; status++) {
+                    final Map<String, String> headers = requests.get(host * 3 + status);
+                    assertEquals(hosts.get(host), expectedIdentity, headers.get("User-Agent"));
+                    assertNull(hosts.get(host), headers.get("Cookie"));
+                    assertNull(hosts.get(host), headers.get("Referer"));
+                }
+            }
+            final Map<String, String> explicit = requests.get(requests.size() - 1);
+            assertEquals("Rumble-test/explicit", explicit.get("User-Agent"));
+            assertEquals("rumble=explicit", explicit.get("Cookie"));
+            assertEquals("https://example.org/", explicit.get("Referer"));
+        } finally {
+            clientField.set(downloader, previousClient);
+            serverExecutor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void controlledHttpPeerReceivesDefaultIdentityWithoutYoutubeCookies() throws Exception {
+        final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
+        final java.lang.reflect.Field clientField = DownloaderImpl.class.getDeclaredField("client");
+        clientField.setAccessible(true);
+        final OkHttpClient previousClient = downloader.getClient();
+        try (ServerSocket server = new ServerSocket(0, 3, InetAddress.getLoopbackAddress())) {
+            server.setSoTimeout(5000);
+            final Future<List<Map<String, String>>> received = serverExecutor.submit(
+                    () -> serveResponses(server, List.of(200, 403, 429)));
+            clientField.set(downloader, new OkHttpClient.Builder()
+                    .proxy(Proxy.NO_PROXY)
+                    .dns(host -> Collections.singletonList(InetAddress.getLoopbackAddress()))
+                    .callTimeout(10, TimeUnit.SECONDS)
+                    .addNetworkInterceptor(new DownloaderImpl.YoutubeCookieInterceptor()).build());
+            final List<String> hosts = List.of("rumble.com", "www.rumble.com",
+                    "hugh.cdn.rumble.cloud");
+            final int[] statuses = {200, 403, 429};
+            for (int index = 0; index < hosts.size(); index++) {
+                assertEquals(statuses[index], downloader.get("http://" + hosts.get(index) + ":"
+                        + server.getLocalPort() + "/").responseCode());
+            }
+            for (final Map<String, String> headers : received.get(10, TimeUnit.SECONDS)) {
+                assertEquals(DownloaderImpl.USER_AGENT, headers.get("User-Agent"));
+                assertNull(headers.get("Cookie"));
+            }
+        } finally {
+            clientField.set(downloader, previousClient);
+            serverExecutor.shutdownNow();
+        }
+    }
+
+    @Test
     public void productionResponsesReachKickClassificationWithoutLeakingCookies() throws Exception {
         final java.lang.reflect.Field clientField = DownloaderImpl.class.getDeclaredField("client");
         clientField.setAccessible(true);
@@ -309,6 +426,61 @@ public class DownloaderImplTest {
             clientField.set(downloader, previousClient);
             NewPipe.init(previousDownloader);
         }
+    }
+
+    private static KeyStore testKeys(final String resource) throws Exception {
+        final KeyStore keys = KeyStore.getInstance("PKCS12");
+        try (InputStream input = DownloaderImplTest.class.getResourceAsStream(resource)) {
+            assertNotNull(input);
+            keys.load(input, "test-only".toCharArray());
+        }
+        return keys;
+    }
+
+    private static X509TrustManager testTrustManager(final String resource) throws Exception {
+        final TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
+        trustManagers.init(testKeys(resource));
+        return (X509TrustManager) trustManagers.getTrustManagers()[0];
+    }
+
+    private static SSLContext testTlsContext(final String resource) throws Exception {
+        final KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(
+                KeyManagerFactory.getDefaultAlgorithm());
+        keyManagers.init(testKeys(resource), "test-only".toCharArray());
+        final SSLContext tls = SSLContext.getInstance("TLS");
+        tls.init(keyManagers.getKeyManagers(),
+                new X509TrustManager[]{testTrustManager(resource)}, null);
+        return tls;
+    }
+
+    private static List<Map<String, String>> serveResponses(final ServerSocket server,
+                                                           final List<Integer> statuses)
+            throws Exception {
+        final List<Map<String, String>> requests = new ArrayList<>();
+        for (final int status : statuses) {
+            try (Socket socket = server.accept()) {
+                socket.setSoTimeout(5000);
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(
+                        socket.getInputStream(), StandardCharsets.UTF_8));
+                final Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+                assertNotNull(reader.readLine());
+                String line;
+                while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    final int colon = line.indexOf(':');
+                    if (colon > 0) {
+                        headers.merge(line.substring(0, colon), line.substring(colon + 1).trim(),
+                                (first, second) -> first + ", " + second);
+                    }
+                }
+                requests.add(headers);
+                final String response = "HTTP/1.1 " + status + " Test\r\n"
+                        + "Content-Type: application/json\r\nContent-Length: 2\r\n"
+                        + "Connection: close\r\n\r\n{}";
+                socket.getOutputStream().write(response.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        return requests;
     }
 
     private static List<String> serveRedirect(final ServerSocket server) throws Exception {

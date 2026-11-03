@@ -1,6 +1,7 @@
 package org.schabi.newpipe;
 
 import android.content.Context;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -38,14 +39,25 @@ public final class DownloaderImpl extends Downloader {
                     + "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36";
     private static final String BITCHUTE_MEDIA_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0";
+    private static final String RUMBLE_USER_AGENT =
+            "Rumble-AndroidTV/2.11.0.10198 (" + Build.MODEL + "; Android "
+                    + Build.VERSION.RELEASE + " " + Build.VERSION.SDK_INT + ") okhttp/5.1.0";
     private static final String ODYSEE_MEDIA_REFERER = "https://odysee.com/";
 
     public static String getMediaUserAgent(final String url) {
         final HttpUrl parsed = HttpUrl.parse(url);
         // BitChute's seed CDN closes Chrome/145 connections without an HTTP response.
         // Keep this workaround confined to its media hosts.
-        return parsed != null && parsed.host().matches("seed[a-z0-9]+\\.bitchute\\.com")
-                ? BITCHUTE_MEDIA_USER_AGENT : USER_AGENT;
+        if (parsed != null) {
+            if (parsed.host().matches("seed[a-z0-9]+\\.bitchute\\.com")) {
+                return BITCHUTE_MEDIA_USER_AGENT;
+            }
+            if (parsed.isHttps() && (isHostOrSubdomain(parsed.host(), "rumble.com")
+                    || parsed.host().equals("hugh.cdn.rumble.cloud"))) {
+                return RUMBLE_USER_AGENT;
+            }
+        }
+        return USER_AGENT;
     }
 
     /**

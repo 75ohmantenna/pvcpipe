@@ -24,11 +24,11 @@ object ListHelper {
 
     // Audio format in order of quality. 0=lowest quality, n=highest quality
     private val AUDIO_FORMAT_QUALITY_RANKING =
-        listOf(MediaFormat.MP3, MediaFormat.WEBMA, MediaFormat.M4A)
+        listOf(MediaFormat.MP3, MediaFormat.WEBMA, MediaFormat.AAC, MediaFormat.M4A)
 
     // Audio format in order of efficiency. 0=least efficient, n=most efficient
     private val AUDIO_FORMAT_EFFICIENCY_RANKING =
-        listOf(MediaFormat.MP3, MediaFormat.M4A, MediaFormat.WEBMA)
+        listOf(MediaFormat.MP3, MediaFormat.AAC, MediaFormat.M4A, MediaFormat.WEBMA)
 
     // Use a Set for better performance
     private val HIGH_RESOLUTION_LIST = setOf(1440, 2160)

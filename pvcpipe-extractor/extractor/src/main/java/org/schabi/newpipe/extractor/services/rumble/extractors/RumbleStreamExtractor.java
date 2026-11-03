@@ -25,6 +25,8 @@ import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
+import org.schabi.newpipe.extractor.services.rumble.RumbleApi;
+import org.schabi.newpipe.extractor.services.rumble.RumbleMediaResolver;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleStreamLinkHandlerFactory;
 import org.schabi.newpipe.extractor.stream.AudioStream;
@@ -37,6 +39,7 @@ import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.extractor.utils.ExtractorLogger;
+import org.schabi.newpipe.extractor.utils.JsonUtils;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import javax.annotation.Nonnull;
@@ -45,13 +48,16 @@ import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,13 +84,17 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     private static final String RELATED_STREAMS_SELECTOR = "ul.mediaList-list";
     private static final Pattern HLS_RESOLUTION_PATTERN =
             Pattern.compile("^[1-9][0-9]*x([1-9][0-9]*)$");
-    private static final Pattern VIEWER_ID_PATTERN = Pattern.compile("viewer_id: \"(.*)\"");
+    private static final JsonObject EMPTY_METADATA = new JsonObject();
 
     private Document doc;
     JsonObject embedJsonStreamInfoObj;
-    private boolean embedOnly;
+    @Nullable
+    private JsonObject details;
+    private long numericId;
+    private StreamInfoItemsCollector relatedItems;
+    @Nullable
+    private String resolvedPublicUrl;
 
-    private int ageLimit = -1;
     private List<VideoStream> videoStreams;
     private List<AudioStream> audioStreams;
     private List<SubtitlesStream> subtitles = Collections.emptyList();
@@ -103,22 +113,33 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         super(service, linkHandler);
     }
 
+    @Override
+    public String getUrl() throws ParsingException {
+        return resolvedPublicUrl == null ? super.getUrl() : resolvedPublicUrl;
+    }
+
     @Nonnull
     @Override
     public String getName() throws ParsingException {
         assertPageFetched();
-        final String title =
-                Parser.unescapeEntities(embedJsonStreamInfoObj.getString(TITLE), true);
-
-        return title;
+        return Parser.unescapeEntities(firstNonempty(
+                embedJsonStreamInfoObj.getString(TITLE), detailString(TITLE)), true);
     }
 
     @Nullable
     @Override
     public String getTextualUploadDate() throws ParsingException {
 
-        final String textualDate = embedJsonStreamInfoObj.getString(PUBLICATION_DATE);
-        return textualDate;
+        final String embedDate = embedJsonStreamInfoObj.getString(PUBLICATION_DATE);
+        if (!isNullOrEmpty(embedDate)) {
+            try {
+                PvcParsingHelper.parseDateFrom(embedDate);
+                return embedDate;
+            } catch (final ParsingException ignored) {
+                // Invalid optional embed dates may be supplied by details instead.
+            }
+        }
+        return detailString("upload_date");
     }
 
     @Override
@@ -137,7 +158,11 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     @Override
     public List<Image> getThumbnails() throws ParsingException {
         assertPageFetched();
-        final String thumbUrl = embedJsonStreamInfoObj.getString(COVER_IMAGE);
+        String thumbUrl = embedJsonStreamInfoObj.getString(COVER_IMAGE);
+        if (isNullOrEmpty(thumbUrl)) {
+            thumbUrl = detailString("thumb");
+            return images(thumbUrl);
+        }
         int height = Image.HEIGHT_UNKNOWN;
         int width = Image.WIDTH_UNKNOWN;
         // the size of the cover image is only given in the list of all thumbnails
@@ -164,6 +189,9 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     @Override
     public Description getDescription() throws ParsingException {
         assertPageFetched();
+        if (details != null && details.get("description") instanceof String) {
+            return new Description(details.getString("description"), Description.PLAIN_TEXT);
+        }
         if (doc == null) {
             return new Description("", Description.PLAIN_TEXT);
         }
@@ -189,11 +217,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
 
     @Override
     public int getAgeLimit() throws ParsingException {
-        if (ageLimit == -1) {
-            ageLimit = NO_AGE_LIMIT;
-        }
-
-        return ageLimit;
+        return details != null && details.getBoolean("is_age_restricted") ? 18 : NO_AGE_LIMIT;
     }
 
     public static class FetchWithDownloaderImpl implements Fetcher {
@@ -222,7 +246,10 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     public long getLength() throws ParsingException {
         assertPageFetched();
         final Number duration = embedJsonStreamInfoObj.getNumber(DURATION);
-        return duration == null ? 0 : duration.longValue();
+        if (duration != null && duration.doubleValue() >= 0) {
+            return duration.longValue();
+        }
+        return details == null ? 0 : details.getLong(DURATION, 0);
     }
 
     /**
@@ -238,27 +265,28 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     @Override
     public long getViewCount() throws ParsingException {
         assertPageFetched();
+        if (getStreamType() == StreamType.LIVE_STREAM) {
+            return details == null ? -1 : details.getLong("watching_now", -1);
+        }
+        if (details != null && details.get("views") instanceof Number) {
+            return details.getLong("views");
+        }
         if (doc == null) {
             return -1;
         }
-        if (getStreamType() == StreamType.LIVE_STREAM) {
-            return getLiveViewCount();
-        } else {
-            final String errorMsg = "Could not extract the view count";
-            try {
-                final String viewCount =
-                        RumbleParsingHelper.extractSafely(false, errorMsg,
-                                () -> doc.select("div.media-description-info-views")
-                                        .first().text());
-                // some or all recorded live streams have no view count
-                // eg.: https://rumble.com/v6q1s7c
-                if (null == viewCount) {
-                    return super.getViewCount();
-                }
-                return Utils.mixedNumberWordToLong(viewCount.replace(",", ""));
-            } catch (final NumberFormatException e) {
-                throw new ParsingException(errorMsg, e);
+        final String errorMsg = "Could not extract the view count";
+        try {
+            final String viewCount =
+                    RumbleParsingHelper.extractSafely(false, errorMsg,
+                            () -> doc.select("div.media-description-info-views")
+                                    .first().text());
+            // Some recorded live streams have no view count.
+            if (viewCount == null) {
+                return super.getViewCount();
             }
+            return Utils.mixedNumberWordToLong(viewCount.replace(",", ""));
+        } catch (final NumberFormatException e) {
+            throw new ParsingException(errorMsg, e);
         }
     }
 
@@ -270,7 +298,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
             final String votes = RumbleParsingHelper.extractSafely(false, "",
                     () -> doc.select(cssQuery)
                             .first().text());
-            return Utils.mixedNumberWordToLong(votes);
+            return isNullOrEmpty(votes) ? -1 : Utils.mixedNumberWordToLong(votes);
         } catch (final NumberFormatException e) {
             return -1;
         }
@@ -278,40 +306,71 @@ public final class RumbleStreamExtractor extends StreamExtractor {
 
     @Override
     public long getLikeCount() throws ParsingException {
-        return getLikeOrDislikesCount("span[data-js=\"rumbles_up_votes\"]");
+        final JsonObject votes = details == null ? null : details.getObject("rumble_votes");
+        return votes != null && votes.get("num_votes_up") instanceof Number
+                ? votes.getLong("num_votes_up")
+                : getLikeOrDislikesCount("span[data-js=\"rumbles_up_votes\"]");
     }
 
     @Override
     public long getDislikeCount() throws ParsingException {
-        return getLikeOrDislikesCount("span[data-js=\"rumbles_down_votes\"]");
+        final JsonObject votes = details == null ? null : details.getObject("rumble_votes");
+        return votes != null && votes.get("num_votes_down") instanceof Number
+                ? votes.getLong("num_votes_down")
+                : getLikeOrDislikesCount("span[data-js=\"rumbles_down_votes\"]");
     }
 
     @Nonnull
     @Override
     public String getUploaderUrl() throws ParsingException {
         assertPageFetched();
-        return embedJsonStreamInfoObj.getObject(AUTHOR).getString("url");
+        return firstNonempty(embedJsonStreamInfoObj.getObject(AUTHOR).getString("url"),
+                detailUploader().getString("url"));
     }
 
     @Nonnull
     @Override
     public String getUploaderName() throws ParsingException {
         assertPageFetched();
-        final String uploaderName =
-                embedJsonStreamInfoObj.getObject(AUTHOR).getString("name");
-        return uploaderName;
+        return firstNonempty(embedJsonStreamInfoObj.getObject(AUTHOR).getString("name"),
+                detailUploader().getString("name"));
     }
 
     @Override
     public boolean isUploaderVerified() throws ParsingException {
-        // TODO Extract the watch page's uploader verification badge when available.
-        return false;
+        return detailUploader().getBoolean("verified_badge");
+    }
+
+    @Override
+    public long getUploaderSubscriberCount() {
+        return detailUploader().getLong("followers", UNKNOWN_SUBSCRIBER_COUNT);
+    }
+
+    private JsonObject detailUploader() {
+        return details != null && details.get("by") instanceof JsonObject
+                ? (JsonObject) details.get("by") : EMPTY_METADATA;
+    }
+
+    private String detailString(final String key) {
+        return details == null ? null : details.getString(key);
+    }
+
+    private static String firstNonempty(final String first, final String second) {
+        return !isNullOrEmpty(first) ? first : second == null ? "" : second;
+    }
+
+    private static List<Image> images(final String url) {
+        return isNullOrEmpty(url) ? Collections.emptyList() : List.of(new Image(url,
+                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
 
     @Nonnull
     @Override
     public List<Image> getUploaderAvatars() throws ParsingException {
         assertPageFetched();
+        if (detailUploader().containsKey("thumb")) {
+            return images(detailUploader().getString("thumb"));
+        }
         if (doc == null) {
             return Collections.emptyList();
         }
@@ -324,7 +383,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         try {
             final String thumbnailUrl = RumbleParsingHelper
                     .extractUploaderAvatarUrl(theUserPathToHisAvatar, doc);
-            if (thumbnailUrl == null) {
+            if (isNullOrEmpty(thumbnailUrl)) {
                 return Collections.emptyList(); // a letter is shown in place of an image
             }
             // the page does not give a size, but Rumble serves these avatars no larger than
@@ -536,9 +595,26 @@ public final class RumbleStreamExtractor extends StreamExtractor {
                 .setId(ID_UNKNOWN)
                 .setContent(videoUrl, true)
                 .setDeliveryMethod(DeliveryMethod.PROGRESSIVE_HTTP)
-                .setMediaFormat(MediaFormat.M4A)
+                .setMediaFormat(audioFormat(videoUrl))
                 .setAverageBitrate(bitrate);
         return builder.build();
+    }
+
+    @Nullable
+    private static MediaFormat audioFormat(final String url) {
+        try {
+            final String path = new URI(url).getPath();
+            if (path == null) {
+                return null;
+            }
+            final String suffix = path.toLowerCase(Locale.ROOT);
+            if (suffix.endsWith(".aac")) {
+                return MediaFormat.AAC;
+            }
+            return suffix.endsWith(".m4a") || suffix.endsWith(".mp4") ? MediaFormat.M4A : null;
+        } catch (final URISyntaxException e) {
+            return null;
+        }
     }
 
     private VideoStream createVideoStream(
@@ -566,15 +642,51 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         // The embed API uses 2 for an active live stream. A value of 1 is upcoming or post-live,
         // depending on livestream_has_dvr, and must not be exposed as currently live.
         final Number isLive = embedJsonStreamInfoObj.getNumber(videoLiveStreamKey);
-        final boolean isLiveStream = isLive != null && isLive.intValue() == 2;
+        final boolean isLiveStream = isLive == null
+                ? details != null && details.getBoolean(videoLiveStreamKey)
+                : isLive.doubleValue() == 2;
         return isLiveStream ? StreamType.LIVE_STREAM : StreamType.VIDEO_STREAM;
     }
 
     @Nullable
     @Override
     public StreamInfoItemsCollector getRelatedItems() throws ExtractionException {
+        if (relatedItems != null) {
+            return relatedItems;
+        }
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         if (doc == null || doc.select(RELATED_STREAMS_SELECTOR).isEmpty()) {
+            final JsonObject data;
+            try {
+                data = RumbleApi.fetchData(getDownloader(), RumbleApi.serviceUrl(
+                        "video.autoplay", Map.of("api", "8", "video_id",
+                                Long.toString(numericId))), getExtractorLocalization());
+            } catch (final IOException e) {
+                throw new ParsingException("Could not load Rumble related videos", e);
+            }
+            final Set<Long> seen = new HashSet<>();
+            seen.add(numericId);
+            for (final Object entry : JsonUtils.getArray(data, "videos")) {
+                if (!(entry instanceof JsonObject)) {
+                    continue;
+                }
+                final JsonObject video = (JsonObject) entry;
+                final Number value = JsonUtils.getNumber(video, "id");
+                final long id;
+                try {
+                    id = value instanceof Long || value instanceof Integer
+                            ? value.longValue() : new BigDecimal(value.toString()).longValueExact();
+                } catch (final ArithmeticException | NumberFormatException e) {
+                    throw new ParsingException("Invalid Rumble related video ID", e);
+                }
+                if (id <= 0) {
+                    throw new ParsingException("Rumble related video ID must be positive");
+                }
+                if (seen.add(id)) {
+                    collector.commit(new RumbleJsonStreamInfoItemExtractor(video));
+                }
+            }
+            relatedItems = collector;
             return collector;
         }
         final List<Node> nodes = doc.select(RELATED_STREAMS_SELECTOR).first().childNodes();
@@ -588,6 +700,7 @@ public final class RumbleStreamExtractor extends StreamExtractor {
             }
         }
 
+        relatedItems = collector;
         return collector;
     }
 
@@ -604,16 +717,12 @@ public final class RumbleStreamExtractor extends StreamExtractor {
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
 
-
-        embedOnly = getUrl().contains("/embed/");
-        final String embedVideoId;
-        if (embedOnly) {
-            embedVideoId = getId();
-        } else {
-            doc = RumbleParsingHelper.fetchParseValidate(downloader, getUrl());
-            embedVideoId = "v" + RumbleParsingHelper.getEmbedVideoId(
-                    getUrl(), () -> doc.toString());
-        }
+        final RumbleMediaResolver.ResolvedMedia resolved = RumbleMediaResolver.resolve(
+                downloader, getLinkHandler(), getExtractorLocalization());
+        doc = resolved.getDocument();
+        details = resolved.getDetails();
+        numericId = resolved.getNumericId();
+        final String embedVideoId = resolved.getEmbedId();
 
         final String queryUrl = "https://rumble.com/embedJS/u3/?request=video&ver=2&v="
                 + embedVideoId;
@@ -623,8 +732,23 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         // TODO Check whether embed requests need site cookies on challenged sessions.
         try {
             embedJsonStreamInfoObj = JsonParser.object().from(response2.responseBody());
+            if (embedJsonStreamInfoObj.containsKey("vid")) {
+                final Object vid = embedJsonStreamInfoObj.get("vid");
+                try {
+                    if (!(vid instanceof Number)
+                            || (vid instanceof Long || vid instanceof Integer
+                            ? ((Number) vid).longValue()
+                            : new BigDecimal(vid.toString()).longValueExact())
+                            != resolved.getNumericId()) {
+                        throw new ParsingException("Rumble embed vid does not match resolved ID");
+                    }
+                } catch (final ArithmeticException | NumberFormatException e) {
+                    throw new ParsingException("Invalid Rumble numeric embed vid", e);
+                }
+            }
             extractStreams(downloader);
-            extractSubtitles();
+            subtitles = RumbleSubtitles.extract(embedJsonStreamInfoObj, details);
+            resolvedPublicUrl = resolved.getPublicUrl();
         } catch (final JsonParserException e) {
             throw new ParsingException("Could not read JSON from: " + queryUrl, e);
         }
@@ -700,67 +824,4 @@ public final class RumbleStreamExtractor extends StreamExtractor {
         return format == MediaFormat.VTT ? subtitles : Collections.emptyList();
     }
 
-    private void extractSubtitles() throws ParsingException {
-        final JsonObject captions = embedJsonStreamInfoObj.getObject("cc");
-        if (captions.isEmpty()) {
-            subtitles = Collections.emptyList();
-            return;
-        }
-
-        final List<SubtitlesStream> extractedSubtitles = new ArrayList<>();
-        for (final String languageCode : captions.keySet()) {
-            final JsonObject caption = captions.getObject(languageCode);
-            final String url = caption.getString("path");
-            if (!isNullOrEmpty(url)) {
-                extractedSubtitles.add(new SubtitlesStream.Builder()
-                        .setContent(url, true)
-                        .setMediaFormat(MediaFormat.VTT)
-                        .setLanguageCode(languageCode)
-                        .setAutoGenerated(false)
-                        .build());
-            }
-        }
-        subtitles = extractedSubtitles;
-    }
-
-    private long getLiveViewCount() throws ParsingException {
-        if (embedOnly || doc == null) {
-            return -1;
-        }
-        final Matcher matcher = VIEWER_ID_PATTERN.matcher(doc.toString());
-        if (!matcher.find()) {
-            throw new ParsingException("Could not extract viewer_id");
-        }
-        final String viewerId = matcher.group(1);
-
-        return retrieveLiveStreamViewerCount(getDownloader(),
-                retrieveNumericVideoId(),
-                viewerId);
-    }
-
-    private long retrieveLiveStreamViewerCount(final Downloader downloader,
-                                               final String videoNumericId,
-                                               final String theViewerId) {
-        try {
-
-            // The former POST version of this viewer-count request was not usable.
-            final Response response = downloader
-                    .get("https://wn0.rumble.com/service.php?video_id="
-                            + videoNumericId
-                            + "&viewer_id="
-                            + theViewerId
-                            + "&name=video.watching-now");
-            final JsonObject jsonObject =
-                    JsonParser.object().from(response.responseBody());
-            return jsonObject.getObject("data").getLong("viewer_count", -1);
-        } catch (final IOException | ReCaptchaException | JsonParserException ignored) {
-            // Live viewer counts are optional metadata.
-        }
-
-        return -1;
-    }
-
-    private String retrieveNumericVideoId() {
-        return embedJsonStreamInfoObj.get("vid").toString();
-    }
 }

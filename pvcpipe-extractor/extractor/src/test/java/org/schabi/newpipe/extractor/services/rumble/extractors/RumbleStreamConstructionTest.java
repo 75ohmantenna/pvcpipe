@@ -11,6 +11,7 @@ import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 import org.schabi.newpipe.extractor.stream.VideoStream;
@@ -74,6 +75,42 @@ class RumbleStreamConstructionTest {
         final VideoStream unknown = streamWithContent(streams, "https://cdn.example/video.other");
         assertVideoMetadata(unknown, null, DeliveryMethod.PROGRESSIVE_HTTP, "unknown", 0);
         assertNull(unknown.getManifestUrl());
+    }
+
+    @Test
+    void audioFormatUsesThePathSuffixWithoutChangingDeliveryOrBitrate() throws Exception {
+        final String[] paths = {"sound.AAC?token=x", "sound.m4a", "sound.mp4",
+                "sound.unknown?file=.aac", "invalid audio.aac"};
+        final MediaFormat[] formats = {MediaFormat.AAC, MediaFormat.M4A, MediaFormat.M4A,
+                null, null};
+        for (int i = 0; i < paths.length; i++) {
+            final String url = "https://cdn.example/" + paths[i];
+            final List<AudioStream> streams = extractor("{\"audio\":[{\"url\":\"" + url
+                    + "\",\"meta\":{\"bitrate\":128}}]}", null).getAudioStreams();
+            assertEquals(1, streams.size());
+            final AudioStream stream = streams.get(0);
+            assertEquals(formats[i], stream.getFormat());
+            assertEquals(url, stream.getContent());
+            assertEquals(128, stream.getAverageBitrate());
+            assertEquals(DeliveryMethod.PROGRESSIVE_HTTP, stream.getDeliveryMethod());
+            if (formats[i] != null) {
+                assertEquals(formats[i] == MediaFormat.AAC ? "audio/aac" : "audio/mp4",
+                        stream.getFormat().getMimeType());
+            }
+        }
+    }
+
+    @Test
+    void ignoresPreviewFormatsAndKeepsEncodedHeight() throws Exception {
+        final List<VideoStream> streams = extractor(
+                "{\"timeline\":[{\"url\":\"https://cdn.example/timeline.mp4\"}],"
+                        + "\"tar\":{\"720\":{\"url\":\"https://cdn.example/duplicate.tar\"}},"
+                        + "\"mp4\":[{\"url\":\"https://cdn.example/encoded.mp4\","
+                        + "\"res\":1080,\"meta\":{\"h\":640,\"bitrate\":900}}]}", null)
+                .getVideoStreams();
+        assertEquals(1, streams.size());
+        assertEquals("640p@900k", streams.get(0).getResolution());
+        assertEquals(900_000, streams.get(0).getBitrate());
     }
 
     @Test

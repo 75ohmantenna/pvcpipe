@@ -1,5 +1,7 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
+import com.grack.nanojson.JsonObject;
+
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.schabi.newpipe.extractor.Image;
@@ -14,9 +16,11 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.extractor.services.rumble.RumbleChannelParsingHelper;
+import org.schabi.newpipe.extractor.services.rumble.RumbleCreatorResolver;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleChannelLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleChannelTabLinkHandlerFactory;
+import org.schabi.newpipe.extractor.utils.JsonUtils;
 import org.schabi.newpipe.extractor.utils.PvcPipeExtractorUtils;
 import org.schabi.newpipe.extractor.utils.Utils;
 
@@ -34,6 +38,7 @@ public class RumbleChannelExtractor extends ChannelExtractor {
     private Document doc;
     private Document about;
     private ParsingException aboutError;
+    private JsonObject metadata;
 
     public RumbleChannelExtractor(final StreamingService service,
                                   final ListLinkHandler linkHandler) {
@@ -55,6 +60,11 @@ public class RumbleChannelExtractor extends ChannelExtractor {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
+        metadata = RumbleCreatorResolver.resolveMetadata(downloader, getUrl(),
+                getExtractorLocalization());
+        if (metadata != null) {
+            return;
+        }
         doc = RumbleParsingHelper.fetchParseValidate(downloader, getUrl());
         final String aboutLink = RumbleParsingHelper.extractSafely(false, "",
                 () -> doc.selectFirst("[href*='about']").absUrl("href"));
@@ -81,19 +91,19 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Nonnull
     @Override
-    public String getId() throws ParsingException {
-        return RumbleChannelParsingHelper.getChannelId(doc);
-    }
-
-    @Nonnull
-    @Override
     public String getName() throws ParsingException {
+        if (metadata != null) {
+            return JsonUtils.getString(metadata, "title");
+        }
         return RumbleChannelParsingHelper.getChannelName(doc);
     }
 
     @Nonnull
     @Override
     public List<Image> getAvatars() throws ParsingException {
+        if (metadata != null) {
+            return metadataImages("thumb");
+        }
         final String url;
         url = RumbleParsingHelper.extractSafely(false,
                 "Could not get avatar url",
@@ -116,9 +126,18 @@ public class RumbleChannelExtractor extends ChannelExtractor {
     @Nonnull
     @Override
     public List<Image> getBanners() throws ParsingException {
+        if (metadata != null) {
+            return metadataImages("backsplash");
+        }
         final String url = RumbleParsingHelper.extractSafely(false,
                 "Could not get banner url",
                 this::extractBannerUrl);
+        return url == null || url.isEmpty() ? List.of() : List.of(new Image(url,
+                Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
+    }
+
+    private List<Image> metadataImages(final String field) {
+        final String url = metadata.getString(field, null);
         return url == null || url.isEmpty() ? List.of() : List.of(new Image(url,
                 Image.HEIGHT_UNKNOWN, Image.WIDTH_UNKNOWN, Image.ResolutionLevel.UNKNOWN));
     }
@@ -140,6 +159,9 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Override
     public long getSubscriberCount() throws ParsingException {
+        if (metadata != null) {
+            return metadata.getLong("followers", ITEM_COUNT_UNKNOWN);
+        }
         final String errorMsg = "Could not get subscriber count";
 
         final String viewCount = RumbleParsingHelper.extractSafely(true,
@@ -160,6 +182,9 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Override
     public String getDescription() throws ParsingException {
+        if (metadata != null) {
+            return metadata.getString("description", "");
+        }
         if (aboutError != null) {
             throw aboutError;
         }
@@ -198,6 +223,9 @@ public class RumbleChannelExtractor extends ChannelExtractor {
 
     @Override
     public boolean isVerified() throws ParsingException {
+        if (metadata != null) {
+            return metadata.getBoolean("verified_badge", false);
+        }
         final String verified = RumbleParsingHelper.extractSafely(false,
                 "",
                 () -> doc.select("svg[class~=(listing|channel)-header--verified]").first().text()

@@ -5,6 +5,7 @@ import android.content.Intent;
 
 import androidx.annotation.NonNull;
 import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
@@ -106,7 +107,9 @@ public final class InternalUrlsHandler {
         final String cleanUrl;
 
         try {
-            cleanUrl = factory.getUrl(factory.getId(url));
+            cleanUrl = service == ServiceList.Rumble
+                    ? factory.fromUrl(url).getOriginalUrl()
+                    : factory.getUrl(factory.getId(url));
         } catch (final ParsingException e) {
             return false;
         }

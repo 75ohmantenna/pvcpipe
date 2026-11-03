@@ -1,17 +1,27 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.localization.ContentCountry;
+import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.pvc.PvcCloudFlareChallengeException;
 import org.schabi.newpipe.extractor.services.DefaultSearchExtractorTest;
+import org.schabi.newpipe.extractor.services.rumble.RumbleCreatorResolver;
+import org.schabi.newpipe.extractor.services.rumble.RumbleMediaResolver;
 import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
 import org.schabi.newpipe.extractor.services.rumble.search.filter.RumbleFilters;
 
+import java.lang.reflect.Field;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,11 +35,54 @@ import static org.schabi.newpipe.extractor.ServiceList.Rumble;
 
 @Tag("offline")
 class RumbleAdversarialReviewTest {
+    private Downloader previousDownloader;
+    private Localization previousLocalization;
+    private ContentCountry previousCountry;
+    private Map<String, Long> cache;
+    private Map<String, Long> previousCache;
+    private Map<String, String> creatorCache;
+    private Map<String, String> previousCreatorCache;
+
+    @BeforeEach
+    @SuppressWarnings("unchecked")
+    void saveState() throws Exception {
+        previousDownloader = NewPipe.getDownloader();
+        previousLocalization = NewPipe.getPreferredLocalization();
+        previousCountry = NewPipe.getPreferredContentCountry();
+        final Field field = RumbleMediaResolver.class.getDeclaredField("VIDEO_IDS_CACHE");
+        field.setAccessible(true);
+        cache = (Map<String, Long>) field.get(null);
+        synchronized (cache) {
+            previousCache = new LinkedHashMap<>(cache);
+            cache.clear();
+        }
+        final Field creatorField = RumbleCreatorResolver.class.getDeclaredField("CREATOR_IDS_CACHE");
+        creatorField.setAccessible(true);
+        creatorCache = (Map<String, String>) creatorField.get(null);
+        synchronized (creatorCache) {
+            previousCreatorCache = new LinkedHashMap<>(creatorCache);
+            creatorCache.clear();
+        }
+    }
+
+    @AfterEach
+    void restoreState() {
+        synchronized (cache) {
+            cache.clear();
+            cache.putAll(previousCache);
+        }
+        NewPipe.init(previousDownloader, previousLocalization, previousCountry);
+        synchronized (creatorCache) {
+            creatorCache.clear();
+            creatorCache.putAll(previousCreatorCache);
+        }
+    }
+
     @Test
     void inlinePlayersAcceptScriptAttributesAndEitherQuoteStyle() throws Exception {
-        assertEquals("review123", RumbleParsingHelper.getEmbedVideoId(
+        assertEquals("vreview123", RumbleParsingHelper.extractEmbedVideoId(
                 "https://rumble.com/vreview-inline.html",
-                () -> "<script type='text/javascript'>\nRumble('play', {\n"
+                "<script type='text/javascript'>\nRumble('play', {\n"
                         + "video: 'vreview123', div: 'player'});</script>"));
     }
 
@@ -40,15 +93,22 @@ class RumbleAdversarialReviewTest {
             @Override
             public Response execute(@Nonnull final Request request) {
                 requests.add(request.url());
-                return response(request, 200,
-                        "<iframe src='https://rumble.com/embed/vreview456/'></iframe>");
+                assertTrue(request.url().startsWith(
+                        "https://rumble.com/service.php?name=media.details&"));
+                return response(request, 200, "{\"data\":{\"id\":"
+                        + Long.parseLong("review456", 36) + ",\"url\":"
+                        + "\"https://rumble.com/vreview-watch.html\"}}");
             }
         });
         for (final String misleadingQuery : List.of("/embed/vother", "/shorts/vother")) {
             final String url = "https://rumble.com/vreview-watch.html?next=" + misleadingQuery;
+            final boolean firstRequest = requests.isEmpty();
             assertEquals("https://rumble.com/service.php?video=review456&name=comment.list",
                     Rumble.getCommentsExtractor(url).getUrl());
-            assertTrue(requests.contains(url));
+            if (firstRequest) {
+                assertTrue(URLDecoder.decode(requests.get(0), StandardCharsets.UTF_8)
+                        .contains("&url=" + url));
+            }
         }
     }
 
@@ -57,6 +117,10 @@ class RumbleAdversarialReviewTest {
         NewPipe.init(new Downloader() {
             @Override
             public Response execute(@Nonnull final Request request) {
+                if (request.url().startsWith(
+                        "https://rumble.com/service.php?name=video_collection.search&")) {
+                    return response(request, 200, "{\"data\":{\"items\":[]}}");
+                }
                 return request.url().endsWith("/about")
                         ? response(request, 403, "<title>Just a moment...</title>")
                         : response(request, 200, "<title>Example</title>"
@@ -133,7 +197,9 @@ class RumbleAdversarialReviewTest {
         });
         final var filter = DefaultSearchExtractorTest.getFilterItem(Rumble,
                 RumbleFilters.ID_CF_MAIN_CHANNELS);
-        final var extractor = Rumble.getSearchExtractor("example", List.of(filter), null);
+        final var extractor = Rumble.getSearchExtractor("example", List.of(filter),
+                List.of(DefaultSearchExtractorTest.getFilterItem(Rumble,
+                        RumbleFilters.ID_SF_SORT_BY_MOST_RECENT)));
         extractor.fetchPage();
         return extractor.getInitialPage();
     }

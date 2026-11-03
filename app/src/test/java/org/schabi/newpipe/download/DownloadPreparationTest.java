@@ -81,6 +81,25 @@ public class DownloadPreparationTest {
     }
 
     @Test
+    public void rawAacUsesItsOwnMimeSuffixAndRecoveryIdentityWithoutPostprocessing() {
+        final AudioStream aac = audio(MediaFormat.AAC);
+        select(DownloadPreparation.Kind.AUDIO, aac, null, 100, 0);
+        preparation.save("recording", DownloadPreparation.Destination.askDocument(), environment);
+
+        assertEquals("recording.aac", environment.location.filename);
+        assertEquals("audio/aac", environment.location.mime);
+        environment.location.complete(environment.fileUri);
+        final DownloadPreparation.Launch launch = environment.launches.get(0);
+        assertArrayEquals(new String[]{aac.getContent()}, launch.urls);
+        assertNull(launch.psName);
+        assertEquals('a', launch.kind);
+        assertEquals(1, launch.recoveryInfo.size());
+        assertEquals(MediaFormat.AAC, launch.recoveryInfo.get(0).getFormat());
+        assertEquals(128, launch.recoveryInfo.get(0).getDesiredBitrate());
+        assertEquals('a', launch.recoveryInfo.get(0).getKind());
+    }
+
+    @Test
     public void pairedMp4CarriesOrderedUrlsSizesAndRecovery() throws Exception {
         final VideoStream video = video(MediaFormat.MPEG_4, DeliveryMethod.PROGRESSIVE_HTTP);
         final AudioStream audio = audio(MediaFormat.M4A);

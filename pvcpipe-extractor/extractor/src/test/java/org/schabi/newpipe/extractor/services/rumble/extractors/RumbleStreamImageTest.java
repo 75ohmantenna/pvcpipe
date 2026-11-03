@@ -11,9 +11,12 @@ import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.rumble.RumbleMediaResolver;
 import org.schabi.newpipe.extractor.stream.StreamExtractor;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,16 +39,30 @@ class RumbleStreamImageTest {
     private Downloader previousDownloader;
     private Localization previousLocalization;
     private ContentCountry previousCountry;
+    private Map<String, Long> cache;
+    private Map<String, Long> previousCache;
 
     @BeforeEach
-    void saveExtractorConfiguration() {
+    @SuppressWarnings("unchecked")
+    void saveExtractorConfiguration() throws Exception {
         previousDownloader = NewPipe.getDownloader();
         previousLocalization = NewPipe.getPreferredLocalization();
         previousCountry = NewPipe.getPreferredContentCountry();
+        final Field field = RumbleMediaResolver.class.getDeclaredField("VIDEO_IDS_CACHE");
+        field.setAccessible(true);
+        cache = (Map<String, Long>) field.get(null);
+        synchronized (cache) {
+            previousCache = new LinkedHashMap<>(cache);
+            cache.clear();
+        }
     }
 
     @AfterEach
     void restoreExtractorConfiguration() {
+        synchronized (cache) {
+            cache.clear();
+            cache.putAll(previousCache);
+        }
         NewPipe.init(previousDownloader, previousLocalization, previousCountry);
     }
 
@@ -87,14 +104,19 @@ class RumbleStreamImageTest {
     }
 
     @Test
-    void missingCoverImageDoesNotTakeASizeFromTheThumbnailList() throws Exception {
-        assertImage(thumbnail("\"t\":[{\"w\":1280,\"h\":720}]"), null,
-                Image.WIDTH_UNKNOWN, Image.HEIGHT_UNKNOWN, Image.ResolutionLevel.UNKNOWN);
+    void missingCoverImageDoesNotProduceAnImage() throws Exception {
+        for (final String cover : new String[] {"", "\"i\":null,", "\"i\":\"\","}) {
+            NewPipe.init(new FixtureDownloader(cover + "\"t\":[{\"w\":1280,\"h\":720}]", null));
+            final StreamExtractor extractor =
+                    Rumble.getStreamExtractor("https://rumble.com/embed/vtest/");
+            extractor.fetchPage();
+            assertTrue(extractor.getThumbnails().isEmpty());
+        }
     }
 
     @Test
     void uploaderAvatarIsLowResolution() throws Exception {
-        final List<Image> avatars = avatars("https://rumble.com/vimage1-with-avatar.html",
+        final List<Image> avatars = avatars("https://rumble.com/vimage1",
                 "user-image--img user-image--img--id-" + AVATAR_ID);
 
         assertEquals(1, avatars.size());
@@ -104,7 +126,7 @@ class RumbleStreamImageTest {
 
     @Test
     void letterAvatarGivesNoImage() throws Exception {
-        assertTrue(avatars("https://rumble.com/vimage2-with-letter.html",
+        assertTrue(avatars("https://rumble.com/vimage2",
                 "user-image--letter").isEmpty());
     }
 

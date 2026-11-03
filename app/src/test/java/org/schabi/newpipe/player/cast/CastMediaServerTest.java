@@ -4,8 +4,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import android.content.Context;
 
 import org.junit.Test;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.DeliveryMethod;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamType;
+import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,6 +34,36 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class CastMediaServerTest {
+    @Test
+    public void progressiveAudioHandoffUsesExtractedAacOrM4aMimeWithoutCodecFallback()
+            throws Exception {
+        final Context context = mock(Context.class);
+        when(context.getApplicationContext()).thenReturn(context);
+        for (final MediaFormat format : new MediaFormat[]{MediaFormat.AAC, MediaFormat.M4A}) {
+            final String mime = format == MediaFormat.AAC ? "audio/aac" : "audio/mp4";
+            final AudioStream audio = new AudioStream.Builder().setId("audio")
+                    .setContent("https://media.example/audio", true).setMediaFormat(format)
+                    .setDeliveryMethod(DeliveryMethod.PROGRESSIVE_HTTP)
+                    .setAverageBitrate(128).build();
+            final StreamInfo info = new StreamInfo(ServiceList.Rumble.getServiceId(),
+                    "https://rumble.com/v7hnjfy-example.html",
+                    "https://rumble.com/v7hnjfy-example.html", StreamType.AUDIO_STREAM,
+                    "audio", "recording", 0);
+            info.setAudioStreams(List.of(audio));
+            final StreamInfoTag tag = StreamInfoTag.of(info, List.of(), -1, List.of(audio), 0);
+            final CastMediaServer server = mock(CastMediaServer.class);
+            final String proxy = "http://192.0.2.1/audio";
+            when(server.register(audio.getContent(), mime, -1)).thenReturn(proxy);
+
+            try (CastMediaResolver resolver = new CastMediaResolver(context)) {
+                final CastMedia media = resolver.resolve(info, tag, server);
+                assertEquals(mime, media.mimeType());
+                assertEquals(proxy, media.url());
+                verify(server).register(audio.getContent(), mime, -1);
+            }
+        }
+    }
+
     @Test
     public void localContentSupportsHeadSuffixRangesAndCannotBecomeAnOpenProxy() throws Exception {
         final CastMediaServer server = new CastMediaServer(InetAddress.getByName("127.0.0.1"));

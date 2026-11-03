@@ -57,6 +57,7 @@ public enum MediaFormat {
     WAV       (0x700, "WAV",       "wav",  "audio/wav"),
     FLAC      (0x800, "FLAC",      "flac", "audio/flac"),
     ALAC      (0x900, "ALAC",      "alac", "audio/alac"),
+    AAC       (0xa00, "AAC",       "aac",  "audio/aac"),
     // subtitles formats
     VTT        (0x1000, "WebVTT",                     "vtt",  "text/vtt"),
     TTML       (0x2000, "Timed Text Markup Language", "ttml", "application/ttml+xml"),

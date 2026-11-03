@@ -151,9 +151,61 @@ resolution. Read [the soundcloud implementation](../pvcpipe-extractor/extractor/
 
 - Links: watch, embed and Shorts addresses, and channel addresses under `/c/`
   and `/user/`.
-- A video comes as progressive files, HLS renditions and, where Rumble gives
-  one, an audio file. Livestreams play.
-- A channel has Videos and Livestreams tabs. There is no Shorts tab.
+- App HTTP requests use the official Android TV identity
+  `Rumble-AndroidTV/2.11.0.10198 (<model>; Android <release> <SDK>) okhttp/5.1.0`
+  for HTTPS `rumble.com`, its dot-delimited subdomains, and exactly
+  `hugh.cdn.rumble.cloud`. Other hosts and HTTP retain their existing policy.
+  The version identifies the emulated client, not PVCPipe. Each constructed
+  request selects its identity; automatic redirects can retain the initial UA,
+  so this is not per-hop identity confinement or a general Cloudflare solution.
+  It adds no credentials, cookies or tracking parameters and does not establish
+  which identity the optional challenge WebView uses.
+- API responses distinguish explicit errors and malformed envelopes from valid
+  empty lists. Explicit challenge headers or paired challenge markers in the
+  first 8 KiB also fail on HTTP 200; ordinary refusals remain ordinary failures.
+- Full slugged watch links and canonical Shorts links resolve through public
+  `media.details`; numeric IDs are converted to internal embed IDs, never
+  inferred from public permalink IDs. Normal playback retains `embedJS/u3`
+  and response-provided media URLs. Direct embeds do not require details.
+  Successful resolution exposes a validated full public URL for new saved
+  entries. Shorts use details-backed MP4 sources and a Shorts-feed related list,
+  without requiring watch HTML; recommendation ranking equivalence is unproved.
+- Cold legacy bare watch links still need the existing HTML embed lookup and
+  can fail on a refusal or challenge. Existing saved rows are not rewritten:
+  full-URL and legacy-bare rows can coexist because storage identity is
+  `(service_id, url)`. This does not universally repair old bookmarks.
+- Video searches with unrestricted upload dates, ordinary creator searches and
+  Live use public API 8 listings. Shorts keeps API 7. Continuations advance by
+  raw returned entries, including filtered/unreadable rows, not the requested
+  limit or visible count. Video search and Shorts honor required `has_more`;
+  creator search and Live stop on an empty raw page. Creator search never emits
+  an offset above its observed 10000 search-depth bound; this is not a claim of
+  exhaustive creator enumeration.
+- Date-restricted searches and stale creator searches with non-default filters
+  still use their existing HTML requests. The leaderboard, Editor Picks,
+  Latest and Trending Today kiosks also retain HTML and can fail on challenges.
+  Their ranking, time-window and completeness equivalence to other API feeds
+  is unproved; a refusal is not an empty list.
+- Videos retain progressive files, HLS renditions and available audio. Explicit
+  `availability=premium` without `has_access_to_premium=true` is denied; an
+  access flag of false alone is not a restriction on ordinary public content.
+  Listings mark/filter explicit premium availability, not private/unlisted
+  visibility. Unknown restrictions remain unknown. No paid/account gate is bypassed.
+- Comments share the media resolver for watch, embed and Shorts inputs, but keep
+  the legacy `comment.list` HTML/CSS response and DOM mapper. Malformed/API-error
+  pages fail and clear prior comment/image state; only a structurally valid
+  no-list envelope indicates disabled comments. An empty list stays enabled.
+  Fifteen-item pages and nested replies retain their response bodies. Reply
+  counts describe the available nested records, not guaranteed complete server
+  threads; complete pinned/owner/deleted/reply parity for the candidate JSON
+  comments API remains unproved, so no partial JSON fallback is used.
+- Creator metadata uses validated typed IDs from listings or one exact-type,
+  exact-slug search page before `video_collection.meta`. An exact-search miss
+  retains the HTML/About path; it does not prove the creator is absent. API
+  errors remain failures. Public IDs stay `c/<slug>` and `user/<slug>`.
+- A channel has Videos and Livestreams tabs, still fetched through their existing
+  HTML paths. Their API filtering equivalence is unproved; challenged tabs
+  remain an explicit reliability limit. There is no Shorts tab.
 - "Handle Rumble Cloudflare challenge" in the PVCPipe settings adds an
   interceptor for 403 answers from Rumble hosts
   (`PvcCfChallenge403Interceptor`). Only GET responses identified as Cloudflare
@@ -164,6 +216,61 @@ resolution. Read [the soundcloud implementation](../pvcpipe-extractor/extractor/
   and POST requests keep their original response. A WebView result replaces
   it only when marked successful, nonblank and free of those challenge
   markers. This needs a working WebView on the device.
+
+### 2026-11-03 rebuilt-extractor follow-up
+
+At 00:27–00:32 UTC, a JDK 21 harness using the rebuilt 0.2.4 extractor exercised
+fresh public results with the TV research identity (`ResearchModel`, Android 13,
+SDK 33). Requests were GET-only, cookie-free, capped at 1 MiB / 20 seconds,
+at most one request start per second; media probes read only 4 KiB ranges.
+This was a desktop HTTP client, not Android OkHttp, a decoder or a receiver.
+
+Two VODs, two Shorts and one active live item resolved and replayed in separate
+fresh JVMs from their returned public URLs:
+[VOD 1](https://rumble.com/v7hnjfy-sci-fi-movie-or-space-history.html),
+[VOD 2](https://rumble.com/v7gtth4-beyond-space-defense-war-sabotage-and-survival-beyond-earth.html),
+[Short 1](https://rumble.com/shorts/v7hh3vw),
+[Short 2](https://rumble.com/shorts/v7hnt9y), and
+[live](https://rumble.com/v7hrvsa-ep-4026b-ds-election-panictheir-own-are-turning-on-thempropaganda-failedtim.html).
+VOD audio was labeled AAC; automatic English captions were marked generated.
+MP4 and HLS probes returned HTTP 206 with matching file/playlist signatures.
+Normal autoplay and Shorts-feed related lists had no collector errors.
+Cold FYMVideos metadata resolved through `_c1330192`; legacy watch/embed comments
+returned two top-level records, and the sampled Short returned eight, without
+claiming complete threads.
+
+| Fresh listing | First-page visible rows | Second-page visible rows | Overlapping public URLs |
+| --- | ---: | ---: | ---: |
+| Video search, `space`, offsets 0/20 | 20 | 20 | 0 |
+| Creator search, `space`, API 8, offsets 0/19 | 19 | 19 | 19 |
+| Live, offsets 0/20 | 20 | 20 | 0 |
+| Shorts, API 7, offsets 0/10 | 10 | 10 | 0 |
+
+**Creator pagination remains a demonstrated server-contract limit:** this query
+repeated the entire page despite API 8 and the advanced raw offset. The extractor
+does not claim reliable distinct-page enumeration or silently switch feeds.
+Earlier NASA offset observations remain historical, not proof for this query.
+
+The retained HTML paths also returned HTTP 200 and parsed without collector
+errors on this host in the same run:
+
+| Retained path | Visible rows |
+| --- | ---: |
+| Video search: today | 17 |
+| Video search: this week | 25 |
+| Video search: this month | 25 |
+| Video search: this year | 25 |
+| Creator search: most recent | 39 |
+| Battle leaderboard | 50 |
+| Editor Picks | 25 |
+| Latest | 25 |
+| Trending Today | 25 |
+| FYMVideos Videos tab | 25 |
+| FYMVideos Livestreams tab | 0 |
+
+The empty Livestreams result came from valid HTML, not a suppressed challenge.
+These dated successes do not establish Android challenge behavior, future
+availability, API/HTML ranking equivalence or real playback/download/cast success.
 
 ## Odysee
 

@@ -1,0 +1,21 @@
+{
+  "request": {
+    "httpMethod": "GET",
+    "url": "https://rumble.com/service.php?name=video_collection.search&api=8&query=Vlemx&offset=0&limit=20",
+    "headers": {
+      "Accept": ["application/json"],
+      "Accept-Language": ["en-GB, en;q=0.9"]
+    },
+    "localization": {
+      "languageCode": "en",
+      "countryCode": "GB"
+    }
+  },
+  "response": {
+    "responseCode": 200,
+    "responseMessage": "OK",
+    "responseBody": "{\"data\":{\"items\":[]}}",
+    "latestUrl": "https://rumble.com/service.php?name=video_collection.search&api=8&query=Vlemx&offset=0&limit=20",
+    "responseHeaders": {"Content-Type": ["application/json"]}
+  }
+}

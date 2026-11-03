@@ -26,6 +26,77 @@ stream types do not need rebuilding merely to toggle video. Preloading the
 queue, expiring loaded items and managing the timeline belong to
 `MediaSourceManager`, not here.
 
+## Rumble source metadata
+
+Rumble keeps the existing progressive/HLS construction and encoded-height quality
+labels. Embed metadata takes precedence for title/date/duration/cover/uploader;
+public details supplement it and supply plain-text descriptions, follower counts
+and explicit age restrictions. Active live is embed `live == 2`, with details'
+boolean used only when embed live is missing. Live views come from details
+`watching_now` or stay unknown; extraction no longer sends an HTML-derived viewer
+identity to a watching endpoint.
+
+Raw `.aac` audio is `AAC` / `audio/aac`, not M4A. Audio selection includes AAC,
+but MP4 secondary-audio muxing remains M4A-only. AAC downloads use `.aac` without
+the M4A postprocessor; recovery still matches format and bitrate exactly.
+Old mislabeled M4A missions do not become compatible AAC missions and may need a
+fresh download. Neither renaming an old file nor relaxing representation matching
+is safe.
+
+Embed captions precede supplemental details captions. A terminal `-auto` marks a
+generated track and is removed from its language code; original-code track IDs
+keep manual and generated captions distinct. Malformed optional tracks do not
+remove valid captions. Normal related items use fetched HTML when available,
+otherwise public autoplay JSON; Shorts use the Shorts feed instead. These are
+schema/metadata corrections, not proof of equivalent recommendation ranking.
+
+The shared request policy also reaches player, download, HLS preprocessing and
+cast upstream requests. It does not change Media3 decoding, background source
+selection, active-live manifest choice or the existing FCast controls. JVM
+construction and controlled peers are separate evidence from decoded Android
+playback, completed public downloads and real receiver/segment access.
+
+### 2026-11-03 verification follow-up
+
+The rebuilt 0.2.4 checkout passed `make ci`, the 171-case offline Rumble gate,
+and the 241-case targeted app regression selection. This includes real extractor
+replay through serialized queue/library URLs and timestamp service-intent consumers,
+AAC selection/download preparation/exact recovery, and controlled cast/HLS/range peers.
+
+On a newly created, empty API-35 x86_64 emulator (`sdk_gphone64_x86_64`,
+`emulator-5580`), matching debug/test signing was verified before installation.
+Only direct instrumentation with the ordinary AndroidJUnitRunner was used:
+
+| Selected suite | Passed | Failed |
+| --- | ---: | ---: |
+| PlaybackSourcesIntegrationTest | 11 | 0 |
+| Media3SourceEngineIntegrationTest | 16 | 1 |
+| HlsDownloadIntegrationTest | 4 | 0 |
+
+`kickNativeMasterDecodesBothLanguagesAndKeepsCaptionsAcrossSeekAndQualityChange`
+timed out preparing its controlled source. It was not rerun or counted as a pass.
+The completed controlled HLS download/postprocessing scenarios are not completed
+public Rumble downloads or AAC-file transfer proof.
+
+The actual debug app rendered public VOD and Short frames and an active live
+frame from `v7hs29o-live-from-rumble-studio.html`. The earlier `v7hrvsa` sample
+had become recorded content by the Android run; a separately selected
+`v7hr9m2` premium item correctly showed the paid-content error. No entitlement
+bypass was attempted. Player logs showed decoded video sizes and playing/buffering
+transitions; repeated buffering, slow initialization and a System UI ANR prevent
+a smooth-playback or general device guarantee. A full-watch history entry
+reopened after process restart with an empty app info cache and retained its slug.
+A non-Rumble comparison using YouTube `jNQXAC9IVRw` remained on its loading surface
+within the observation window and was stopped; it is not a successful playback
+comparison or evidence that Rumble-specific code caused the delay.
+
+Manual timestamp seeking without a duplicate queue entry, live-quality switching,
+sidecar caption selection, background audio, and a device playlist round-trip
+were not established by this run. Their deterministic consumer tests are separate
+evidence. Real receiver decoding/control/segment access and a completed public
+download remain unverified; no real FCast receiver was available, and the public
+download scope allowed only bounded range probes. The physical phone was untouched.
+
 ## Seek interval settings
 
 Video/audio settings offer 5–30 seconds in 5-second steps, with a 10-second

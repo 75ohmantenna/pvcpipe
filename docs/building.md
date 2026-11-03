@@ -247,14 +247,27 @@ compatible debug installation, run the selected classes directly:
 
 ```sh
 adb -s '<verified-emulator-serial>' shell am instrument -w \
-  -e class org.schabi.newpipe.player.resolver.Media3SourceEngineIntegrationTest,us.shandian.giga.postprocessing.HlsDownloadIntegrationTest \
+  -e class org.schabi.newpipe.player.resolver.PlaybackSourcesIntegrationTest,org.schabi.newpipe.player.resolver.Media3SourceEngineIntegrationTest,us.shandian.giga.postprocessing.HlsDownloadIntegrationTest \
   org.seventyfiveohmantenna.pvcpipe.debug.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 These harnesses use temporary media/cache/storage and no application database.
-They still require the installation/signing checks above. Compilation, host
-FFmpeg conversion and controlled HTTP tests do not establish decoded Android
-playback, caption selection or real receiver behavior.
+They still require the installation/signing checks above.
+`PlaybackSourcesIntegrationTest` constructs sources without transfers;
+`Media3SourceEngineIntegrationTest` observes real engine loading;
+`HlsDownloadIntegrationTest` completes controlled downloads and native processing.
+None establishes current public Rumble reachability, decoded receiver playback,
+or a general Cloudflare bypass. Build APKs separately with
+`./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest`, then inspect
+the selected emulator/package/signatures before installation. Do not set the
+restore-fixture property for these classes.
+
+For Rumble reliability changes, run `forkCiTest --tests '*services.rumble*'`
+through the root composite task path above, never the live-default extractor
+`test` task or REC mode. Keep bounded fresh GET-only research, Android UI/decoder
+checks, controlled completed downloads and real FCast receiver evidence separate.
+Public media probes are limited to 4 KiB ranges under the current research scope;
+a completed public recording/audio download requires separate authorization.
 
 ## Controlled validation tools
 

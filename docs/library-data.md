@@ -35,6 +35,20 @@ with automatic-thumbnail updates in the same transaction.
 - The fragment tracks draft revisions so a completed save does not mark newer
   edits as saved or replace them with an older result.
 
+Rumble URL identity: new successful extractions retain a validated full public
+watch URL in `StreamInfo.url`, which queues, history, local playlists and download
+sources persist. These full links can resolve after restart without the bounded
+in-memory ID cache. Existing bare-watch references and database rows stay intact;
+their cold replay still depends on the HTML embed lookup and can be challenged.
+Database stream identity is `(service_id, url)`, so an old bare link and a newly
+resolved full link can coexist rather than being guessed into one history row.
+
+On 2026-11-03, the disposable debug emulator's Rumble history entry reopened after
+a process restart using its full slugged watch URL with an empty app info cache;
+fresh title/view metadata loaded. Separate JVM tests replay serialized
+`PlayQueueItem` URLs and `StreamEntity.toStreamInfoItem()` URLs after evicting
+resolver state. A manual device playlist round-trip was not established.
+
 A permanent thumbnail stores a stream ID, not an independent image copy.
 `StreamDAO.deleteOrphans` preserves streams referenced by history, playlist
 contents, feeds or a stored playlist thumbnail ID. The thumbnail's permanent flag

@@ -46,6 +46,11 @@ public final class CommentsInfoItemsCollector
             addError(e);
         }
         try {
+            resultItem.setUploaderVerified(extractor.isUploaderVerified());
+        } catch (final Exception e) {
+            addError(e);
+        }
+        try {
             resultItem.setTextualUploadDate(extractor.getTextualUploadDate());
         } catch (final Exception e) {
             addError(e);

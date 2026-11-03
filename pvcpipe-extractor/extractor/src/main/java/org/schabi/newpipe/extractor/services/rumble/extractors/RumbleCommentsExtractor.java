@@ -1,9 +1,7 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
-import com.grack.nanojson.JsonArray;
 import com.grack.nanojson.JsonObject;
-import com.grack.nanojson.JsonParser;
-import com.grack.nanojson.JsonParserException;
+import com.grack.nanojson.JsonWriter;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -16,16 +14,18 @@ import org.schabi.newpipe.extractor.comments.CommentsExtractor;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItemsCollector;
 import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
-import org.schabi.newpipe.extractor.services.rumble.RumbleParsingHelper;
-import org.schabi.newpipe.extractor.utils.Utils;
+import org.schabi.newpipe.extractor.services.rumble.RumbleMediaResolver;
+import org.schabi.newpipe.extractor.services.rumble.RumbleApi;
+import org.schabi.newpipe.extractor.services.rumble.linkHandler.RumbleStreamLinkHandlerFactory;
+import org.schabi.newpipe.extractor.utils.JsonUtils;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +45,7 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     private Document doc;
     private byte[] initialResponseBody;
     private String commentsUrl;
+    private ExtractionException responseError;
 
     public RumbleCommentsExtractor(
             final StreamingService service,
@@ -58,61 +59,24 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
         if (commentsUrl != null) {
             return commentsUrl;
         }
-        final String videoUrl = getOriginalUrl();
-        final String path;
+        final String embedId;
         try {
-            path = Utils.stringToURL(videoUrl).getPath();
-        } catch (final MalformedURLException e) {
-            throw new ParsingException("Invalid Rumble video URL", e);
-        }
-        final String id;
-        if (path.startsWith("/embed/")) {
-            id = getId().substring(1);
-        } else if (path.startsWith("/shorts/")) {
-            id = getShortsVideoId(videoUrl);
-        } else {
-            id = RumbleParsingHelper.getEmbedVideoId(videoUrl,
-                    () -> RumbleParsingHelper.fetchResponse(getDownloader(), videoUrl)
-                            .responseBody());
-        }
-        commentsUrl = "https://rumble.com/service.php?video=" + id + "&name=comment.list";
-        return commentsUrl;
-    }
-
-    private String getShortsVideoId(final String url) throws ParsingException {
-        final Document shortsDoc;
-        try {
-            shortsDoc = RumbleParsingHelper.fetchParseValidate(getDownloader(), url);
+            embedId = RumbleMediaResolver.resolveEmbedId(getDownloader(),
+                    RumbleStreamLinkHandlerFactory.getInstance().fromUrl(getOriginalUrl()),
+                    getExtractorLocalization());
         } catch (final IOException | ReCaptchaException e) {
-            throw new ParsingException("Could not fetch Rumble shorts page", e);
+            throw new ParsingException("Could not resolve Rumble comment video", e);
         }
-        final Element script = shortsDoc.selectFirst("rum-shorts script[type=application/json]");
-        if (script == null) {
-            throw new ParsingException("Rumble shorts JSON not found");
-        }
-        try {
-            final JsonObject root = JsonParser.object().from(script.data());
-            final JsonArray items = root.getArray("items");
-            if (items == null) {
-                throw new ParsingException("Rumble shorts items not found");
-            }
-            for (final Object item : items) {
-                if (item instanceof JsonObject) {
-                    final JsonObject video = (JsonObject) item;
-                    if (getId().equals(video.getString("permalink_id"))
-                            && video.getLong("id") > 0) {
-                        return Long.toString(video.getLong("id"), 36);
-                    }
-                }
-            }
-        } catch (final JsonParserException e) {
-            throw new ParsingException("Could not parse Rumble shorts JSON", e);
-        }
-        throw new ParsingException("Short video not found in JSON");
+        commentsUrl = "https://rumble.com/service.php?video=" + embedId.substring(1)
+                + "&name=comment.list";
+        return commentsUrl;
     }
 
     @Override
     public boolean isCommentsDisabled() throws ExtractionException {
+        if (responseError != null) {
+            throw responseError;
+        }
         return doc == null;
     }
 
@@ -127,6 +91,10 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     @Override
     public InfoItemsPage<CommentsInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
+        if (page == null) {
+            clearResponseState();
+            throw responseError;
+        }
         byte[] responseBody = page.getBody();
         loadFromResponseBody(responseBody);
         if (isCommentsDisabled()) {
@@ -153,9 +121,21 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
     @Override
     public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
-        initialResponseBody = RumbleParsingHelper.fetchResponse(downloader, getUrl())
-                .responseBody().getBytes(StandardCharsets.UTF_8);
-        loadFromResponseBody(initialResponseBody);
+        clearResponseState();
+        initialResponseBody = null;
+        try {
+            final JsonObject response = RumbleApi.fetchJson(
+                    downloader, getUrl(), getExtractorLocalization());
+            final byte[] body = JsonWriter.string(response).getBytes(StandardCharsets.UTF_8);
+            loadFromResponseBody(body);
+            initialResponseBody = body;
+        } catch (final ExtractionException e) {
+            responseError = e;
+            throw e;
+        } catch (final IOException e) {
+            responseError = new ParsingException("Could not fetch Rumble comments", e);
+            throw e;
+        }
     }
 
     public Elements getComments(int[] id) {
@@ -222,27 +202,72 @@ public class RumbleCommentsExtractor extends CommentsExtractor {
         }
     }
 
-    private void loadFromResponseBody(byte[] responseBody) throws ExtractionException {
+    private void clearResponseState() {
+        doc = null;
+        imageMap = null;
+        responseError = new ParsingException("Rumble comments response is unavailable");
+    }
+
+    private void loadFromResponseBody(final byte[] responseBody) throws ExtractionException {
+        clearResponseState();
         try {
             if (responseBody == null) {
-                return;
+                throw new ParsingException("Missing Rumble comments response body");
             }
-            JsonObject info = JsonParser.object().from(
+            final JsonObject info = JsonUtils.toJsonObject(
                     new String(responseBody, StandardCharsets.UTF_8));
-            if (info.has("html") && info.has("css_libs")) {
-                doc = Jsoup.parse(info.get("html").toString());
-                if (doc.selectFirst("ul.comments-1") == null) {
-                    doc = null;
-                    return;
+            // Continuations carry a body rather than fetching a new network response.
+            // Validate their envelope as well, even if an error also supplies HTML.
+            validateContinuationEnvelope(info);
+            final String html = JsonUtils.getString(info, "html");
+            final Object stylesheets = JsonUtils.getValue(info, "css_libs");
+            final String css;
+            if (stylesheets instanceof String) {
+                css = (String) stylesheets;
+            } else if (stylesheets instanceof JsonObject) {
+                final StringBuilder combined = new StringBuilder();
+                for (final Object value : ((JsonObject) stylesheets).values()) {
+                    if (!(value instanceof String)) {
+                        throw new ParsingException("Invalid Rumble comment stylesheet value");
+                    }
+                    combined.append((String) value).append('\n');
                 }
-                Elements createComment = doc.select("li.comment-item.comment-item.comments-create");
-                if (!createComment.isEmpty()) {
-                    createComment.remove();
-                }
-                initImageMap(info.get("css_libs").toString());
+                css = combined.toString();
+            } else {
+                throw new ParsingException("Invalid Rumble comments css_libs");
             }
-        } catch (final JsonParserException e) {
-            throw new ExtractionException("Could not read json from: " + getUrl(), e);
+            final Document parsed = Jsoup.parse(html);
+            if (parsed.selectFirst("ul.comments-1") != null) {
+                parsed.select("li.comment-item.comment-item.comments-create").remove();
+                initImageMap(css);
+                doc = parsed;
+            }
+            responseError = null;
+        } catch (final ExtractionException e) {
+            responseError = e;
+            throw e;
+        }
+    }
+
+    private static void validateContinuationEnvelope(final JsonObject info)
+            throws ParsingException {
+        if (info.get("errors") != null && !JsonUtils.getArray(info, "errors").isEmpty()) {
+            throw new ContentNotAvailableException(
+                    "Rumble API error: " + JsonWriter.string(info.get("errors")));
+        }
+        final Object error = info.get("error");
+        if (error != null
+                && !(error instanceof String && ((String) error).trim().isEmpty())
+                && !(error instanceof Map && ((Map<?, ?>) error).isEmpty())
+                && !(error instanceof java.util.List && ((java.util.List<?>) error).isEmpty())) {
+            throw new ContentNotAvailableException("Rumble API error: " + JsonWriter.string(error));
+        }
+        if (info.get("data") instanceof JsonObject) {
+            final JsonObject data = JsonUtils.getObject(info, "data");
+            if (data.get("success") != null && !JsonUtils.getBoolean(data, "success")) {
+                throw new ContentNotAvailableException(
+                        "Rumble API error: " + JsonWriter.string(data));
+            }
         }
     }
 }

@@ -19,7 +19,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -255,32 +254,9 @@ public final class RumbleParsingHelper {
     private static final Pattern EMBED_PLAY_CALL_PATTERN = Pattern.compile(
             "\\bRumble\\(\\s*[\"']play[\"']\\s*,\\s*\\{[^}]*"
                     + "[\"']?video[\"']?\\s*:\\s*[\"'](v[0-9a-z]+)[\"']");
-    private static final int EMBED_VIDEO_ID_CACHE_SIZE = 64;
-    private static final Map<String, String> EMBED_VIDEO_IDS_CACHE =
-            Collections.synchronizedMap(new LinkedHashMap<String, String>(
-                    EMBED_VIDEO_ID_CACHE_SIZE, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(final Map.Entry<String, String> eldest) {
-                    return size() > EMBED_VIDEO_ID_CACHE_SIZE;
-                }
-            });
 
-    public static String getEmbedVideoId(
-            final String url,
-            final Callable<String> contentProvider) throws ParsingException {
-        final String cachedId = EMBED_VIDEO_IDS_CACHE.get(url);
-        if (cachedId != null) {
-            return cachedId;
-        }
-        final String content;
-        try {
-            content = contentProvider.call();
-        } catch (final ParsingException e) {
-            throw e;
-        } catch (final Exception e) {
-            throw new ParsingException("Could not extract the embed id due to missing content", e);
-        }
-
+    public static String extractEmbedVideoId(
+            final String url, final String content) throws ParsingException {
         Matcher matcher = EMBED_URL_PATTERN.matcher(content);
         String embedId = matcher.find() ? matcher.group(1) : null;
         if (embedId == null) {
@@ -293,10 +269,7 @@ public final class RumbleParsingHelper {
             }
         }
         if (embedId != null) {
-            // Remove v (first character) from the id.
-            final String result = embedId.substring(1);
-            EMBED_VIDEO_IDS_CACHE.put(url, result);
-            return result;
+            return embedId;
         }
         throw AttachException.createAttachException(
                 "Could not extract the embed id due to missing context. URL: " + url,
@@ -315,20 +288,52 @@ public final class RumbleParsingHelper {
             final String errMsg = code + " - " + getErrFromTitle(doc);
             if (errMsg.toLowerCase(Locale.ROOT).contains("private")) {
                 throw new PrivateContentException(errMsg);
-            } else if (doc.selectFirst("span#challenge-error-text") != null
+            }
+        }
+        checkForChallenge(response);
+        if (code == 403) {
+            final String errMsg = code + " - " + getErrFromTitle(doc);
+            if (doc.selectFirst("span#challenge-error-text") != null
                     || errMsg.toLowerCase(Locale.ROOT).contains("just a moment...")) {
                 throw new PvcCloudFlareChallengeException(
                         errMsg + " for " + response.latestUrl());
-            } else {
-                throw new ContentNotAvailableException(errMsg);
             }
-
+            throw new ContentNotAvailableException(errMsg);
         } else if (code >= 400) {
             String errMsg = getErrFromTitle(doc);
             if (errMsg == null) {
                 errMsg = "Rumble request failed";
             }
             throw new ContentNotAvailableException(code + " - " + errMsg);
+        }
+    }
+
+    private static void checkForChallenge(final Response response)
+            throws PvcCloudFlareChallengeException {
+        final String mitigation = response.getHeader("cf-mitigated");
+        if (mitigation != null && mitigation.trim().equalsIgnoreCase("challenge")) {
+            throw new PvcCloudFlareChallengeException(
+                    "Rumble Cloudflare challenge for " + response.latestUrl());
+        }
+
+        // Inspect no more than the first 8 KiB of UTF-8 content, including successful responses.
+        final String body = response.responseBody();
+        int end = 0;
+        int bytes = 0;
+        while (end < body.length()) {
+            final int codePoint = body.codePointAt(end);
+            final int length = codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2
+                    : codePoint <= 0xffff ? 3 : 4;
+            if (bytes + length > 8192) {
+                break;
+            }
+            bytes += length;
+            end += Character.charCount(codePoint);
+        }
+        final String prefix = body.substring(0, end).toLowerCase(Locale.ROOT);
+        if (prefix.contains("challenge-platform") && prefix.contains("just a moment")) {
+            throw new PvcCloudFlareChallengeException(
+                    "Rumble Cloudflare challenge for " + response.latestUrl());
         }
     }
 
@@ -365,6 +370,8 @@ public final class RumbleParsingHelper {
         if (response.responseCode() >= 400) {
             checkIfContentIsAccessible(response,
                     Jsoup.parse(response.responseBody(), response.latestUrl()));
+        } else {
+            checkForChallenge(response);
         }
         return response;
     }

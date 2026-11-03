@@ -1,5 +1,7 @@
 package org.schabi.newpipe.util;
 
+import android.content.Context;
+
 import org.junit.Test;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -16,6 +18,9 @@ import java.util.Locale;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.mockito.Mockito.mock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -230,6 +235,43 @@ public class ListHelperTest {
                 AUDIO_STREAMS_TEST_LIST, cmp));
         assertEquals(192, stream.getAverageBitrate());
         assertEquals(MediaFormat.MP3, stream.getFormat());
+    }
+
+    @Test
+    public void aacOnlyAudioRemainsSelectableWithM4aPreference() {
+        final AudioStream aac = generateAudioStream("aac", MediaFormat.AAC, 128);
+        final List<AudioStream> streams = List.of(aac);
+        for (final boolean limitDataUsage : new boolean[]{false, true}) {
+            final int index = ListHelper.getAudioIndexByHighestRank(streams,
+                    ListHelper.getAudioFormatComparator(MediaFormat.M4A, limitDataUsage));
+            assertSame(aac, streams.get(index));
+        }
+    }
+
+    @Test
+    public void m4aRetainsTiePreferenceOverRawAac() {
+        final AudioStream aac = generateAudioStream("aac", MediaFormat.AAC, 128);
+        final AudioStream m4a = generateAudioStream("m4a", MediaFormat.M4A, 128);
+        final List<AudioStream> streams = List.of(m4a, aac);
+        for (final boolean limitDataUsage : new boolean[]{false, true}) {
+            for (final MediaFormat preference : new MediaFormat[]{null, MediaFormat.M4A}) {
+                final int index = ListHelper.getAudioIndexByHighestRank(streams,
+                        ListHelper.getAudioFormatComparator(preference, limitDataUsage));
+                assertSame(m4a, streams.get(index));
+            }
+        }
+    }
+
+    @Test
+    public void rawAacIsNotAnMp4MuxInput() {
+        final Context context = mock(Context.class);
+        final VideoStream video = generateVideoStream("mp4", MediaFormat.MPEG_4, "720p", true);
+        final AudioStream aac = generateAudioStream("aac", MediaFormat.AAC, 256);
+        final AudioStream m4a = generateAudioStream("m4a", MediaFormat.M4A, 128);
+
+        assertNull(SecondaryStreamHelper.getAudioStreamFor(context, List.of(aac), video));
+        assertSame(m4a, SecondaryStreamHelper.getAudioStreamFor(context,
+                List.of(aac, m4a), video));
     }
 
     @Test
