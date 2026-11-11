@@ -136,6 +136,14 @@ configure<ApplicationExtension> {
         generateLocaleConfig = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric API 36 intercepts FileDescriptor through the JDK SharedSecrets API.
+            it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+        }
+    }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true

@@ -313,6 +313,11 @@ rotation changes window bounds without replacing the player. Entering landscape
 preserves paused and completed playback rather than starting or replaying it.
 Opening a new video still supplies its explicit autoplay request.
 
+The detail container owns safe insets for inline and multiwindow playback; the
+main control overlay applies them only in true fullscreen, avoiding double padding
+after rotation or reparenting. Time counters use opaque black backgrounds for
+contrast over video.
+
 Main, popup and background mode changes capture the selected source's current
 position before rebuilding its media sources, independently of caller snapshots
 and watch-history recording. Unknown or temporarily zero duration does not clamp

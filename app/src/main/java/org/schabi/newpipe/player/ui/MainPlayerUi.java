@@ -38,6 +38,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
@@ -157,6 +159,10 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
     protected void initListeners() {
         super.initListeners();
 
+        ViewCompat.setOnApplyWindowInsetsListener(binding.playbackControlRoot,
+                (view, insets) -> applyPlaybackControlInsets(view, insets, isFullscreen,
+                        getParentActivity().map(DeviceUtils::isInMultiWindow).orElse(false)));
+
         binding.screenRotationButton.setOnClickListener(makeOnClickListener(() -> {
             // Only if it's not a vertical video or vertical video but in landscape with locked
             // orientation a screen orientation can be changed automatically
@@ -203,6 +209,8 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
     protected void deinitListeners() {
         super.deinitListeners();
 
+        ViewCompat.setOnApplyWindowInsetsListener(binding.playbackControlRoot, null);
+
         binding.queueButton.setOnClickListener(null);
         binding.segmentsButton.setOnClickListener(null);
         binding.addToPlaylistButton.setOnClickListener(null);
@@ -211,6 +219,19 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         context.getContentResolver().unregisterContentObserver(settingsContentObserver);
 
         binding.getRoot().removeOnLayoutChangeListener(this);
+    }
+
+    static WindowInsetsCompat applyPlaybackControlInsets(final View view,
+                                                         final WindowInsetsCompat insets,
+                                                         final boolean fullscreen,
+                                                         final boolean inMultiWindow) {
+        // The detail fragment already pads its content in these modes. Insets are still
+        // forwarded to the player, so fitsSystemWindows would apply the same padding twice.
+        if (!fullscreen || inMultiWindow) {
+            view.setPadding(0, 0, 0, 0);
+            return insets;
+        }
+        return ViewCompat.onApplyWindowInsets(view, insets);
     }
 
     @Override
@@ -371,6 +392,7 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         }
         binding.itemsListPanel.setPadding(0, 0, 0, 0);
         player.getFragmentListener().ifPresent(PlayerServiceEventListener::onViewCreated);
+        ViewCompat.requestApplyInsets(binding.playbackControlRoot);
     }
 
     /**
@@ -948,6 +970,7 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
             binding.playbackControlRoot.setPadding(0, 0, 0, 0);
         }
         fragmentListener.onFullscreenStateChanged(isFullscreen);
+        ViewCompat.requestApplyInsets(binding.playbackControlRoot);
 
         binding.metadataView.setVisibility(isFullscreen ? View.VISIBLE : View.GONE);
         binding.playerCloseButton.setVisibility(isFullscreen ? View.GONE : View.VISIBLE);
