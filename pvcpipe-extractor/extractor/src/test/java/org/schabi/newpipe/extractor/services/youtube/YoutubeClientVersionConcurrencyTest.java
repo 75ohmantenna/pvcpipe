@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
@@ -13,7 +16,9 @@ import org.schabi.newpipe.extractor.localization.Localization;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.lang.reflect.Field;
+import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +30,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,6 +45,8 @@ import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 class YoutubeClientVersionConcurrencyTest {
     private static final String FIRST_VERSION = "2.20261005.01.00";
     private static final String SECOND_VERSION = "2.20261006.01.00";
+    private static final String SW_DATA_URL = "https://www.youtube.com/sw.js_data";
+    private static final String SW_SCRIPT_URL = "https://www.youtube.com/sw.js";
     private final Map<String, Object> previousState = new HashMap<>();
     private Downloader previousDownloader;
     private Localization previousLocalization;
@@ -94,6 +102,110 @@ class YoutubeClientVersionConcurrencyTest {
         assertEquals(FIRST_VERSION, first.get(5, TimeUnit.SECONDS));
         assertEquals(FIRST_VERSION, second.get(5, TimeUnit.SECONDS));
         assertEquals(1, downloader.requests.get());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", ")]}'", ")]}'\n"})
+    void serviceWorkerDataProvidesTheVersionWithoutFallback(final String prefix) throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) {
+                requests.incrementAndGet();
+                assertEquals(SW_DATA_URL, request.url());
+                assertEquals("GET", request.httpMethod());
+                assertEquals(List.of("https://www.youtube.com"), request.headers().get("Origin"));
+                assertEquals(List.of("https://www.youtube.com"), request.headers().get("Referer"));
+                return response(request, prefix + versionBody(FIRST_VERSION));
+            }
+        });
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(1, requests.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidDataBodies")
+    void invalidDataFallsBackToLegacyScriptWithoutPoisoningCache(final String body) throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) {
+                final int index = requests.incrementAndGet();
+                assertEquals(index == 1 ? SW_DATA_URL : SW_SCRIPT_URL, request.url());
+                return response(request, index == 1 ? body : legacyVersionBody(SECOND_VERSION));
+            }
+        });
+        assertEquals(SECOND_VERSION, getClientVersion());
+        assertEquals(SECOND_VERSION, getClientVersion());
+        assertEquals(2, requests.get());
+    }
+
+    private static Stream<String> invalidDataBodies() {
+        return Stream.of("", "not json", "{}", "[]", "[null]", "[[null,null,{}]]",
+                versionBody(""), versionBody(" "), versionBody("not-a-version"),
+                versionBody(".."), versionBody(FIRST_VERSION).replace("\"" + FIRST_VERSION + "\"", "null"),
+                versionBody(FIRST_VERSION).replace("\"" + FIRST_VERSION + "\"", "123"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {204, 302, 403, 429, 503})
+    void unsuccessfulDataResponseCannotSupplyACachedVersion(final int status) throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) {
+                final int index = requests.incrementAndGet();
+                assertEquals(index == 1 ? SW_DATA_URL : SW_SCRIPT_URL, request.url());
+                return index == 1
+                        ? new Response(status, "Fixture status", Map.of(), versionBody(FIRST_VERSION), request.url())
+                        : response(request, legacyVersionBody(SECOND_VERSION));
+            }
+        });
+        assertEquals(SECOND_VERSION, getClientVersion());
+        assertEquals(SECOND_VERSION, getClientVersion());
+        assertEquals(2, requests.get());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    void interruptedDiscoveryStopsAndLeavesTheCacheRetryable(final int interruptedRequest)
+            throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws IOException {
+                final int index = requests.incrementAndGet();
+                if (index == interruptedRequest) {
+                    throw new InterruptedIOException("Fixture cancellation");
+                }
+                return response(request, index < interruptedRequest ? "invalid"
+                        : versionBody(FIRST_VERSION));
+            }
+        });
+        assertThrows(InterruptedIOException.class, YoutubeParsingHelper::getClientVersion);
+        assertEquals(interruptedRequest, requests.get());
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(interruptedRequest + 1, requests.get());
+    }
+
+    @Test
+    void serviceWorkerTimeoutsStillAllowHtmlFallback() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(@Nonnull final Request request) throws IOException {
+                requests.incrementAndGet();
+                if (request.url().equals(SW_DATA_URL) || request.url().equals(SW_SCRIPT_URL)) {
+                    throw new SocketTimeoutException("Fixture timeout");
+                }
+                return response(request, "var ytInitialData = {};" + legacyVersionBody(FIRST_VERSION));
+            }
+        });
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(FIRST_VERSION, getClientVersion());
+        assertEquals(3, requests.get());
     }
 
     @Test
@@ -202,7 +314,7 @@ class YoutubeClientVersionConcurrencyTest {
             @Override
             public Response execute(@Nonnull final Request request) {
                 requests.incrementAndGet();
-                if (request.url().endsWith("/sw.js")) {
+                if (request.url().equals(SW_DATA_URL) || request.url().equals(SW_SCRIPT_URL)) {
                     return response(request, "no version here");
                 }
                 return response(request, "var ytInitialData = {\"responseContext\":{"
@@ -213,7 +325,7 @@ class YoutubeClientVersionConcurrencyTest {
         });
         assertEquals(FIRST_VERSION, getClientVersion());
         assertEquals(FIRST_VERSION, getClientVersion());
-        assertEquals(2, requests.get());
+        assertEquals(3, requests.get());
     }
 
     @Test
@@ -222,7 +334,7 @@ class YoutubeClientVersionConcurrencyTest {
         NewPipe.init(new Downloader() {
             @Override
             public Response execute(@Nonnull final Request request) throws IOException {
-                if (requests.incrementAndGet() <= 2) {
+                if (requests.incrementAndGet() <= 3) {
                     throw new IOException("Fixture request failed");
                 }
                 return response(request, versionBody(FIRST_VERSION));
@@ -231,7 +343,7 @@ class YoutubeClientVersionConcurrencyTest {
         assertThrows(IOException.class, YoutubeParsingHelper::getClientVersion);
         assertEquals(FIRST_VERSION, getClientVersion());
         assertEquals(FIRST_VERSION, getClientVersion());
-        assertEquals(3, requests.get());
+        assertEquals(4, requests.get());
     }
 
     @Test
@@ -289,6 +401,10 @@ class YoutubeClientVersionConcurrencyTest {
     }
 
     private static String versionBody(final String version) {
+        return "[[null,null,[[[" + "null,".repeat(16) + "\"" + version + "\"]]]]]";
+    }
+
+    private static String legacyVersionBody(final String version) {
         return "INNERTUBE_CONTEXT_CLIENT_VERSION\":\"" + version + "\"";
     }
 

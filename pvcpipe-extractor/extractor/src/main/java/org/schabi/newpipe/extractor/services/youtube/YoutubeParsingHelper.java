@@ -67,7 +67,9 @@ import org.schabi.newpipe.extractor.utils.RandomStringFromAlphabetGenerator;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -171,6 +173,8 @@ public final class YoutubeParsingHelper {
             {"INNERTUBE_CONTEXT_CLIENT_VERSION\":\"([0-9\\.]+?)\"",
                     "innertube_context_client_version\":\"([0-9\\.]+?)\"",
                     "client.version=([0-9\\.]+)"};
+    private static final Pattern WEB_CLIENT_VERSION_PATTERN =
+            Pattern.compile("[0-9]+(?:\\.[0-9]+)+");
     private static final String[] INITIAL_DATA_REGEXES =
             {"window\\[\"ytInitialData\"\\]\\s*=\\s*(\\{.*?\\});",
                     "var\\s*ytInitialData\\s*=\\s*(\\{.*?\\});"};
@@ -498,6 +502,37 @@ public final class YoutubeParsingHelper {
     }
 
 
+    private static void extractClientVersionFromSwJsData()
+            throws IOException, ExtractionException {
+        final String url = "https://www.youtube.com/sw.js_data";
+        final var headers = getOriginReferrerHeaders("https://www.youtube.com");
+        final Response response = getDownloader().get(url, headers);
+        if (response.responseCode() != 200) {
+            throw new IOException("Could not fetch YouTube service worker data: HTTP "
+                    + response.responseCode());
+        }
+
+        String body = response.responseBody();
+        if (body.startsWith(")]}'")) {
+            body = body.substring(4);
+        }
+
+        final String candidate;
+        try {
+            final JsonArray data = JsonParser.array().from(body);
+            candidate = data.getArray(0).getArray(2).getArray(0).getArray(0).getString(16);
+        } catch (final JsonParserException e) {
+            throw new ParsingException("Could not parse YouTube service worker data", e);
+        }
+        // Do not cache a missing or changed field as a successfully extracted client version.
+        if (candidate == null || !WEB_CLIENT_VERSION_PATTERN.matcher(candidate).matches()) {
+            throw new ParsingException(
+                    "Missing or invalid YouTube WEB client version in sw.js_data");
+        }
+        clientVersion = candidate;
+        clientVersionExtracted = true;
+    }
+
     private static void extractClientVersionFromSwJs()
             throws IOException, ExtractionException {
         if (clientVersionExtracted) {
@@ -591,13 +626,23 @@ public final class YoutubeParsingHelper {
             return clientVersion;
         }
 
-        // Always extract the latest client version, by trying first to extract it from the
-        // JavaScript service worker, then from HTML search results page as a fallback, to prevent
-        // fingerprinting based on the client version used
+        // Prefer service worker data, retaining the legacy script and HTML search fallbacks.
+        // Discovering the latest version avoids fingerprinting based on a hardcoded version.
         try {
-            extractClientVersionFromSwJs();
+            extractClientVersionFromSwJsData();
         } catch (final Exception e) {
-            extractClientVersionFromHtmlSearchResultsPage();
+            if (e instanceof InterruptedIOException && !(e instanceof SocketTimeoutException)) {
+                throw (InterruptedIOException) e;
+            }
+            try {
+                extractClientVersionFromSwJs();
+            } catch (final Exception legacyFailure) {
+                if (legacyFailure instanceof InterruptedIOException
+                        && !(legacyFailure instanceof SocketTimeoutException)) {
+                    throw (InterruptedIOException) legacyFailure;
+                }
+                extractClientVersionFromHtmlSearchResultsPage();
+            }
         }
 
         if (clientVersionExtracted) {
