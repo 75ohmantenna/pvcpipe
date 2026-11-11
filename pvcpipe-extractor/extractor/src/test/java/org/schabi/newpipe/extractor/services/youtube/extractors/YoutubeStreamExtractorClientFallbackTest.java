@@ -11,6 +11,7 @@ import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException;
+import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
@@ -178,6 +179,49 @@ class YoutubeStreamExtractorClientFallbackTest {
         fixtures.vision = playable(OTHER_ID, "Wrong video", "wrong");
 
         assertThrows(PrivateContentException.class, () -> fetch(fixtures));
+    }
+
+    @Test
+    void privateMessagesWorkWithoutReasonAndSurviveOtherClientFailure() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.android = "{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+                + "\"messages\":[null,42,{},\"Sign in\",\"This video is PRIVATE\"]}}";
+        fixtures.vision = unavailable("UNPLAYABLE", "Video unavailable");
+
+        assertThrows(PrivateContentException.class, () -> fetch(fixtures));
+    }
+
+    @Test
+    void privateMessageOverridesGenericLoginReason() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = "{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+                + "\"reason\":\"Video unavailable\",\"messages\":[\"Private video\"]}}";
+
+        assertThrows(PrivateContentException.class, () -> fetch(fixtures));
+    }
+
+    @Test
+    void nullAndNonStringMessagesRemainGenericUnavailability() throws Exception {
+        for (final String messages : new String[]{"null", "[]", "[null,42,{}]"}) {
+            final PlayerFixtures fixtures = new PlayerFixtures();
+            fixtures.android = "{\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+                    + "\"messages\":" + messages + "}}";
+            final ContentNotAvailableException failure = assertThrows(
+                    ContentNotAvailableException.class, () -> fetch(fixtures));
+            assertEquals(ContentNotAvailableException.class, failure.getClass());
+        }
+    }
+
+    @Test
+    void wrongIdPrivateMessagesCannotOverrideActualVideoFailure() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.android = unavailable("UNPLAYABLE", "Video unavailable");
+        fixtures.vision = "{\"videoDetails\":{\"videoId\":\"" + OTHER_ID + "\"},"
+                + "\"playabilityStatus\":{\"status\":\"LOGIN_REQUIRED\","
+                + "\"messages\":[\"Private video\"]}}";
+        final ContentNotAvailableException failure = assertThrows(
+                ContentNotAvailableException.class, () -> fetch(fixtures));
+        assertEquals(ContentNotAvailableException.class, failure.getClass());
     }
 
     @Test
