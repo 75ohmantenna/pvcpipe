@@ -13,7 +13,8 @@ import java.util.function.BooleanSupplier;
  * <p>
  * Seeking in place and keeping the current queue avoid source reinitialization. A history
  * lookup checks for a saved starting position before initializing the incoming queue.
- * The checks run in the order of the constants; the first one that applies wins.
+ * An explicit mode handoff keeps the live queue before considering its old recovery snapshot.
+ * Other requests check the constants in order; the first one that applies wins.
  */
 enum QueuePlaybackChoice {
     /**
@@ -38,6 +39,7 @@ enum QueuePlaybackChoice {
      * @param current         the queue the player has now, if any
      * @param incoming        the queue it is asked to play
      * @param sameQueue       whether both queues have the same streams and index
+     * @param preservePosition whether this is a handoff of the active queue to another mode
      * @param resumeRequested whether the request asks to resume from the saved position
      * @param resumeEnabled   the user's "resume playback" setting; only read when needed
      * @return what to do with the incoming queue
@@ -47,9 +49,15 @@ enum QueuePlaybackChoice {
                                   @Nullable final PlayQueue current,
                                   @NonNull final PlayQueue incoming,
                                   final boolean sameQueue,
+                                  final boolean preservePosition,
                                   final boolean resumeRequested,
                                   @NonNull final BooleanSupplier resumeEnabled) {
-        if (hasPlayer
+        if (preservePosition && hasPlayer && sameQueue && current != null
+                && !current.isDisposed()) {
+            // A mode handoff carries a serialized snapshot, not a new timestamp request.
+            // Keep the live clock, which may have advanced since the caller saved the queue.
+            return KEEP_CURRENT_QUEUE;
+        } else if (hasPlayer
                 && incoming.size() == 1 && incoming.getItem() != null
                 && current != null && current.size() == 1 && current.getItem() != null
                 && incoming.getItem().isSameItem(current.getItem())

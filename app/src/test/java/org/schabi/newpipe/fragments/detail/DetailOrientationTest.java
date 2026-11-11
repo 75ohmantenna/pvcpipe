@@ -87,10 +87,17 @@ public class DetailOrientationTest {
     }
 
     @Test
-    public void landscapeStartsAStoppedPlayerOnlyWhenTheOrientationIsLocked() {
-        assertTrue(DetailOrientation.startsPlaybackInLandscape(true, false));
-        assertFalse(DetailOrientation.startsPlaybackInLandscape(true, true));
-        assertFalse(DetailOrientation.startsPlaybackInLandscape(false, false));
-        assertFalse(DetailOrientation.startsPlaybackInLandscape(false, true));
+    public void landscapeOnlyResumesRequestedPlaybackWithoutReplayingCompletedVideo() {
+        for (final boolean locked : BOTH) {
+            for (final boolean playing : BOTH) {
+                for (final boolean playWhenReady : BOTH) {
+                    for (final boolean completed : BOTH) {
+                        assertEquals(locked && !playing && playWhenReady && !completed,
+                                DetailOrientation.startsPlaybackInLandscape(
+                                        locked, playing, playWhenReady, completed));
+                    }
+                }
+            }
+        }
     }
 }

@@ -87,11 +87,23 @@ public final class NavigationHelper {
                                              @NonNull final Class<T> targetClazz,
                                              @Nullable final PlayQueue playQueue,
                                              @NonNull final PlayerIntentType playerIntentType) {
+        return getPlayerIntent(context, targetClazz, playQueue, playerIntentType, false);
+    }
+
+    @NonNull
+    public static <T> Intent getPlayerIntent(@NonNull final Context context,
+                                             @NonNull final Class<T> targetClazz,
+                                             @Nullable final PlayQueue playQueue,
+                                             @NonNull final PlayerIntentType playerIntentType,
+                                             final boolean preserveCurrentPosition) {
         final String cacheKey = Optional.ofNullable(playQueue)
                 .map(queue -> SerializedCache.getInstance().put(queue, PlayQueue.class))
                 .orElse(null);
         return PlayerService.authenticateInternalIntent(context, new Intent(context, targetClazz))
                 .putExtra(Player.PLAY_QUEUE_KEY, cacheKey)
+                // Only explicit handoffs keep the live clock over their serialized snapshot.
+                // A new queue from a timestamp URL must still seek, even for the same video.
+                .putExtra(Player.PRESERVE_CURRENT_POSITION, preserveCurrentPosition)
                 .putExtra(Player.PLAYER_TYPE, PlayerType.MAIN)
                 .putExtra(PlayerService.SHOULD_START_FOREGROUND_EXTRA, true)
                 .putExtra(Player.PLAYER_INTENT_TYPE, playerIntentType);
@@ -140,6 +152,13 @@ public final class NavigationHelper {
     public static void playOnPopupPlayer(final Context context,
                                          final PlayQueue queue,
                                          final boolean resumePlayback) {
+        playOnPopupPlayer(context, queue, resumePlayback, false);
+    }
+
+    public static void playOnPopupPlayer(final Context context,
+                                         final PlayQueue queue,
+                                         final boolean resumePlayback,
+                                         final boolean preserveCurrentPosition) {
         if (!PermissionHelper.isPopupEnabledElseAsk(context)) {
             return;
         }
@@ -147,7 +166,7 @@ public final class NavigationHelper {
         Toast.makeText(context, R.string.popup_playing_toast, Toast.LENGTH_SHORT).show();
 
         final var intent = getPlayerIntent(context, PlayerService.class, queue,
-                PlayerIntentType.AllOthers)
+                PlayerIntentType.AllOthers, preserveCurrentPosition)
                 .putExtra(Player.PLAYER_TYPE, PlayerType.POPUP)
                 .putExtra(Player.RESUME_PLAYBACK, resumePlayback);
         context.startForegroundService(intent);
@@ -156,11 +175,18 @@ public final class NavigationHelper {
     public static void playOnBackgroundPlayer(final Context context,
                                               final PlayQueue queue,
                                               final boolean resumePlayback) {
+        playOnBackgroundPlayer(context, queue, resumePlayback, false);
+    }
+
+    public static void playOnBackgroundPlayer(final Context context,
+                                              final PlayQueue queue,
+                                              final boolean resumePlayback,
+                                              final boolean preserveCurrentPosition) {
         Toast.makeText(context, R.string.background_player_playing_toast, Toast.LENGTH_SHORT)
                 .show();
 
         final Intent intent = getPlayerIntent(context, PlayerService.class, queue,
-                PlayerIntentType.AllOthers)
+                PlayerIntentType.AllOthers, preserveCurrentPosition)
                 .putExtra(Player.PLAYER_TYPE, PlayerType.AUDIO)
                 .putExtra(Player.RESUME_PLAYBACK, resumePlayback);
         context.startForegroundService(intent);

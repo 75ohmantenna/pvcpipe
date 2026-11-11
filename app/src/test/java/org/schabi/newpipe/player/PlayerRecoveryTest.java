@@ -16,6 +16,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -62,6 +63,7 @@ import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.player.resolver.PlaybackSources;
 import org.schabi.newpipe.player.ui.PlayerUiList;
+import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
@@ -76,6 +78,7 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.schedulers.TestScheduler;
 import io.reactivex.rxjava3.subjects.CompletableSubject;
@@ -282,6 +285,133 @@ public class PlayerRecoveryTest {
         verifyNoInteractions(preferences);
         queue.setIndex(0);
         synchronizeAndAssert(0, PLAYING_POSITION);
+    }
+
+    @Test
+    public void localRecoveryPreservesPositionWithUnknownDuration() throws Exception {
+        captureWithoutDuration(androidx.media3.common.C.TIME_UNSET);
+    }
+
+    @Test
+    public void localRecoveryPreservesPositionWithTemporarilyZeroDuration() throws Exception {
+        captureWithoutDuration(0);
+    }
+
+    private void captureWithoutDuration(final long duration) throws Exception {
+        start();
+        when(exoPlayer.getDuration()).thenReturn(duration);
+
+        player.setRecovery();
+
+        assertEquals(PLAYING_POSITION, queue.getItem().getRecoveryPosition());
+        queue.setIndex(0);
+        synchronizeAndAssert(0, PLAYING_POSITION);
+    }
+
+    @Test
+    public void mainToPopupCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.MAIN, PlayerType.POPUP);
+    }
+
+    @Test
+    public void popupToMainCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.POPUP, PlayerType.MAIN);
+    }
+
+    @Test
+    public void mainToBackgroundCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.MAIN, PlayerType.AUDIO);
+    }
+
+    @Test
+    public void backgroundToMainCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.AUDIO, PlayerType.MAIN);
+    }
+
+    @Test
+    public void popupToBackgroundCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.POPUP, PlayerType.AUDIO);
+    }
+
+    @Test
+    public void backgroundToPopupCapturesPositionBeforeReload() throws Exception {
+        modeChange(PlayerType.AUDIO, PlayerType.POPUP);
+    }
+
+    private void modeChange(final PlayerType from, final PlayerType to) throws Exception {
+        start();
+        setField("playerType", to);
+        setField("UIs", new PlayerUiList());
+        setField("progressUpdateDisposable", new SerialDisposable());
+        doNothing().when(player).startProgressLoop();
+        doAnswer(call -> {
+            assertEquals("Capture must precede source replacement", PLAYING_POSITION,
+                    queue.getItem().getRecoveryPosition());
+            return null;
+        }).when(player).reloadPlayQueueManager();
+
+        try (MockedStatic<NavigationHelper> navigation = mockStatic(NavigationHelper.class)) {
+            player.handleIntentPost(from);
+        }
+
+        queue.setIndex(0);
+        synchronizeAndAssert(0, PLAYING_POSITION);
+    }
+
+    @Test
+    public void timestampDuringPendingSelectionSurvivesModeReloadAndSynchronization()
+            throws Exception {
+        pendingTimestamp(SELECTED_RECOVERY, false);
+    }
+
+    @Test
+    public void timestampWithoutOlderRecoverySurvivesModeReloadAndSynchronization()
+            throws Exception {
+        pendingTimestamp(PlayQueueItem.RECOVERY_UNSET, false);
+    }
+
+    @Test
+    public void latestTimestampDuringPendingSelectionSurvivesModeReloadAndSynchronization()
+            throws Exception {
+        pendingTimestamp(SELECTED_RECOVERY, true);
+    }
+
+    private void pendingTimestamp(final long recovery, final boolean earlierTimestamp)
+            throws Exception {
+        start();
+        final String selectedUrl = "https://example.com/watch/pending";
+        final StreamInfo selectedInfo = new StreamInfo(0, selectedUrl, selectedUrl,
+                StreamType.VIDEO_STREAM, "pending", "pending", 0);
+        final PlayQueueItem selected = new PlayQueueItem(selectedInfo);
+        queue.append(List.of(selected));
+        queue.setRecovery(1, recovery);
+        queue.setIndex(1);
+        // The engine still owns the previous occurrence while B's metadata is pending.
+        final var timestamp = Player.class.getDeclaredMethod("playFromTimestamp",
+                StreamInfo.class, int.class, boolean.class);
+        timestamp.setAccessible(true);
+        if (earlierTimestamp) {
+            timestamp.invoke(player, selectedInfo, 20, true);
+        }
+        timestamp.invoke(player, selectedInfo, 30, true);
+        setField("playerType", PlayerType.POPUP);
+        setField("UIs", new PlayerUiList());
+        setField("progressUpdateDisposable", new SerialDisposable());
+        doNothing().when(player).startProgressLoop();
+
+        try (MockedStatic<NavigationHelper> navigation = mockStatic(NavigationHelper.class)) {
+            player.handleIntentPost(PlayerType.MAIN);
+        }
+
+        assertEquals("Latest timestamp must replace the older pending recovery", 30_000,
+                selected.getRecoveryPosition());
+        mainThread.triggerActions();
+        // The pending engine seek alone is insufficient: synchronization must seek there too.
+        verify(exoPlayer, times(2)).seekTo(1, 30_000);
+        verify(exoPlayer, times(earlierTimestamp ? 1 : 0)).seekTo(1, 20_000);
+        verify(exoPlayer, never()).seekTo(1, SELECTED_RECOVERY);
+        verify(exoPlayer, never()).seekToDefaultPosition(anyInt());
+        assertEquals(PlayQueueItem.RECOVERY_UNSET, selected.getRecoveryPosition());
     }
 
     @Test

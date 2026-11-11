@@ -29,10 +29,11 @@ public class QueuePlaybackChoiceTest {
         final PlayQueue incoming = queue(1, sameItemAs(playing, 42_000L));
 
         assertEquals(SEEK_IN_PLACE,
-                QueuePlaybackChoice.of(true, current, incoming, false, false, MUST_NOT_BE_READ));
+                QueuePlaybackChoice.of(true, current, incoming, false, false, false,
+                        MUST_NOT_BE_READ));
         // It wins over the later choices even when they would apply too.
         assertEquals(SEEK_IN_PLACE,
-                QueuePlaybackChoice.of(true, current, incoming, true, true, ENABLED));
+                QueuePlaybackChoice.of(true, current, incoming, true, false, true, ENABLED));
     }
 
     @Test
@@ -40,18 +41,30 @@ public class QueuePlaybackChoiceTest {
         final PlayQueue incoming = queue(1, sameItemAs(playing, 42_000L));
 
         assertEquals(START,
-                QueuePlaybackChoice.of(false, current, incoming, false, false, DISABLED));
+                QueuePlaybackChoice.of(false, current, incoming, false, false, false, DISABLED));
         assertEquals(START,
-                QueuePlaybackChoice.of(true, null, incoming, false, false, DISABLED));
+                QueuePlaybackChoice.of(true, null, incoming, false, false, false, DISABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, queue(2, playing), incoming,
-                false, false, DISABLED));
+                false, false, false, DISABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, current,
-                queue(2, sameItemAs(playing, 42_000L)), false, false, DISABLED));
+                queue(2, sameItemAs(playing, 42_000L)), false, false, false, DISABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, current,
-                queue(1, item(42_000L)), false, false, DISABLED));
+                queue(1, item(42_000L)), false, false, false, DISABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, current,
                 queue(1, sameItemAs(playing, PlayQueueItem.RECOVERY_UNSET)),
-                false, false, DISABLED));
+                false, false, false, DISABLED));
+    }
+
+    @Test
+    public void modeHandoffKeepsLiveQueueInsteadOfItsOldRecoverySnapshot() {
+        final PlayQueue incoming = queue(1, sameItemAs(playing, 0));
+        assertEquals(KEEP_CURRENT_QUEUE,
+                QueuePlaybackChoice.of(true, current, incoming, true, true,
+                        true, MUST_NOT_BE_READ));
+        // A new timestamp queue still seeks, including when its destination mode changes.
+        assertEquals(SEEK_IN_PLACE,
+                QueuePlaybackChoice.of(true, current, incoming, true, false,
+                        true, MUST_NOT_BE_READ));
     }
 
     @Test
@@ -59,7 +72,8 @@ public class QueuePlaybackChoiceTest {
         final PlayQueue incoming = queue(2, item(PlayQueueItem.RECOVERY_UNSET));
 
         assertEquals(KEEP_CURRENT_QUEUE,
-                QueuePlaybackChoice.of(true, current, incoming, true, true, MUST_NOT_BE_READ));
+                QueuePlaybackChoice.of(true, current, incoming, true, false, true,
+                        MUST_NOT_BE_READ));
     }
 
     @Test
@@ -69,9 +83,9 @@ public class QueuePlaybackChoiceTest {
         when(disposed.isDisposed()).thenReturn(true);
 
         assertEquals(START,
-                QueuePlaybackChoice.of(false, current, incoming, true, true, ENABLED));
+                QueuePlaybackChoice.of(false, current, incoming, true, false, true, ENABLED));
         assertEquals(START,
-                QueuePlaybackChoice.of(true, disposed, incoming, true, true, ENABLED));
+                QueuePlaybackChoice.of(true, disposed, incoming, true, false, true, ENABLED));
     }
 
     @Test
@@ -79,9 +93,9 @@ public class QueuePlaybackChoiceTest {
         final PlayQueue incoming = queue(2, item(PlayQueueItem.RECOVERY_UNSET));
 
         assertEquals(RESUME_FROM_HISTORY,
-                QueuePlaybackChoice.of(true, current, incoming, false, true, ENABLED));
+                QueuePlaybackChoice.of(true, current, incoming, false, false, true, ENABLED));
         assertEquals(RESUME_FROM_HISTORY,
-                QueuePlaybackChoice.of(false, null, incoming, false, true, ENABLED));
+                QueuePlaybackChoice.of(false, null, incoming, false, false, true, ENABLED));
     }
 
     @Test
@@ -91,16 +105,18 @@ public class QueuePlaybackChoiceTest {
         when(empty.isEmpty()).thenReturn(true);
 
         assertEquals(START,
-                QueuePlaybackChoice.of(true, current, incoming, false, false, MUST_NOT_BE_READ));
+                QueuePlaybackChoice.of(true, current, incoming, false, false, false,
+                        MUST_NOT_BE_READ));
         assertEquals(START,
-                QueuePlaybackChoice.of(true, current, incoming, false, true, DISABLED));
+                QueuePlaybackChoice.of(true, current, incoming, false, false, true, DISABLED));
         assertEquals(START,
-                QueuePlaybackChoice.of(false, current, incoming, true, true, ENABLED));
-        assertEquals(START, QueuePlaybackChoice.of(true, current, empty, false, true, ENABLED));
+                QueuePlaybackChoice.of(false, current, incoming, true, false, true, ENABLED));
+        assertEquals(START,
+                QueuePlaybackChoice.of(true, current, empty, false, false, true, ENABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, current, queue(2, null),
-                false, true, ENABLED));
+                false, false, true, ENABLED));
         assertEquals(START, QueuePlaybackChoice.of(true, current, queue(2, item(42_000L)),
-                false, true, ENABLED));
+                false, false, true, ENABLED));
     }
 
     private static PlayQueueItem item(final long recoveryPosition) {

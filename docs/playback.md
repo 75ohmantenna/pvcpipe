@@ -294,14 +294,39 @@ alone does not prove that the receiver has decoded video or played audio.
 ## A request to play a queue
 
 [`QueuePlaybackChoice`](../app/src/main/java/org/schabi/newpipe/player/QueuePlaybackChoice.java)
-decides what the player does with a queue it is asked to play. It checks, in
-this order, whether to seek in place, keep the loaded queue, or look up a
-resume position first. If none applies, the queue starts from scratch.
+decides what the player does with a queue it is asked to play. A mode-switch
+handoff of the active queue keeps its live position instead of seeking to the
+serialized queue's older recovery snapshot. Mode-switch callers explicitly mark
+the active queue handoff before serialization; a new queue from a timestamp URL
+still seeks to that timestamp. Other requests check, in order, whether to seek in place,
+keep the loaded queue, or look up a resume position first. If none applies, the queue starts from scratch.
 `Player.handleQueuePlayback` cancels any pending timestamp/resume decision after
 it retrieves a valid cached queue, then carries out the answer. Timestamp
 requests also replace that pending decision; enqueueing into an existing queue
 does not. Cancellation prevents the old lookup from applying playback changes,
 not history writes already accepted by `PlaybackHistory`.
+
+## Rotation and player modes
+
+Portrait/landscape recreation reconnects to the existing player service; popup
+rotation changes window bounds without replacing the player. Entering landscape
+preserves paused and completed playback rather than starting or replaying it.
+Opening a new video still supplies its explicit autoplay request.
+
+Main, popup and background mode changes capture the selected source's current
+position before rebuilding its media sources, independently of caller snapshots
+and watch-history recording. Unknown or temporarily zero duration does not clamp
+a valid local or cast position back to zero. Existing source-occurrence ownership
+checks still protect a pending selection from the previous video's clock. Timestamp
+requests made before source synchronization update that selected occurrence's
+pending recovery, so another mode/quality reload cannot restore an older timestamp.
+
+`PlayerRecoveryTest`, `PlayerIntentTest`, `QueuePlaybackChoiceTest`,
+`NavigationHelperPlayerHandoffTest` and `DetailOrientationTest` cover those
+policies with controlled boundaries. `PlayerRecoveryEngineIntegrationTest`
+also exercises repeated mode reloads with real Media3 audio playback. These
+checks are distinct from activity recreation, popup surfaces and physical-device
+rotation testing.
 
 ## Changing the queue
 

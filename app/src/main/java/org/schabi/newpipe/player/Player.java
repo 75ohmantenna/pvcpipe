@@ -127,6 +127,7 @@ public final class Player implements PlaybackListener, Listener {
     public static final String PLAY_QUEUE_KEY = "play_queue_key";
     public static final String RESUME_PLAYBACK = "resume_playback";
     public static final String PLAY_WHEN_READY = "play_when_ready";
+    public static final String PRESERVE_CURRENT_POSITION = "preserve_current_position";
     public static final String PLAYER_TYPE = "player_type";
     public static final String IS_MUTED = "is_muted";
     public static final String VIDEO_SEGMENTS = "video_segments";
@@ -366,6 +367,7 @@ public final class Player implements PlaybackListener, Listener {
         // initialization. QueuePlaybackChoice orders those cases to avoid unnecessary source
         // reinitialization; outstanding timestamp/history delivery was cancelled above.
         switch (QueuePlaybackChoice.of(!exoPlayerIsNull(), playQueue, newQueue, samePlayQueue,
+                intent.getBooleanExtra(PRESERVE_CURRENT_POSITION, false),
                 intent.getBooleanExtra(RESUME_PLAYBACK, false),
                 () -> DependentPreferenceHelper.getResumePlaybackEnabled(context))) {
             case SEEK_IN_PLACE:
@@ -465,8 +467,10 @@ public final class Player implements PlaybackListener, Listener {
 
     public void handleIntentPost(final PlayerType oldPlayerType) {
         if (oldPlayerType != playerType && playQueue != null) {
-            // If playerType changes from one to another we should reload the player
-            // (to disable/enable video stream or to set quality)
+            // Every mode switch must capture its own recovery before replacing the source.
+            // Callers may not have saved it, or playback may have advanced since their snapshot.
+            setRecovery();
+            // Disable/enable video or apply the mode's preferred quality.
             reloadPlayQueueManager();
             stopProgressLoop();
             startProgressLoop();
@@ -640,8 +644,9 @@ public final class Player implements PlaybackListener, Listener {
         final long windowPos = getCurrentPosition();
         final long duration = getDuration();
 
-        // A pending cast seek is valid intent even before its duration is known.
-        setRecovery(queuePos, casting.isActive() && duration <= 0
+        // A valid local or cast clock must survive an unknown/temporarily empty duration.
+        // Clamping against TIME_UNSET or zero would lose the position during a source change.
+        setRecovery(queuePos, duration <= 0
                 ? Math.max(0, windowPos) : MathUtils.clamp(windowPos, 0, duration));
     }
 
@@ -2036,8 +2041,12 @@ public final class Player implements PlaybackListener, Listener {
         if (casting.isActive()) {
             casting.seek(position);
         } else {
-            // Timestamp intents may arrive before the timeline is prepared: retain ExoPlayer's
-            // pending indexed seek instead of clamping against an unknown/old duration.
+            // A pending engine seek can be lost when a mode/quality change replaces its source.
+            // Store the requested timestamp on the selected occurrence until it owns the source.
+            if (!loadedSourceOwnsSelectedItem()) {
+                playQueue.setRecovery(playQueue.getIndex(), Math.max(0, position));
+            }
+            // Do not clamp against the previous source's or an unknown duration.
             simpleExoPlayer.seekTo(playQueue.getIndex(), position);
         }
     }

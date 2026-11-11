@@ -89,15 +89,19 @@ final class DetailOrientation {
     }
 
     /**
-     * With auto-rotate off the user got to landscape on purpose, by the rotation button or by
-     * opening the player in fullscreen, so a player that is not playing is started.
+     * Entering landscape may resume requested playback, but must not override a pause or
+     * replay a completed video. Opening a new video explicitly supplies its autoplay intent.
      *
      * @param orientationLocked whether auto-rotate is off in the system settings
      * @param playing           whether the player is playing
+     * @param playWhenReady     whether playback is currently requested
+     * @param completed         whether playback reached the end
      * @return whether to start playback now that the device is in landscape
      */
     static boolean startsPlaybackInLandscape(final boolean orientationLocked,
-                                             final boolean playing) {
-        return orientationLocked && !playing;
+                                             final boolean playing,
+                                             final boolean playWhenReady,
+                                             final boolean completed) {
+        return orientationLocked && !playing && playWhenReady && !completed;
     }
 }

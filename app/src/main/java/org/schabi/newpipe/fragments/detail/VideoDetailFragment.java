@@ -958,7 +958,8 @@ public final class VideoDetailFragment
             NavigationHelper.enqueueOnPlayer(activity, queue, PlayerType.POPUP);
         } else {
             replaceQueueIfUserConfirms(() -> NavigationHelper
-                    .playOnPopupPlayer(activity, queue, true));
+                    .playOnPopupPlayer(activity, queue, true,
+                            isPlayerAvailable() && queue == player.getPlayQueue()));
         }
     }
 
@@ -1017,7 +1018,8 @@ public final class VideoDetailFragment
             NavigationHelper.enqueueOnPlayer(activity, queue, PlayerType.AUDIO);
         } else {
             replaceQueueIfUserConfirms(() -> NavigationHelper
-                    .playOnBackgroundPlayer(activity, queue, true));
+                    .playOnBackgroundPlayer(activity, queue, true,
+                            isPlayerAvailable() && queue == player.getPlayQueue()));
         }
     }
 
@@ -1036,7 +1038,8 @@ public final class VideoDetailFragment
         final Context context = requireContext();
         final Intent playerIntent =
                 NavigationHelper.getPlayerIntent(context, PlayerService.class, queue,
-                                PlayerIntentType.AllOthers)
+                                PlayerIntentType.AllOthers,
+                                isPlayerAvailable() && queue == player.getPlayQueue())
                         .putExtra(Player.PLAY_WHEN_READY, autoPlayEnabled)
                         .putExtra(Player.RESUME_PLAYBACK, true);
         activity.startForegroundService(playerIntent);
@@ -1915,7 +1918,8 @@ public final class VideoDetailFragment
         player.UIs().get(MainPlayerUi.class).ifPresent(MainPlayerUi::checkLandscape);
         // Let's give a user time to look at video information page if video is not playing
         if (DetailOrientation.startsPlaybackInLandscape(globalScreenOrientationLocked(activity),
-                player.isPlaying())) {
+                player.isPlaying(), player.getPlayWhenReady(),
+                player.getCurrentState() == Player.STATE_COMPLETED)) {
             player.play();
         }
     }

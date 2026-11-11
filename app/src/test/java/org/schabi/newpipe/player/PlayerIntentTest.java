@@ -6,6 +6,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -37,8 +41,10 @@ import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.player.resolver.PlaybackSources;
 import org.schabi.newpipe.player.ui.MainPlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUiList;
+import org.schabi.newpipe.player.ui.PopupPlayerUi;
 import org.schabi.newpipe.util.DependentPreferenceHelper;
 import org.schabi.newpipe.util.ExtractorHelper;
+import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.SerializedCache;
 
 import java.lang.reflect.Field;
@@ -217,6 +223,65 @@ public class PlayerIntentTest {
 
         assertSame(current, player.getPlayQueue());
         verify(exoPlayer).setPlayWhenReady(true);
+        verifyNoInteractions(history);
+    }
+
+    @Test
+    public void popupHandoffDoesNotSeekToAnOldSingleItemSnapshot() throws Exception {
+        singleItemModeChange(true, false);
+    }
+
+    @Test
+    public void timestampQueueStillSeeksWhenItAlsoChangesPlayerMode() throws Exception {
+        singleItemModeChange(false, false);
+    }
+
+    @Test
+    public void repeatedPopupHandoffDoesNotRewindOnceTheModeAlreadyChanged() throws Exception {
+        singleItemModeChange(true, true);
+    }
+
+    private void singleItemModeChange(final boolean handoff, final boolean repeat)
+            throws Exception {
+        type(PlayerIntentType.AllOthers);
+        final PlayQueue current = queue("current");
+        final PlayQueue incoming = queue("current");
+        incoming.setRecovery(0, 0);
+        setField("playQueue", current);
+        setField("UIs", new PlayerUiList(mock(PopupPlayerUi.class)));
+        setField("progressUpdateDisposable", new SerialDisposable());
+        when(cache.take("queue", PlayQueue.class)).thenReturn(incoming);
+        when(intent.getBooleanExtra(Player.PRESERVE_CURRENT_POSITION, false)).thenReturn(handoff);
+        intentCompat.when(() -> IntentCompat.getSerializableExtra(
+                intent, Player.PLAYER_TYPE, PlayerType.class)).thenReturn(PlayerType.POPUP);
+        when(exoPlayer.getCurrentPosition()).thenReturn(45_000L);
+        // Recovery storage and real source replacement are covered by PlayerRecoveryTest and
+        // PlayerRecoveryEngineIntegrationTest. Here the full intent path must not rewind first.
+        doNothing().when(player).setRecovery();
+        doNothing().when(player).reloadPlayQueueManager();
+        doNothing().when(player).startProgressLoop();
+
+        try (MockedStatic<NavigationHelper> navigation = mockStatic(NavigationHelper.class)) {
+            player.handleIntent(intent);
+            player.handleIntentPost(PlayerType.MAIN);
+            if (repeat) {
+                // A queued second tap arrives after the first intent already switched modes.
+                player.handleIntent(intent);
+                player.handleIntentPost(PlayerType.POPUP);
+            }
+        }
+
+        assertSame(current, player.getPlayQueue());
+        assertSame(PlayerType.POPUP, player.getPlayerType());
+        if (handoff) {
+            verify(exoPlayer, never()).seekTo(anyInt(), anyLong());
+            verify(exoPlayer, never()).seekToDefaultPosition(anyInt());
+        } else {
+            verify(exoPlayer).seekTo(0, 0);
+        }
+        final InOrder order = inOrder(player);
+        order.verify(player).setRecovery();
+        order.verify(player).reloadPlayQueueManager();
         verifyNoInteractions(history);
     }
 
