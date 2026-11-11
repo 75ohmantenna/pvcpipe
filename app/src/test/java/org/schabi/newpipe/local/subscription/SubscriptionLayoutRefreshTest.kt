@@ -109,6 +109,46 @@ class SubscriptionLayoutRefreshTest {
     }
 
     @Test
+    fun `destroy view detaches the retained adapter without clearing rows or scroll state`() {
+        val rows = (0 until adapter.itemCount).map(adapter::getItem)
+        val scrollState = manager.onSaveInstanceState()
+        val carouselState = Mockito.mock(android.os.Parcelable::class.java)
+        ReflectionHelpers.setField(fragment, "feedGroupsCarouselState", carouselState)
+        ReflectionHelpers.setField(fragment, "itemsListState", scrollState)
+        fragment.onDestroyView()
+        org.junit.Assert.assertNull(recycler.adapter)
+        fragment.onDestroyView()
+        assertSame(adapter, ReflectionHelpers.getField(fragment, "groupAdapter"))
+        assertEquals(rows, (0 until adapter.itemCount).map(adapter::getItem))
+        assertSame(scrollState, ReflectionHelpers.getField(fragment, "itemsListState"))
+        assertSame(carouselState, ReflectionHelpers.getField(fragment, "feedGroupsCarouselState"))
+        val context = RuntimeEnvironment.getApplication()
+        val replacement = Mockito.spy(RecyclerView(context))
+        val replacementManager = Mockito.spy(GridLayoutManager(context, 1))
+        replacement.layoutManager = replacementManager
+        replacement.adapter = adapter
+        val replacementBinding = FragmentSubscriptionBinding::class.java.declaredConstructors.single().apply { isAccessible = true }
+            .newInstance(RelativeLayout(context), null, null, replacement) as FragmentSubscriptionBinding
+        ReflectionHelpers.setField(fragment, "_binding", replacementBinding)
+        loadRows()
+        verify(replacementManager).onRestoreInstanceState(scrollState)
+        val carousel = Mockito.mock(org.schabi.newpipe.local.subscription.item.FeedGroupCarouselItem::class.java)
+        ReflectionHelpers.setField(fragment, "feedGroupsCarousel", carousel)
+        doReturn(false).`when`(replacement).post(Mockito.any(Runnable::class.java))
+        ReflectionHelpers.callInstanceMethod<Void>(
+            fragment,
+            "handleFeedGroups",
+            ReflectionHelpers.ClassParameter.from(List::class.java, emptyList<Any>()),
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, false)
+        )
+        verify(carousel).onRestoreInstanceState(carouselState)
+        assertSame(adapter, replacement.adapter)
+        org.junit.Assert.assertNull(fragment.itemsListState)
+        org.junit.Assert.assertNull(fragment.feedGroupsCarouselState)
+        org.junit.Assert.assertNull(recycler.adapter)
+    }
+
+    @Test
     fun `resume applies list to grid and back without replacing the adapter or manager`() {
         val headers = (0 until adapter.itemCount).map(adapter::getItem).filterIsInstance<Header>()
         val scrollState = manager.onSaveInstanceState()

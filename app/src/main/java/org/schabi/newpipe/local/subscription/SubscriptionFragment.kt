@@ -137,6 +137,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        _binding?.itemsList?.adapter = null
         _binding = null
     }
 
