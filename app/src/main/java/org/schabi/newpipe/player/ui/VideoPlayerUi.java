@@ -1041,6 +1041,8 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     }
 
     private void setMuteButton(final boolean isMuted) {
+        binding.switchMute.setContentDescription(context.getString(
+                isMuted ? R.string.unmute : R.string.mute));
         binding.switchMute.setImageDrawable(AppCompatResources.getDrawable(context, isMuted
                 ? R.drawable.ic_volume_off : R.drawable.ic_volume_up));
     }
