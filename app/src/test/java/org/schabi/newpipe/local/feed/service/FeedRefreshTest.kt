@@ -18,6 +18,8 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.schabi.newpipe.database.subscription.SubscriptionEntity
+import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import org.schabi.newpipe.extractor.stream.StreamType
 
 class FeedRefreshTest {
     private val threshold = OffsetDateTime.parse("2026-10-06T10:00:00Z")
@@ -31,9 +33,8 @@ class FeedRefreshTest {
 
         val result = refresh.result.test().assertComplete().assertNoErrors().values().single()
 
-        assertEquals(setOf(1L, 2L, 3L, 4L), result.map { it.value!!.uid }.toSet())
-        assertTrue(result.all { it.isOnNext })
-        assertEquals(result, operations.storedBatches.single())
+        assertEquals(setOf(1L, 2L, 3L, 4L), result.map { it.url.substringAfterLast('/').toLong() }.toSet())
+        assertSummaries(operations.storedBatches.single(), result)
         assertEquals(listOf("store", "trim"), operations.effects)
         assertEquals(1, operations.trimCalls)
         assertEquals(7L, operations.selectedGroup)
@@ -43,6 +44,24 @@ class FeedRefreshTest {
         assertEquals(FeedLoadState("processing", -1, -1), progress.values().last())
         assertEquals(listOf(0, 1, 2, 3, 4), progress.values().dropLast(1).map { it.currentProgress })
         assertTrue(events.last() is FeedEventManager.Event.SuccessResultEvent)
+    }
+
+    @Test
+    fun `already stored payloads with no new streams are absent from cached notification result`() {
+        val operations = TestOperations(45).apply {
+            streamCount = 100
+            newStreamCount = 0
+        }
+        val events = ArrayList<FeedEventManager.Event>()
+        val refresh = refresh(operations, events)
+
+        val result = refresh.result.test().assertComplete().values().single()
+
+        assertEquals(listOf(20, 20, 5), operations.storedBatches.map { it.size })
+        assertTrue(operations.storedBatches.flatten().all { it.value!!.streams.size == 100 })
+        assertTrue(result.isEmpty())
+        refresh.result.test().assertValue(result).assertComplete()
+        assertEquals(45, operations.fetches.size)
     }
 
     @Test
@@ -88,14 +107,14 @@ class FeedRefreshTest {
 
         val result = refresh.result.test().assertComplete().assertNoErrors().values().single()
 
-        assertEquals(setOf(1L, 3L), result.mapNotNull { it.value?.uid }.toSet())
-        val error = result.single { it.isOnError }.error as FeedRefresh.RequestException
+        assertEquals(setOf(1L, 3L), result.map { it.url.substringAfterLast('/').toLong() }.toSet())
+        val error = operations.storedBatches.single().single { it.isOnError }.error as FeedRefresh.RequestException
         assertEquals(2L, error.subscriptionId)
         assertEquals(42, error.serviceId)
         assertEquals("https://example.test/channel/2", error.url)
         assertEquals("42:https://example.test/channel/2", error.message)
         assertSame(cause, error.cause)
-        assertEquals(result, operations.storedBatches.single())
+        assertSummaries(operations.storedBatches.single(), result)
         val completed = events.last() as FeedEventManager.Event.SuccessResultEvent
         assertEquals(listOf(error), completed.itemsErrors)
         assertEquals(listOf(0, 1, 2, 3), progress.values().dropLast(1).map { it.currentProgress })
@@ -181,8 +200,8 @@ class FeedRefreshTest {
 
         assertEquals(5, operations.fetches.size)
         assertEquals(5, result.size)
-        assertEquals(operations.fetches.toSet(), result.map { it.value!!.uid }.toSet())
-        assertEquals(result, operations.storedBatches.single())
+        assertEquals(operations.fetches.toSet(), result.map { it.url.substringAfterLast('/').toLong() }.toSet())
+        assertSummaries(operations.storedBatches.single(), result)
         assertEquals(listOf("store", "trim"), operations.effects)
         assertTrue(events.last() is FeedEventManager.Event.SuccessResultEvent)
     }
@@ -228,7 +247,7 @@ class FeedRefreshTest {
         val operations = TestOperations(8)
         val events = ArrayList<FeedEventManager.Event>()
         val refresh = refresh(operations, events, io, main)
-        lateinit var result: TestObserver<List<Notification<FeedUpdateInfo>>>
+        lateinit var result: TestObserver<List<FeedNotificationInfo>>
         val progress = refresh.progress.subscribe { state ->
             if (state.currentProgress == 5) result.dispose()
         }
@@ -242,7 +261,7 @@ class FeedRefreshTest {
         assertEquals(1, operations.trimCalls)
         assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
         val replay = refresh.result.test().assertComplete().values().single()
-        assertEquals(operations.storedBatches.single(), replay)
+        assertSummaries(operations.storedBatches.single(), replay)
         assertEquals(1, operations.queries)
         assertEquals(8, operations.fetches.size)
         assertEquals(1, operations.storedBatches.size)
@@ -294,7 +313,7 @@ class FeedRefreshTest {
         assertEquals(5, operations.storedBatches.single().size)
         assertEquals(listOf("store", "trim"), operations.effects)
         val replay = refresh.result.test().assertComplete().values().single()
-        assertEquals(operations.fetches.toSet(), replay.map { it.value!!.uid }.toSet())
+        assertEquals(operations.fetches.toSet(), replay.map { it.url.substringAfterLast('/').toLong() }.toSet())
         assertEquals(1, operations.queries)
         assertEquals(1, operations.storedBatches.size)
         assertEquals(1, operations.trimCalls)
@@ -356,7 +375,7 @@ class FeedRefreshTest {
         val nextEvents = ArrayList<FeedEventManager.Event>()
 
         refresh(operations, nextEvents).result.test().assertComplete().assertValue { items ->
-            items.size == 2 && items.all { it.isOnNext }
+            items.size == 2
         }
 
         val nextCompletion = nextEvents.last() as FeedEventManager.Event.SuccessResultEvent
@@ -429,6 +448,7 @@ class FeedRefreshTest {
             }
 
             override fun storeBatch(list: List<Notification<FeedUpdateInfo>>): List<Throwable> {
+                list.forEach { it.value?.newStreams = emptyList() }
                 batches.add(list.toList())
                 return emptyList()
             }
@@ -467,11 +487,10 @@ class FeedRefreshTest {
                 .assertComplete().assertNoErrors().values().single()
             assertTrue(observer.isDisposed)
             assertEquals(3, fetches.size)
-            assertEquals(3, replay.size)
-            assertTrue(replay.all { it.isOnNext })
-            assertEquals(fetches.toSet(), replay.map { it.value!!.uid }.toSet())
+            assertTrue(replay.isEmpty())
             assertEquals(1, batches.size)
-            assertEquals(replay, batches.single())
+            assertEquals(fetches.toSet(), batches.single().map { it.value!!.uid }.toSet())
+            assertSummaries(batches.single(), replay)
             assertEquals(1, trims.get())
             assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
             assertTrue(events.none { it is FeedEventManager.Event.ErrorResultEvent })
@@ -485,6 +504,19 @@ class FeedRefreshTest {
             refresh.cancel()
             release.countDown()
             observer.dispose()
+        }
+    }
+
+    private fun assertSummaries(stored: List<Notification<FeedUpdateInfo>>, summaries: List<FeedNotificationInfo>) {
+        val expected = stored.mapNotNull { it.value }.filter { it.newStreams.isNotEmpty() }
+        assertEquals(expected.size, summaries.size)
+        expected.zip(summaries).forEach { (info, summary) ->
+            assertEquals(info.name, summary.name)
+            assertEquals(info.url, summary.url)
+            assertEquals(info.pseudoId, summary.pseudoId)
+            assertEquals(info.avatarUrl, summary.avatarUrl)
+            assertEquals(info.serviceId, summary.serviceId)
+            assertEquals(info.newStreams, summary.newStreams)
         }
     }
 
@@ -523,6 +555,8 @@ class FeedRefreshTest {
         var storeError: Throwable? = null
         var trimError: Throwable? = null
         var afterFetch: (() -> Unit)? = null
+        var streamCount = 2
+        var newStreamCount = 1
         var queries = 0
         var subscriptionCalls = 0
         var storeAttempts = 0
@@ -556,7 +590,9 @@ class FeedRefreshTest {
                 serviceId = subscriptionEntity.serviceId,
                 description = null,
                 subscriberCount = null,
-                streams = emptyList(),
+                streams = (1..streamCount).map {
+                    StreamInfoItem(42, "${subscriptionEntity.url}/$it", "stream $it", StreamType.VIDEO_STREAM)
+                },
                 errors = emptyList()
             )
         }
@@ -566,7 +602,7 @@ class FeedRefreshTest {
             storeError?.let { throw it }
             storedBatches.add(list.toList())
             effects.add("store")
-            list.forEach { it.value?.newStreams = emptyList() }
+            list.forEach { it.value?.let { info -> info.newStreams = info.streams.takeLast(newStreamCount) } }
             return list.mapNotNull { it.error }
         }
 

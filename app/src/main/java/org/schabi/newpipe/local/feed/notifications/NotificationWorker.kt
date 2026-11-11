@@ -57,21 +57,12 @@ class NotificationWorker(
         }
         refresh.result
             .doOnSubscribe { showLoadingFeedForegroundNotification() }
-            .map { feed ->
-                // filter out feedUpdateInfo items (i.e. channels) with nothing new
-                feed.mapNotNull {
-                    it.value?.takeIf { feedUpdateInfo ->
-                        feedUpdateInfo.newStreams.isNotEmpty()
-                    }
+            .observeOn(AndroidSchedulers.mainThread())
+            .map { summaries ->
+                summaries.forEach { summary ->
+                    notificationHelper.displayNewStreamsNotifications(summary)
                 }
-            }
-            .observeOn(AndroidSchedulers.mainThread()) // Picasso requires calls from main thread
-            .map { feedUpdateInfoList ->
-                // display notifications for each feedUpdateInfo (i.e. channel)
-                feedUpdateInfoList.forEach { feedUpdateInfo ->
-                    notificationHelper.displayNewStreamsNotifications(feedUpdateInfo)
-                }
-                return@map Result.success()
+                Result.success()
             }
             .doOnError { throwable ->
                 Log.e(TAG, "Error while displaying streams notifications", throwable)

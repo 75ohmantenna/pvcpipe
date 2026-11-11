@@ -111,9 +111,11 @@ class FeedRefreshDatabaseTest {
         assertEquals(5, updatedSubscriptionCount())
         assertEquals(1, events.filterIsInstance<FeedEventManager.Event.SuccessResultEvent>().size)
         assertTrue(events.filterIsInstance<FeedEventManager.Event.ErrorResultEvent>().isEmpty())
-        assertTrue(replay.all { it.value!!.newStreams.size == 1 })
+        assertTrue(replay.all { it.newStreams.size == 1 })
 
         val completedIds = fetched.toSet()
+        assertEquals(completedIds.map { streamUrl(it) }.toSet(), replay.flatMap { it.newStreams }.map { it.url }.toSet())
+        assertEquals(subscriptions.filter { it.uid in completedIds }.map { it.url }.toSet(), replay.map { it.url }.toSet())
         subscriptions.forEach { original ->
             val stored = database.subscriptionDAO().getSubscription(original.uid)
             if (original.uid in completedIds) {
@@ -128,7 +130,7 @@ class FeedRefreshDatabaseTest {
         }
 
         // Repeated observation must not repeat the accepted refresh or its database writes.
-        refresh.result.timeout(10, TimeUnit.SECONDS).blockingGet()
+        assertEquals(replay, refresh.result.timeout(10, TimeUnit.SECONDS).blockingGet())
         assertEquals(5, fetchCount.get())
         assertEquals(5, rowCount("streams"))
         assertEquals(5, rowCount("feed"))

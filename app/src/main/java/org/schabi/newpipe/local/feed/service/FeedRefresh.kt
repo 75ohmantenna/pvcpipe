@@ -39,11 +39,11 @@ class FeedRefresh internal constructor(
      * One subscribed refresh, replayed to later observers. Disposing an observer detaches it;
      * [cancel] cooperatively stops new extractions while allowing accepted results to drain.
      */
-    val result: Single<List<Notification<FeedUpdateInfo>>> = buildResult()
+    val result: Single<List<FeedNotificationInfo>> = buildResult()
         .doOnError { postEvent(FeedEventManager.Event.ErrorResultEvent(it)) }
         .cache()
 
-    private fun buildResult(): Single<List<Notification<FeedUpdateInfo>>> {
+    private fun buildResult(): Single<List<FeedNotificationInfo>> {
         // Count YouTube subscriptions passing the first cancellation check so throttling
         // applies once every BATCH_SIZE entries (before the parallel extraction stage).
         val youtubeExtractionCount = AtomicInteger()
@@ -88,7 +88,15 @@ class FeedRefresh internal constructor(
             }
             .observeOn(io)
             .buffer(BUFFER_COUNT_BEFORE_INSERT)
-            .doOnNext { itemsErrors.addAll(operations.storeBatch(it)) }
+            .map { batch ->
+                itemsErrors.addAll(operations.storeBatch(batch))
+                // Persistence needs the full payload. Only notification inputs survive this batch.
+                batch.mapNotNull { notification ->
+                    notification.value?.takeIf { it.newStreams.isNotEmpty() }?.let { info ->
+                        FeedNotificationInfo(info.name, info.avatarUrl, info.url, info.serviceId, info.newStreams)
+                    }
+                }
+            }
             .subscribeOn(io)
             .toList()
             .flatMap { x -> postProcessFeed().toSingleDefault(x.flatten()) }

@@ -13,7 +13,7 @@ import androidx.core.content.getSystemService
 import androidx.preference.PreferenceManager
 import org.schabi.newpipe.R
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
-import org.schabi.newpipe.local.feed.service.FeedUpdateInfo
+import org.schabi.newpipe.local.feed.service.FeedNotificationInfo
 import org.schabi.newpipe.util.NavigationHelper
 import org.schabi.newpipe.util.image.CoilHelper
 
@@ -29,7 +29,7 @@ class NotificationHelper(val context: Context) {
      * Opening the summary notification will open the corresponding channel page. Opening the
      * individual notifications will open the corresponding video.
      */
-    fun displayNewStreamsNotifications(data: FeedUpdateInfo) {
+    fun displayNewStreamsNotifications(data: FeedNotificationInfo) {
         val newStreams = data.newStreams
         val summary = context.resources.getQuantityString(
             R.plurals.new_streams,
