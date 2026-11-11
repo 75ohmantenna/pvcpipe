@@ -120,6 +120,10 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
     List<FilterItem> selectedSortFilter = new ArrayList<>();
 
+    // The editor may differ from the query that owns the current results and next page.
+    @Nullable
+    private String searchDraft;
+
     // these represents the last search
     String lastSearchedString;
 
@@ -446,6 +450,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         state.putString("lastSearchedString" + STATE_SUFFIX, lastSearchedString);
         state.putSerializable("metaInfo" + STATE_SUFFIX, metaInfo);
         state.putString("searchString" + STATE_SUFFIX, searchString);
+        state.putString("searchDraft" + STATE_SUFFIX, searchDraft);
         state.putString("searchSuggestion" + STATE_SUFFIX, searchSuggestion);
         state.putInt("serviceId" + STATE_SUFFIX, serviceId);
         state.putIntegerArrayList("userSelectedContentFilterList" + STATE_SUFFIX,
@@ -471,6 +476,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         if (state.containsKey("searchString" + STATE_SUFFIX)) {
             searchString = state.getString("searchString" + STATE_SUFFIX);
         }
+        if (state.containsKey("searchDraft" + STATE_SUFFIX)) {
+            searchDraft = state.getString("searchDraft" + STATE_SUFFIX);
+        }
         if (state.containsKey("searchSuggestion" + STATE_SUFFIX)) {
             searchSuggestion = state.getString("searchSuggestion" + STATE_SUFFIX);
         }
@@ -492,9 +500,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
     @Override
     public void onSaveInstanceState(@NonNull final Bundle bundle) {
-        searchString = searchEditText != null
-                ? getSearchEditString().trim()
-                : searchString;
+        searchDraft = searchEditText != null
+                ? getSearchEditString()
+                : searchDraft;
 
         super.onSaveInstanceState(bundle);
     }
@@ -563,7 +571,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
                     + ", lastSearchedQuery → "
                     + lastSearchedString);
         }
-        searchEditText.setText(searchString);
+        searchEditText.setText(searchDraft != null ? searchDraft : searchString);
 
         if (TextUtils.isEmpty(searchString)
                 || isSearchEditBlank()) {
@@ -671,7 +679,8 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
                     s.removeSpan(span);
                 }
 
-                final String newText = getSearchEditString().trim();
+                searchDraft = getSearchEditString();
+                final String newText = searchDraft.trim();
                 suggestionPublisher.onNext(newText);
             }
         };
