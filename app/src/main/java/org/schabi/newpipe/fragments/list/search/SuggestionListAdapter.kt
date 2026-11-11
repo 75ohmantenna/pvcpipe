@@ -59,6 +59,10 @@ class SuggestionListAdapter :
                 }
             )
             binding.itemSuggestionQuery.text = item.query
+            binding.suggestionInsert.contentDescription = binding.suggestionInsert.context.getString(
+                R.string.insert_search_suggestion,
+                item.query
+            )
         }
     }
 
