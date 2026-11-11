@@ -55,7 +55,15 @@ class RemotePlaylistManager(private val database: AppDatabase) {
     fun onUpdate(playlistId: Long, playlistInfo: PlaylistInfo): Single<Int> {
         return Single.fromCallable {
             val playlist = PlaylistRemoteEntity(playlistInfo).apply { uid = playlistId }
-            playlistRemoteTable.update(playlist)
+            playlistRemoteTable.updateMetadata(
+                playlist.uid,
+                playlist.serviceId,
+                playlist.orderingName,
+                playlist.url,
+                playlist.thumbnailUrl,
+                playlist.uploader,
+                playlist.streamCount
+            )
         }.subscribeOn(Schedulers.io())
     }
 }

@@ -53,6 +53,24 @@ interface PlaylistRemoteDAO : BasicDAO<PlaylistRemoteEntity> {
     @Query("DELETE FROM remote_playlists WHERE uid = :playlistId")
     fun deletePlaylist(playlistId: Long): Int
 
+    /** Refresh remote-owned fields without overwriting the user's bookmark order. */
+    @Query(
+        """
+        UPDATE remote_playlists SET service_id = :serviceId, name = :name, url = :url,
+            thumbnail_url = :thumbnailUrl, uploader = :uploader, stream_count = :streamCount
+        WHERE uid = :playlistId
+        """
+    )
+    fun updateMetadata(
+        playlistId: Long,
+        serviceId: Int,
+        name: String?,
+        url: String?,
+        thumbnailUrl: String?,
+        uploader: String?,
+        streamCount: Long?
+    ): Int
+
     @Query("UPDATE remote_playlists SET display_index = :displayIndex WHERE uid = :playlistId")
     fun updateDisplayIndex(playlistId: Long, displayIndex: Long): Int
 }
