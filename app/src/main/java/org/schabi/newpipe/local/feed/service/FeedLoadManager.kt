@@ -152,7 +152,8 @@ class FeedLoadManager(private val context: Context) {
                             ChannelTabHelper.fetchFeedChannelTab(
                                 context,
                                 defaultSharedPreferences,
-                                tab
+                                tab,
+                                subscriptionEntity.serviceId
                             )
                         }
                         .map {

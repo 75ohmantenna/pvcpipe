@@ -32,7 +32,8 @@ abstract class FeedDAO {
      *                              progress, even when includePlayed is true
      * @param uploadDateBefore get only streams uploaded before this date (useful to filter out
      *                         future streams); use null to not filter by upload date
-     * @return at most 500 matching streams, with undated streams first and then newest uploads;
+     * @return at most 500 matching streams, with ongoing live streams first; within each
+     *         category, undated streams precede newest uploads, then uploader name breaks ties;
      *         streams without an upload date remain eligible with a date cutoff
      * @see StreamStateEntity.isFinished()
      * @see StreamStateEntity.PLAYBACK_FINISHED_END_MILLISECONDS
@@ -40,7 +41,7 @@ abstract class FeedDAO {
      */
     @Query(
         """
-        SELECT s.*, sst.progress_time
+        SELECT DISTINCT s.*, sst.progress_time
         FROM streams s
 
         LEFT JOIN stream_state sst
@@ -62,6 +63,9 @@ abstract class FeedDAO {
             :groupId = ${FeedGroupEntity.GROUP_ALL_ID}
             OR fgs.group_id = :groupId
         )
+        -- Kick's extractor persists clips in this canonical URL form (service ID 8).
+        -- Filter cached clips before the limit, without affecting channel browsing or history.
+        AND NOT (s.service_id = 8 AND s.url GLOB 'https://kick.com/*/clips/clip_*')
         AND (
             :includePlayed
             OR sh.stream_id IS NULL
@@ -86,7 +90,8 @@ abstract class FeedDAO {
             OR s.upload_date < :uploadDateBefore
         )
 
-        ORDER BY s.upload_date IS NULL DESC, s.upload_date DESC, s.uploader ASC
+        ORDER BY (s.stream_type IN ('LIVE_STREAM', 'AUDIO_LIVE_STREAM')) DESC,
+            s.upload_date IS NULL DESC, s.upload_date DESC, s.uploader ASC
         LIMIT 500
         """
     )

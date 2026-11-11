@@ -19,6 +19,9 @@ import org.schabi.newpipe.database.feed.model.FeedLastUpdatedEntity
 import org.schabi.newpipe.database.stream.StreamWithState
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.database.subscription.NotificationMode
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.exceptions.ParsingException
+import org.schabi.newpipe.extractor.services.kick.KickUrl
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.local.subscription.FeedGroupIcon
@@ -86,6 +89,9 @@ class FeedDatabaseManager internal constructor(private val database: AppDatabase
         oldestAllowedDate: OffsetDateTime = FEED_OLDEST_ALLOWED_DATE
     ) {
         val itemsToInsert = items.mapNotNull { stream ->
+            if (isKickClip(stream)) {
+                return@mapNotNull null
+            }
             val uploadDate = stream.uploadDate
 
             when {
@@ -109,6 +115,18 @@ class FeedDatabaseManager internal constructor(private val database: AppDatabase
             feedTable.setLastUpdatedForSubscription(
                 FeedLastUpdatedEntity(subscriptionId, OffsetDateTime.now(ZoneOffset.UTC))
             )
+        }
+    }
+
+    private fun isKickClip(stream: StreamInfoItem): Boolean {
+        if (stream.serviceId != ServiceList.Kick.serviceId) {
+            return false
+        }
+        return try {
+            KickUrl.isClip(KickUrl.streamId(stream.url))
+        } catch (_: ParsingException) {
+            // Do not discard an unrelated or unrecognized URL based on a substring match.
+            false
         }
     }
 

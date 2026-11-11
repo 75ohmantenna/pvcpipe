@@ -105,8 +105,6 @@ class FeedFragment : BaseStateFragment<FeedState>() {
     private var updateListViewModeOnResume = false
     private var isRefreshing = false
 
-    private var lastNewItemsCount = 0
-
     init {
         setHasOptionsMenu(true)
     }
@@ -589,8 +587,6 @@ class FeedFragment : BaseStateFragment<FeedState>() {
     private fun highlightNewItemsAfter(updateTime: OffsetDateTime) {
         var highlightCount = 0
 
-        var doCheck = true
-
         for (i in 0 until groupAdapter.itemCount) {
             val item = groupAdapter.getItem(i) as StreamItem
 
@@ -598,25 +594,20 @@ class FeedFragment : BaseStateFragment<FeedState>() {
             var backgroundSupplier = { ctx: Context ->
                 resolveDrawable(ctx, android.R.attr.selectableItemBackground)
             }
-            if (doCheck) {
-                // If the uploadDate is null or true we should highlight the item
-                if (item.streamWithState.stream.uploadDate?.isAfter(updateTime) != false) {
-                    highlightCount++
+            // Live streams are pinned ahead of uploads, so dates need not be globally ordered.
+            // Keep undated items highlighted, as before.
+            if (item.streamWithState.stream.uploadDate?.isAfter(updateTime) != false) {
+                highlightCount++
 
-                    typeface = Typeface.DEFAULT_BOLD
-                    backgroundSupplier = { ctx: Context ->
-                        // Merge the drawables together. Otherwise we would lose the "select" effect
-                        LayerDrawable(
-                            arrayOf(
-                                resolveDrawable(ctx, R.attr.dashed_border),
-                                resolveDrawable(ctx, android.R.attr.selectableItemBackground)
-                            )
+                typeface = Typeface.DEFAULT_BOLD
+                backgroundSupplier = { ctx: Context ->
+                    // Merge the drawables together. Otherwise we would lose the "select" effect
+                    LayerDrawable(
+                        arrayOf(
+                            resolveDrawable(ctx, R.attr.dashed_border),
+                            resolveDrawable(ctx, android.R.attr.selectableItemBackground)
                         )
-                    }
-                } else {
-                    // Decreases execution time due to the order of the items (newest always on top)
-                    // Once a item is is before the updateTime we can skip all following items
-                    doCheck = false
+                    )
                 }
             }
 
@@ -633,16 +624,11 @@ class FeedFragment : BaseStateFragment<FeedState>() {
         // Force updates all items so that the highlighting is correct
         // If this isn't done visible items that are already highlighted will stay in a highlighted
         // state until the user scrolls them out of the visible area which causes a update/bind-call
-        groupAdapter.notifyItemRangeChanged(
-            0,
-            highlightCount.coerceIn(lastNewItemsCount, groupAdapter.itemCount)
-        )
+        groupAdapter.notifyItemRangeChanged(0, groupAdapter.itemCount)
 
         if (highlightCount > 0) {
             showNewItemsLoaded()
         }
-
-        lastNewItemsCount = highlightCount
     }
 
     private fun showNewItemsLoaded() {

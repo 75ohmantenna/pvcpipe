@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import androidx.annotation.StringRes;
 
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
@@ -144,10 +145,17 @@ public final class ChannelTabHelper {
 
     public static boolean fetchFeedChannelTab(final Context context,
                                               final SharedPreferences sharedPreferences,
-                                              final ListLinkHandler tab) {
+                                              final ListLinkHandler tab,
+                                              final int serviceId) {
         final List<FilterItem> contentFilters = tab.getContentFilters();
         if (contentFilters.isEmpty()) {
             return false; // this should never happen, but check just to be sure
+        }
+
+        // Kick clips remain available on channel pages, but not in What's New.
+        if (serviceId == ServiceList.Kick.getServiceId()
+                && contentFilters.contains(ChannelTabs.CLIPS)) {
+            return false;
         }
 
         final int key = ChannelTabHelper.getFetchFeedTabKey(contentFilters.get(0));
