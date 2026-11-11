@@ -1,5 +1,6 @@
 package org.schabi.newpipe.database.subscription
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -83,8 +84,14 @@ abstract class SubscriptionDAO : BasicDAO<SubscriptionEntity> {
     @Query("DELETE FROM subscriptions WHERE url LIKE :url AND service_id = :serviceId")
     abstract fun deleteSubscription(serviceId: Int, url: String): Int
 
-    @Query("SELECT uid FROM subscriptions WHERE url LIKE :url AND service_id = :serviceId")
-    internal abstract fun getSubscriptionIdInternal(serviceId: Int, url: String): Long?
+    @Query("SELECT uid, notification_mode FROM subscriptions WHERE url LIKE :url AND service_id = :serviceId")
+    internal abstract fun getImportStateInternal(serviceId: Int, url: String): ImportState?
+
+    internal data class ImportState(
+        val uid: Long,
+        @ColumnInfo(name = SubscriptionEntity.SUBSCRIPTION_NOTIFICATION_MODE)
+        val notificationMode: Int
+    )
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     internal abstract fun silentInsertAllInternal(entities: List<SubscriptionEntity>): List<Long>
@@ -99,9 +106,11 @@ abstract class SubscriptionDAO : BasicDAO<SubscriptionEntity> {
             if (uidFromInsert != -1L) {
                 entity.uid = uidFromInsert
             } else {
-                val subscriptionIdFromDb = getSubscriptionIdInternal(entity.serviceId, entity.url!!)
+                val storedSubscription = getImportStateInternal(entity.serviceId, entity.url!!)
                     ?: error("Subscription cannot be null just after insertion.")
-                entity.uid = subscriptionIdFromDb
+                entity.uid = storedSubscription.uid
+                // Imports own channel metadata, not the user's notification preference.
+                entity.notificationMode = storedSubscription.notificationMode
 
                 update(entity)
             }
