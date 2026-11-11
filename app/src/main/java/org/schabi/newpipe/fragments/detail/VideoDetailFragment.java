@@ -146,6 +146,10 @@ public final class VideoDetailFragment
     private final DetailPagerScrollController pagerScroll =
             new DetailPagerScrollController(this);
     private FragmentVideoDetailBinding binding;
+    private final Handler detailRenderHandler = new Handler(Looper.getMainLooper());
+    @Nullable
+    private Runnable pendingDetailRender;
+    private long detailRenderGeneration;
 
     private DetailContentCoordinator content;
 
@@ -415,6 +419,7 @@ public final class VideoDetailFragment
 
     @Override
     public void onDestroyView() {
+        cancelPendingDetailRender();
         super.onDestroyView();
         pagerScroll.detach();
         disposeDislikeWorker();
@@ -805,16 +810,29 @@ public final class VideoDetailFragment
     private void prepareAndHandleInfoIfNeededAfterDelay(final StreamInfo info,
                                                         final boolean scrollToTop,
                                                         final long delay) {
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (activity == null) {
+        cancelPendingDetailRender();
+        final FragmentVideoDetailBinding targetBinding = binding;
+        final long generation = detailRenderGeneration;
+        if (targetBinding == null) {
+            return;
+        }
+        pendingDetailRender = () -> {
+            if (generation != detailRenderGeneration || binding != targetBinding
+                    || activity == null || currentInfo != info) {
                 return;
             }
-            // Data can already be drawn, don't spend time twice
-            if (info.getName().equals(binding.detailVideoTitleView.getText().toString())) {
-                return;
-            }
+            pendingDetailRender = null;
             prepareAndHandleInfo(info, scrollToTop);
-        }, delay);
+        };
+        detailRenderHandler.postDelayed(pendingDetailRender, delay);
+    }
+
+    private void cancelPendingDetailRender() {
+        detailRenderGeneration++;
+        if (pendingDetailRender != null) {
+            detailRenderHandler.removeCallbacks(pendingDetailRender);
+            pendingDetailRender = null;
+        }
     }
 
     private void prepareAndHandleInfo(final StreamInfo info, final boolean scrollToTop) {
@@ -845,6 +863,7 @@ public final class VideoDetailFragment
     }
 
     private void startLoading(final boolean forceLoad, final boolean addToBackStack) {
+        cancelPendingDetailRender();
         super.startLoading(forceLoad);
 
         content.initTabs(serviceId, url, title);
@@ -1242,6 +1261,7 @@ public final class VideoDetailFragment
                                   @Nullable final String newUrl,
                                   @NonNull final String newTitle,
                                   @Nullable final PlayQueue newPlayQueue) {
+        cancelPendingDetailRender();
         this.serviceId = newServiceId;
         this.url = newUrl;
         this.title = newTitle;
