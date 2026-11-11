@@ -59,10 +59,11 @@ class PackageValidator(context: Context) {
      * @return `true` if the caller is known, `false` otherwise.
      */
     fun isKnownCaller(callingPackage: String, callingUid: Int): Boolean {
-        // If the caller has already been checked, return the previous result here.
-        val (checkedUid, checkResult) = callerChecked[callingPackage] ?: Pair(0, false)
-        if (checkedUid == callingUid) {
-            return checkResult
+        // Cache stable trust only. Notification access can change while this service is alive.
+        callerChecked[callingPackage]?.let { (checkedUid, stableTrust) ->
+            if (checkedUid == callingUid) {
+                return stableTrust || hasNotificationAccess(callingPackage)
+            }
         }
 
         /**
@@ -89,7 +90,7 @@ class PackageValidator(context: Context) {
 
         val callerSignature = callerPackageInfo.signature
 
-        val isCallerKnown = when {
+        val stableTrust = when {
             // If it's our own app making the call, allow it.
             callingUid == Process.myUid() -> true
 
@@ -107,29 +108,22 @@ class PackageValidator(context: Context) {
              */
             callerPackageInfo.permissions.contains(MEDIA_CONTENT_CONTROL) -> true
 
-            /*
-             * If the calling app has a notification listener it is able to retrieve notifications
-             * and can connect to an active media session.
-             *
-             * It's not required to allow apps with a notification listener to
-             * connect to your media library, but it does allow easy compatibility
-             * with apps such as Wear OS.
-             */
-            NotificationManagerCompat.getEnabledListenerPackages(this.context)
-                .contains(callerPackageInfo.packageName) -> true
-
             // If none of the previous checks succeeded, then the caller is unrecognized.
             else -> false
         }
 
+        // Save only identity/signature/system-permission trust, never listener membership.
+        callerChecked[callingPackage] = Pair(callingUid, stableTrust)
+        val isCallerKnown = stableTrust || hasNotificationAccess(callingPackage)
         if (!isCallerKnown) {
             logUnknownCaller(callerPackageInfo)
         }
 
-        // Save our work for next time.
-        callerChecked[callingPackage] = Pair(callingUid, isCallerKnown)
         return isCallerKnown
     }
+
+    /** Listener access allows compatible clients such as Wear OS, but is revocable. */
+    private fun hasNotificationAccess(callingPackage: String): Boolean = NotificationManagerCompat.getEnabledListenerPackages(context).contains(callingPackage)
 
     /**
      * Logs an info level message with details of how to add a caller to the allowed callers list
