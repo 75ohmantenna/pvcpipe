@@ -32,6 +32,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.SQLiteMode
+import org.schabi.newpipe.NewPipeDatabase
 import org.schabi.newpipe.database.Migrations
 import org.schabi.newpipe.settings.export.BackupDatabaseValidator
 import org.schabi.newpipe.settings.export.BackupFileLocator
@@ -42,6 +44,7 @@ import org.schabi.newpipe.streams.io.StoredFileHelper
 /** Native host SQLite and real Room/preference/file paths; no device or service access. */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = Application::class, sdk = [26])
+@SQLiteMode(SQLiteMode.Mode.NATIVE)
 class BackupValidationTest {
     @get:Rule val temporary = TemporaryFolder()
     private lateinit var context: Context
@@ -284,6 +287,61 @@ class BackupValidationTest {
             assertEquals(null, activate())
             originalDatabase = Files.readAllBytes(database)
             assertCleaned()
+        }
+    }
+
+    @Test
+    fun `schema six preserves populated playlist covers membership and visible thumbnails`() {
+        val candidate = schema(6, "playlist-covers")
+        SQLiteDatabase.openDatabase(candidate.toString(), null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            for ((uid, thumbnail) in listOf(11 to "first-cover", 22 to "second-cover")) {
+                db.execSQL(
+                    "INSERT INTO streams(uid, service_id, url, title, stream_type, duration, uploader, thumbnail_url) " +
+                        "VALUES(?, 0, ?, ?, 'VIDEO_STREAM', 100, 'Uploader', ?)",
+                    arrayOf<Any>(uid, "https://example.test/$uid", "Stream $uid", thumbnail)
+                )
+            }
+            db.execSQL("INSERT INTO playlists VALUES(101, 'Permanent second cover', 'second-cover', 1)")
+            db.execSQL("INSERT INTO playlists VALUES(102, 'Automatic first cover', 'first-cover', 0)")
+            db.execSQL("INSERT INTO playlists VALUES(103, 'Unmatched cover', 'not-a-member-cover', 1)")
+            db.execSQL("INSERT INTO playlists VALUES(104, 'Empty playlist', '', 0)")
+            db.execSQL("INSERT INTO playlist_stream_join VALUES(101, 11, 0), (101, 22, 1), (102, 22, 0), (102, 11, 1), (103, 11, 0)")
+        }
+        // Exercise production registration, including 6 -> 7, and current Room validation.
+        val room = NewPipeDatabase.createDatabase(context, candidate.toAbsolutePath().toString())
+        try {
+            val migrated = room.openHelper.writableDatabase
+            assertEquals(Migrations.DB_VER_9, migrated.version)
+            assertTrue(migrated.isDatabaseIntegrityOk)
+            migrated.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+            val playlists = room.playlistDAO().getAll().blockingFirst().associateBy { it.uid }
+            assertEquals(setOf(101L, 102L, 103L, 104L), playlists.keys)
+            assertEquals("Permanent second cover", playlists.getValue(101).name)
+            assertEquals(22L, playlists.getValue(101).thumbnailStreamId)
+            assertTrue(playlists.getValue(101).isThumbnailPermanent)
+            assertEquals(11L, playlists.getValue(102).thumbnailStreamId)
+            assertFalse(playlists.getValue(102).isThumbnailPermanent)
+            assertEquals(-1L, playlists.getValue(103).thumbnailStreamId)
+            assertTrue(playlists.getValue(103).isThumbnailPermanent)
+            assertEquals(-1L, playlists.getValue(104).thumbnailStreamId)
+            assertFalse(playlists.getValue(104).isThumbnailPermanent)
+            val members = mutableListOf<Triple<Long, Long, Long>>()
+            migrated.query("SELECT playlist_id, stream_id, join_index FROM playlist_stream_join ORDER BY playlist_id, join_index").use {
+                while (it.moveToNext()) members.add(Triple(it.getLong(0), it.getLong(1), it.getLong(2)))
+            }
+            assertEquals(
+                listOf(Triple(101L, 11L, 0L), Triple(101L, 22L, 1L), Triple(102L, 22L, 0L), Triple(102L, 11L, 1L), Triple(103L, 11L, 0L)),
+                members
+            )
+            assertEquals(setOf(11L, 22L), room.streamDAO().getAll().blockingFirst().map { it.uid }.toSet())
+            val visible = room.playlistStreamDAO().getPlaylistMetadata().blockingFirst().associateBy { it.uid }
+            assertEquals("second-cover", visible.getValue(101).thumbnailUrl)
+            assertEquals("first-cover", visible.getValue(102).thumbnailUrl)
+            assertEquals(null, visible.getValue(103).thumbnailUrl)
+            assertEquals(null, visible.getValue(104).thumbnailUrl)
+            assertEquals(listOf(2L, 2L, 1L, 0L), (101L..104L).map { visible.getValue(it).streamCount })
+        } finally {
+            room.close()
         }
     }
 
