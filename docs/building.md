@@ -101,7 +101,11 @@ Native libraries use legacy packaging (`useLegacyPackaging` in
 `app/build.gradle.kts`) so the installer extracts them. The HLS remuxer
 executes `libffmpeg.so` from the app's native library directory. Leaving that
 binary inside the APK prevents this processing step.
-`FfmpegPackagingTest` checks the packaging requirement on a device.
+`FfmpegPackagingTest` checks the packaging requirement on a device. Its test-only
+runner redirects output to a unique temporary file, enforces a 30-second wait,
+and terminates/reaps the child and removes the file on failure or interruption.
+Controlled JVM child fixtures cover normal/nonzero exits, verbose output, timeout
+and interruption; they do not prove packaged Android executable compatibility.
 The checked-in converter AAR supplies MPEG-TS and MP4 input plus the H.264
 framing filter needed by concat. `make ci` checks its pinned checksum; the
 [native build recipe](../app/libs/README.md) records source revisions, NDK,

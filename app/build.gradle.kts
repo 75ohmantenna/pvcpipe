@@ -125,9 +125,11 @@ configure<ApplicationExtension> {
 
     sourceSets {
         getByName("test") {
+            java.directories += "$projectDir/src/testShared/java"
             resources.directories += "$projectDir/schemas"
         }
         getByName("androidTest") {
+            java.directories += "$projectDir/src/testShared/java"
             assets.directories += "$projectDir/schemas"
         }
     }

@@ -1,6 +1,5 @@
 package us.shandian.giga.postprocessing;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
@@ -14,8 +13,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
-import java.io.InputStream;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The HLS remuxer runs {@code libffmpeg.so} as a program. That only works if the installer
@@ -34,14 +31,9 @@ public class FfmpegPackagingTest {
 
     @Test
     public void ffmpegRuns() throws Exception {
-        final Process process = new ProcessBuilder(RunFFmpeg.getFfmpegPath(context), "-version")
-                .redirectErrorStream(true).start();
-        final String output;
-        try (InputStream stream = process.getInputStream()) {
-            output = new String(stream.readAllBytes());
-        }
-        assertTrue(process.waitFor(30, TimeUnit.SECONDS));
-        assertEquals(output, 0, process.exitValue());
+        final String output = BoundedTestProcess.run(
+                new ProcessBuilder(RunFFmpeg.getFfmpegPath(context), "-version"),
+                context.getCacheDir(), 30000);
         assertTrue(output, output.contains("ffmpeg version"));
     }
 }
