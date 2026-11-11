@@ -251,6 +251,12 @@ repeated the entire page despite API 8 and the advanced raw offset. The extracto
 does not claim reliable distinct-page enumeration or silently switch feeds.
 Earlier NASA offset observations remain historical, not proof for this query.
 
+Follow-up (2026-11-11): creator continuations now carry the preceding page's
+visible creator identities. If a fully readable response repeats that identity
+set, the extractor stops without appending duplicates, even if metadata or ordering
+changes. Partial overlap still continues using raw-row offsets. This is covered
+by offline fixtures, not a new live-network validation.
+
 The retained HTML paths also returned HTTP 200 and parsed without collector
 errors on this host in the same run:
 

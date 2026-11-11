@@ -236,6 +236,63 @@ class RumbleSearchExtractorTest {
     }
 
     @Test
+    void repeatedCreatorPageStopsWithoutAppendingDuplicatesAcrossFreshExtractors()
+            throws Exception {
+        final String channel = creator("channel", "_c123", true);
+        final String user = creator("user", "_uAlpha9", false);
+        downloader.apiBody = parameters -> "{\"data\":{\"items\":["
+                + ("0".equals(parameters.get("offset")) ? channel + "," + user
+                        : user + "," + channel.replace("Title", "Updated title")) + "]}}";
+        final var first = fetch(search(RumbleFilters.ID_CF_MAIN_CHANNELS));
+        assertEquals("2", first.getNextPage().getId());
+
+        final var repeated = search(RumbleFilters.ID_CF_MAIN_CHANNELS)
+                .getPage(first.getNextPage());
+
+        assertTrue(repeated.getItems().isEmpty());
+        assertTrue(repeated.getErrors().isEmpty());
+        assertNull(repeated.getNextPage());
+        assertEquals(List.of("0", "2"), downloader.urls.stream()
+                .map(url -> query(url).get("offset")).toList());
+    }
+
+    @Test
+    void partiallyOverlappingCreatorPagesRetainNewItemsAndContinue()
+            throws Exception {
+        final String channel = creator("channel", "_c123", true);
+        final String user = creator("user", "_uAlpha9", false);
+        final String other = creator("channel", "_c456", true)
+                .replace("SharedSlug", "OtherSlug");
+        downloader.apiBody = parameters -> "{\"data\":{\"items\":["
+                + ("0".equals(parameters.get("offset")) ? channel + "," + user
+                        : user + "," + other) + "]}}";
+        final var first = fetch(search(RumbleFilters.ID_CF_MAIN_CHANNELS));
+        final var second = search(RumbleFilters.ID_CF_MAIN_CHANNELS)
+                .getPage(first.getNextPage());
+
+        assertEquals(List.of("https://rumble.com/user/SharedSlug",
+                "https://rumble.com/c/OtherSlug"), second.getItems().stream()
+                .map(InfoItem::getUrl).toList());
+        assertTrue(second.getErrors().isEmpty());
+        assertEquals("4", second.getNextPage().getId());
+    }
+
+    @Test
+    void unreadableCreatorRowsDoNotFalselyTriggerRepeatedPageGuard() throws Exception {
+        final String channel = creator("channel", "_c123", true);
+        downloader.apiBody = parameters -> "{\"data\":{\"items\":[" + channel
+                + ("0".equals(parameters.get("offset")) ? "" : ",42") + "]}}";
+        final var first = fetch(search(RumbleFilters.ID_CF_MAIN_CHANNELS));
+        final var second = search(RumbleFilters.ID_CF_MAIN_CHANNELS)
+                .getPage(first.getNextPage());
+
+        assertEquals(1, second.getItems().size());
+        assertFalse(second.getErrors().isEmpty());
+        assertEquals("3", second.getNextPage().getId());
+        assertNull(second.getNextPage().getIds());
+    }
+
+    @Test
     void malformedCreatorsDoNotStopPaginationOrLaterCreators() throws Exception {
         downloader.apiBody = parameters -> "{\"data\":{\"items\":["
                 + creator("channel", "_uWrong", true) + ","

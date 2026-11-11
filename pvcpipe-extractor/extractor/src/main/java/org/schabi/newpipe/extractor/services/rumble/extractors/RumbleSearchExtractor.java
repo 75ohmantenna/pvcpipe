@@ -33,8 +33,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 
@@ -85,7 +87,7 @@ public class RumbleSearchExtractor extends SearchExtractor {
     @Override
     public InfoItemsPage<InfoItem> getInitialPage() throws IOException, ExtractionException {
         if (apiData != null) {
-            return extractApiPage(apiData, apiUrl);
+            return extractApiPage(apiData, apiUrl, null);
         }
         if (doc == null) {
             throw new ParsingException("Rumble search has not been fetched");
@@ -205,7 +207,8 @@ public class RumbleSearchExtractor extends SearchExtractor {
                 ? "media.search" : "video_collection.search", parameters);
     }
 
-    private InfoItemsPage<InfoItem> extractApiPage(final JsonObject data, final String url)
+    private InfoItemsPage<InfoItem> extractApiPage(final JsonObject data, final String url,
+                                                  @Nullable final List<String> previousCreatorUrls)
             throws ParsingException {
         final Map<String, String> parameters = queryParameters(url);
         final String name = parameters.remove("name");
@@ -236,12 +239,30 @@ public class RumbleSearchExtractor extends SearchExtractor {
                 collector.commit(new RumbleJsonChannelInfoItemExtractor(item));
             }
         }
+        final List<String> creatorUrls;
+        if (videos || !collector.getErrors().isEmpty()
+                || collector.getItems().size() != items.size()) {
+            creatorUrls = null;
+        } else {
+            final TreeSet<String> identities = new TreeSet<>();
+            for (final InfoItem creator : collector.getItems()) {
+                identities.add(creator.getUrl());
+            }
+            creatorUrls = new ArrayList<>(identities);
+            // Some creator searches ignore the advanced offset and repeat the entire page.
+            // Carry identities in Page so this also works with a fresh extractor instance.
+            // Only infer repetition from fully readable pages, not partial overlap.
+            if (!creatorUrls.isEmpty() && creatorUrls.equals(previousCreatorUrls)) {
+                return new InfoItemsPage<>(Collections.emptyList(), null, collector.getErrors());
+            }
+        }
         final long nextOffset = (long) offset + items.size();
         final boolean continuation = videos ? hasMore : !items.isEmpty() && nextOffset < 10000;
         Page next = null;
         if (continuation) {
             parameters.put("offset", Long.toString(nextOffset));
-            next = new Page(RumbleApi.serviceUrl(name, parameters), Long.toString(nextOffset));
+            next = new Page(RumbleApi.serviceUrl(name, parameters), Long.toString(nextOffset),
+                    creatorUrls, null, null);
         }
         return new InfoItemsPage<>(collector, next);
     }
@@ -364,7 +385,7 @@ public class RumbleSearchExtractor extends SearchExtractor {
                 throw new ParsingException("Rumble creator search offset exceeds 10000");
             }
             return extractApiPage(RumbleApi.fetchData(getDownloader(), page.getUrl(),
-                    getExtractorLocalization()), page.getUrl());
+                    getExtractorLocalization()), page.getUrl(), page.getIds());
         }
         if ("/service.php".equals(URI.create(page.getUrl()).getPath())) {
             throw new ParsingException("Unsupported Rumble search API page");
