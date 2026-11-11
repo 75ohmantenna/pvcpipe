@@ -12,7 +12,6 @@ import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.net.HttpURLConnection;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.List;
@@ -55,7 +54,7 @@ public class DownloadMissionRecover extends Thread {
             try {
                 tryRecover();
                 return;
-            } catch (InterruptedIOException | ClosedByInterruptException e) {
+            } catch (ClosedByInterruptException e) {
                 return;
             } catch (ValidatedRange.InvalidRangeException e) {
                 mMission.notifyError(e);
@@ -74,14 +73,11 @@ public class DownloadMissionRecover extends Thread {
 
     private void tryRecover() throws ExtractionException, IOException, HttpError {
         if (mExtractor == null) {
-            try {
-                final StreamingService svr = NewPipe.getServiceByUrl(mMission.source);
-                mExtractor = svr.getStreamExtractor(mMission.source);
-                mExtractor.fetchPage();
-            } catch (ExtractionException e) {
-                mExtractor = null;
-                throw e;
-            }
+            final StreamingService svr = NewPipe.getServiceByUrl(mMission.source);
+            final StreamExtractor candidate = svr.getStreamExtractor(mMission.source);
+            candidate.fetchPage();
+            // Retain only a fetched page; later probe retries may safely reuse it.
+            mExtractor = candidate;
         }
 
         // maybe the following check is redundant

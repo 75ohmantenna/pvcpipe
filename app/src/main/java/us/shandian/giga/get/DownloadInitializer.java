@@ -7,7 +7,6 @@ import androidx.annotation.NonNull;
 import org.schabi.newpipe.streams.io.SharpStream;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.net.HttpURLConnection;
 import java.nio.channels.ClosedByInterruptException;
 
@@ -197,10 +196,13 @@ public class DownloadInitializer extends Thread {
                 mMission.bindInitializedRepresentation(mConn);
 
                 break;
-            } catch (InterruptedIOException | ClosedByInterruptException e) {
-                return;
             } catch (Exception e) {
-                if (!mMission.running || super.isInterrupted()) {
+                // Release failed connections without changing successful-session reuse.
+                if (mConn != null) {
+                    mConn.disconnect();
+                }
+                if (e instanceof ClosedByInterruptException
+                        || !mMission.running || super.isInterrupted()) {
                     return;
                 }
 
