@@ -8,7 +8,8 @@
   Checkstyle. Install both so Gradle can resolve the declared toolchains.
   The daemon JVM criteria in both builds select Java 25 even when the shell's
   `JAVA_HOME` points to another version. No automatic JDK download is configured.
-- Python 3 for the offline recorded-fixture privacy checks in `make ci`.
+- Python 3 for the offline recorded-fixture privacy and deletion-driver checks
+  in `make ci`.
   These checks use only the Python standard library.
 - Both Gradle wrappers download Gradle 9.8.2 and verify its SHA-256 checksum.
   A globally installed Gradle does not change the wrapper version. Initial builds
@@ -41,9 +42,13 @@ publishing step. This repository declares no publication workflow.
 make ci                        # every check below, then both APKs
 ```
 
-`make ci` first runs the offline fixture-sanitizer tests and checks recorded
-fixtures for known captured identifiers. It then runs five serial Gradle
-invocations and stops at the first failure:
+`make ci` verifies the converter artifact, runs the offline fixture-sanitizer
+and deletion-driver unit tests, and checks recorded fixtures for known captured identifiers. The deletion-driver
+tests substitute validation, native execution and shell calls; they never run ADB
+and do not establish Android deletion behavior. The two suites are named explicitly
+so a future device-dependent host suite is not silently included.
+
+It then runs five serial Gradle invocations and stops at the first failure:
 static/build-logic checks, JVM tests, Android lint, the debug APK, then the release
 APK. Each invocation uses `--no-daemon` so compiler and lint memory is released
 between stages.
@@ -188,7 +193,8 @@ sign or publish an APK. Never label a debug-key APK as a production-signed relea
 
 ## Tests
 
-`make ci` runs build-logic and app JVM tests, offline extractor tests, style and
+`make ci` runs the two offline Python suites above, build-logic and app JVM tests,
+offline extractor tests, style and
 dependency checks, lint and both APK builds. It does not run instrumentation or
 live-service tests. App tests can be filtered with
 `./gradlew --no-daemon :app:testDebugUnitTest --tests '<pattern>'`.
@@ -272,7 +278,8 @@ a completed public recording/audio download requires separate authorization.
 ## Controlled validation tools
 
 Host drivers under `tools/` document their required fixtures, APKs and arguments;
-read their source and `--help` before use. They are separate from `make ci`.
+read their source and `--help` before use. The drivers are separate from `make ci`;
+only the offline deletion-driver orchestration unit tests run in the gate.
 
 | Driver | Scope |
 | --- | --- |

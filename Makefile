@@ -3,6 +3,7 @@
 ci:
 	python3 tools/rebuild_hls_converter.py --verify
 	python3 -m unittest discover -s tools -p test_sanitize_recorded_mocks.py
+	python3 -m unittest discover -s tools -p test_download_deletion_crashes.py
 	python3 tools/sanitize_recorded_mocks.py pvcpipe-extractor/extractor/src/test/resources/mocks
 	./gradlew --no-daemon --no-continue --max-workers=1 \
 		:buildSrc:test :app:runCheckstyle :app:runKtlint \
