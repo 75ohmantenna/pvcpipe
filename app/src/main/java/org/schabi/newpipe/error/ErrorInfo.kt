@@ -259,7 +259,7 @@ class ErrorInfo private constructor(
                         }
 
                         cause is Loader.UnexpectedLoaderException && cause.cause is ExtractionException ->
-                            getMessage(throwable, action, serviceId)
+                            getMessage(cause.cause, action, serviceId)
 
                         throwable.type == ExoPlaybackException.TYPE_SOURCE ->
                             ErrorMessage(R.string.player_stream_failure)
