@@ -164,15 +164,21 @@ class ErrorUtil {
                     )
 
             val notificationManager = NotificationManagerCompat.from(context)
-            if (notificationManager.areNotificationsEnabled()) {
+            val errorChannel = notificationManager.getNotificationChannel(context.getString(R.string.error_report_channel_id))
+            val notificationAvailable = if (notificationManager.areNotificationsEnabled() &&
+                errorChannel != null && errorChannel.importance != NotificationManagerCompat.IMPORTANCE_NONE
+            ) {
                 notificationManager
                     .notify(ERROR_REPORT_NOTIFICATION_ID, notificationBuilder.build())
+                true
+            } else {
+                false
             }
 
             ContextCompat.getMainExecutor(context).execute {
-                // since the notification is silent, also show a toast, otherwise the user is confused
-                Toast.makeText(context, R.string.error_report_notification_toast, Toast.LENGTH_SHORT)
-                    .show()
+                // Keep the failure visible even when the notification cannot be shown.
+                val message = if (notificationAvailable) R.string.error_report_notification_toast else R.string.error_report_unavailable_toast
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
         }
 

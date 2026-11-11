@@ -240,6 +240,7 @@
     <!-- error activity -->
     <string name="error_report_notification_title">PVCPipe encountered an error. Tap to report it</string>
     <string name="error_report_notification_toast">An error occurred. See the notification</string>
+    <string name="error_report_unavailable_toast">An error occurred</string>
     <string name="sorry_string">Sorry, that should not have happened.</string>
     <string name="reporting_copy">Copy report</string>
     <string name="reporting_share">Share report…</string>
