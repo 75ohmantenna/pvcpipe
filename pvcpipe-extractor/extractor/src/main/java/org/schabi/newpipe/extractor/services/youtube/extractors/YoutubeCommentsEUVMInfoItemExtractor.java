@@ -14,8 +14,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.schabi.newpipe.extractor.services.youtube.YoutubeDescriptionHelper.attributedDescriptionToHtml;
+import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.fixThumbnailUrl;
 import static org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getImagesFromThumbnailsArray;
 import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 
@@ -24,6 +27,8 @@ import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
  * updates.
  */
 class YoutubeCommentsEUVMInfoItemExtractor implements CommentsInfoItemExtractor {
+
+    private static final Pattern AVATAR_SIZE = Pattern.compile("=s([0-9]+)(?:-|[?&#]|$)");
 
     private static final String AUTHOR = "author";
     private static final String PROPERTIES = "properties";
@@ -164,9 +169,31 @@ class YoutubeCommentsEUVMInfoItemExtractor implements CommentsInfoItemExtractor 
     @Nonnull
     @Override
     public List<Image> getUploaderAvatars() throws ParsingException {
-        return getImagesFromThumbnailsArray(commentEntityPayload.getObject("avatar")
-                .getObject("image")
-                .getArray("sources"));
+        final List<Image> images = getImagesFromThumbnailsArray(commentEntityPayload
+                .getObject("avatar").getObject("image").getArray("sources"));
+        if (!images.isEmpty()) {
+            return images;
+        }
+
+        final String url = commentEntityPayload.getObject(AUTHOR)
+                .getString("avatarThumbnailUrl");
+        if (isNullOrEmpty(url)) {
+            return List.of();
+        }
+        int size = Image.HEIGHT_UNKNOWN;
+        final Matcher matcher = AVATAR_SIZE.matcher(url);
+        if (matcher.find()) {
+            try {
+                final int parsedSize = Integer.parseInt(matcher.group(1));
+                if (parsedSize > 0) {
+                    size = parsedSize;
+                }
+            } catch (final NumberFormatException ignored) {
+                // Unrecognized or overflowing sizes must not discard an otherwise usable avatar.
+            }
+        }
+        return List.of(new Image(fixThumbnailUrl(url), size, size,
+                Image.ResolutionLevel.fromHeight(size)));
     }
 
     @Override
