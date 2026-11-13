@@ -339,13 +339,16 @@ public class DownloadDialogPreparationTest {
         when(parent.getId()).thenReturn(R.id.audio_track_spinner);
         when(binding.videoAudioGroup.getCheckedRadioButtonId()).thenReturn(R.id.audio_button);
         when(dialog.getContext()).thenReturn(mock(Context.class));
-        try (var lookups = mockStatic(StreamInfoWrapper.class, CALLS_REAL_METHODS);
+        // A real fallback invokes AndroidSchedulers while stubbing, poisoning its class in
+        // this plain JVM. Keep every size request on the controlled, pending Single.
+        try (var lookups = mockStatic(StreamInfoWrapper.class);
              var defaults = mockStatic(org.schabi.newpipe.util.ListHelper.class);
              var pairing = mockStatic(org.schabi.newpipe.util.SecondaryStreamHelper.class);
              var logging = mockStatic(Log.class)) {
             lookups.when(() -> StreamInfoWrapper.fetchMoreInfoForWrapper(any(), any()))
                     .thenReturn(io.reactivex.rxjava3.core.Single.never());
             dialog.onItemSelected(parent, null, 1, 1);
+            lookups.verify(() -> StreamInfoWrapper.fetchMoreInfoForWrapper(any(), any()), times(3));
             final var adapter = org.mockito.ArgumentCaptor.forClass(
                     android.widget.SpinnerAdapter.class);
             verify(binding.audioStreamSpinner).setAdapter(adapter.capture());
