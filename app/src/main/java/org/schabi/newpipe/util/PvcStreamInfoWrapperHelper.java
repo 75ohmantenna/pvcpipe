@@ -2,6 +2,7 @@ package org.schabi.newpipe.util;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
+import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
@@ -20,7 +21,7 @@ public final class PvcStreamInfoWrapperHelper {
      * @param streamInfo     overall metadata that applies to all streams.
      * @param streamsWrapper the wrapper
      * @param <X>            the stream type to get the {@link MediaFormat}.
-     * @return true if HLS stream and could calculate stream size
+     * @return true if HLS was handled, including when its media size remains unknown
      */
     public static <X extends Stream> boolean pvcIfStreamIsHlsCalcAndSetSize(
             final X stream,
@@ -30,8 +31,9 @@ public final class PvcStreamInfoWrapperHelper {
             final long approxSize = pvcCalcSize(streamInfo, stream);
             if (approxSize > 0) {
                 streamsWrapper.setSize(stream, approxSize);
-                return true;
             }
+            // A playlist's Content-Length is never the size of its media payload.
+            return true;
         }
         return false;
     }
@@ -39,13 +41,20 @@ public final class PvcStreamInfoWrapperHelper {
     private static <X extends Stream> long pvcCalcSize(
             final StreamInfo streamInfo,
             final X stream) {
+        final long bitrate;
         if (stream instanceof VideoStream videoStream) {
-            final long bitrate = videoStream.getBitrate();
-            final long duration = streamInfo.getDuration();
-            if (bitrate > 0 && duration > 0) {
-                // 8 to convert bits to Bytes
-                final long approxDownloadSizeInBytes = (bitrate / 8) * duration;
-                return approxDownloadSizeInBytes;
+            bitrate = videoStream.getBitrate();
+        } else if (stream instanceof AudioStream audioStream) {
+            bitrate = (long) audioStream.getAverageBitrate() * 1000L;
+        } else {
+            return -1;
+        }
+        final long duration = streamInfo == null ? -1 : streamInfo.getDuration();
+        if (bitrate > 0 && duration > 0) {
+            try {
+                return Math.multiplyExact(bitrate / 8L, duration);
+            } catch (final ArithmeticException ignored) {
+                // An invalid estimate must remain unknown, never wrap to a small size.
             }
         }
         return -1; // size could not be calculated

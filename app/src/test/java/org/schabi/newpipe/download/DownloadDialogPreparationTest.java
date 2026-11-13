@@ -256,6 +256,171 @@ public class DownloadDialogPreparationTest {
         assertNull(stream.getFormat());
     }
 
+    @Test
+    public void hlsSidecarNeedsSingleUseExplicitSilentVideoConfirmation() throws Exception {
+        configureHlsSidecar();
+        final AlertDialog window = mock(AlertDialog.class);
+        try (var alerts = mockConstruction(AlertDialog.Builder.class,
+                withSettings().defaultAnswer(RETURNS_SELF),
+                (builder, context) -> when(builder.create()).thenReturn(window));
+             var names = mockStatic(org.schabi.newpipe.util.FilenameUtils.class)) {
+            names.when(() -> org.schabi.newpipe.util.FilenameUtils.createFilename(any(), any()))
+                    .thenReturn("recording");
+            invoke("prepareSelectedDownload");
+            verifyNoInteractions(module);
+            final var click = org.mockito.ArgumentCaptor.forClass(
+                    android.content.DialogInterface.OnClickListener.class);
+            verify(alerts.constructed().get(0)).setPositiveButton(
+                    eq(R.string.download_video_without_audio), click.capture());
+            click.getValue().onClick(window, android.content.DialogInterface.BUTTON_POSITIVE);
+            click.getValue().onClick(window, android.content.DialogInterface.BUTTON_POSITIVE);
+            verify(module, times(1)).save(eq("recording"), any(), any());
+        }
+    }
+
+    @Test
+    public void canceledOrChangedHlsSidecarConfirmationHasNoDestinationEffects() throws Exception {
+        for (final boolean dismissed : new boolean[]{true, false}) {
+            configureHlsSidecar();
+            final AlertDialog window = mock(AlertDialog.class);
+            try (var alerts = mockConstruction(AlertDialog.Builder.class,
+                    withSettings().defaultAnswer(RETURNS_SELF),
+                    (builder, context) -> when(builder.create()).thenReturn(window))) {
+                invoke("prepareSelectedDownload");
+                final var click = org.mockito.ArgumentCaptor.forClass(
+                        android.content.DialogInterface.OnClickListener.class);
+                verify(alerts.constructed().get(0)).setPositiveButton(
+                        eq(R.string.download_video_without_audio), click.capture());
+                if (dismissed) {
+                    final var dismiss = org.mockito.ArgumentCaptor.forClass(
+                            android.content.DialogInterface.OnDismissListener.class);
+                    verify(window).setOnDismissListener(dismiss.capture());
+                    dismiss.getValue().onDismiss(window);
+                } else {
+                    dialog.selectedAudioTrackIndex = 1;
+                }
+                click.getValue().onClick(window, android.content.DialogInterface.BUTTON_POSITIVE);
+                verifyNoInteractions(module);
+                inject("silentVideoDialog", null);
+            }
+        }
+    }
+
+    @Test
+    public void previousIntentionalSilentVideoNeedsNoNewConfirmation() throws Exception {
+        configureHlsSidecar();
+        inject("wrappedAudioTracks", new org.schabi.newpipe.util.AudioTrackAdapter
+                .AudioTracksWrapper(List.of(), null));
+        try (var alerts = mockConstruction(AlertDialog.Builder.class,
+                withSettings().defaultAnswer(RETURNS_SELF));
+             var names = mockStatic(org.schabi.newpipe.util.FilenameUtils.class)) {
+            names.when(() -> org.schabi.newpipe.util.FilenameUtils.createFilename(any(), any()))
+                    .thenReturn("recording");
+            invoke("prepareSelectedDownload");
+            assertEquals(0, alerts.constructed().size());
+            verify(module).save(eq("recording"), any(), any());
+        }
+    }
+
+    @Test
+    public void trackChangeRebindsVisibleSpinnerBeforePendingHeaderLookup() throws Exception {
+        final DownloadDialogBinding binding = configureHlsSidecar();
+        final AudioStream progressive = new AudioStream.Builder().setId("progressive")
+                .setContent("https://media.test/audio.m4a", true).setMediaFormat(MediaFormat.M4A)
+                .setAverageBitrate(128).build();
+        final AudioStream hls = hlsAudio();
+        inject("wrappedAudioTracks", new org.schabi.newpipe.util.AudioTrackAdapter
+                .AudioTracksWrapper(
+                        List.of(List.of(progressive, progressive), List.of(hls)), null));
+        inject("disposables", new io.reactivex.rxjava3.disposables.CompositeDisposable());
+        dialog.wrappedSubtitleStreams = new StreamInfoWrapper<>(List.of(), null);
+        dialog.selectedAudioIndex = 1;
+        final android.widget.Spinner parent = mock(android.widget.Spinner.class);
+        when(parent.getId()).thenReturn(R.id.audio_track_spinner);
+        when(binding.videoAudioGroup.getCheckedRadioButtonId()).thenReturn(R.id.audio_button);
+        when(dialog.getContext()).thenReturn(mock(Context.class));
+        try (var lookups = mockStatic(StreamInfoWrapper.class, CALLS_REAL_METHODS);
+             var defaults = mockStatic(org.schabi.newpipe.util.ListHelper.class);
+             var pairing = mockStatic(org.schabi.newpipe.util.SecondaryStreamHelper.class);
+             var logging = mockStatic(Log.class)) {
+            lookups.when(() -> StreamInfoWrapper.fetchMoreInfoForWrapper(any(), any()))
+                    .thenReturn(io.reactivex.rxjava3.core.Single.never());
+            dialog.onItemSelected(parent, null, 1, 1);
+            final var adapter = org.mockito.ArgumentCaptor.forClass(
+                    android.widget.SpinnerAdapter.class);
+            verify(binding.audioStreamSpinner).setAdapter(adapter.capture());
+            assertEquals(1, adapter.getValue().getCount());
+            assertSame(hls, adapter.getValue().getItem(0));
+            assertEquals(0, dialog.selectedAudioIndex);
+            verify(binding.audioStreamSpinner).setSelection(0);
+        }
+        dialog.selectedAudioTrackIndex = 2;
+        final Method method = DownloadDialog.class.getDeclaredMethod("getWrappedAudioStreams");
+        method.setAccessible(true);
+        assertEquals(0, ((StreamInfoWrapper<?>) method.invoke(dialog)).getStreamsList().size());
+    }
+
+    private DownloadDialogBinding configureHlsSidecar() throws Exception {
+        final VideoStream video = new VideoStream.Builder().setId("video-only")
+                .setContent("https://media.test/video.mp4", true).setMediaFormat(MediaFormat.MPEG_4)
+                .setResolution("720p").setIsVideoOnly(true).build();
+        final StreamInfoWrapper<VideoStream> wrapper =
+                new StreamInfoWrapper<>(List.of(video), null);
+        @SuppressWarnings("unchecked")
+        final StreamItemAdapter<VideoStream, AudioStream> adapter = mock(StreamItemAdapter.class);
+        when(adapter.getItem(0)).thenReturn(video);
+        when(adapter.getAllSecondary()).thenReturn(new SparseArrayCompat<>(0));
+        inject("videoStreamsAdapter", adapter);
+        inject("sponsorBlockSegments", new SponsorBlockSegment[0]);
+        inject("wrappedAudioTracks", new org.schabi.newpipe.util.AudioTrackAdapter
+                .AudioTracksWrapper(List.of(List.of(hlsAudio())), null));
+        inject("context", mock(Context.class));
+        inject("askForSavePath", true);
+        dialog.wrappedVideoStreams = wrapper;
+        dialog.selectedVideoIndex = 0;
+        dialog.selectedAudioTrackIndex = 0;
+        dialog.currentInfo = new StreamInfo(0, "https://media.test/watch",
+                "https://media.test/watch",
+                StreamType.VIDEO_STREAM, "id", "recording", 0);
+        final DownloadDialogBinding binding = mock(DownloadDialogBinding.class);
+        for (final String name : List.of(
+                "audioStreamSpinner", "audioTrackSpinner", "qualitySpinner")) {
+            setBinding(binding, name, mock(android.widget.Spinner.class));
+        }
+        for (final String name : List.of("audioButton", "videoButton", "subtitleButton")) {
+            setBinding(binding, name, mock(android.widget.RadioButton.class));
+        }
+        setBinding(binding, "audioTrackPresentInVideoText",
+                mock(org.schabi.newpipe.views.NewPipeTextView.class));
+        final RadioGroup group = mock(RadioGroup.class);
+        when(group.getCheckedRadioButtonId()).thenReturn(R.id.video_button);
+        setBinding(binding, "videoAudioGroup", group);
+        final SeekBar threads = mock(SeekBar.class);
+        when(threads.getProgress()).thenReturn(2);
+        setBinding(binding, "threads", threads);
+        final org.schabi.newpipe.views.NewPipeEditText name =
+                mock(org.schabi.newpipe.views.NewPipeEditText.class);
+        final android.text.Editable text = mock(android.text.Editable.class);
+        when(text.toString()).thenReturn("recording");
+        when(name.getText()).thenReturn(text);
+        setBinding(binding, "fileName", name);
+        inject("dialogBinding", binding);
+        return binding;
+    }
+
+    private static AudioStream hlsAudio() {
+        return new AudioStream.Builder().setId("aac-hls")
+                .setContent("https://media.test/audio.m3u8", true).setMediaFormat(MediaFormat.M4A)
+                .setDeliveryMethod(DeliveryMethod.HLS).setAverageBitrate(160).build();
+    }
+
+    private static void setBinding(final DownloadDialogBinding binding, final String name,
+                                   final Object value) throws Exception {
+        final Field field = DownloadDialogBinding.class.getField(name);
+        field.setAccessible(true);
+        field.set(binding, value);
+    }
+
     private DownloadPreparation.Presentation presentation() throws Exception {
         final Class<?> type = Class.forName(
                 DownloadDialog.class.getName() + "$DownloadPresentation");

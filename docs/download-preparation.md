@@ -10,9 +10,10 @@ Download preparation and execution are separate:
   one download, `DownloadManager` tracks pending and finished missions, and
   `DownloadManagerService` runs them.
 
-Preparation accepts progressive media URLs and video HLS rendition URLs.
-Split progressive video/audio can require postprocessing; arbitrary DASH
-manifests and audio-only HLS are not accepted by this preparation path.
+Preparation accepts progressive media URLs, combined video HLS renditions and
+AAC audio HLS renditions labeled M4A. Split progressive video/audio can require
+postprocessing; arbitrary DASH manifests and other HLS audio codecs are not
+accepted by this preparation path.
 The implementation defines format combinations, filenames, destination
 handling, resume checks and postprocessing. This guide focuses on selection,
 submission and persisted state.
@@ -167,10 +168,12 @@ for the tested boundaries.
 
 ## HLS downloads
 
-Completed combined HLS video is prepared with Media3's `HlsPlaylistParser` and
+Completed combined HLS video and M4A-labeled AAC HLS audio are prepared with Media3's `HlsPlaylistParser` and
 remuxed by `PvcFromHlsRemuxer` with the bundled FFmpeg. Master playlists remain
-selection errors. Live/ongoing media and video-only HLS are rejected before
-destination/picker effects; HLS audio/subtitle downloads are not offered.
+selection errors. Streams identified as live/ongoing and video-only HLS are rejected before
+destination/picker effects; MP3/Opus/unknown-codec HLS audio and HLS subtitles
+are not offered. Audio media playlists must also have an explicit ENDLIST tag;
+a live snapshot is rejected during mission preparation.
 
 - `PvcHlsPreProcessor` parses the streamed successful response against its
   effective URL after redirects. It retains Media3-resolved byte ranges,
@@ -205,6 +208,31 @@ destination/picker effects; HLS audio/subtitle downloads are not offered.
   Old encrypted checkpoints with **implicit IVs** did not retain media-sequence
   identity; they fail with an explicit-IV error rather than invent a sequence.
   Explicit-IV encrypted and unencrypted legacy checkpoints remain supported.
+
+### Audio HLS — 2026-11-13
+
+The audio dropdown admits URL-based HLS AAC streams declared M4A, including
+SoundCloud's AAC 96/160 kbps variants. Existing progressive choices and defaults
+are preserved, including unknown-language groups. Only progressive audio can
+be paired with progressive video-only downloads; an unpairable HLS language displays a warning and requires an explicit
+"Download video without audio" confirmation before destination preparation. It
+does not silently substitute another language. Existing intentional video-only
+downloads without a new HLS audio track remain available. Playlist headers
+are never used as media sizes. Audio HLS uses a checked bitrate/duration
+estimate in bytes, or retains unknown size.
+
+Audio HLS uses the same durable playlist/plan checkpoints, whole-resource resume,
+byte windows, initialization maps and identity AES-128 handling as video HLS.
+The persisted mission kind selects mandatory audio mapping, no video, AAC
+bitstream validation and MP4 container output, saved with `.m4a`/`audio/mp4`.
+Missing audio or non-AAC content fails conversion before output copying. The
+bundled native build adds the AAC demuxer for raw ADTS segments; MPEG-TS and
+fragmented MP4 inputs remain supported without re-encoding. See `app/libs/README.md`.
+
+Controlled host tests exercise generated ADTS, MPEG-TS and fMP4 audio, explicit
+no-video output, duration/container/codec checks, restored plans and rejection
+without overwriting output. These are not live SoundCloud or physical Android
+converter results. Fixtures are generated sine waves, not third-party recordings.
 
 WebM Opus-to-Ogg conversion rejects block-laced input. `WebMReader` does not
 split laced blocks into packets, so treating a whole block as one packet
@@ -353,3 +381,18 @@ call ordering, checkpoint serialization and stalled playlist/key HTTP cancellati
 with fresh retries. These checks do not establish Android scheduling: the bound
 timeout → resume → unbind path has not yet been executed on a device for this
 change, nor has the platform deadline itself been forced.
+
+### Audio HLS native device follow-up (2026-11-13)
+
+A physical Pixel 6a running Android 17/API 37 executed the rebuilt ARM64
+converter pinned in `app/libs/README.md`. Synthetic manifest byte windows,
+including the fMP4 initialization map, were staged with their playlist durations.
+Production-equivalent concat/copy arguments, mandatory audio mapping, `-vn`,
+`aac_adtstoasc` and MP4 output produced one AAC audio track and no video for
+ADTS (8.021333 seconds), fMP4 (8.021333 seconds) and MPEG-TS (8.000000 seconds).
+No-audio and Opus inputs were rejected with exit code 234.
+
+The isolated temporary device files were removed and their absence verified;
+app data, settings and UI were unchanged. This verifies the shipped ARM64 native
+conversion path, not the full Java mission/service integration, Android decoding
+or live SoundCloud downloads. Those remain separately unverified for this change.

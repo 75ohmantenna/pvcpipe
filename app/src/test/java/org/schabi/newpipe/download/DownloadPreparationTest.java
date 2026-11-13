@@ -125,6 +125,44 @@ public class DownloadPreparationTest {
     }
 
     @Test
+    public void hlsAacUsesM4aNameAndDurableHlsRemuxerAcrossPickerRestore() throws Exception {
+        final AudioStream audio = new AudioStream.Builder().setId("aac_160k")
+                .setContent("https://media.test/audio.m3u8", true).setMediaFormat(MediaFormat.M4A)
+                .setDeliveryMethod(DeliveryMethod.HLS).setAverageBitrate(160).build();
+        select(DownloadPreparation.Kind.AUDIO, audio, null, -1, 0);
+        preparation.save("recording", DownloadPreparation.Destination.askDocument(), environment);
+        assertEquals("recording.m4a", environment.location.filename);
+        assertEquals("audio/mp4", environment.location.mime);
+        final DownloadPreparation.Location state = serialized(environment.location.state());
+        preparation.close();
+        preparation = new DownloadPreparation(environment, () -> selected);
+        preparation.resume(state, environment.fileUri, environment);
+        final DownloadPreparation.Launch launch = environment.launches.get(0);
+        assertEquals(Postprocessing.ALGORITHM_PVC_HLS_REMUXER, launch.psName);
+        assertEquals('a', launch.kind);
+        assertArrayEquals(new String[]{audio.getContent()}, launch.urls);
+        assertEquals(MediaFormat.M4A, launch.recoveryInfo.get(0).getFormat());
+    }
+
+    @Test
+    public void unsupportedHlsAudioAndMismatchedOutputFailBeforePicker() {
+        for (final MediaFormat format : List.of(MediaFormat.MP3, MediaFormat.OPUS,
+                MediaFormat.AAC, MediaFormat.M4A)) {
+            final AudioStream audio = new AudioStream.Builder().setId("hls")
+                    .setContent("https://media.test/audio.m3u8", true).setMediaFormat(format)
+                    .setDeliveryMethod(DeliveryMethod.HLS).setAverageBitrate(128).build();
+            selected = new DownloadPreparation.Selection(DownloadPreparation.Kind.AUDIO, audio,
+                    MediaFormat.MP3, null, -1, 0, 5, info, segments);
+            preparation.save("recording", DownloadPreparation.Destination.askDocument(),
+                    environment);
+        }
+        assertEquals(4, environment.failures.size());
+        assertNull(environment.location);
+        assertTrue(environment.launches.isEmpty());
+        assertEquals(0, environment.resolutions);
+    }
+
+    @Test
     public void hlsVideoSelectsRemuxer() throws Exception {
         select(DownloadPreparation.Kind.VIDEO, combinedHls(), null, 100, 0);
         final DownloadPreparation.Launch launch = submitDocument();

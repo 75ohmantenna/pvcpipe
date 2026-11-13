@@ -283,6 +283,93 @@ public class PvcHlsWindowConversionTest {
     }
 
     @Test
+    public void audioHlsRemuxesAdtsTsAndFmp4WithOnlyAacAudio() throws Exception {
+        proveAudioConversion("audio-adts.aac", "audio-adts.m3u8");
+        proveAudioConversion("kick-audio.ts", "kick-audio.m3u8");
+        proveAudioConversion("audio-fmp4.mp4", "audio-fmp4.m3u8");
+        // Even mislabeled combined media cannot publish video as an audio download.
+        proveAudioConversion("kick-ts.ts", "kick-ts.m3u8");
+    }
+
+    @Test
+    public void audioMissionPlanAndOutputSelectionSurviveSerialization() throws Exception {
+        final DownloadMission parsed = prepare(Files.readString(
+                fixture("audio-fmp4.m3u8").toPath()), 'a');
+        final DownloadMission original = new DownloadMission(parsed.urls, null, 'a',
+                new PvcFromHlsRemuxer(workParent()));
+        original.pvcArbitraryData = parsed.pvcArbitraryData;
+        final DownloadMission restored = (DownloadMission) roundTrip(original);
+        assertEquals('a', restored.kind);
+        final File completed = temporary.newFile();
+        try (FileStream input = new FileStream(fixture("audio-fmp4.mp4"));
+             FileStream output = new FileStream(completed)) {
+            PvcFromHlsRemuxer.convert(restored, new SharpStream[]{input}, output,
+                    workParent(), this::hostFfmpeg);
+        }
+        assertAudioOutput(completed);
+    }
+
+    @Test
+    public void audioMissingOrNonAacStreamDoesNotOverwriteOutput() throws Exception {
+        final File videoOnly = temporary.newFile("video.ts");
+        final File opus = temporary.newFile("opus.mp4");
+        assertEquals(0, run(List.of("ffmpeg", "-v", "error", "-y", "-i",
+                fixture("kick-ts.ts").toString(), "-map", "0:v:0", "-c", "copy",
+                videoOnly.toString())).status);
+        assertEquals(0, run(List.of("ffmpeg", "-v", "error", "-y", "-i",
+                fixture("kick-audio.ts").toString(), "-c:a", "libopus", opus.toString())).status);
+        for (final File media : List.of(videoOnly, opus)) {
+            final DownloadMission audio = mission(plan(0, 0, -1));
+            audio.kind = 'a';
+            try (FileStream input = new FileStream(media);
+                 FileStream output = source("untouched")) {
+                assertThrows(IOException.class, () -> PvcFromHlsRemuxer.convert(audio,
+                        new SharpStream[]{input}, output, workParent(), this::hostFfmpeg));
+                assertEquals(9, output.length());
+                output.rewind();
+                assertEquals('u', output.read());
+            }
+        }
+    }
+
+    private void proveAudioConversion(final String name, final String playlist) throws Exception {
+        final DownloadMission audio = prepare(Files.readString(fixture(playlist).toPath()), 'a');
+        final File completed = temporary.newFile("audio-" + name + ".m4a");
+        try (FileStream input = new FileStream(fixture(name));
+             FileStream output = new FileStream(completed)) {
+            PvcFromHlsRemuxer.convert(audio, new SharpStream[]{input}, output, workParent(),
+                    this::hostFfmpeg);
+            assertFalse(input.isClosed());
+            assertFalse(output.isClosed());
+        }
+        assertAudioOutput(completed);
+    }
+
+    private int hostFfmpeg(final String[] arguments) throws IOException, InterruptedException {
+        final List<String> command = new ArrayList<>();
+        command.add("ffmpeg");
+        command.addAll(Arrays.asList(arguments));
+        return run(command).status;
+    }
+
+    private void assertAudioOutput(final File completed) throws Exception {
+        final CommandResult probe = run(List.of("ffprobe", "-v", "error", "-show_entries",
+                "stream=codec_name,codec_type:format=format_name,duration", "-of",
+                "default=noprint_wrappers=1", completed.toString()));
+        assertEquals(probe.text, 0, probe.status);
+        assertTrue(probe.text, probe.text.contains("codec_name=aac"));
+        assertTrue(probe.text, probe.text.contains("codec_type=audio"));
+        assertFalse(probe.text, probe.text.contains("codec_type=video"));
+        assertEquals(1, probe.text.lines().filter(line -> line.startsWith("codec_type=")).count());
+        assertTrue(probe.text, probe.text.contains("format_name=mov,mp4,m4a"));
+        final double duration = Double.parseDouble(probe.text.lines()
+                .filter(line -> line.startsWith("duration="))
+                .map(line -> line.substring("duration=".length())).findFirst().orElseThrow());
+        assertEquals(8.0, duration, 0.25);
+        System.out.println("Audio HLS host conversion " + completed.getName() + ": " + probe.text);
+    }
+
+    @Test
     public void realHostFfmpegFailureLeavesOutputUnchanged() throws Exception {
         try (FileStream input = source("not transport stream media");
              FileStream output = source("untouched")) {
@@ -439,6 +526,11 @@ public class PvcHlsWindowConversionTest {
     }
 
     private static DownloadMission prepare(final String manifest) throws Exception {
+        return prepare(manifest, 'v');
+    }
+
+    private static DownloadMission prepare(final String manifest, final char kind)
+            throws Exception {
         final OkHttpClient client = new OkHttpClient.Builder().addInterceptor(chain ->
                 new Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                         .code(200).message("OK").body(ResponseBody.create(
@@ -448,6 +540,7 @@ public class PvcHlsWindowConversionTest {
                 PvcHlsPreProcessor.class.getDeclaredConstructor(OkHttpClient.class);
         constructor.setAccessible(true);
         final DownloadMission mission = mission(null);
+        mission.kind = kind;
         mission.urls = new String[]{"https://media.test/playlist.m3u8"};
         mission.recoveryInfo = new MissionRecoveryInfo[1];
         constructor.newInstance(client).modifyMission(mission);

@@ -53,7 +53,7 @@ public class PvcHlsPreProcessor {
     }
 
     public void modifyMission(final DownloadMission mission) {
-        prepare(mission.urls[0]).applyTo(mission);
+        prepare(mission.urls[0], mission.kind == 'a').applyTo(mission);
     }
 
     /**
@@ -62,9 +62,20 @@ public class PvcHlsPreProcessor {
      * @return validated resources and plan ready for atomic publication
      */
     public Prepared prepare(final String playlistUrl) {
+        return prepare(playlistUrl, false);
+    }
+
+    /**
+     * Audio-only downloads require a finalized media playlist, not a live snapshot.
+     * @param playlistUrl original media playlist address
+     * @param requireEndList whether an explicit end tag is required
+     * @return validated resources and plan
+     */
+    public Prepared prepare(final String playlistUrl, final boolean requireEndList) {
         final LinkedHashMap<String, Integer> resources = new LinkedHashMap<>();
         try {
-            return new Prepared(resources, readPlan(URI.create(playlistUrl), resources));
+            return new Prepared(resources,
+                    readPlan(URI.create(playlistUrl), resources, requireEndList));
         } catch (final IOException | IllegalArgumentException e) {
             throw new RuntimeException("Could not prepare HLS download", e);
         }
@@ -97,7 +108,8 @@ public class PvcHlsPreProcessor {
     }
 
     private HlsDownloadPlan readPlan(final URI uri,
-                                     final LinkedHashMap<String, Integer> resources)
+                                     final LinkedHashMap<String, Integer> resources,
+                                     final boolean requireEndList)
             throws IOException {
         final HlsMediaPlaylist playlist;
         final String base;
@@ -110,6 +122,9 @@ public class PvcHlsPreProcessor {
                 throw new IOException("Select an HLS media playlist before downloading");
             }
             playlist = (HlsMediaPlaylist) parsed;
+        }
+        if (requireEndList && !playlist.hasEndTag) {
+            throw new IOException("Audio HLS download requires a completed media playlist");
         }
         validateEncryption(playlist);
         if (playlist.segments.isEmpty()) {

@@ -1102,4 +1102,6 @@
     <string name="loading_progress_unknown" translatable="false">∞/∞</string>
     <string name="playback_speed_default" translatable="false">1×</string>
     <string name="subscription_unavailable_service">Unavailable service (ID %1$d)</string>
+    <string name="download_hls_audio_separate">This HLS audio track can only be downloaded separately. Choose a progressive audio track, download audio separately, or continue without audio.</string>
+    <string name="download_video_without_audio">Download video without audio</string>
 </resources>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild the pinned converter with MP4 input support; see app/libs/README.md."""
+"""Rebuild the pinned converter with MP4 and raw AAC input support; see app/libs/README.md."""
 
 import argparse
 import hashlib
@@ -17,7 +17,8 @@ FFMPEG_REPO = "https://github.com/evermind-zz/FFmpeg4slimhls-converter.git"
 BASE_URL = ("https://jitpack.io/com/github/75ohmantenna/slimhls-converter/"
             "7e7f373dbf/slimhls-converter-7e7f373dbf.aar")
 BASE_SHA256 = "1ea205c289effc445acacaa1fa00f2e564c001e9ccc155e5201168065b13e01a"
-VENDORED_SHA256 = "2743910cd6d4bc5999d8aa7de6ccdb6249bde0d3c7b50335e71fa46972d52074"
+PREVIOUS_SHA256 = "2743910cd6d4bc5999d8aa7de6ccdb6249bde0d3c7b50335e71fa46972d52074"
+VENDORED_SHA256 = "bfb1710ee391b4862cda0d56395a505d32c15935c58b8e9cc5ae671ec6848307"
 ARCHITECTURES = {
     "armeabi-v7a": ("arm", "armv7a-linux-androideabi", 19),
     "arm64-v8a": ("arm64", "aarch64-linux-android", 21),
@@ -41,12 +42,12 @@ def main():
     parser.add_argument("--base-aar", type=Path, help="Cached original or vendored AAR (verified)")
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--output", type=Path, default=Path(
-        "app/libs/slimhls-converter-7e7f373dbf-mov.aar"))
+        "app/libs/slimhls-converter-7e7f373dbf-mov-aac.aar"))
     args = parser.parse_args()
     if args.verify:
         if hashlib.sha256(args.output.read_bytes()).hexdigest() != VENDORED_SHA256:
             parser.error("Vendored converter AAR checksum mismatch")
-        print("Verified pinned HLS converter AAR (four ABIs, MOV/MP4 input)")
+        print("Verified pinned HLS converter AAR (four ABIs, MOV/MP4 and AAC input)")
         return
     if args.ndk is None or args.work is None:
         parser.error("Rebuilding requires --ndk and --work")
@@ -78,7 +79,7 @@ def main():
     if not base.exists():
         with urllib.request.urlopen(BASE_URL) as response, base.open("wb") as output:
             shutil.copyfileobj(response, output)
-    if hashlib.sha256(base.read_bytes()).hexdigest() not in (BASE_SHA256, VENDORED_SHA256):
+    if hashlib.sha256(base.read_bytes()).hexdigest() not in (BASE_SHA256, PREVIOUS_SHA256, VENDORED_SHA256):
         parser.error("Converter AAR checksum mismatch")
     binaries = {}
     for abi, (arch, prefix, api) in ARCHITECTURES.items():
@@ -95,6 +96,7 @@ def main():
             "--disable-asm", "--enable-avformat", "--enable-avcodec", "--enable-avutil",
             "--enable-swresample", "--enable-decoder=h264", "--enable-decoder=aac",
             "--enable-demuxer=mpegts", "--enable-demuxer=concat", "--enable-demuxer=mov",
+            "--enable-demuxer=aac",
             "--enable-muxer=mp4", "--enable-parser=h264", "--enable-parser=aac",
             "--enable-protocol=file", "--enable-protocol=concat", "--enable-bsf=aac_adtstoasc",
             "--enable-bsf=h264_mp4toannexb",

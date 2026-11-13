@@ -345,7 +345,7 @@ dependencies {
     // HLS parsing, downloading and remuxing shared by supported services
     implementation(libs.evermind.hlsdownloader)
     // Pinned minimal FFmpeg with MPEG-TS and MOV/MP4 input; see libs/README.md.
-    implementation(files("libs/slimhls-converter-7e7f373dbf-mov.aar"))
+    implementation(files("libs/slimhls-converter-7e7f373dbf-mov-aac.aar"))
     // Logcat toolkit
     implementation(libs.evermind.logcattoolkit)
     // Cloudflare challenge helper

@@ -104,6 +104,8 @@ public class DownloadDialog extends DialogFragment
     private StoredDirectoryHelper mainStorageVideo = null;
     private DownloadPreparation downloadPreparation;
     private AlertDialog collisionDialog;
+    private AlertDialog silentVideoDialog;
+    private Object silentVideoRequest;
     private MenuItem okButton = null;
     private Context context = null;
     private boolean askForSavePath;
@@ -154,15 +156,13 @@ public class DownloadDialog extends DialogFragment
     public DownloadDialog(@NonNull final Context context, @NonNull final StreamInfo info) {
         this.currentInfo = info;
 
-        final List<AudioStream> audioStreams =
-                getStreamsOfSpecifiedDelivery(info.getAudioStreams(), PROGRESSIVE_HTTP);
         final List<List<AudioStream>> groupedAudioStreams =
-                ListHelper.getGroupedAudioStreams(context, audioStreams);
+                DownloadAudioStreams.groups(context, info.getAudioStreams());
         this.wrappedAudioTracks = new AudioTracksWrapper(groupedAudioStreams, context);
         this.selectedAudioTrackIndex =
-                ListHelper.getDefaultAudioTrackGroup(context, groupedAudioStreams);
+                DownloadAudioStreams.defaultGroup(context, groupedAudioStreams);
 
-        // Only progressive streams and supported HLS video can be prepared for download.
+        // Only progressive streams and supported HLS media can be prepared for download.
         final List<VideoStream> videoStreams = ListHelper.getSortedStreamVideosList(
                 context,
                 withHlsStreams(info,
@@ -171,7 +171,7 @@ public class DownloadDialog extends DialogFragment
                 false,
                 // If there are multiple languages available, prefer streams without audio
                 // to allow language selection
-                wrappedAudioTracks.size() > 1
+                DownloadAudioStreams.progressiveGroupCount(groupedAudioStreams) > 1
         );
 
         this.wrappedVideoStreams = new StreamInfoWrapper<>(videoStreams, context);
@@ -286,7 +286,8 @@ public class DownloadDialog extends DialogFragment
                 continue;
             }
             final AudioStream audioStream = SecondaryStreamHelper.getAudioStreamFor(
-                    context, audioStreams.getStreamsList(), videoStreams.get(i));
+                    context, getStreamsOfSpecifiedDelivery(audioStreams.getStreamsList(),
+                            PROGRESSIVE_HTTP), videoStreams.get(i));
 
             if (audioStream != null) {
                 secondaryStreams.append(i, new SecondaryStreamHelper<>(audioStreams, audioStream));
@@ -325,7 +326,7 @@ public class DownloadDialog extends DialogFragment
 
         dialogBinding.fileName.setText(FilenameUtils.createFilename(getContext(),
                 currentInfo.getName()));
-        selectedAudioIndex = ListHelper.getDefaultAudioFormat(getContext(),
+        selectedAudioIndex = DownloadAudioStreams.defaultFormat(getContext(),
                 getWrappedAudioStreams().getStreamsList());
 
         selectedSubtitleIndex = getSubtitleIndexBy(subtitleStreamsAdapter.getAll());
@@ -391,6 +392,11 @@ public class DownloadDialog extends DialogFragment
         if (collisionDialog != null) {
             collisionDialog.dismiss();
             collisionDialog = null;
+        }
+        silentVideoRequest = null;
+        if (silentVideoDialog != null) {
+            silentVideoDialog.dismiss();
+            silentVideoDialog = null;
         }
         if (downloadPreparation != null) {
             downloadPreparation.close();
@@ -505,8 +511,12 @@ public class DownloadDialog extends DialogFragment
 
         dialogBinding.audioTrackSpinner.setVisibility(
                 isVideoOnly && wrappedAudioTracks.size() > 1 ? View.VISIBLE : View.GONE);
+        final boolean separateAudio = selectedHlsAudioCannotBePaired();
+        dialogBinding.audioTrackPresentInVideoText.setText(separateAudio
+                ? R.string.download_hls_audio_separate : R.string.audio_track_present_in_video);
         dialogBinding.audioTrackPresentInVideoText.setVisibility(
-                !isVideoOnly && wrappedAudioTracks.size() > 1 ? View.VISIBLE : View.GONE);
+                separateAudio || !isVideoOnly && wrappedAudioTracks.size() > 1
+                        ? View.VISIBLE : View.GONE);
     }
 
     private void setupSubtitleSpinner() {
@@ -633,7 +643,17 @@ public class DownloadDialog extends DialogFragment
             final boolean trackChanged = selectedAudioTrackIndex != position;
             selectedAudioTrackIndex = position;
             if (trackChanged) {
+                selectedAudioIndex = DownloadAudioStreams.defaultFormat(context,
+                        getWrappedAudioStreams().getStreamsList());
                 updateSecondaryStreams();
+                // Replace the visible adapter before asynchronous size lookups. Its previous
+                // group's indices must never address this newly selected group's streams.
+                if (dialogBinding.videoAudioGroup.getCheckedRadioButtonId() == R.id.audio_button) {
+                    setupAudioSpinner();
+                } else if (dialogBinding.videoAudioGroup.getCheckedRadioButtonId()
+                        == R.id.video_button) {
+                    setupVideoSpinner();
+                }
                 fetchStreamsSize();
             }
         } else if (parentId == R.id.audio_stream_spinner) {
@@ -733,7 +753,7 @@ public class DownloadDialog extends DialogFragment
     }
 
     private StreamInfoWrapper<AudioStream> getWrappedAudioStreams() {
-        if (selectedAudioTrackIndex < 0 || selectedAudioTrackIndex > wrappedAudioTracks.size()) {
+        if (selectedAudioTrackIndex < 0 || selectedAudioTrackIndex >= wrappedAudioTracks.size()) {
             return StreamInfoWrapper.empty();
         }
         return wrappedAudioTracks.getTracksList().get(selectedAudioTrackIndex);
@@ -799,7 +819,67 @@ public class DownloadDialog extends DialogFragment
                     ? mainStorageAudio : mainStorageVideo;
             destination = DownloadPreparation.Destination.savedFolder(folder);
         }
+        if (selectedHlsAudioCannotBePaired()) {
+            confirmSilentVideo(destination);
+            return;
+        }
         downloadPreparation.save(getNameEditText(), destination, new DownloadPresentation());
+    }
+
+    private boolean selectedHlsAudioCannotBePaired() {
+        if (dialogBinding.videoAudioGroup.getCheckedRadioButtonId() != R.id.video_button) {
+            return false;
+        }
+        try {
+            final DownloadPreparation.Selection selection = selectedDownload();
+            return selection != null && DownloadAudioStreams.requiresSeparateAudio(
+                    selection.primary, getWrappedAudioStreams().getStreamsList(),
+                    selection.secondary);
+        } catch (final RuntimeException invalidSelection) {
+            // Let DownloadPreparation report invalid indices/metadata without filesystem effects.
+            return false;
+        }
+    }
+
+    private void confirmSilentVideo(final DownloadPreparation.Destination destination) {
+        if (silentVideoDialog != null) {
+            return;
+        }
+        final DownloadDialogBinding source = dialogBinding;
+        final DownloadPreparation preparation = downloadPreparation;
+        final StreamInfo info = currentInfo;
+        final int track = selectedAudioTrackIndex;
+        final DownloadPreparation.Selection selection = selectedDownload();
+        final Object request = new Object();
+        silentVideoRequest = request;
+        final AlertDialog confirmation = new AlertDialog.Builder(context)
+                .setTitle(R.string.download_dialog_title)
+                .setMessage(R.string.download_hls_audio_separate)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.download_video_without_audio, (dialog, which) -> {
+                    if (silentVideoRequest != request) {
+                        return;
+                    }
+                    silentVideoRequest = null;
+                    if (dialogBinding != source || downloadPreparation != preparation
+                            || currentInfo != info || selectedAudioTrackIndex != track
+                            || !selectedHlsAudioCannotBePaired()) {
+                        return;
+                    }
+                    final DownloadPreparation.Selection current = selectedDownload();
+                    if (current.primary == selection.primary && current.secondary == null) {
+                        preparation.save(getNameEditText(), destination,
+                                new DownloadPresentation());
+                    }
+                }).create();
+        silentVideoDialog = confirmation;
+        confirmation.setOnDismissListener(dialog -> {
+            if (silentVideoDialog == confirmation) {
+                silentVideoDialog = null;
+                silentVideoRequest = null;
+            }
+        });
+        confirmation.show();
     }
 
     private DownloadPreparation.Selection selectedDownload() {

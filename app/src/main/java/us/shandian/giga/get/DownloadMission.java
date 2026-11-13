@@ -773,7 +773,8 @@ public class DownloadMission extends Mission {
         hlsPreprocessor = processor;
         init = new Thread(() -> {
             try {
-                final PvcHlsPreProcessor.Prepared prepared = processor.prepare(urls[0]);
+                final PvcHlsPreProcessor.Prepared prepared = kind == 'a'
+                        ? processor.prepare(urls[0], true) : processor.prepare(urls[0]);
                 synchronized (DownloadMission.this) {
                     if (!running || init != Thread.currentThread()
                             || Thread.currentThread().isInterrupted()) {

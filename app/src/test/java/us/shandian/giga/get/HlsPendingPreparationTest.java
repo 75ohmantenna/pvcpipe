@@ -80,6 +80,40 @@ public class HlsPendingPreparationTest {
     }
 
     @Test
+    public void audioPauseCancelsPreparationAndRetainsPlaylistKind() throws Exception {
+        final DownloadMission mission = mission();
+        mission.kind = 'a';
+        final CountDownLatch entered = new CountDownLatch(1);
+        final CountDownLatch finish = new CountDownLatch(1);
+        final PvcHlsPreProcessor.Prepared prepared = mock(PvcHlsPreProcessor.Prepared.class);
+        try (var construction = mockConstruction(PvcHlsPreProcessor.class, (processor, context) -> {
+            when(processor.prepare(any(), org.mockito.Mockito.eq(true))).thenAnswer(call -> {
+                entered.countDown();
+                try {
+                    finish.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    // Simulate a late result and verify ownership, not interruption alone.
+                }
+                return prepared;
+            });
+        })) {
+            mission.start();
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            final Thread initializer = mission.init;
+            mission.pause();
+            finish.countDown();
+            initializer.join(5000);
+            assertFalse(initializer.isAlive());
+            assertTrue(mission.hlsPreparationPending);
+            org.junit.Assert.assertEquals('a', mission.kind);
+            verify(prepared, never()).applyTo(any());
+            verify(construction.constructed().get(0)).cancel();
+        } finally {
+            finish.countDown();
+        }
+    }
+
+    @Test
     public void failedPreparedCheckpointRestoresRetryableOriginalPlaylist() throws Exception {
         final DownloadMission mission = mission();
         final PvcHlsPreProcessor.Prepared result = mock(PvcHlsPreProcessor.Prepared.class);
@@ -148,7 +182,7 @@ public class HlsPendingPreparationTest {
     @Test
     public void pendingPlaylistSurvivesCheckpointSerialization() throws Exception {
         final DownloadMission original = new DownloadMission(
-                new String[]{"https://example.test/playlist.m3u8"}, null, 'v', null);
+                new String[]{"https://example.test/playlist.m3u8"}, null, 'a', null);
         original.hlsPreparationPending = true;
         final java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
         try (var output = new java.io.ObjectOutputStream(bytes)) {
@@ -158,6 +192,7 @@ public class HlsPendingPreparationTest {
                 new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
             final DownloadMission restored = (DownloadMission) input.readObject();
             assertTrue(restored.hlsPreparationPending);
+            org.junit.Assert.assertEquals('a', restored.kind);
             assertArrayEquals(original.urls, restored.urls);
         }
     }

@@ -375,7 +375,8 @@ Media3 load-error event while video and audio continue; this does not promise
 caption error feedback in the app UI. External players/downloads retain actual media
 playlist URLs; direct MP4 clips never fetch their media as playlist text.
 Video-only HLS and live/ongoing streams are rejected before download destination
-effects. HLS audio/subtitle downloads remain excluded. Receiver caption selection
+effects. M4A-labeled AAC HLS audio uses the download remux path; other HLS audio codecs
+and HLS subtitles remain excluded. Receiver caption selection
 is not newly promised; the main player remains the only cast playback-control panel.
 
 Thumbnails retain actual deduplicated candidates and filename-derived dimensions,

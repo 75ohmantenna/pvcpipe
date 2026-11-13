@@ -18,3 +18,9 @@ kick-ts video starts at 1.421333s (MPEGTS 127920); audio starts at 1.400000s
 (MPEGTS 126000), not zero. The loopback engine harness authors English/French
 segmented WebVTT against this measured audio timestamp origin.
 The single-file playlists exercise EXT-X-BYTERANGE; kick-fmp4 also uses EXT-X-MAP.
+
+2026-11-13: audio-adts and audio-fmp4 are generated eight-second 48kHz sine waves
+for AAC-only HLS download conversion. ADTS is concatenated with explicit byte
+windows; fMP4 includes an initialization map and byte windows. Regenerate with:
+python3 tools/generate_hls_audio_fixtures.py
+Host tests also reuse kick-audio for TS and kick-ts to prove video is discarded.

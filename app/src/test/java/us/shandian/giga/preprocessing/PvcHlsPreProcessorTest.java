@@ -55,6 +55,29 @@ import us.shandian.giga.preprocessing.PvcHlsPreProcessor.FetchWithDownloaderImpl
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, application = Application.class, sdk = 26)
 public class PvcHlsPreProcessorTest {
+    @Test
+    public void audioRequiresEndedMediaAndPreservesSupportedByteWindows() throws Exception {
+        final String media = "#EXTM3U\n#EXT-X-TARGETDURATION:2\n#EXTINF:2,\n"
+                + "#EXT-X-BYTERANGE:100@0\nshared.aac\n";
+        final PvcHlsPreProcessor live = new PvcHlsPreProcessor(clientAnswering(200,
+                media.getBytes(StandardCharsets.UTF_8)));
+        assertThrows(RuntimeException.class, () -> live.prepare("https://media.test/a.m3u8", true));
+        final DownloadMission audio = new DownloadMission(new String[]{"https://media.test/a.m3u8"},
+                null, 'a', null);
+        audio.recoveryInfo = new MissionRecoveryInfo[1];
+        final PvcHlsPreProcessor ended = new PvcHlsPreProcessor(clientAnswering(200,
+                (media + "#EXT-X-ENDLIST\n").getBytes(StandardCharsets.UTF_8)));
+        ended.modifyMission(audio);
+        final HlsDownloadPlan plan = (HlsDownloadPlan) audio.pvcArbitraryData;
+        assertEquals(1, audio.urls.length);
+        assertEquals(100, plan.getSegments().get(0).getMediaWindow().getLength());
+        final String drm = media.replace("#EXTINF",
+                "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key\"\n#EXTINF")
+                + "#EXT-X-ENDLIST\n";
+        assertThrows(RuntimeException.class, () -> new PvcHlsPreProcessor(clientAnswering(200,
+                drm.getBytes(StandardCharsets.UTF_8))).prepare("https://media.test/a.m3u8", true));
+    }
+
     // An AES-128 key is 16 arbitrary bytes. These are not valid UTF-8.
     private static final byte[] KEY = {(byte) 0xff, (byte) 0xfe, (byte) 0x80, 0x00, 0x7f,
             (byte) 0xc3, 0x28, (byte) 0xa0, (byte) 0xa1, (byte) 0xe2, (byte) 0x82, 0x28,

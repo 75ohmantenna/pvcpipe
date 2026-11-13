@@ -529,14 +529,16 @@ final class DownloadPreparation {
             if (format == null || !primary.isUrl() || primary.getContent() == null
                     || primary.getContent().isBlank()
                     || (primary.getDeliveryMethod() != PROGRESSIVE_HTTP
-                    && !(selected.kind == Kind.VIDEO && primary.getDeliveryMethod() == HLS))) {
+                    && !(primary.getDeliveryMethod() == HLS && (selected.kind == Kind.VIDEO
+                    || selected.kind == Kind.AUDIO && format == MediaFormat.M4A
+                    && DownloadAudioStreams.isSupportedHls(primary))))) {
                 throw new IllegalArgumentException("Unsupported stream format or delivery");
             }
             if (StreamTypeUtil.isLiveStream(selected.info.getStreamType())
                     || primary.getDeliveryMethod() == HLS
-                    && ((VideoStream) primary).isVideoOnly()) {
+                    && primary instanceof VideoStream && ((VideoStream) primary).isVideoOnly()) {
                 throw new IllegalArgumentException(
-                        "Downloads require completed media and combined HLS video");
+                        "Downloads require completed media and supported HLS streams");
             }
             if (selected.secondary != null && (selected.kind != Kind.VIDEO
                     || primary.getDeliveryMethod() == HLS
@@ -559,7 +561,9 @@ final class DownloadPreparation {
                     selected.secondary == null ? 0 : selected.secondarySize);
             nearLength = selected.secondary != null && selected.primarySize > 0
                     && selected.secondarySize > 0 ? requiredSize : 0;
-            if (kind == Kind.AUDIO && format == MediaFormat.M4A) {
+            if (primary.getDeliveryMethod() == HLS) {
+                psName = Postprocessing.ALGORITHM_PVC_HLS_REMUXER;
+            } else if (kind == Kind.AUDIO && format == MediaFormat.M4A) {
                 psName = Postprocessing.ALGORITHM_M4A_NO_DASH;
             } else if (kind == Kind.AUDIO && format == MediaFormat.WEBMA_OPUS) {
                 psName = Postprocessing.ALGORITHM_OGG_FROM_WEBM_DEMUXER;
@@ -567,8 +571,6 @@ final class DownloadPreparation {
                 psName = format == MediaFormat.MPEG_4
                         ? Postprocessing.ALGORITHM_MP4_FROM_DASH_MUXER
                         : Postprocessing.ALGORITHM_WEBM_MUXER;
-            } else if (kind == Kind.VIDEO && primary.getDeliveryMethod() == HLS) {
-                psName = Postprocessing.ALGORITHM_PVC_HLS_REMUXER;
             } else if (kind == Kind.SUBTITLE && format == MediaFormat.TTML) {
                 psName = Postprocessing.ALGORITHM_TTML_CONVERTER;
             } else {

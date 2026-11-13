@@ -324,7 +324,8 @@ public class PvcFromHlsRemuxer extends Postprocessing {
                 try {
                     checkInterrupted();
                     applySegmentDurations(arguments, plan.getSegments());
-                    final int status = executor.execute(arguments);
+                    final int status = executor.execute(mission.kind == 'a'
+                            ? audioArguments(arguments) : arguments);
                     if (status != 0) {
                         throw new IOException("FFmpeg exited with status " + status);
                     }
@@ -348,6 +349,15 @@ public class PvcFromHlsRemuxer extends Postprocessing {
             }
             copyFileToStream(remuxedFile, output);
         });
+    }
+
+    private static String[] audioArguments(final String[] original) {
+        // Select mandatory audio and reject non-AAC codecs rather than silently emitting an
+        // empty file, video, or an unexpected codec under the advertised M4A format.
+        final List<String> arguments = new ArrayList<>(List.of(original));
+        arguments.addAll(arguments.size() - 1, List.of("-map", "0:a:0", "-vn",
+                "-bsf:a", "aac_adtstoasc", "-f", "mp4"));
+        return arguments.toArray(new String[0]);
     }
 
     private static void applySegmentDurations(final String[] arguments,

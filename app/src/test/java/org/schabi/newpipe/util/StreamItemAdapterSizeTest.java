@@ -24,6 +24,29 @@ public class StreamItemAdapterSizeTest {
     }
 
     @Test
+    public void hlsAudioUsesKbpsEstimateAndNeverPlaylistHeaders() {
+        final AudioStream audio = new AudioStream.Builder().setId("hls")
+                .setContent("https://media.test/audio.m3u8", true)
+                .setMediaFormat(MediaFormat.M4A).setAverageBitrate(160)
+                .setDeliveryMethod(org.schabi.newpipe.extractor.stream.DeliveryMethod.HLS).build();
+        final org.schabi.newpipe.extractor.stream.StreamInfo info =
+                org.mockito.Mockito.mock(org.schabi.newpipe.extractor.stream.StreamInfo.class);
+        for (final long duration : new long[]{10, -1, Long.MAX_VALUE}) {
+            org.mockito.Mockito.when(info.getDuration()).thenReturn(duration);
+            final StreamInfoWrapper<AudioStream> wrapper = new StreamInfoWrapper<>(
+                    List.of(audio), null);
+            StreamInfoWrapper.fetchMoreInfo(info, wrapper, url -> {
+                throw new AssertionError("HLS playlist must not be probed for media size");
+            });
+            if (duration == 10) {
+                assertEquals(200000, wrapper.getSizeInBytes(audio));
+            } else {
+                assertTrue(wrapper.getSizeInBytes(audio) < 0);
+            }
+        }
+    }
+
+    @Test
     public void onlyASuccessfulAnswerDescribesTheStream() {
         assertTrue(StreamInfoWrapper.isSuccessful(response(200, "1")));
         assertTrue(StreamInfoWrapper.isSuccessful(response(206, "1")));
