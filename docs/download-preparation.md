@@ -378,9 +378,9 @@ remain existing recovery/error boundaries, not resumable conversion guarantees.
 
 Focused JVM regressions cover admission, detached completion, started-lifetime
 call ordering, checkpoint serialization and stalled playlist/key HTTP cancellation
-with fresh retries. These checks do not establish Android scheduling: the bound
-timeout → resume → unbind path has not yet been executed on a device for this
-change, nor has the platform deadline itself been forced.
+with fresh retries. These checks alone do not establish Android scheduling.
+The native direct-callback follow-up below covers bound timeout/resume/unbind;
+the platform deadline itself has not been forced.
 
 ### Audio HLS native device follow-up (2026-11-13)
 
@@ -396,3 +396,27 @@ The isolated temporary device files were removed and their absence verified;
 app data, settings and UI were unchanged. This verifies the shipped ARM64 native
 conversion path, not the full Java mission/service integration, Android decoding
 or live SoundCloud downloads. Those remain separately unverified for this change.
+
+### Native timeout lifecycle follow-up (2026-11-13)
+
+`DownloadTimeoutDeviceTest` passed on a physical Pixel 6a running Android 17/API
+37 in an explicitly opted-in, newly installed verification package. Two cycles
+invoked the service timeout callback twice, waited for a readable checkpoint,
+resumed from a real foreground About activity, and removed the final test binding.
+Native ActivityManager state confirmed the started/foreground lifetime remained
+active after each unbind; the warm service and manager identity were retained.
+The controlled loopback download finished with exactly 2,097,289 expected bytes
+and retired its checkpoint files. The non-skipped result markers reported two
+cycles and exact-byte verification; the run took 5.194 seconds and the maximum
+paired callback invocation took 7 ms on that run, not a timing guarantee.
+
+The first attempt found a test assertion error: checkpoint storage must pass
+through `StoredFileHelper.deserialize` before its transient URI representation is
+used. The corrected test passed; no production defect was established by that
+failure. This is a direct callback test, not evidence of Android delivering its
+six-hour budget timeout, process-death recovery, or conversion completion after
+service timeout. Existing JVM tests cover additional failure/admission paths.
+
+The disposable debug target and instrumentation packages were removed after the
+run and their absence verified. No existing package was updated or removed, no
+permission was granted, and no global timeout/device setting was changed.

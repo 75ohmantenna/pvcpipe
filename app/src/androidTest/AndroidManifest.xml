@@ -3,7 +3,7 @@
     <application>
         <provider
             android:name="us.shandian.giga.service.DeletionDocumentsProvider"
-            android:authorities="org.seventyfiveohmantenna.pvcpipe.debug.test.download-delete"
+            android:authorities="${downloadTestAuthority}"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS" />

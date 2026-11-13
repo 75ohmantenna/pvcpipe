@@ -133,6 +133,80 @@ an identity or signature mismatch; follow the device-safety procedure below.
 `make ci` is the repository's local gate. Run it before pushing; it does not
 include instrumentation tests or live-network extractor tests.
 
+## Disposable physical-device verification
+
+`-Ppvcpipe.debugVerificationId=<token>` builds a separately named **PVCPipe
+Verification** debug app at
+`org.seventyfiveohmantenna.pvcpipe.verification.<token>.debug`, with a matching
+`.test` instrumentation package and isolated download-test provider authority.
+The token must match `[a-z][a-z0-9]{1,31}`. Without the property, normal debug
+identity, label and provider authority are unchanged. Combining this property
+with `pvcpipe.restoreFixture` is rejected.
+
+Choose a fresh random token. Before installation, inspect both APK manifests,
+test target and signing certificates; verify the exact packages are absent.
+Use an initial install scoped to the intended user **without replacement or
+permission-grant flags**. Never install over an existing package, and never use
+`connectedDebugAndroidTest` on a populated physical device. If another profile
+cannot be inspected, do not probe it or assume it is empty; a fresh token and
+fail-if-existing installation must still prevent replacement of a global package.
+
+`DownloadTimeoutDeviceTest` runs only with both instrumentation arguments
+`disposableVerification=true` and `expectedPackage=<exact verification target>`.
+It validates the package before creating its own fixture directory or preferences.
+Without both arguments it is not device verification: absent arguments skip the
+test, while partial/invalid opt-in fails. Run only this selected class through
+direct instrumentation; do not run the whole destructive integration suite.
+Successful evidence includes `timeoutCycles=2`, `exactBytesVerified=true` and the
+verified byte count, in addition to a passing test result.
+
+After the safe installation checks, the selected invocation is:
+
+```sh
+adb -s <serial> shell am instrument --user <user> -w \
+  -e class us.shandian.giga.service.DownloadTimeoutDeviceTest \
+  -e disposableVerification true -e expectedPackage <verification-target> \
+  <verification-target>.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The test uses a real foreground About activity, a loopback HTTP peer, private
+synthetic bytes and the real bound download service. It invokes `onTimeout`
+directly, waits for a readable checkpoint, explicitly resumes, removes the last
+test binding and checks the native started/foreground lifetime twice. This is
+not evidence that Android delivers its six-hour timeout callback. Do not change
+global timeout budgets, permissions or device settings to run it.
+
+After collecting results, remove only the newly installed verification packages
+for the intended user and verify their absence. Compare the original app's
+package/version/update metadata before and after; this does not inspect or prove
+the contents of its private data.
+
+### Isolated Pixel verification (2026-11-13)
+
+The native timeout test passed on Pixel 6a/Android 17 (API 37); its exact scope
+and result are recorded in [download-preparation.md](download-preparation.md#native-timeout-lifecycle-follow-up-2026-11-13).
+Default debug package/provider identity was checked in the merged manifest.
+Invalid verification identifiers and combining verification with the restore
+fixture both failed at build configuration as intended. Checkstyle and ktlint
+passed. The explicit device run emitted completion markers; absent opt-in emitted
+none, and partial opt-in failed before fixture setup.
+
+A separately identified, signed, non-debuggable 0.2.7 release with a fresh suffix completed
+R8 optimization and resource shrinking. On the same Pixel it cold-launched and
+rendered its main Live tab after the disposable app's notification request was
+declined. No media was played or downloaded. Another app then became foreground;
+the verification process and its paused Main activity remained alive, with no
+AndroidRuntime errors in that process's captured stream. Verification did not
+reclaim focus, so About navigation was not checked. This is limited optimized
+startup/UI evidence, not full extractor, playback, Android decoding or every
+R8-sensitive feature coverage.
+
+All three newly installed verification packages were removed for the test user
+and their absence verified. The original package set and normal app's code path,
+version and update time matched the preflight snapshot. Private user-app data
+was not read or compared. No pre-existing package was updated or removed, no
+permission was granted, and no global device setting was changed.
+
 ## Release signing
 
 Release signing is optional and never falls back to the Android debug key.

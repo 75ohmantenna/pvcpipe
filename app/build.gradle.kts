@@ -31,6 +31,16 @@ val pvcpipeVersion = PvcVersion.name(
 val restoreFixture = providers.gradleProperty("pvcpipe.restoreFixture")
     .map { it.toBooleanStrict() }.getOrElse(false)
 
+// Opt-in disposable debug packages prevent instrumentation from touching an installed app.
+val debugVerificationId = providers.gradleProperty("pvcpipe.debugVerificationId").orNull
+require(debugVerificationId == null || debugVerificationId.matches(Regex("[a-z][a-z0-9]{1,31}"))) {
+    "pvcpipe.debugVerificationId must be a lowercase disposable identifier (2-32 characters)"
+}
+require(debugVerificationId == null || !restoreFixture) {
+    "Disposable debug verification cannot use the restore fixture runner"
+}
+val debugSuffix = debugVerificationId?.let { ".verification.$it.debug" } ?: ".debug"
+
 val releaseSigningOverride = providers.environmentVariable("PVCPIPE_SIGNING_PROPERTIES")
 val releaseSigningFile = layout.projectDirectory.file(
     releaseSigningOverride.orElse(
@@ -68,6 +78,8 @@ configure<ApplicationExtension> {
         } else {
             "androidx.test.runner.AndroidJUnitRunner"
         }
+        manifestPlaceholders["downloadTestAuthority"] =
+            "org.seventyfiveohmantenna.pvcpipe$debugSuffix.test.download-delete"
         if (restoreFixture) {
             testApplicationId = "org.seventyfiveohmantenna.pvcpipe.debug.restorefixture"
         }
@@ -92,8 +104,11 @@ configure<ApplicationExtension> {
         debug {
             isDebuggable = true
 
-            applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "PVCPipe Debug")
+            applicationIdSuffix = debugSuffix
+            resValue(
+                "string", "app_name",
+                if (debugVerificationId == null) "PVCPipe Debug" else "PVCPipe Verification"
+            )
         }
 
         release {
