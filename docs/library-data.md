@@ -115,6 +115,31 @@ stores the results in batches and then trims old entries from the feed.
 - All of this runs inside the app's process. If Android kills the process,
   the refresh is gone.
 
+Manual refresh progress and errors belong to a run and its selected group. A new
+manual run supersedes the old UI producer; timeout/destruction revokes an
+interrupted producer while its accepted database writes can still drain. Queued
+older UI events and acknowledgments cannot replace the newer run. An all-groups
+refresh applies to every group; a group-only refresh does not show its progress
+or errors in unrelated groups. Acknowledging a result leaves the current screen
+intact but new observers start idle.
+
+Feed content invalidation is observed separately from run-owned progress/errors,
+including trim-only writes to feed/streams that do not update subscription
+timestamps. Canceled drains and silent workers can therefore update the list
+without completing or resetting a newer manual run.
+
+Background notification refreshes do not publish manual-feed UI state. They
+still persist their results and return the same cached notification summaries.
+Concurrent workers have separate process-local foreground notification IDs;
+ordinary stream/channel notifications use stable tags, so their URL-derived
+numeric IDs cannot overwrite an untagged foreground slot. Existing notifications
+from older versions may remain untagged until Android dismisses them.
+
+The 2026-11-13 regression tests exercise queued events, reentrant acknowledgment,
+group changes, canceled refresh draining, cached results, and notification-ID
+collisions in controlled JVM/Robolectric tests. This is not verification of
+Android's real foreground-service/WorkManager scheduling on a physical device.
+
 `FeedLoadManager` builds the refresh and does its loading and storing. It
 leaves out subscriptions of services the app does not have, and it uses a
 service's feed extractor in place of loading the channel when the dedicated

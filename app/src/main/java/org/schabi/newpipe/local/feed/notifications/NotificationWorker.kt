@@ -17,13 +17,13 @@ import androidx.work.rxjava3.RxWorker
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Single
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.schabi.newpipe.App
 import org.schabi.newpipe.R
 import org.schabi.newpipe.error.ErrorInfo
 import org.schabi.newpipe.error.ErrorUtil
 import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.local.feed.service.FeedLoadManager
-import org.schabi.newpipe.local.feed.service.FeedLoadService
 import org.schabi.newpipe.local.feed.service.FeedRefresh
 
 /*
@@ -34,6 +34,8 @@ class NotificationWorker(
     appContext: Context,
     workerParams: WorkerParameters
 ) : RxWorker(appContext, workerParams) {
+
+    private val foregroundNotificationId = allocateForegroundNotificationId()
 
     private val notificationHelper by lazy {
         NotificationHelper(appContext)
@@ -96,11 +98,16 @@ class NotificationWorker(
             .setContentTitle(applicationContext.getString(R.string.feed_notification_loading))
             .build()
         setForegroundAsync(
-            ForegroundInfo(FeedLoadService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            ForegroundInfo(foregroundNotificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         )
     }
 
     companion object {
+
+        // Each concurrent worker owns its foreground slot; fixed service IDs are positive.
+        private val nextForegroundNotificationId = AtomicInteger(-1)
+
+        internal fun allocateForegroundNotificationId(): Int = nextForegroundNotificationId.getAndDecrement()
 
         private val TAG = NotificationWorker::class.java.simpleName
         private const val WORK_TAG = App.PACKAGE_NAME + "_streams_notifications"

@@ -35,10 +35,12 @@ class FeedLoadManager(private val context: Context) {
      * Prepare a subscription refresh. Work begins when [FeedRefresh.result] is subscribed.
      * [groupId] selects all subscriptions, notification-enabled subscriptions, or a feed group.
      * [ignoreOutdatedThreshold] checks all selected subscriptions regardless of update age.
+     * [postEvent] is silent unless the manual service supplies its owned UI session.
      */
     fun createRefresh(
         groupId: Long = FeedGroupEntity.GROUP_ALL_ID,
-        ignoreOutdatedThreshold: Boolean = false
+        ignoreOutdatedThreshold: Boolean = false,
+        postEvent: (FeedEventManager.Event) -> Unit = {}
     ): FeedRefresh {
         val defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
         val useFeedExtractor = defaultSharedPreferences.getBoolean(
@@ -69,7 +71,7 @@ class FeedLoadManager(private val context: Context) {
             context.getString(R.string.feed_processing_message),
             Schedulers.io(),
             AndroidSchedulers.mainThread(),
-            FeedEventManager::postEvent
+            postEvent
         )
     }
 

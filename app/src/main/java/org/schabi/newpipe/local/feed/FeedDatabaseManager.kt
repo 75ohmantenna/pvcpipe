@@ -2,6 +2,7 @@ package org.schabi.newpipe.local.feed
 
 import android.content.Context
 import android.util.Log
+import androidx.room.rxjava3.createFlowable
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Flowable
@@ -15,9 +16,12 @@ import org.schabi.newpipe.NewPipeDatabase
 import org.schabi.newpipe.database.AppDatabase
 import org.schabi.newpipe.database.feed.model.FeedEntity
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity
+import org.schabi.newpipe.database.feed.model.FeedGroupSubscriptionEntity
 import org.schabi.newpipe.database.feed.model.FeedLastUpdatedEntity
+import org.schabi.newpipe.database.history.model.StreamHistoryEntity
 import org.schabi.newpipe.database.stream.StreamWithState
 import org.schabi.newpipe.database.stream.model.StreamEntity
+import org.schabi.newpipe.database.stream.model.StreamStateEntity
 import org.schabi.newpipe.database.subscription.NotificationMode
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.exceptions.ParsingException
@@ -40,6 +44,16 @@ class FeedDatabaseManager internal constructor(private val database: AppDatabase
     }
 
     fun groups() = feedGroupTable.getAll()
+
+    /** Includes trim-only writes, which do not update subscription refresh timestamps. */
+    fun contentChanges(): Flowable<Any> = createFlowable(
+        database,
+        FeedEntity.FEED_TABLE,
+        StreamEntity.STREAM_TABLE,
+        StreamStateEntity.STREAM_STATE_TABLE,
+        StreamHistoryEntity.STREAM_HISTORY_TABLE,
+        FeedGroupSubscriptionEntity.FEED_GROUP_SUBSCRIPTION_TABLE
+    )
 
     fun database() = database
 

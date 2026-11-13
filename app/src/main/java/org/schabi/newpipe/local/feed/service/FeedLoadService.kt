@@ -61,6 +61,7 @@ class FeedLoadService : Service() {
 
     private lateinit var feedLoadManager: FeedLoadManager
     private var feedRefresh: FeedRefresh? = null
+    private var eventSession: FeedEventManager.Session? = null
 
     // /////////////////////////////////////////////////////////////////////////
     // Lifecycle
@@ -85,7 +86,9 @@ class FeedLoadService : Service() {
         }
 
         val groupId = intent.getLongExtra(EXTRA_GROUP_ID, FeedGroupEntity.GROUP_ALL_ID)
-        val refresh = feedLoadManager.createRefresh(groupId)
+        val session = FeedEventManager.begin(groupId)
+        eventSession = session
+        val refresh = feedLoadManager.createRefresh(groupId, postEvent = session::post)
         feedRefresh = refresh
         setupNotification(refresh)
         setupBroadcastReceiver()
@@ -131,11 +134,13 @@ class FeedLoadService : Service() {
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         // Stop foreground work promptly; cooperative cancellation flushes collected feed results.
+        eventSession?.close()
         feedRefresh?.cancel()
         stopService()
     }
 
     override fun onDestroy() {
+        eventSession?.close()
         feedRefresh?.cancel()
         disposeAll()
         // The refresh owns draining buffered results independently of these observers.

@@ -11,7 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.preference.PreferenceManager
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Flowable
-import io.reactivex.rxjava3.functions.Function6
+import io.reactivex.rxjava3.functions.Function7
 import io.reactivex.rxjava3.processors.BehaviorProcessor
 import io.reactivex.rxjava3.schedulers.Schedulers
 import java.time.OffsetDateTime
@@ -57,28 +57,31 @@ class FeedViewModel(
 
     private var combineDisposable = Flowable
         .combineLatest(
-            FeedEventManager.events(),
+            FeedEventManager.events(groupId),
             showPlayedItemsFlowable,
             showPartiallyPlayedItemsFlowable,
             showFutureItemsFlowable,
             feedDatabaseManager.notLoadedCount(groupId),
             feedDatabaseManager.oldestSubscriptionUpdate(groupId),
+            feedDatabaseManager.contentChanges(),
 
-            Function6 {
-                    t1: FeedEventManager.Event,
+            Function7 {
+                    t1: FeedEventManager.Envelope,
                     t2: Boolean,
                     t3: Boolean,
                     t4: Boolean,
                     t5: Long,
-                    t6: List<OffsetDateTime?>
+                    t6: List<OffsetDateTime?>,
+                    _: Any
                 ->
-                return@Function6 CombineResultEventHolder(t1, t2, t3, t4, t5, t6.firstOrNull())
+                return@Function7 CombineResultEventHolder(t1, t2, t3, t4, t5, t6.firstOrNull())
             }
         )
         .throttleLatest(DEFAULT_THROTTLE_TIMEOUT, TimeUnit.MILLISECONDS)
         .subscribeOn(Schedulers.io())
         .observeOn(Schedulers.io())
-        .map { (event, showPlayedItems, showPartiallyPlayedItems, showFutureItems, notLoadedCount, oldestUpdate) ->
+        .map { (envelope, showPlayedItems, showPartiallyPlayedItems, showFutureItems, notLoadedCount, oldestUpdate) ->
+            val event = envelope.event
             val streamItems = if (event is SuccessResultEvent || event is IdleEvent) {
                 feedDatabaseManager
                     .getStreams(groupId, showPlayedItems, showPartiallyPlayedItems, showFutureItems)
@@ -87,21 +90,23 @@ class FeedViewModel(
                 arrayListOf()
             }
 
-            CombineResultDataHolder(event, streamItems, notLoadedCount, oldestUpdate)
+            CombineResultDataHolder(envelope, streamItems, notLoadedCount, oldestUpdate)
         }
         .observeOn(AndroidSchedulers.mainThread())
-        .subscribe { (event, listFromDB, notLoadedCount, oldestUpdate) ->
-            mutableStateLiveData.postValue(
+        .subscribe { (envelope, listFromDB, notLoadedCount, oldestUpdate) ->
+            // Work queued by throttleLatest/observeOn must not render an older run.
+            if (!FeedEventManager.isCurrent(envelope)) return@subscribe
+            val event = envelope.event
+            mutableStateLiveData.value =
                 when (event) {
                     is IdleEvent -> FeedState.LoadedState(listFromDB.map { e -> StreamItem(e) }, oldestUpdate, notLoadedCount, listOf())
                     is ProgressEvent -> FeedState.ProgressState(event.currentProgress, event.maxProgress, event.progressMessage)
                     is SuccessResultEvent -> FeedState.LoadedState(listFromDB.map { e -> StreamItem(e) }, oldestUpdate, notLoadedCount, event.itemsErrors)
                     is ErrorResultEvent -> FeedState.ErrorState(event.error)
                 }
-            )
 
             if (event is ErrorResultEvent || event is SuccessResultEvent) {
-                FeedEventManager.reset()
+                FeedEventManager.acknowledge(envelope)
             }
         }
 
@@ -111,7 +116,7 @@ class FeedViewModel(
     }
 
     private data class CombineResultEventHolder(
-        val t1: FeedEventManager.Event,
+        val t1: FeedEventManager.Envelope,
         val t2: Boolean,
         val t3: Boolean,
         val t4: Boolean,
@@ -120,7 +125,7 @@ class FeedViewModel(
     )
 
     private data class CombineResultDataHolder(
-        val t1: FeedEventManager.Event,
+        val t1: FeedEventManager.Envelope,
         val t2: List<StreamWithState>,
         val t3: Long,
         val t4: OffsetDateTime?

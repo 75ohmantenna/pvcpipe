@@ -139,7 +139,7 @@ class FeedRefresh internal constructor(
      * Remove streams from the database which are not linked / used by any table.
      */
     private fun postProcessFeed() = Completable.fromRunnable {
-        postEvent(FeedEventManager.Event.ProgressEvent(R.string.feed_processing_message))
+        postEvent(FeedEventManager.Event.ProgressEvent(progressMessage = R.string.feed_processing_message))
         operations.trim()
 
         postEvent(FeedEventManager.Event.SuccessResultEvent(itemsErrors.toList()))
@@ -148,7 +148,7 @@ class FeedRefresh internal constructor(
         maxProgress.set(-1)
 
         notificationUpdater.onNext(processingDescription)
-        postEvent(FeedEventManager.Event.ProgressEvent(R.string.feed_processing_message))
+        postEvent(FeedEventManager.Event.ProgressEvent(progressMessage = R.string.feed_processing_message))
     }.subscribeOn(io)
 
     class RequestException(

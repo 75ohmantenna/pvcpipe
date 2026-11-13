@@ -74,7 +74,7 @@ class NotificationHelper(val context: Context) {
         showStreamNotifications(newStreams, data.serviceId, avatarIcon)
         // Show summary notification
         if (manager.areNotificationsEnabled()) {
-            manager.notify(data.pseudoId, summaryBuilder.build())
+            manager.notify("feed:channel:${data.serviceId}:${data.url}", data.pseudoId, summaryBuilder.build())
         }
     }
 
@@ -87,7 +87,7 @@ class NotificationHelper(val context: Context) {
             newStreams.forEach { stream ->
                 val notification =
                     createStreamNotification(stream, serviceId, channelIcon)
-                manager.notify(stream.url.hashCode(), notification)
+                manager.notify("feed:stream:$serviceId:${stream.url}", stream.url.hashCode(), notification)
             }
         }
     }

@@ -11,6 +11,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers
 import java.io.IOException
 import java.lang.reflect.Modifier
 import java.time.OffsetDateTime
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +28,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.SQLiteMode
 import org.schabi.newpipe.R
 import org.schabi.newpipe.database.AppDatabase
+import org.schabi.newpipe.database.feed.model.FeedGroupEntity
 import org.schabi.newpipe.database.stream.model.StreamEntity
 import org.schabi.newpipe.database.subscription.SubscriptionEntity
 import org.schabi.newpipe.extractor.localization.DateWrapper
@@ -134,6 +137,7 @@ class FeedNotificationPersistenceTest {
         )
         // Null avatar uses a local drawable only. No image or service network requests.
         NotificationHelper(context).displayNewStreamsNotifications(data)
+        assertTrue(manager.activeNotifications.all { it.tag != null })
         val notifications = manager.activeNotifications.associate { it.id to it.notification }
         assertEquals(104, notifications.size)
         val summary = notifications.getValue(data.pseudoId)
@@ -152,6 +156,66 @@ class FeedNotificationPersistenceTest {
             assertEquals(stream.url, intent.getStringExtra(KEY_URL))
             assertEquals(stream.name, intent.getStringExtra(KEY_TITLE))
             assertEquals(data.serviceId, intent.getIntExtra(KEY_SERVICE_ID, -1))
+        }
+    }
+
+    @Test
+    fun `new stream notification tags preserve foreground slots with colliding numeric IDs`() {
+        val streams = listOf(stream("notice"))
+        val data = FeedNotificationInfo("Channel", null, "https://example.test/channel", 0, streams)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channel = context.getString(R.string.streams_notification_channel_id)
+        manager.createNotificationChannel(NotificationChannel(channel, "Streams", NotificationManager.IMPORTANCE_DEFAULT))
+        val foreground = android.app.Notification.Builder(context, channel).setContentTitle("Foreground").build()
+        manager.notify(data.pseudoId, foreground)
+        manager.notify(streams.single().url.hashCode(), foreground)
+        val helper = NotificationHelper(context)
+        helper.displayNewStreamsNotifications(data)
+        helper.displayNewStreamsNotifications(data)
+        assertEquals(4, manager.activeNotifications.size)
+        assertEquals(2, manager.activeNotifications.count { it.tag == null })
+        assertEquals(2, manager.activeNotifications.count { it.tag != null })
+        manager.cancel(data.pseudoId)
+        manager.cancel(streams.single().url.hashCode())
+        assertEquals(2, manager.activeNotifications.size)
+        assertTrue(manager.activeNotifications.all { it.tag != null })
+    }
+
+    @Test
+    fun `trim after interrupted session reloads idle feed without a terminal UI event`() {
+        val feed = FeedDatabaseManager(database)
+        val stale = stream("stale").apply { uploadDate = DateWrapper(OffsetDateTime.now().minusYears(1)) }
+        val recent = stream("reference")
+        val info = payload("stale-channel", listOf(stale, recent))
+        feed.upsertAll(info.uid, listOf(stale, recent), OffsetDateTime.now().minusYears(2))
+        val group = FeedGroupEntity.GROUP_ALL_ID
+        val beforeTimestamp = feed.oldestSubscriptionUpdate(group).blockingFirst()
+        val store = FeedEventManager.EventStore()
+        val session = store.begin(group)
+        session.close()
+        val trimmed = CountDownLatch(1)
+        val displayed = Flowable.combineLatest(
+            store.events(group),
+            feed.contentChanges()
+        ) { envelope, _ -> envelope }
+            .filter { store.isCurrent(it) && it.event is FeedEventManager.Event.IdleEvent }
+            .map { feed.getStreams(group, true, true, true).blockingGet()!! }
+            .doAfterNext { if (it.size == 1 && it.single().stream.url == recent.url) trimmed.countDown() }
+            .test()
+        try {
+            displayed.awaitCount(1).assertNoErrors()
+            assertEquals(2, displayed.values().last().size)
+            // Neither a canceled producer nor a silent worker needs to publish success
+            // to refresh the data: trim invalidates feed/streams, not feed_last_updated.
+            feed.removeOrphansOrOlderStreams()
+            assertTrue("trimmed feed was not reloaded", trimmed.await(10L, TimeUnit.SECONDS))
+            displayed.assertNoErrors()
+            assertEquals(listOf(recent.url), displayed.values().last().map { it.stream.url })
+            assertEquals(beforeTimestamp, feed.oldestSubscriptionUpdate(group).blockingFirst())
+            session.post(FeedEventManager.Event.SuccessResultEvent())
+            store.events(group).test().assertValue { it.event is FeedEventManager.Event.IdleEvent }
+        } finally {
+            displayed.cancel()
         }
     }
 

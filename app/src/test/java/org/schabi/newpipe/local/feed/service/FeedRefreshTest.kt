@@ -507,6 +507,57 @@ class FeedRefreshTest {
         }
     }
 
+    @Test
+    fun `canceled old refresh persists accepted results without completing newer UI run`() {
+        val store = FeedEventManager.EventStore()
+        val observer = store.events(7L).test()
+        val oldSession = store.begin(7L)
+        val operations = TestOperations(4)
+        val io = TestScheduler()
+        val main = TestScheduler()
+        val refresh = FeedRefresh(7L, threshold, true, operations, "processing", io, main, oldSession::post)
+        val result = refresh.result.test()
+        io.triggerActions()
+        main.triggerActions()
+        io.triggerActions()
+        assertTrue(operations.fetches.isNotEmpty())
+        assertTrue(operations.storedBatches.isEmpty())
+        refresh.cancel()
+        oldSession.close()
+        store.begin(7L).post(FeedEventManager.Event.ProgressEvent(1, 10))
+        val newer = observer.values().last()
+        drain(io, main)
+        result.assertComplete().assertNoErrors()
+        assertEquals(operations.fetches.size, operations.storedBatches.flatten().size)
+        assertEquals(1, operations.trimCalls)
+        assertEquals(newer, observer.values().last())
+        refresh.result.test().assertValue(result.values().single()).assertComplete()
+        assertEquals(1, operations.queries)
+    }
+
+    @Test
+    fun `silent background refresh still persists and returns notification summaries`() {
+        val store = FeedEventManager.EventStore()
+        store.begin(7L).post(FeedEventManager.Event.ProgressEvent(1, 10))
+        val observer = store.events(7L).test()
+        val before = observer.values().single()
+        val operations = TestOperations(4)
+        val refresh = FeedRefresh(
+            FeedLoadManager.GROUP_NOTIFICATION_ENABLED,
+            threshold,
+            true,
+            operations,
+            "processing",
+            Schedulers.trampoline(),
+            Schedulers.trampoline()
+        ) {}
+        val result = refresh.result.test().assertComplete().assertNoErrors().values().single()
+        assertSummaries(operations.storedBatches.single(), result)
+        assertEquals(4, result.size)
+        assertEquals(FeedLoadManager.GROUP_NOTIFICATION_ENABLED, operations.selectedGroup)
+        observer.assertValue(before)
+    }
+
     private fun assertSummaries(stored: List<Notification<FeedUpdateInfo>>, summaries: List<FeedNotificationInfo>) {
         val expected = stored.mapNotNull { it.value }.filter { it.newStreams.isNotEmpty() }
         assertEquals(expected.size, summaries.size)
