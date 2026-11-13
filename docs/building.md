@@ -20,6 +20,27 @@ Toolchain and dependency versions are pinned in `gradle/libs.versions.toml`,
 targets do not make every desktop JDK API available on Android; SDK APIs and
 core-library desugaring still determine runtime availability.
 
+## Dependency integrity boundary
+
+Dependency coordinates are fixed in both version catalogs and the build
+scripts, but this repository does not currently enforce a complete resolved
+transitive dependency lock or Gradle dependency-verification allowlist. The
+wrapper distribution and vendored HLS converter have explicit SHA-256 checks;
+these do not authenticate every downloaded dependency, repository metadata,
+wrapper JAR or installed SDK/JDK. A lock fixes selected versions, not their bytes.
+
+The 2026-11-13 review did not establish dependency drift and did not change
+versions or enable a cache-derived strict policy. Before enabling enforcement,
+review initial checksums and their provenance, then validate the root app,
+`buildSrc`, included extractor and extractor standalone build. Include the
+release gate, Android test and restore-fixture compilation, and host-selected
+tools such as protoc. Review metadata for an explicitly supported host matrix
+rather than assuming one host's cache covers every platform. Automatically
+generated checksums are an initial trust decision, not independent proof of
+authenticity. Verify that a deliberately modified dependency is rejected in an
+isolated cache before enforcing the policy; do not bypass missing coverage with
+broad trusted-group exceptions.
+
 ## Layout
 
 | Path | What is in it |
