@@ -8,6 +8,7 @@ import com.grack.nanojson.JsonWriter
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.io.ObjectOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,10 +26,24 @@ import org.schabi.newpipe.streams.io.SharpOutputStream
 import org.schabi.newpipe.streams.io.StoredFileHelper
 import org.schabi.newpipe.util.ZipHelper
 
-class ImportExportManager(
+class ImportExportManager internal constructor(
     private val fileLocator: BackupFileLocator,
-    private val databaseValidator: DatabaseValidator
+    private val databaseValidator: DatabaseValidator,
+    private val copyPolicy: BackupCopyPolicy
 ) {
+    constructor(fileLocator: BackupFileLocator, databaseValidator: DatabaseValidator) :
+        this(fileLocator, databaseValidator, BackupCopyPolicy())
+
+    fun interface SnapshotCopy {
+        @Throws(IOException::class)
+        fun copy()
+    }
+
+    fun interface Snapshot {
+        @Throws(IOException::class)
+        fun run(copy: SnapshotCopy)
+    }
+
     fun interface DatabaseValidator : RestoreTransaction.Validator {
         @Throws(IOException::class)
         override fun validate(database: Path)
@@ -76,37 +91,33 @@ class ImportExportManager(
         }
     }
 
-    /** Write the database and preferences to the selected document, truncating existing content. */
+    /** Snapshot locally before truncating the selected document or performing provider IO. */
     @Throws(Exception::class)
-    fun exportDatabase(preferences: SharedPreferences, file: StoredFileHelper) {
-        // truncate the file before writing to it, otherwise if the new content is smaller than the
-        // previous file size, the file will retain part of the previous content and be corrupted
-        ZipOutputStream(SharpOutputStream(file.openAndTruncateStream()).buffered()).use { outZip ->
-            // add the database
-            val name = BackupFileLocator.FILE_NAME_DB
-            ZipHelper.addFileToZip(outZip, name, fileLocator.db)
-
-            // Include the legacy format for older importers; current restores prefer JSON.
-            ZipHelper.addFileToZip(
-                outZip,
-                BackupFileLocator.FILE_NAME_SERIALIZED_PREFS
-            ) { byteOutput ->
-                ObjectOutputStream(byteOutput).use { output ->
-                    output.writeObject(preferences.all)
-                    output.flush()
+    fun exportDatabase(preferences: SharedPreferences, file: StoredFileHelper, snapshot: Snapshot) {
+        workingDirectory().use { working ->
+            val database = working.path.resolve(BackupFileLocator.FILE_NAME_DB)
+            val budget = copyPolicy.budget(working.path)
+            snapshot.run {
+                Files.newInputStream(fileLocator.db).use { input ->
+                    budget.copy(input, database, expected = Files.size(fileLocator.db))
                 }
             }
-
-            // add the JSON preferences
-            ZipHelper.addFileToZip(
-                outZip,
-                BackupFileLocator.FILE_NAME_JSON_PREFS
-            ) { byteOutput ->
-                JsonWriter
-                    .indent("")
-                    .on(byteOutput)
-                    .`object`(preferences.all)
-                    .done()
+            // Both encodings describe the same settings snapshot, even if an editor commits
+            // while the ZIP is being written. Copy sets as well as the map itself.
+            val entries = preferences.all.mapValuesTo(HashMap()) { (_, value) ->
+                if (value is Set<*>) HashSet(value) else value
+            }
+            ZipOutputStream(SharpOutputStream(file.openAndTruncateStream()).buffered()).use { outZip ->
+                ZipHelper.addFileToZip(outZip, BackupFileLocator.FILE_NAME_DB, database)
+                ZipHelper.addFileToZip(outZip, BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) { byteOutput ->
+                    ObjectOutputStream(byteOutput).use { output ->
+                        output.writeObject(entries)
+                        output.flush()
+                    }
+                }
+                ZipHelper.addFileToZip(outZip, BackupFileLocator.FILE_NAME_JSON_PREFS) { byteOutput ->
+                    JsonWriter.indent("").on(byteOutput).`object`(entries).done()
+                }
             }
         }
     }
@@ -121,11 +132,14 @@ class ImportExportManager(
 
     fun inspect(file: StoredFileHelper): Inspection = workingDirectory().use { working ->
         try {
-            ZipFile(copyArchive(file, working.path).toFile()).use { zip ->
+            val archive = copyArchive(file, working.path, copyPolicy.budget(working.path))
+            BackupZipMetadata.check(archive, copyPolicy.zipMetadataLimit)
+            ZipFile(archive.toFile()).use { zip ->
                 validateEntries(zip)
                 Inspection(true, offeredSettings(zip))
             }
-        } catch (_: IOException) {
+        } catch (error: IOException) {
+            if (error is BackupResourceException || error is InterruptedIOException) throw error
             Inspection(false, null)
         }
     }
@@ -136,7 +150,9 @@ class ImportExportManager(
         var temporary: Path? = null
         try {
             val preferences = workingDirectory().use { working ->
-                val snapshot = copyArchive(file, working.path)
+                val budget = copyPolicy.budget(working.path)
+                val snapshot = copyArchive(file, working.path, budget)
+                BackupZipMetadata.check(snapshot, copyPolicy.zipMetadataLimit)
                 val candidate = working.path.resolve(BackupFileLocator.FILE_NAME_DB)
                 val decoded = ZipFile(snapshot.toFile()).use { zip ->
                     validateEntries(zip)
@@ -147,14 +163,14 @@ class ImportExportManager(
                             throw IOException("Backup settings changed; inspect the backup again")
                         }
                         val settings = working.path.resolve("settings")
-                        extractVerified(zip, zip.getEntry(settingsEntry), settings)
+                        extractVerified(zip, zip.getEntry(settingsEntry), settings, budget, copyPolicy.settingsLimit)
                         Files.newInputStream(settings).use {
                             if (settingsEntry == BackupFileLocator.FILE_NAME_JSON_PREFS) decodeJson(it) else decodeSerialized(it)
                         }
                     }
                     val database = zip.getEntry(BackupFileLocator.FILE_NAME_DB)
                         ?: throw IOException("Backup does not contain a database")
-                    extractVerified(zip, database, candidate)
+                    extractVerified(zip, database, candidate, budget)
                     if (Files.size(candidate) == 0L) throw IOException("Backup database is empty")
                     entries
                 }
@@ -193,9 +209,9 @@ class ImportExportManager(
         }
     }
 
-    private fun extractVerified(zip: ZipFile, entry: ZipEntry, destination: Path) {
+    private fun extractVerified(zip: ZipFile, entry: ZipEntry, destination: Path, budget: BackupCopyBudget, limit: Long = Long.MAX_VALUE) {
         CheckedInputStream(zip.getInputStream(entry), CRC32()).use { input ->
-            val count = Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING)
+            val count = budget.copy(input, destination, limit, entry.size)
             if (entry.size != count || entry.crc != input.checksum.value) {
                 throw ZipException("Backup entry size or CRC mismatch: ${entry.name}")
             }
@@ -207,10 +223,10 @@ class ImportExportManager(
         return WorkingDirectory(Files.createTempDirectory(fileLocator.db.parent, "backup-restore-"))
     }
 
-    private fun copyArchive(file: StoredFileHelper, directory: Path): Path {
+    private fun copyArchive(file: StoredFileHelper, directory: Path, budget: BackupCopyBudget): Path {
         val snapshot = directory.resolve("source.zip")
         file.stream.use { stream ->
-            Files.copy(SharpInputStream(stream), snapshot)
+            budget.copy(SharpInputStream(stream), snapshot)
         }
         return snapshot
     }

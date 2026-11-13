@@ -15,6 +15,7 @@ import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.settings.export.BackupFileLocator;
 import org.schabi.newpipe.settings.export.BackupDatabaseValidator;
+import org.schabi.newpipe.settings.export.BackupDatabaseSnapshot;
 import org.schabi.newpipe.player.notification.NotificationConstants;
 import org.schabi.newpipe.settings.export.ImportExportManager;
 import org.schabi.newpipe.settings.export.ImportedPreferenceTypes;
@@ -67,6 +68,10 @@ final class BackupRestore {
     interface Platform {
         StoredFileHelper document(Uri uri);
         void checkpoint();
+        default void snapshot(final ImportExportManager.SnapshotCopy copy) throws IOException {
+            checkpoint();
+            copy.copy();
+        }
         void normalizeImportedPreferences(Map<String, Object> values);
         void restart();
         void reportRestoreFailure(Throwable error);
@@ -113,8 +118,8 @@ final class BackupRestore {
             if (archives.hasPendingRestore()) {
                 throw new IOException("A restored database is awaiting restart");
             }
-            platform.checkpoint();
-            archives.exportDatabase(preferences, platform.document(destination));
+            archives.exportDatabase(preferences, platform.document(destination),
+                    platform::snapshot);
             preferences.edit().putString(pathKey, destination.toString()).apply();
             return true;
         }).ignoreElement();
@@ -195,6 +200,12 @@ final class BackupRestore {
         @Override
         public void checkpoint() {
             NewPipeDatabase.checkpoint();
+        }
+
+        @Override
+        public void snapshot(final ImportExportManager.SnapshotCopy copy) throws IOException {
+            BackupDatabaseSnapshot.copy(NewPipeDatabase.getInstance(context)
+                    .getOpenHelper().getWritableDatabase(), copy);
         }
 
         @Override

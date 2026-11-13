@@ -201,10 +201,20 @@ the screen closes.
 [`ImportExportManager`](../app/src/main/java/org/schabi/newpipe/settings/export/ImportExportManager.kt)
 reads and writes the archive.
 
-**Export.** PVCPipe checkpoints the local library database and writes a ZIP
-with three entries: `newpipe.db`, `preferences.json` and `newpipe.settings`
-(the legacy serialized form of the same preferences). It excludes downloaded
-media, the separate finished-downloads database and unfinished-download state.
+**Export.** PVCPipe briefly holds database writer admission while making a private
+local snapshot. In WAL mode a separate connection must backfill every committed
+frame; a pinned older reader that prevents this causes a retryable failure, not an
+incomplete snapshot. Rollback-journal databases use the same writer gate without
+opening a second checkpoint connection. The gate is released before ZIP compression
+or writing to the selected document provider. Failure while preparing the local
+snapshot leaves an existing destination untouched. A later output/provider failure
+can still leave a partial ZIP in the selected destination. This needs temporary space for one database copy;
+writes can wait for that local copy, not for a slow external destination.
+
+The ZIP contains three entries: `newpipe.db`, `preferences.json` and
+`newpipe.settings` (the legacy serialized form). Both settings encodings come from
+one map snapshot with detached sets. The export excludes downloaded media, the
+separate finished-downloads database and unfinished-download state.
 
 **Inspection.** Before a restore the app copies the document to a private temporary
 directory, opens its ZIP central directory and discovers which form of settings
@@ -215,6 +225,29 @@ not validate the database or entry payloads, and is not a retained snapshot.
 When settings are included in the restore, a change in the preferred settings
 format before preparation stops the restore and requires a new inspection.
 Database-only restores do not recheck the settings format.
+
+Temporary archive and extracted files share a streamed byte budget derived from
+available local storage, leaving a small reserve. Actual bytes are checked before
+writing, rather than trusting ZIP entry lengths or imposing a fixed maximum
+library size. Free space is rechecked during copying; this is not a reservation
+against other apps, and later SQLite validation/migration may require additional
+space. IO failures still clean temporary files without publishing a restore.
+
+Before `ZipFile` opens the archive, bounded metadata checks accept ordinary
+single-disk ZIP and ZIP64 directories and reject ambiguous/truncated metadata.
+There may be at most 4,096 entries, and central-directory bytes are capped at the
+smaller of 16 MiB and one thirty-second of the runtime maximum heap. These metadata
+limits do not cap the compressed or expanded database payload. Settings input has
+the same byte cap when settings are selected; database-only restore remains
+available for an archive with oversized settings. This limits input size, not every
+possible decoded-object allocation: legacy serialized collection declarations
+retain the existing vulnerable-format warning and should only come from trusted
+backups.
+
+Copying checks thread interruption between reads and before writes. This does not
+promise immediate cancellation of a blocked document-provider read. Closing the
+settings screen still only detaches its observer; it does not cancel an accepted
+restore or change the transaction/publication ownership described below.
 
 **Restore choices.** The overwrite confirmation still comes first. If the
 backup contains settings, **Restore backup** then explains the two actions:

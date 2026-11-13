@@ -68,7 +68,7 @@ class ImportExportManagerTest {
 
         val output = File.createTempFile("newpipe_", "")
         `when`(storedFileHelper.openAndTruncateStream()).thenReturn(FileStream(output))
-        ImportExportManager(fileLocator) { }.exportDatabase(sharedPreferences, storedFileHelper)
+        ImportExportManager(fileLocator) { }.exportDatabase(sharedPreferences, storedFileHelper) { it.copy() }
 
         val zipFile = ZipFile(output)
         val entries = zipFile.entries().toList()
