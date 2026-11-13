@@ -73,6 +73,7 @@ public class DownloadRangeIntegrityTest {
     private ResponseRule rule;
     // When set, the server answers every HEAD request with this status and no length.
     private volatile int headRefusalStatus;
+    private boolean verifyFixtureTermination;
 
     @FunctionalInterface
     private interface ResponseRule {
@@ -121,7 +122,7 @@ public class DownloadRangeIntegrityTest {
         } finally {
             server.close();
             executor.shutdownNow();
-            if (!retryMissions.isEmpty()) {
+            if (verifyFixtureTermination || !retryMissions.isEmpty()) {
                 assertTrue("HTTP fixture threads leaked",
                         executor.awaitTermination(5, TimeUnit.SECONDS));
             }
@@ -733,22 +734,73 @@ public class DownloadRangeIntegrityTest {
 
     @Test
     public void parallelBlocksRejectDifferentSameSizeRepresentation() throws Exception {
+        verifyFixtureTermination = true;
         final byte[] changed = Arrays.copyOf(content, content.length);
         for (int i = 0; i < changed.length; i++) {
             changed[i] ^= 0x5a;
         }
-        rule = (exchange, start, end) ->
-                sendVersionedRange(exchange, start, end,
-                        start == 0 || "HEAD".equals(exchange.getRequestMethod())
-                                ? content : changed,
-                        start == 0 || "HEAD".equals(exchange.getRequestMethod())
-                                ? "\"v1\"" : "\"v2\"");
+        final CountDownLatch originalBlockRequested = new CountDownLatch(1);
+        final CountDownLatch changedBlockRequested = new CountDownLatch(1);
+        final AtomicReference<Throwable> fixtureFailure = new AtomicReference<>();
+        rule = (exchange, start, end) -> {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                // HEAD discovery/probes must finish before the parallel workers can start.
+                // Hold both representations until distinct real block requests have arrived.
+                (start == 0 ? originalBlockRequested : changedBlockRequested).countDown();
+                final CountDownLatch otherBlock = start == 0
+                        ? changedBlockRequested : originalBlockRequested;
+                try {
+                    if (!otherBlock.await(5, TimeUnit.SECONDS)) {
+                        final IOException failure = new IOException(
+                                "Both block representations were not requested");
+                        fixtureFailure.compareAndSet(null, failure);
+                        throw failure;
+                    }
+                } catch (final InterruptedException interrupted) {
+                    fixtureFailure.compareAndSet(null, interrupted);
+                    Thread.currentThread().interrupt();
+                    throw new IOException(interrupted);
+                }
+            }
+            sendVersionedRange(exchange, start, end,
+                    start == 0 || "HEAD".equals(exchange.getRequestMethod())
+                            ? content : changed,
+                    start == 0 || "HEAD".equals(exchange.getRequestMethod())
+                            ? "\"v1\"" : "\"v2\"");
+        };
         final CountDownLatch terminal = new CountDownLatch(1);
         final DownloadMission mission = mission(terminal);
         mission.threadCount = 3;
-        runAndAwait(mission, terminal);
-        assertTrue(mediaRequests.get() >= 2);
-        assertFailed(mission);
+        try {
+            runAndAwait(mission, terminal);
+            assertNull("HTTP fixture synchronization failed", fixtureFailure.get());
+            assertEquals(0, originalBlockRequested.getCount());
+            assertEquals(0, changedBlockRequested.getCount());
+            assertTrue(mediaRequests.get() >= 2);
+            assertFailed(mission);
+            assertTrue(mission.errObject instanceof ValidatedRange.InvalidRangeException);
+            assertEquals("Ranged response has a different resource validator; restart required",
+                    mission.errObject.getMessage());
+            for (final Thread worker : mission.threads) {
+                assertFalse("download worker did not terminate", worker.isAlive());
+            }
+        } finally {
+            originalBlockRequested.countDown();
+            changedBlockRequested.countDown();
+            try (var logging = mockStatic(Log.class)) {
+                mission.pause();
+            }
+            if (mission.init != null) {
+                mission.init.join(5000);
+                assertFalse("initializer did not terminate", mission.init.isAlive());
+            }
+            if (mission.threads != null) {
+                for (final Thread worker : mission.threads) {
+                    worker.join(5000);
+                    assertFalse("download worker leaked", worker.isAlive());
+                }
+            }
+        }
     }
 
     @Test
