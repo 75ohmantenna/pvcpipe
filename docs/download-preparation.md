@@ -267,6 +267,33 @@ grants read access to that one file.
 - Preview thumbnails for the share sheet come from a separate `FileProvider`
   that covers only the `share_preview` cache folder.
 
+### URL share previews (2026-11-13)
+
+URL sharing keeps its text/title and chooser permissions. Cached image lookup,
+decode, bounded rendering, JPEG creation, URI canonicalization and provider MIME
+lookup run on one background worker. No network image request is made. Preview
+bitmaps are at most 1024 pixels per edge and encoded files at most 2 MiB; cache
+owned images are not recycled or modified. Small hardware bitmaps get a bounded
+software copy; oversized hardware or non-cloneable drawable images use the disk
+cache when available, otherwise sharing falls back to text.
+
+Only one preview is prepared at a time, with at most one pending request. A newer
+share, source pause/destruction or changed detail/player content prevents an old
+request from launching a chooser. Service/popup contexts remain supported. A
+published preview is not removed by the chooser's own lifecycle transition.
+
+Each preview has a unique file, so a later share cannot overwrite an earlier
+recipient's image. Recent files are retained instead of evicted to admit new
+ones. Admission is limited to 64 cache entries and 32 MiB, with a full new-file
+allowance reserved; when full, sharing uses text only. Generated files older
+than seven days are eligible for cleanup on a later share. This is cache data:
+Android may remove it earlier, and URI access still depends on Android grants.
+Canceled unpublished output is removed on the worker.
+
+Controlled JVM/Robolectric regressions cover request ownership, real host bitmap
+rendering/files, retained URIs and chooser grants. They are not a physical-device
+latency measurement or verification of a particular OEM share sheet.
+
 ## SAF stream cleanup
 
 `StoredFileHelper.getStream` uses `FileStreamSAF` for document URIs and

@@ -209,8 +209,10 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
                         }
                     } else if (itemId == R.id.menu_item_share) {
                         if (currentInfo != null) {
+                            final var sharedInfo = currentInfo;
                             ShareUtils.shareText(requireContext(), name,
-                                    currentInfo.getOriginalUrl(), currentInfo.getAvatars());
+                                    sharedInfo.getOriginalUrl(), sharedInfo.getAvatars(),
+                                    getViewLifecycleOwner(), () -> currentInfo == sharedInfo);
                         }
                     } else {
                         return false;

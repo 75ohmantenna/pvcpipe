@@ -330,7 +330,9 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
                     requireContext(),
                     selectedItem.name,
                     selectedItem.url,
-                    selectedItem.thumbnails
+                    selectedItem.thumbnails,
+                    viewLifecycleOwner,
+                    { isResumed }
                 )
 
                 1 -> ShareUtils.openUrlInBrowser(requireContext(), selectedItem.url)

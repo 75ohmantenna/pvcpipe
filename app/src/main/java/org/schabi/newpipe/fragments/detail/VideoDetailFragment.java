@@ -495,7 +495,8 @@ public final class VideoDetailFragment
         binding.detailControlsDownload.setOnClickListener(v -> openDownloadDialog());
         binding.detailControlsShare.setOnClickListener(makeOnClickListener(info ->
                 ShareUtils.shareText(requireContext(), info.getName(), info.getUrl(),
-                        info.getThumbnails())));
+                        info.getThumbnails(), getViewLifecycleOwner(),
+                        () -> currentInfo == info && binding != null)));
         binding.detailControlsOpenInBrowser.setOnClickListener(makeOnClickListener(info ->
                 ShareUtils.openUrlInBrowser(requireContext(), info.getUrl())));
         binding.detailControlsPlayWithKodi.setOnClickListener(makeOnClickListener(info ->

@@ -236,8 +236,11 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         binding.share.setOnClickListener(makeOnClickListener(() -> {
             final PlayQueueItem currentItem = player.getCurrentItem();
             if (currentItem != null) {
+                final View sharedView = binding.getRoot();
                 ShareUtils.shareText(context, currentItem.getTitle(),
-                        player.getVideoUrlAtCurrentTime(), currentItem.getThumbnails());
+                        player.getVideoUrlAtCurrentTime(), currentItem.getThumbnails(), null,
+                        () -> binding != null && sharedView.isAttachedToWindow()
+                                && player.getCurrentItem() == currentItem);
             }
         }));
         binding.share.setOnLongClickListener(v -> {

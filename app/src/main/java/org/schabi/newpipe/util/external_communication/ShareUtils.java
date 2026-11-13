@@ -1,17 +1,16 @@
 package org.schabi.newpipe.util.external_communication;
 
-import static org.schabi.newpipe.MainActivity.DEBUG;
-import static coil3.Image_androidKt.toBitmap;
-
+import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
@@ -19,6 +18,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
+import androidx.lifecycle.LifecycleOwner;
 
 import org.schabi.newpipe.BuildConfig;
 import org.schabi.newpipe.R;
@@ -26,16 +26,20 @@ import org.schabi.newpipe.RouterActivity;
 import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
-import java.nio.file.Files;
-import java.util.Collections;
 import java.util.List;
-
-import coil3.SingletonImageLoader;
-import coil3.disk.DiskCache;
-import coil3.memory.MemoryCache;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 public final class ShareUtils {
     private static final String TAG = ShareUtils.class.getSimpleName();
+
+    private static final SharePreviewCoordinator PREVIEWS = new SharePreviewCoordinator(
+            Executors.newSingleThreadExecutor(runnable -> {
+                final Thread thread = new Thread(runnable, "share-preview");
+                thread.setDaemon(true);
+                return thread;
+            }), runnable -> new Handler(Looper.getMainLooper()).post(runnable));
 
     private ShareUtils() {
     }
@@ -211,6 +215,32 @@ public final class ShareUtils {
                                  @NonNull final String title,
                                  final String content,
                                  final String imagePreviewUrl) {
+        shareText(context, title, content, imagePreviewUrl, lifecycleOwner(context), () -> true);
+    }
+
+    /**
+     * Preview sharing with explicit source ownership (also supports service/player contexts).
+     * @param context chooser context
+     * @param title shared content title
+     * @param content shared text or URL
+     * @param images cached preview candidates
+     * @param owner optional UI lifecycle; service contexts may omit it
+     * @param stillValid main-thread check that the source content is still current
+     */
+    public static void shareText(@NonNull final Context context,
+                                 @NonNull final String title,
+                                 final String content,
+                                 final List<Image> images,
+                                 @Nullable final LifecycleOwner owner,
+                                 @NonNull final BooleanSupplier stillValid) {
+        shareText(context, title, content, ImageStrategy.choosePreferredImage(images),
+                owner, stillValid);
+    }
+
+    private static void shareText(final Context context, final String title, final String content,
+                                  final String imagePreviewUrl, final LifecycleOwner owner,
+                                  final BooleanSupplier stillValid) {
+        PREVIEWS.cancel();
         final Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
         shareIntent.putExtra(Intent.EXTRA_TEXT, content);
@@ -218,19 +248,62 @@ public final class ShareUtils {
             shareIntent.putExtra(Intent.EXTRA_TITLE, title);
             shareIntent.putExtra(Intent.EXTRA_SUBJECT, title);
         }
-
-        // See https://developer.android.com/training/sharing/send#adding-rich-content-previews
-        // If loading of images has been disabled, don't try to generate a content preview
-        if (!TextUtils.isEmpty(imagePreviewUrl) && ImageStrategy.shouldLoadImages()) {
-
-            final ClipData clipData = generateClipDataForImagePreview(context, imagePreviewUrl);
-            if (clipData != null) {
-                shareIntent.setClipData(clipData);
-                shareIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
+        final BooleanSupplier valid = () -> isContextActive(context) && stillValid.getAsBoolean();
+        if (!valid.getAsBoolean()) {
+            return;
         }
+        if (TextUtils.isEmpty(imagePreviewUrl) || !ImageStrategy.shouldLoadImages()) {
+            openAppChooser(context, shareIntent, false);
+            return;
+        }
+        final Context application = context.getApplicationContext();
+        final AtomicReference<ClipData> preview = new AtomicReference<>();
+        PREVIEWS.submit(owner != null ? owner : lifecycleOwner(context), valid, active -> {
+            final var file = SharePreviewStore.prepare(application, imagePreviewUrl, active);
+            if (file != null) {
+                try {
+                    // URI canonicalization/provider MIME lookup also stays off the main thread.
+                    preview.set(ClipData.newUri(application.getContentResolver(), "",
+                            FileProvider.getUriForFile(application,
+                                    BuildConfig.APPLICATION_ID + ".provider", file)));
+                } catch (final RuntimeException error) {
+                    Log.w(TAG, "Cannot attach share preview", error);
+                    file.delete();
+                    return null;
+                }
+            }
+            return file;
+        }, file -> {
+            if (file != null && preview.get() != null) {
+                shareIntent.setClipData(preview.get());
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+            openAppChooser(context, shareIntent, false);
+        });
+    }
 
-        openAppChooser(context, shareIntent, false);
+    @Nullable
+    private static LifecycleOwner lifecycleOwner(final Context context) {
+        final Context unwrapped = unwrapContext(context);
+        return unwrapped instanceof LifecycleOwner ? (LifecycleOwner) unwrapped : null;
+    }
+
+    private static boolean isContextActive(final Context context) {
+        final Context unwrapped = unwrapContext(context);
+        return !(unwrapped instanceof Activity) || (!((Activity) unwrapped).isFinishing()
+                && !((Activity) unwrapped).isDestroyed());
+    }
+
+    private static Context unwrapContext(final Context context) {
+        Context current = context;
+        while (current instanceof ContextWrapper && !(current instanceof Activity)) {
+            final Context base = ((ContextWrapper) current).getBaseContext();
+            if (base == current || base == null) {
+                break;
+            }
+            current = base;
+        }
+        return current;
     }
 
     /**
@@ -298,86 +371,4 @@ public final class ShareUtils {
         }
     }
 
-    /**
-     * Generate a {@link ClipData} with the image of the content shared, if it's in the app cache.
-     *
-     * <p>
-     * In order not to worry about network issues (timeouts, DNS issues, low connection speed, ...)
-     * when sharing a content, only images in the {@link MemoryCache} or {@link DiskCache}
-     * used by the Coil library are used as preview images. If the thumbnail image is not in the
-     * cache, no {@link ClipData} will be generated and {@code null} will be returned.
-     *
-     * <p>
-     * In order to display the image in the content preview of the Android share sheet, an URI of
-     * the content, accessible and readable by other apps has to be generated, so a new file inside
-     * the application cache's {@code share_preview} directory will be generated, named
-     * {@code android_share_sheet_image_preview.jpg} (overwriting any existing file).
-     * The thumbnail will be compressed in JPEG format, with a {@code 90} compression level.
-     * </p>
-     *
-     * <p>
-     * Note that if an exception occurs when generating the {@link ClipData}, {@code null} is
-     * returned.
-     * </p>
-     *
-     * <p>
-     * Using the result of this method when sharing has only an effect on the system share sheet (if
-     * OEMs didn't change Android system standard behavior) on Android API 29 and higher.
-     * </p>
-     *
-     * @param context      the context to use
-     * @param thumbnailUrl the URL of the content thumbnail
-     * @return a {@link ClipData} of the content thumbnail, or {@code null}
-     */
-    @Nullable
-    private static ClipData generateClipDataForImagePreview(
-            @NonNull final Context context,
-            @NonNull final String thumbnailUrl) {
-        try {
-            // Save the image in memory to the application's cache because we need a URI to the
-            // image to generate a ClipData which will show the share sheet, and so an image file
-            final Context applicationContext = context.getApplicationContext();
-            final var loader = SingletonImageLoader.get(context);
-            final var value = loader.getMemoryCache()
-                    .get(new MemoryCache.Key(thumbnailUrl, Collections.emptyMap()));
-
-            final Bitmap cachedBitmap;
-            if (value != null) {
-                cachedBitmap = toBitmap(value.getImage());
-            } else {
-                try (var snapshot = loader.getDiskCache().openSnapshot(thumbnailUrl)) {
-                    if (snapshot != null) {
-                        cachedBitmap = BitmapFactory.decodeFile(snapshot.getData().toString());
-                    } else {
-                        cachedBitmap = null;
-                    }
-                }
-            }
-
-            if (cachedBitmap == null) {
-                return null;
-            }
-
-            final var path = applicationContext.getCacheDir().toPath()
-                    .resolve("share_preview/android_share_sheet_image_preview.jpg");
-            Files.createDirectories(path.getParent());
-            // Any existing file will be overwritten
-            try (var outputStream = Files.newOutputStream(path)) {
-                cachedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-            }
-
-            final ClipData clipData = ClipData.newUri(applicationContext.getContentResolver(), "",
-                    FileProvider.getUriForFile(applicationContext,
-                            BuildConfig.APPLICATION_ID + ".provider",
-                            path.toFile()));
-
-            if (DEBUG) {
-                Log.d(TAG, "ClipData successfully generated for Android share sheet: " + clipData);
-            }
-            return clipData;
-        } catch (final Exception e) {
-            Log.w(TAG, "Error when setting preview image for share sheet", e);
-            return null;
-        }
-    }
 }

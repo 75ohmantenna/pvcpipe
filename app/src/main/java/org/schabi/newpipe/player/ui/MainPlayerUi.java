@@ -764,8 +764,11 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
                 if (currentItem != null) {
                     String videoUrl = player.getVideoUrl();
                     videoUrl += ("&t=" + seconds);
+                    final View sharedView = binding.getRoot();
                     ShareUtils.shareText(context, currentItem.getTitle(),
-                            videoUrl, currentItem.getThumbnails());
+                            videoUrl, currentItem.getThumbnails(), null,
+                            () -> binding != null && sharedView.isAttachedToWindow()
+                                    && player.getCurrentItem() == currentItem);
                 }
             }
         };

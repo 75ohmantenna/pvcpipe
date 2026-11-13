@@ -79,7 +79,7 @@ public final class QueueItemMenuUtil {
                 return true;
             } else if (itemId == R.id.menu_item_share) {
                 shareText(context, item.getTitle(), item.getUrl(),
-                        item.getThumbnails());
+                        item.getThumbnails(), null, view::isAttachedToWindow);
                 return true;
             } else if (itemId == R.id.menu_item_download) {
                 fetchStreamInfoAndSaveToDatabase(context, item.getServiceId(), item.getUrl(),
