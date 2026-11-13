@@ -1,78 +1,305 @@
 package org.schabi.newpipe.extractor.services.youtube;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.jupiter.api.Assertions;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-import org.schabi.newpipe.extractor.InitNewPipeTest;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.downloader.Request;
+import org.schabi.newpipe.extractor.downloader.Response;
 
-import java.util.Arrays;
-import java.util.stream.Stream;
-
-@Disabled("Throttling parameter deobfuscation is currently not functional, "
-    + "see https://github.com/TeamNewPipe/NewPipeExtractor/issues/1339")
-class YoutubeThrottlingParameterDeobfuscationTest implements InitYoutubeTest {
+@Tag("offline")
+class YoutubeThrottlingParameterDeobfuscationTest {
+    static final String PLAYER = "var ar=[fn];fn=function(a){return "
+                                 + "a.split(\"\").reverse().join(\"\")};a.get(\"n\"))&&(b=ar[0](b);"
+                                 + "signatureTimestamp:12345;";
     @BeforeEach
-    void beforeEach() {
-        InitNewPipeTest.initEmpty();
-        YoutubeTestsUtils.ensureStateless();
+    void reset() {
+        YoutubeJavaScriptPlayerManager.clearAllCaches();
     }
 
+    @AfterEach
+    void cleanup() {
+        YoutubeJavaScriptPlayerManager.clearAllCaches();
+        NewPipe.init(null);
+    }
 
-    @Test
-    void testExtractFunction__success() {
-        InitNewPipeTest.initNewPipe(getClass(), "extractSuccess");
+    static Response response(String url, String body) {
+        return new Response(200, "OK", null, body, url);
+    }
 
-        final String[] videoIds = {"jE1USQrs1rw", "CqxjzfudGAc", "goH-9MfQI7w", "KYIdr_7H5Yw", "J1WeqmGbYeI"};
-
-        final String obfuscatedUrl = "https://r6---sn-4g5ednek.googlevideo.com/videoplayback?expire=1626562120&ei=6AnzYO_YBpql1gLGkb_IBQ&ip=127.0.0.1&id=o-ANhBEf36Z5h-8U9DDddtPDqtS0ZNwf0XJAAigudKI2uI&itag=278&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278&source=youtube&requiressl=yes&vprv=1&mime=video%2Fwebm&ns=TvecOReN0vPuXb3j_zq157IG&gir=yes&clen=2915100&dur=270.203&lmt=1608157174907785&keepalive=yes&fexp=24001373,24007246&c=WEB&txp=5535432&n=N9BWSTFT7vvBJrvQ&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&alr=yes&sig=AOq0QJ8wRQIgW6XnUDKPDSxiT0_KE_tDDMpcaCJl2Un5p0Fu9qZNQGkCIQDWxsDHi_s2BEmRqIbd1C5g_gzfihB7RZLsScKWNMwzzA%3D%3D&cpn=9r2yt3BqcYmeb2Yu&cver=2.20210716.00.00&redirect_counter=1&cm2rm=sn-4g5ezy7s&cms_redirect=yes&mh=Y5&mm=34&mn=sn-4g5ednek&ms=ltu&mt=1626540524&mv=m&mvi=6&pl=43&lsparams=mh,mm,mn,ms,mv,mvi,pl&lsig=AG3C_xAwRQIhAIUzxTn9Vw1-vm-_7OQ5-0h1M6AZsY9Bx1FlCCTeMICzAiADtGggbn4Znsrh2EnvyOsGnYdRGcbxn4mW9JMOQiInDQ%3D%3D&range=259165-480735&rn=11&rbuf=20190";
-
-        Assertions.assertAll(
-            Arrays.stream(videoIds)
-                .flatMap(videoId -> {
-                    final String deobfuscatedUrl =
-                        assertDoesNotThrow(() -> YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
-                            videoId, obfuscatedUrl));
-                    return assertDeobfuscation(obfuscatedUrl, deobfuscatedUrl);
-                })
-        );
+    static void install(String code) {
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(Request r) {
+                return response(
+                        r.url(), r.url().endsWith("iframe_api") ? "player\\/12345678\\/" : code);
+            }
+        });
     }
 
     @Test
-    void testDecode__success() throws ParsingException {
-        InitNewPipeTest.initNewPipe(getClass(), "decodeSuccess");
-        
-        // URL extracted from browser with the developer tools
-        final String obfuscatedUrl = "https://r6---sn-4g5ednek.googlevideo.com/videoplayback?expire=1626562120&ei=6AnzYO_YBpql1gLGkb_IBQ&ip=127.0.0.1&id=o-ANhBEf36Z5h-8U9DDddtPDqtS0ZNwf0XJAAigudKI2uI&itag=278&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278&source=youtube&requiressl=yes&vprv=1&mime=video%2Fwebm&ns=TvecOReN0vPuXb3j_zq157IG&gir=yes&clen=2915100&dur=270.203&lmt=1608157174907785&keepalive=yes&fexp=24001373,24007246&c=WEB&txp=5535432&n=N9BWSTFT7vvBJrvQ&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&alr=yes&sig=AOq0QJ8wRQIgW6XnUDKPDSxiT0_KE_tDDMpcaCJl2Un5p0Fu9qZNQGkCIQDWxsDHi_s2BEmRqIbd1C5g_gzfihB7RZLsScKWNMwzzA%3D%3D&cpn=9r2yt3BqcYmeb2Yu&cver=2.20210716.00.00&redirect_counter=1&cm2rm=sn-4g5ezy7s&cms_redirect=yes&mh=Y5&mm=34&mn=sn-4g5ednek&ms=ltu&mt=1626540524&mv=m&mvi=6&pl=43&lsparams=mh,mm,mn,ms,mv,mvi,pl&lsig=AG3C_xAwRQIhAIUzxTn9Vw1-vm-_7OQ5-0h1M6AZsY9Bx1FlCCTeMICzAiADtGggbn4Znsrh2EnvyOsGnYdRGcbxn4mW9JMOQiInDQ%3D%3D&range=259165-480735&rn=11&rbuf=20190";
-        final String deobfuscatedUrl =
+    void onlyNValueChanges() throws Exception {
+        install(PLAYER);
+        assertEquals("https://example.test/abc?other=abc&n=cba#abc",
                 YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
-                        "jE1USQrs1rw", obfuscatedUrl);
-        // The deobfuscation function changes over time, so we just check if the corresponding
-        // parameter changed
-        Assertions.assertAll(assertDeobfuscation(obfuscatedUrl, deobfuscatedUrl));
-    }
-
-    private Stream<Executable> assertDeobfuscation(final String obfuscatedUrl, final String deobfuscatedUrl) {
-        return Stream.of(
-            () -> assertNotEquals(obfuscatedUrl, deobfuscatedUrl),
-            () -> assertFalse(deobfuscatedUrl.contains("&n=&"), "Extracted n parameter is empty for " + deobfuscatedUrl)
-        );
+                        "id", "https://example.test/abc?other=abc&n=abc#abc"));
     }
 
     @Test
-    void testDecode__noThrottlingParam__success() throws ParsingException {
-        final String noNParamUrl = "https://r5---sn-4g5ednsz.googlevideo.com/videoplayback?expire=1626553257&ei=SefyYPmIFoKT1wLtqbjgCQ&ip=127.0.0.1&id=o-AIT5xGifsaEAdEOAb5vd06J9VNtm-KHHolnaZRGPjHZi&itag=140&source=youtube&requiressl=yes&mh=xO&mm=31%2C29&mn=sn-4g5ednsz%2Csn-4g5e6nsr&ms=au%2Crdu&mv=m&mvi=5&pl=24&initcwndbps=1322500&vprv=1&mime=audio%2Fmp4&ns=cA2SS5atEe0mH8tMwGTO4RIG&gir=yes&clen=3009275&dur=185.898&lmt=1626356984653961&mt=1626531173&fvip=5&keepalive=yes&fexp=24001373%2C24007246&beids=23886212&c=WEB&txp=6411222&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAPueRlTutSlzPafxrqBmgZz5m7-Zfbw3QweDp3j4XO9SAiEA5tF7_ZCJFKmS-D6I1jlUURjpjoiTbsYyKuarV4u6E8Y%3D&sig=AOq0QJ8wRQIgRD_4WwkPeTEKGVSQqPsznMJGqq4nVJ8o1ChGBCgi4Y0CIQCZT3tI40YLKBWJCh2Q7AlvuUIpN0ficzdSElLeQpJdrw==";
-        final String deobfuscatedUrl =
-                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
-                        "jE1USQrs1rw", noNParamUrl);
+    void directFunctionName() throws Exception {
+        assertEquals("fn",
+                YoutubeThrottlingParameterUtils.getDeobfuscationFunctionName(
+                        "fn=function(a){return a};a.get(\"n\"))&&(b=fn(b)"));
+    }
 
-        assertEquals(noNParamUrl, deobfuscatedUrl);
+    @Test
+    void clearedGenerationCannotBeRepopulatedByOldDownload() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(Request r) throws java.io.IOException {
+                if (r.url().endsWith("iframe_api"))
+                    return response(r.url(), "player\\/12345678\\/");
+                boolean old = Thread.currentThread().getName().equals("old-player");
+                if (old) {
+                    entered.countDown();
+                    try {
+                        if (!release.await(5, TimeUnit.SECONDS))
+                            throw new java.io.IOException("latch timeout");
+                    } catch (InterruptedException e) {
+                        throw new java.io.IOException(e);
+                    }
+                }
+                return response(r.url(), "signatureTimestamp:" + (old ? "11111" : "22222"));
+            }
+        });
+        ExecutorService executor =
+                Executors.newSingleThreadExecutor(r -> new Thread(r, "old-player"));
+        Future<Integer> old =
+                executor.submit(() -> YoutubeJavaScriptPlayerManager.getSignatureTimestamp("id"));
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            YoutubeJavaScriptPlayerManager.clearAllCaches();
+            assertEquals(22222, YoutubeJavaScriptPlayerManager.getSignatureTimestamp("id"));
+            release.countDown();
+            assertEquals(11111, old.get(5, TimeUnit.SECONDS));
+            assertEquals(22222, YoutubeJavaScriptPlayerManager.getSignatureTimestamp("id"));
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void recorded2026SignatureHasIndependentlyVerifiedOutput() throws Exception {
+        // Existing c9168c90 fixture, recorded January 2026. Golden independently
+        // verified in Node22/V8 and Rhino using only the extracted function.
+        // This is NOT evidence of current-live n deobfuscation compatibility.
+        try (var in = getClass().getResourceAsStream(
+                     "/mocks/v1/org/schabi/newpipe/extractor/services/youtube/youtubesignatures/"
+                     + "generated_mock_1.json")) {
+            assertNotNull(in);
+            String code = com.grack.nanojson.JsonParser.object()
+                                  .from(in)
+                                  .getObject("response")
+                                  .getString("responseBody");
+            install(code);
+            long coldStart = System.nanoTime();
+            assertEquals("6543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponalkjihgfedcbm",
+                    YoutubeJavaScriptPlayerManager.deobfuscateSignature("id",
+                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"));
+            long coldNanos = System.nanoTime() - coldStart;
+            long warmStart = System.nanoTime();
+            for (int i = 0; i < 20; i++)
+                assertEquals("6543210ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponalkjihgfedcbm",
+                        YoutubeJavaScriptPlayerManager.deobfuscateSignature("id",
+                                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"));
+            System.out.printf("Recorded signature diagnostic: cold %.3fms, warm mean %.3fms%n",
+                    coldNanos / 1e6, (System.nanoTime() - warmStart) / 20e6);
+            assertEquals(20472, YoutubeJavaScriptPlayerManager.getSignatureTimestamp("id"));
+        }
+    }
+
+    @Test
+    void dollarArgumentEarlyReturnIsRemoved() throws Exception {
+        String code = "fn=function($a){var b=0;if(typeof missing===\"undefined\")return $a;return "
+                      + "$a.split(\"\").reverse().join(\"\")};";
+        assertEquals("cba",
+                org.schabi.newpipe.extractor.utils.JavaScript.run(
+                        YoutubeThrottlingParameterUtils.getDeobfuscationFunction(code, "fn"), "fn",
+                        "abc"));
+    }
+
+    @Test
+    void whitespaceRegexFallbackRemainsCallable() throws Exception {
+        String code =
+                "fn = function(a){a=a.split(\"\");try{a.reverse()}catch(e){}return a.join(\"\")};";
+        assertEquals("cba",
+                org.schabi.newpipe.extractor.utils.JavaScript.run(
+                        YoutubeThrottlingParameterUtils.getDeobfuscationFunction(code, "fn"), "fn",
+                        "abc"));
+    }
+
+    @Test
+    void noParameterDoesNotFetchOrModifyUrl() throws Exception {
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(Request request) {
+                throw new AssertionError("unexpected download");
+            }
+        });
+        for (String url :
+                new String[] {"https://example.test/a?x=1", "https://example.test/a&n=abc",
+                        "https://example.test/a#?n=abc", "https://example.test/a?x=z?n=abc",
+                        "https://example.test/a?n=", "https://example.test/a?x=1#&n=abc"}) {
+            assertEquals(url,
+                    YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                            "id", url));
+        }
+    }
+
+    @Test
+    void encodedValueAndDuplicateKeysPreserveOtherBytes() throws Exception {
+        install(PLAYER);
+        assertEquals("https://example.test/?n=%2Bba&other=a%62%2B#frag",
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                        "id", "https://example.test/?n=a%62%2B&other=a%62%2B#frag"));
+        assertEquals("https://example.test/?n=&n=cba&n=xyz",
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                        "id", "https://example.test/?n=&n=abc&n=xyz"));
+        assertEquals("https://example.test/?n=%26ba",
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                        "id", "https://example.test/?n=ab%26"));
+    }
+
+    @Test
+    void malformedEncodingFailsBeforeFetching() {
+        NewPipe.init(null);
+        assertThrows(org.schabi.newpipe.extractor.exceptions.ParsingException.class,
+                ()
+                        -> YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                                "id", "https://example.test/?n=%ZZ"));
+    }
+
+    @Test
+    void concurrentColdCallsShareOneFetchAndIndependentEvaluations() throws Exception {
+        var fetches = new java.util.concurrent.atomic.AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(Request request) {
+                if (request.url().endsWith("iframe_api"))
+                    return response(request.url(), "player\\/12345678\\/");
+                fetches.incrementAndGet();
+                return response(request.url(), PLAYER);
+            }
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            java.util.List<Future<String>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < 32; i++) {
+                final String value = "token" + i;
+                results.add(pool.submit(() -> {
+                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                    return YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                            "id", "https://example.test/?n=" + value);
+                }));
+            }
+            start.countDown();
+            for (int i = 0; i < 32; i++)
+                assertEquals("https://example.test/?n=" + new StringBuilder("token" + i).reverse(),
+                        results.get(i).get(10, TimeUnit.SECONDS));
+            assertEquals(1, fetches.get());
+            assertEquals(32, YoutubeJavaScriptPlayerManager.getThrottlingParametersCacheSize());
+            assertEquals("https://example.test/?n=0nekot",
+                    YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                            "different-video", "https://example.test/?n=token0"));
+            assertEquals(1, fetches.get());
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void parameterClearRetiresInFlightResultMapButKeepsPlayer() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        var fetches = new java.util.concurrent.atomic.AtomicInteger();
+        NewPipe.init(new Downloader() {
+            @Override
+            public Response execute(Request request) throws java.io.IOException {
+                if (request.url().endsWith("iframe_api"))
+                    return response(request.url(), "player\\/12345678\\/");
+                fetches.incrementAndGet();
+                entered.countDown();
+                try {
+                    if (!release.await(5, TimeUnit.SECONDS))
+                        throw new java.io.IOException("timeout");
+                } catch (InterruptedException e) {
+                    throw new java.io.IOException(e);
+                }
+                return response(request.url(), PLAYER);
+            }
+        });
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        Future<String> result = pool.submit(
+                ()
+                        -> YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                                "id", "https://example.test/?n=abc"));
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            YoutubeJavaScriptPlayerManager.clearThrottlingParametersCache();
+            release.countDown();
+            assertEquals("https://example.test/?n=cba", result.get(5, TimeUnit.SECONDS));
+            assertEquals(0, YoutubeJavaScriptPlayerManager.getThrottlingParametersCacheSize());
+            assertEquals("https://example.test/?n=cba",
+                    YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                            "id", "https://example.test/?n=abc"));
+            assertEquals(1, YoutubeJavaScriptPlayerManager.getThrottlingParametersCacheSize());
+            assertEquals(1, fetches.get());
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void onlySelectedFunctionIsEvaluatedAndExtractionErrorsAreRetired() throws Exception {
+        install("throw new Error('full player must not execute');" + PLAYER);
+        assertEquals("https://example.test/?n=cba",
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                        "id", "https://example.test/?n=abc"));
+        YoutubeJavaScriptPlayerManager.clearAllCaches();
+        install("var unsupported=1;");
+        var first = assertThrows(org.schabi.newpipe.extractor.exceptions.ParsingException.class,
+                ()
+                        -> YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                                "id", "https://example.test/?n=abc"));
+        install(PLAYER);
+        assertSame(first,
+                assertThrows(org.schabi.newpipe.extractor.exceptions.ParsingException.class,
+                        ()
+                                -> YoutubeJavaScriptPlayerManager
+                                           .getUrlWithThrottlingParameterDeobfuscated(
+                                                   "id", "https://example.test/?n=abc")));
+        YoutubeJavaScriptPlayerManager.clearAllCaches();
+        assertEquals("https://example.test/?n=cba",
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                        "id", "https://example.test/?n=abc"));
     }
 }

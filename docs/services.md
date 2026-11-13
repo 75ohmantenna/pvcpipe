@@ -114,6 +114,36 @@ restriction, visionOS, and optionally iOS. The app supplies proof tokens only
 through the web-client provider; see [playback.md](playback.md#youtube-proof-tokens).
 A `login_required` response mentioning a bot becomes `SignInConfirmNotBotException`.
 
+### JavaScript compatibility regression coverage — 2026-11-13
+
+The deterministic `forkCiTest` gate now runs exact-output throttling-function
+shape tests instead of the disabled legacy live tests. They cover direct and
+array-selected names, dollar-named parameters, early-return removal, the regex
+fallback, selected-function-only evaluation, URL query boundaries and encoding,
+and cold/warm/cache-clear concurrency. Only the first nonempty `n` query value
+is transformed; unrelated query bytes, path and fragment are preserved. Malformed
+percent encoding fails with a parsing error before downloading player code.
+
+Player cache generations isolate in-flight work from explicit clears. Cold
+script/function extraction is synchronized per generation; independent JavaScript
+evaluations remain outside that lock. Parameter-only clears retain the selected
+player but retire the old result map. Controlled concurrent tests assert one
+cold fetch and separate correct results, not physical-device throughput.
+
+The stored January 2026 `c9168c90` player verifies the exact signature output and
+timestamp. The signature golden was independently checked with Node 22/V8 and
+Rhino using the extracted function, not the full player. Diagnostic cold/warm
+timings are informational, not a timing-sensitive test or phone benchmark.
+
+**Known unresolved compatibility gap:** investigation of that same historical
+player found the broad throttling-name pattern selects an unrelated URL helper
+(`FI`), which leaves the tested `n` unchanged. This is not a valid deobfuscation
+result or an intentional compatibility contract. The synthetic shape tests do
+not establish modern/live throttling support. A modern algorithm still needs a
+verified input/output oracle before replacing the working signature path or
+introducing full-player evaluation. No such modernization or live-playback
+claim is included in this change.
+
 ## SoundCloud
 
 SoundCloud is audio only. Client-ID discovery tries the mobile runtime config

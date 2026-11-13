@@ -18,10 +18,6 @@ import java.util.regex.Pattern;
  */
 final class YoutubeThrottlingParameterUtils {
 
-    // NOTE: When changing this you should also change the quick exit/shortcut
-    // in getThrottlingParameterFromStreamingUrl
-    private static final Pattern THROTTLING_PARAM_PATTERN = Pattern.compile("[&?]n=([^&]+)");
-
     private static final String SINGLE_CHAR_VARIABLE_REGEX = "[a-zA-Z0-9$_]";
 
     private static final String MULTIPLE_CHARS_REGEX = SINGLE_CHAR_VARIABLE_REGEX + "+";
@@ -123,7 +119,7 @@ final class YoutubeThrottlingParameterUtils {
     // See https://stackoverflow.com/q/45074813
     @SuppressWarnings("RegExpRedundantEscape")
     private static final String DEOBFUSCATION_FUNCTION_BODY_REGEX =
-            "=\\s*function([\\S\\s]*?\\}\\s*return [\\w$]+?\\.join\\(\"\"\\)\\s*\\};)";
+            "\\s*=\\s*function([\\S\\s]*?\\}\\s*return [\\w$]+?\\.join\\(\"\"\\)\\s*\\};)";
 
     private static final String DEOBFUSCATION_FUNCTION_ARRAY_OBJECT_TYPE_DECLARATION_REGEX = "var ";
 
@@ -131,7 +127,7 @@ final class YoutubeThrottlingParameterUtils {
             "\\s*=\\s*\\[(.+?)][;,]";
 
     private static final String FUNCTION_ARGUMENTS_REGEX =
-            "=\\s*function\\s*\\(\\s*([^)]*)\\s*\\)";
+            "function\\s*(?:[\\w$]+\\s*)?\\(\\s*([^)]*)\\s*\\)";
 
     private static final String EARLY_RETURN_REGEX =
             ";\\s*if\\s*\\(\\s*typeof\\s+" + MULTIPLE_CHARS_REGEX
@@ -161,7 +157,7 @@ final class YoutubeThrottlingParameterUtils {
         }
 
         final String functionName = matcher.group(1);
-        if (matcher.groupCount() == 1) {
+        if (matcher.groupCount() == 1 || matcher.group(2) == null) {
             return functionName;
         }
 
@@ -172,7 +168,10 @@ final class YoutubeThrottlingParameterUtils {
                         + FUNCTION_NAMES_IN_DEOBFUSCATION_ARRAY_REGEX);
         final String arrayStr = Parser.matchGroup1(arrayPattern, javaScriptPlayerCode);
         final String[] names = arrayStr.split(",");
-        return names[arrayNum];
+        if (arrayNum >= names.length) {
+            throw new ParsingException("Throttling function array index is out of range");
+        }
+        return names[arrayNum].trim();
     }
 
     /**
@@ -205,19 +204,33 @@ final class YoutubeThrottlingParameterUtils {
      */
     @Nullable
     static String getThrottlingParameterFromStreamingUrl(@Nonnull final String streamingUrl) {
-        // Do a quick check if the n parameter is even present, if not abort
-        // This improves performance by 60-900x
-        if (!streamingUrl.contains("&n=") && !streamingUrl.contains("?n=")) {
+        final int[] span = throttlingParameterSpan(streamingUrl);
+        return span == null || span[0] == span[1] ? null
+                : streamingUrl.substring(span[0], span[1]);
+    }
+
+    // Match within the query only, never a path or fragment that merely resembles a query.
+    @Nullable
+    static int[] throttlingParameterSpan(final String url) {
+        if (!url.contains("?n=") && !url.contains("&n=")) {
             return null;
         }
-        try {
-            return Parser.matchGroup1(THROTTLING_PARAM_PATTERN, streamingUrl);
-        } catch (final Parser.RegexException e) {
-            // If the throttling parameter could not be parsed from the URL, it means that there is
-            // no throttling parameter
-            // Return null in this case
+        final int query = url.indexOf('?');
+        final int fragment = url.indexOf('#');
+        if (query < 0 || (fragment >= 0 && fragment < query)) {
             return null;
         }
+        final int end = fragment < 0 ? url.length() : fragment;
+        int start = query + 1;
+        while (start < end) {
+            final int delimiter = url.indexOf('&', start);
+            final int valueEnd = delimiter < 0 || delimiter > end ? end : delimiter;
+            if (url.startsWith("n=", start) && valueEnd > start + 2) {
+                return new int[]{start + 2, valueEnd};
+            }
+            start = valueEnd + 1;
+        }
+        return null;
     }
 
     @Nonnull
@@ -272,7 +285,7 @@ final class YoutubeThrottlingParameterUtils {
                 .matchGroup1(FUNCTION_ARGUMENTS_REGEX, function)
                 .split(",")[0].trim();
         final Pattern earlyReturnPattern = Pattern.compile(
-                EARLY_RETURN_REGEX + firstArgName + ";",
+                EARLY_RETURN_REGEX + Pattern.quote(firstArgName) + ";",
                 Pattern.DOTALL);
         final Matcher earlyReturnCodeMatcher = earlyReturnPattern.matcher(function);
         return earlyReturnCodeMatcher.replaceFirst(";");

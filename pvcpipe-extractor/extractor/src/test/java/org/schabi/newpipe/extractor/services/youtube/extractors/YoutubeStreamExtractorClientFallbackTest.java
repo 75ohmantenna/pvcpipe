@@ -40,7 +40,7 @@ class YoutubeStreamExtractorClientFallbackTest {
     private ContentCountry previousCountry;
     private Object previousProvider;
     private boolean previousIos;
-    private Object previousSignatureTimestamp;
+    private Object previousPlayerData;
     private Object previousClientVersion;
     private Object previousClientVersionExtracted;
 
@@ -51,14 +51,16 @@ class YoutubeStreamExtractorClientFallbackTest {
         previousCountry = NewPipe.getPreferredContentCountry();
         previousProvider = field(YoutubeStreamExtractor.class, "poTokenProvider").get(null);
         previousIos = (boolean) field(YoutubeStreamExtractor.class, "fetchIosClient").get(null);
-        previousSignatureTimestamp = field(YoutubeJavaScriptPlayerManager.class,
-                "cachedSignatureTimestamp").get(null);
+        previousPlayerData = field(YoutubeJavaScriptPlayerManager.class,
+                "current").get(null);
         previousClientVersion = field(YoutubeParsingHelper.class, "clientVersion").get(null);
         previousClientVersionExtracted = field(YoutubeParsingHelper.class,
                 "clientVersionExtracted").get(null);
         YoutubeStreamExtractor.setPoTokenProvider(null);
         YoutubeStreamExtractor.setFetchIosClient(false);
-        field(YoutubeJavaScriptPlayerManager.class, "cachedSignatureTimestamp").set(null, 12345);
+        YoutubeJavaScriptPlayerManager.clearAllCaches();
+        final Object fixturePlayer = field(YoutubeJavaScriptPlayerManager.class, "current").get(null);
+        field(fixturePlayer.getClass(), "timestamp").set(fixturePlayer, 12345);
         field(YoutubeParsingHelper.class, "clientVersion").set(null, "2.20261001.00.00");
         field(YoutubeParsingHelper.class, "clientVersionExtracted").set(null, true);
     }
@@ -68,7 +70,7 @@ class YoutubeStreamExtractorClientFallbackTest {
         field(YoutubeStreamExtractor.class, "poTokenProvider").set(null, previousProvider);
         YoutubeStreamExtractor.setFetchIosClient(previousIos);
         field(YoutubeJavaScriptPlayerManager.class,
-                "cachedSignatureTimestamp").set(null, previousSignatureTimestamp);
+                "current").set(null, previousPlayerData);
         field(YoutubeParsingHelper.class, "clientVersion").set(null, previousClientVersion);
         field(YoutubeParsingHelper.class, "clientVersionExtracted")
                 .set(null, previousClientVersionExtracted);

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -27,10 +26,7 @@ class YoutubeSignatureTimestampTest {
 
     @Test
     void overflowingTimestampThrowsOnEveryCall() throws Exception {
-        final Field playerCode = YoutubeJavaScriptPlayerManager.class
-                .getDeclaredField("cachedJavaScriptPlayerCode");
-        playerCode.setAccessible(true);
-        playerCode.set(null, "var player={signatureTimestamp:2147483648};");
+        YoutubeThrottlingParameterDeobfuscationTest.install("var player={signatureTimestamp:2147483648};");
 
         final ParsingException first = assertThrows(ParsingException.class,
                 () -> YoutubeJavaScriptPlayerManager.getSignatureTimestamp("unused"));
