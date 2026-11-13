@@ -1,8 +1,11 @@
 package us.shandian.giga.service;
 
 import android.content.Context;
+import android.app.ActivityManager;
 import android.util.AtomicFile;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -15,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import us.shandian.giga.get.DownloadMission;
 import us.shandian.giga.get.FinishedMission;
@@ -47,7 +51,10 @@ public class DownloadManager {
     private final ArrayList<DownloadMission> mMissionsPending = new ArrayList<>();
     private final ArrayList<FinishedMission> mMissionsFinished;
 
-    private final Handler mHandler;
+    private volatile Handler mHandler;
+    private volatile boolean timeoutSuspended;
+    private volatile boolean serviceAttached = true;
+    private volatile CompletableFuture<Void> timeoutPause;
     private final File mPendingMissionsDir;
 
     private NetworkState mLastNetworkStatus = NetworkState.Unavailable;
@@ -84,6 +91,84 @@ public class DownloadManager {
         mPendingMissionsDir = getPendingDir(context);
 
         loadPendingMissions(context);
+    }
+
+    /** Close every admission path before scheduling potentially slow checkpoint writes. */
+    void suspendForTimeout() {
+        timeoutSuspended = true;
+        if (timeoutPause == null) {
+            timeoutPause = CompletableFuture.runAsync(() -> pauseAllMissions(true),
+                    task -> new Thread(task, "DownloadTimeoutPause").start());
+        }
+    }
+
+    boolean isTimeoutSuspended() {
+        return timeoutSuspended;
+    }
+
+    /**
+     * A stopped but still bound service must not leave the Resume button permanently inert.
+     * @param retry explicit user action to retry after the pending checkpoint completes
+     * @return whether download admission is open now
+     */
+    private boolean resumeAfterTimeout(final Runnable retry) {
+        if (!timeoutSuspended) {
+            return true;
+        }
+        if (!serviceAttached) {
+            return false;
+        }
+        final ActivityManager.RunningAppProcessInfo process =
+                new ActivityManager.RunningAppProcessInfo();
+        ActivityManager.getMyMemoryState(process);
+        if (process.importance != ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+            return false;
+        }
+        final CompletableFuture<Void> pause = timeoutPause;
+        if (pause != null && !pause.isDone()) {
+            pause.thenRun(() -> {
+                final Handler handler = mHandler;
+                if (handler != null) {
+                    handler.post(retry);
+                }
+            });
+            return false;
+        }
+        if (pause != null && pause.isCompletedExceptionally()) {
+            return false;
+        }
+        timeoutPause = null;
+        timeoutSuspended = false;
+        return true;
+    }
+
+    // Retain one owner of in-flight files if Android recreates the service before cleanup ends.
+    void attachHandler(final Handler handler) {
+        serviceAttached = handler != null;
+        // Workers must retain a live, service-independent completion sink while stopped.
+        // Dropping FINISHED would leave a completed download stranded in the pending list.
+        final Handler next = handler != null ? handler
+                : new Handler(Looper.getMainLooper(), this::handleDetachedMessage);
+        mHandler = next;
+        synchronized (this) {
+            for (final DownloadMission mission : new ArrayList<>(mMissionsPending)) {
+                mission.mHandler = next;
+                // Reconcile a completion posted to the previous service just as it died.
+                if (handler != null && mission.isFinished() && !mission.isDeletionPending()) {
+                    setFinished(mission);
+                }
+            }
+        }
+    }
+
+    private boolean handleDetachedMessage(final Message message) {
+        if (message.what == DownloadManagerService.MESSAGE_FINISHED) {
+            final DownloadMission mission = (DownloadMission) message.obj;
+            if (!mission.isDeletionPending()) {
+                setFinished(mission);
+            }
+        }
+        return true;
     }
 
     /**
@@ -295,6 +380,13 @@ public class DownloadManager {
      * @param mission the new download mission to add and run (if possible)
      */
     void startMission(final DownloadMission mission) {
+        startMission(mission, true);
+    }
+
+    void startMission(final DownloadMission mission, final boolean userRequested) {
+        if (userRequested) {
+            resumeAfterTimeout(() -> resumeMission(mission));
+        }
         synchronized (this) {
             mission.timestamp = System.currentTimeMillis();
             mission.mHandler = mHandler;
@@ -343,7 +435,7 @@ public class DownloadManager {
 
             final boolean start = !mPrefQueueLimit || getRunningMissionsCount() < 1;
 
-            if (canDownloadInCurrentNetwork() && start) {
+            if (!timeoutSuspended && canDownloadInCurrentNetwork() && start) {
                 mission.start();
             }
         }
@@ -351,8 +443,14 @@ public class DownloadManager {
 
 
     public void resumeMission(final DownloadMission mission) {
+        if (resumeAfterTimeout(() -> resumeMission(mission))) {
+            resumeMissionInternal(mission);
+        }
+    }
+
+    private void resumeMissionInternal(final DownloadMission mission) {
         synchronized (mission) {
-            if (mission.running || mission.isDeletionPending()) {
+            if (timeoutSuspended || mission.running || mission.isDeletionPending()) {
                 return;
             }
             if (!mission.checkpointReady) {
@@ -564,24 +662,28 @@ public class DownloadManager {
     }
 
     public void pauseAllMissions(final boolean force) {
+        final List<DownloadMission> missions;
         synchronized (this) {
-            for (final DownloadMission mission : mMissionsPending) {
-                if (mission.isPsRunning() || mission.isFinished()) {
-                    continue;
-                }
-
-                mission.pause();
+            missions = new ArrayList<>(mMissionsPending);
+        }
+        for (final DownloadMission mission : missions) {
+            if (mission.isPsRunning() || mission.isFinished()) {
+                continue;
             }
+            mission.pause();
         }
     }
 
     public void startAllMissions() {
+        if (!resumeAfterTimeout(this::startAllMissions)) {
+            return;
+        }
         synchronized (this) {
             for (final DownloadMission mission : mMissionsPending) {
                 if (mission.running || mission.isCorrupt()) {
                     continue;
                 }
-                resumeMission(mission);
+                resumeMissionInternal(mission);
             }
         }
     }
@@ -636,7 +738,7 @@ public class DownloadManager {
      */
     boolean runMissions() {
         synchronized (this) {
-            if (mMissionsPending.size() < 1) {
+            if (timeoutSuspended || mMissionsPending.size() < 1) {
                 return false;
             }
             if (!canDownloadInCurrentNetwork()) {
@@ -657,7 +759,7 @@ public class DownloadManager {
                     continue;
                 }
 
-                resumeMission(mission);
+                resumeMissionInternal(mission);
                 if (mission.errCode != ERROR_NOTHING) {
                     continue;
                 }
@@ -706,7 +808,7 @@ public class DownloadManager {
             return;
         }
 
-        if (!mSelfMissionsControl || updateOnly) {
+        if (timeoutSuspended || !mSelfMissionsControl || updateOnly) {
             return; // don't touch anything without the user interaction
         }
 
@@ -722,7 +824,7 @@ public class DownloadManager {
                 if (mission.running && isMetered) {
                     mission.pause();
                 } else if (!mission.running && !isMetered && mission.enqueued) {
-                    resumeMission(mission);
+                    resumeMissionInternal(mission);
                     if (mPrefQueueLimit) {
                         break;
                     }

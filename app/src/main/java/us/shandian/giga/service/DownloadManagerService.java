@@ -61,6 +61,13 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
     private static final String TAG = "DownloadManagerService";
 
+    // Only a timed-out manager is retained. It owns any workers still stopping or converting,
+    // so service recreation must not load a second writable copy of their checkpoints.
+    private static DownloadManager timeoutRecoveryManager;
+    private boolean timedOut;
+    private boolean needsStartedLifetime;
+    private int timeoutGeneration;
+
     public static final int MESSAGE_RUNNING = 0;
     public static final int MESSAGE_PAUSED = 1;
     public static final int MESSAGE_FINISHED = 2;
@@ -147,8 +154,17 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        mManager = new DownloadManager(this, mHandler, loadMainVideoStorage(),
-                loadMainAudioStorage());
+        if (timeoutRecoveryManager != null) {
+            mManager = timeoutRecoveryManager;
+            timeoutRecoveryManager = null;
+            needsStartedLifetime = true;
+            mManager.attachHandler(mHandler);
+            mManager.mMainStorageVideo = loadMainVideoStorage();
+            mManager.mMainStorageAudio = loadMainAudioStorage();
+        } else {
+            mManager = new DownloadManager(getApplicationContext(), mHandler,
+                    loadMainVideoStorage(), loadMainAudioStorage());
+        }
 
         final Intent openDownloadListIntent = new Intent(this, DownloadActivity.class)
                 .setAction(Intent.ACTION_MAIN);
@@ -222,7 +238,8 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         final String action = intent.getAction();
         if (action != null) {
             if (action.equals(Intent.ACTION_RUN)) {
-                mHandler.post(() -> startMission(intent));
+                final int generation = timeoutGeneration;
+                mHandler.post(() -> startMission(intent, generation == timeoutGeneration));
             } else if (downloadDoneNotification != null) {
                 if (action.equals(ACTION_RESET_DOWNLOAD_FINISHED)
                         || action.equals(ACTION_OPEN_DOWNLOADS_FINISHED)) {
@@ -240,6 +257,24 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         }
 
         return START_STICKY;
+    }
+
+    @Override
+    public void onTimeout(final int startId, final int fgsType) {
+        if (timedOut) {
+            return;
+        }
+        timedOut = true;
+        needsStartedLifetime = true;
+        timeoutGeneration++;
+        timeoutRecoveryManager = mManager;
+        mManager.suspendForTimeout();
+        cancelHlsPreparation();
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
+        mForeground = false;
+        manageLock(false);
+        // Do not wait for disk checkpoints or assume bound clients trigger onDestroy().
+        stopSelf();
     }
 
     @Override
@@ -277,7 +312,12 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         cancelHlsPreparation();
         mHandler = null;
-        mManager.pauseAllMissions(true);
+        if (timedOut || mManager.isTimeoutSuspended()) {
+            timeoutRecoveryManager = mManager;
+            mManager.attachHandler(null);
+        } else {
+            mManager.pauseAllMissions(true);
+        }
     }
 
     @Override
@@ -386,11 +426,22 @@ public class DownloadManagerService extends PvcDownloadManagerService {
     @SuppressWarnings("checkstyle:FinalParameters")
     public void updateForegroundState(boolean state) {
         state |= hasHlsPreparation();
+        state &= !mManager.isTimeoutSuspended();
+        if (state && timedOut) {
+            // Explicit foreground user resume has reopened the manager's admission gate.
+            timedOut = false;
+            timeoutRecoveryManager = null;
+        }
         if (state == mForeground) {
             return;
         }
 
         if (state) {
+            if (needsStartedLifetime) {
+                // stopSelf() removed the started lifetime even if a screen kept us bound.
+                startService(new Intent(this, DownloadManagerService.class));
+                needsStartedLifetime = false;
+            }
             startForeground(FOREGROUND_NOTIFICATION_ID, mNotification);
         } else {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
@@ -443,7 +494,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         context.startService(intent);
     }
 
-    private void startMission(final Intent intent) {
+    void startMission(final Intent intent, final boolean userRequested) {
         final String[] urls = intent.getStringArrayExtra(EXTRA_URLS);
         final Uri path = IntentCompat.getParcelableExtra(intent, EXTRA_PATH, Uri.class);
         final Uri parentPath =
@@ -464,7 +515,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
 
         final StoredFileHelper storage;
         try {
-            storage = new StoredFileHelper(this, parentPath, path, tag);
+            storage = new StoredFileHelper(getApplicationContext(), parentPath, path, tag);
         } catch (IOException e) {
             // A saved URI can become inaccessible before service handling.
             throw new RuntimeException(e);
@@ -494,12 +545,12 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         handleConnectivityState(true); // first check the actual network status
 
         if (Postprocessing.ALGORITHM_PVC_HLS_REMUXER.equals(psName)) {
-            pvcLaunchHlsPreProcessor(mission, mManager);
-            updateForegroundState(true);
-            return;
+            // Register the original playlist before any network preparation. A timeout or
+            // process death can now retry it instead of silently dropping the request.
+            mission.hlsPreparationPending = true;
         }
 
-        mManager.startMission(mission);
+        mManager.startMission(mission, userRequested);
     }
 
     public void notifyFinishedDownload(final String name) {
@@ -615,7 +666,7 @@ public class DownloadManagerService extends PvcDownloadManagerService {
         }
 
         try {
-            return new StoredDirectoryHelper(this, Uri.parse(path), tag);
+            return new StoredDirectoryHelper(getApplicationContext(), Uri.parse(path), tag);
         } catch (Exception e) {
             Log.e(TAG, "Failed to load the storage of " + tag + " from " + path, e);
             Toast.makeText(this, R.string.no_available_dir, Toast.LENGTH_LONG).show();

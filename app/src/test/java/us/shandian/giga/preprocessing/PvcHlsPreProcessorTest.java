@@ -360,4 +360,96 @@ public class PvcHlsPreProcessorTest {
             return (HlsDownloadPlan) input.readObject();
         }
     }
+    @Test
+    public void cancelledPlaylistCallStopsAndFreshPreparationCanRetry() throws Exception {
+        assertCancelledPreparationCanRetry("/list.m3u8");
+    }
+
+    @Test
+    public void cancelledKeyCallStopsAndFreshPreparationCanRetry() throws Exception {
+        assertCancelledPreparationCanRetry("/key");
+    }
+
+    private void assertCancelledPreparationCanRetry(final String blockedPath) throws Exception {
+        final var server = new java.net.ServerSocket(0, 8,
+                java.net.InetAddress.getByName("127.0.0.1"));
+        final var entered = new java.util.concurrent.CountDownLatch(1);
+        final var release = new java.util.concurrent.CountDownLatch(1);
+        final var first = new AtomicBoolean(true);
+        final String playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:1\n"
+                + "#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n"
+                + "#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n";
+        final Thread responder = new Thread(() -> {
+            while (!server.isClosed()) {
+                try (var socket = server.accept()) {
+                    socket.setSoTimeout(5000);
+                    final var reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                            socket.getInputStream(), StandardCharsets.US_ASCII));
+                    final String request = reader.readLine();
+                    if (request == null) {
+                        continue;
+                    }
+                    final String path = request.split(" ")[1];
+                    String header;
+                    do {
+                        header = reader.readLine();
+                    } while (header != null && !header.isEmpty());
+                    if (blockedPath.equals(path) && first.getAndSet(false)) {
+                        entered.countDown();
+                        release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                    }
+                    final byte[] body = "/key".equals(path)
+                            ? KEY : playlist.getBytes(StandardCharsets.UTF_8);
+                    final var output = socket.getOutputStream();
+                    output.write(("HTTP/1.1 200 OK\r\nContent-Length: " + body.length
+                            + "\r\nConnection: close\r\n\r\n")
+                            .getBytes(StandardCharsets.US_ASCII));
+                    output.write(body);
+                    output.flush();
+                } catch (IOException error) {
+                    // Cancellation closes the first client socket before its reply.
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "HlsCancellationPeer");
+        responder.start();
+        final var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        final OkHttpClient client = new OkHttpClient.Builder().build();
+        final String url = "http://127.0.0.1:" + server.getLocalPort() + "/list.m3u8";
+        try {
+            final PvcHlsPreProcessor processor = new PvcHlsPreProcessor(client);
+            final var attempt = executor.submit(() -> processor.prepare(url));
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            processor.cancel();
+            assertThrows(java.util.concurrent.ExecutionException.class,
+                    () -> attempt.get(5, java.util.concurrent.TimeUnit.SECONDS));
+            release.countDown();
+            final DownloadMission mission = new DownloadMission(new String[]{url}, null, 'v', null);
+            mission.recoveryInfo = new us.shandian.giga.get.MissionRecoveryInfo[]{null};
+            new PvcHlsPreProcessor(client).prepare(url).applyTo(mission);
+            assertEquals(1, mission.urls.length);
+            assertTrue(mission.urls[0].endsWith("/segment.ts"));
+            final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ObjectOutputStream output = new ObjectOutputStream(bytes)) {
+                output.writeObject(mission);
+            }
+            try (ObjectInputStream input = new ObjectInputStream(
+                    new ByteArrayInputStream(bytes.toByteArray()))) {
+                final DownloadMission restored = (DownloadMission) input.readObject();
+                assertArrayEquals(mission.urls, restored.urls);
+                org.junit.Assert.assertFalse(restored.hlsPreparationPending);
+                assertTrue(restored.pvcArbitraryData instanceof HlsDownloadPlan);
+            }
+        } finally {
+            release.countDown();
+            server.close();
+            responder.join(5000);
+            executor.shutdownNow();
+            client.connectionPool().evictAll();
+            client.dispatcher().executorService().shutdownNow();
+        }
+    }
+
 }

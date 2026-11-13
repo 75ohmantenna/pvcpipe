@@ -293,3 +293,36 @@ Controlled native/HTTP drivers are indexed in [building.md](building.md#controll
 They require isolated fixtures, not an existing user installation.
 The [baseline download records](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/download-preparation.md#cold-process-restart-verification-2026-10-24)
 preserve exact observations, failed attempts and their evidence limits.
+
+## Data-sync foreground timeout (2026-11-13)
+
+The download service handles Android's data-sync timeout without waiting for a
+bound Downloads screen to disconnect. It closes download admission, stops its
+foreground/started lifetime promptly, and pauses network missions and writes their
+checkpoints off the main thread. Queue, connectivity and binder calls cannot
+restart work while the timeout gate is closed. Explicit user resume is accepted
+only after the app is foreground again and the pause has completed; it restores
+the service's started lifetime as well as its foreground notification.
+
+A manager interrupted by timeout remains the sole in-process owner of its files
+across immediate service recreation. Its handler is replaced with a manager-owned
+completion sink while detached, then rebound to the new service. This prevents a
+second deserialized mission from writing alongside a worker still stopping.
+
+New HLS requests are checkpointed with their original playlist before preparation.
+Preparation is an initializer owned by the mission, and cancellation closes the
+active HTTP call. Late results cannot publish into a paused/replaced initializer.
+The prepared segment plan must be checkpointed before downloads begin. Older,
+already-prepared checkpoints retain their existing behavior and are not reparsed.
+
+Existing same-file post-processing is deliberately not forcibly interrupted:
+that would damage the source it is rewriting. It may finish in-process after the
+foreground service has stopped, and its completion is still recorded. This does
+not guarantee conversion survives process death or an indefinite I/O stall; those
+remain existing recovery/error boundaries, not resumable conversion guarantees.
+
+Focused JVM regressions cover admission, detached completion, started-lifetime
+call ordering, checkpoint serialization and stalled playlist/key HTTP cancellation
+with fresh retries. These checks do not establish Android scheduling: the bound
+timeout → resume → unbind path has not yet been executed on a device for this
+change, nor has the platform deadline itself been forced.

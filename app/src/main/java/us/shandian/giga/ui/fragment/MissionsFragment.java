@@ -352,7 +352,8 @@ public class MissionsFragment extends Fragment {
         }
         try {
             final String tag = mission.storage.getTag();
-            mission.storage = new StoredFileHelper(requireContext(), null, destination, tag);
+            mission.storage = new StoredFileHelper(requireContext().getApplicationContext(),
+                    null, destination, tag);
             mAdapter.recoverMission(mission);
         } catch (final IOException e) {
             Toast.makeText(requireContext(), R.string.general_error, Toast.LENGTH_LONG).show();

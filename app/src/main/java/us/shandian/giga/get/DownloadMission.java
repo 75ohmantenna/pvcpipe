@@ -30,6 +30,7 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
 import us.shandian.giga.postprocessing.Postprocessing;
 import us.shandian.giga.postprocessing.PvcFromHlsRemuxer;
 import us.shandian.giga.service.DownloadManagerService;
+import us.shandian.giga.preprocessing.PvcHlsPreProcessor;
 import us.shandian.giga.util.Utility;
 
 import static org.schabi.newpipe.BuildConfig.DEBUG;
@@ -104,6 +105,10 @@ public class DownloadMission extends Mission {
      */
     public Object pvcArbitraryData;
 
+    /** New HLS requests retain their playlist until a prepared checkpoint is durable. */
+    public boolean hlsPreparationPending;
+    private transient PvcHlsPreProcessor hlsPreprocessor;
+
     /**
      * The current resource to download, {@code urls[current]} and {@code offsets[current]}.
      */
@@ -164,7 +169,7 @@ public class DownloadMission extends Mission {
     public int errCode = ERROR_NOTHING;
     public Exception errObject = null;
 
-    public transient Handler mHandler;
+    public transient volatile Handler mHandler;
     private transient boolean[] blockAcquired;
 
     private transient long writingToFileNext;
@@ -717,6 +722,11 @@ public class DownloadMission extends Mission {
 
         notify(DownloadManagerService.MESSAGE_RUNNING);
 
+        if (hlsPreparationPending) {
+            prepareHls();
+            return;
+        }
+
         if (urls[current] == null) {
             doRecover(ERROR_RESOURCE_GONE);
             return;
@@ -758,6 +768,49 @@ public class DownloadMission extends Mission {
         }
     }
 
+    private void prepareHls() {
+        final PvcHlsPreProcessor processor = new PvcHlsPreProcessor();
+        hlsPreprocessor = processor;
+        init = new Thread(() -> {
+            try {
+                final PvcHlsPreProcessor.Prepared prepared = processor.prepare(urls[0]);
+                synchronized (DownloadMission.this) {
+                    if (!running || init != Thread.currentThread()
+                            || Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
+                    synchronized (LOCK) {
+                        final String[] oldUrls = urls;
+                        final long[] oldOffsets = offsets;
+                        final MissionRecoveryInfo[] oldRecovery = recoveryInfo;
+                        prepared.applyTo(this);
+                        hlsPreparationPending = false;
+                        if (!writeThisToFile()) {
+                            urls = oldUrls;
+                            offsets = oldOffsets;
+                            recoveryInfo = oldRecovery;
+                            pvcArbitraryData = null;
+                            hlsPreparationPending = true;
+                            notifyError(ERROR_FILE_CREATION,
+                                    new IOException("Unable to save HLS preparation"));
+                            return;
+                        }
+                    }
+                    hlsPreprocessor = null;
+                    startDownload();
+                }
+            } catch (final Exception error) {
+                synchronized (DownloadMission.this) {
+                    if (running && init == Thread.currentThread()
+                            && !Thread.currentThread().isInterrupted()) {
+                        notifyError(ERROR_UNKNOWN_EXCEPTION, error);
+                    }
+                }
+            }
+        }, "HlsPreparation");
+        init.start();
+    }
+
     synchronized void initializationFinished() {
         if (!running || init != Thread.currentThread() || init.isInterrupted()) {
             return;
@@ -777,6 +830,9 @@ public class DownloadMission extends Mission {
      * Pause the mission.
      */
     public synchronized void pause() {
+        if (hlsPreprocessor != null) {
+            hlsPreprocessor.cancel();
+        }
         starting = false;
         ++startGeneration;
         if (starter != null) {

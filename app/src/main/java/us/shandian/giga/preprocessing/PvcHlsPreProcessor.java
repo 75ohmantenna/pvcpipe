@@ -28,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import okhttp3.OkHttpClient;
+import okhttp3.Call;
 import okhttp3.Request;
 import okhttp3.Response;
 import us.shandian.giga.get.DownloadMission;
@@ -52,25 +53,47 @@ public class PvcHlsPreProcessor {
     }
 
     public void modifyMission(final DownloadMission mission) {
+        prepare(mission.urls[0]).applyTo(mission);
+    }
+
+    /**
+     * Build without mutating a mission that may have been paused in the meantime.
+     * @param playlistUrl original media playlist address
+     * @return validated resources and plan ready for atomic publication
+     */
+    public Prepared prepare(final String playlistUrl) {
         final LinkedHashMap<String, Integer> resources = new LinkedHashMap<>();
-        final HlsDownloadPlan plan;
         try {
-            plan = readPlan(URI.create(mission.urls[0]), resources);
+            return new Prepared(resources, readPlan(URI.create(playlistUrl), resources));
         } catch (final IOException | IllegalArgumentException e) {
             throw new RuntimeException("Could not prepare HLS download", e);
         }
+    }
 
-        // Publish only after parsing, encryption validation and key fetching all succeed.
-        // Workers retain their existing whole-resource download/checkpoint architecture.
-        final String[] urls = resources.keySet().toArray(new String[0]);
-        final MissionRecoveryInfo[] recovery = new MissionRecoveryInfo[urls.length];
-        for (int i = 0; i < recovery.length; i++) {
-            recovery[i] = mission.recoveryInfo[0];
+    public void cancel() {
+        fetcher.cancel();
+    }
+
+    public static final class Prepared {
+        private final String[] urls;
+        private final HlsDownloadPlan plan;
+
+        private Prepared(final LinkedHashMap<String, Integer> resources,
+                         final HlsDownloadPlan plan) {
+            this.urls = resources.keySet().toArray(new String[0]);
+            this.plan = plan;
         }
-        mission.urls = urls;
-        mission.offsets = new long[urls.length];
-        mission.recoveryInfo = recovery;
-        mission.pvcArbitraryData = plan;
+
+        public void applyTo(final DownloadMission mission) {
+            final MissionRecoveryInfo[] recovery = new MissionRecoveryInfo[urls.length];
+            for (int i = 0; i < recovery.length; i++) {
+                recovery[i] = mission.recoveryInfo[0];
+            }
+            mission.urls = urls.clone();
+            mission.offsets = new long[urls.length];
+            mission.recoveryInfo = recovery;
+            mission.pvcArbitraryData = plan;
+        }
     }
 
     private HlsDownloadPlan readPlan(final URI uri,
@@ -253,6 +276,17 @@ public class PvcHlsPreProcessor {
             }
         }
 
+        private volatile boolean cancelled;
+        private volatile Call activeCall;
+
+        private void cancel() {
+            cancelled = true;
+            final Call call = activeCall;
+            if (call != null) {
+                call.cancel();
+            }
+        }
+
         private Response open(final URI uri) throws IOException {
             final String url = uri.toString();
             final Request.Builder request = new Request.Builder().url(url)
@@ -263,7 +297,12 @@ public class PvcHlsPreProcessor {
             }
             final OkHttpClient theClient = client != null
                     ? client : DownloaderImpl.getInstance().getClient();
-            return theClient.newCall(request.build()).execute();
+            final Call call = theClient.newCall(request.build());
+            activeCall = call;
+            if (cancelled || Thread.currentThread().isInterrupted()) {
+                call.cancel();
+            }
+            return call.execute();
         }
     }
 }
