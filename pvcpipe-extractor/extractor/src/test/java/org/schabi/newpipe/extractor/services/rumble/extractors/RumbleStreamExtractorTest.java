@@ -1,6 +1,7 @@
 package org.schabi.newpipe.extractor.services.rumble.extractors;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.downloader.DownloaderFactory;
 import org.schabi.newpipe.extractor.Image;
@@ -58,13 +59,14 @@ public class RumbleStreamExtractorTest {
         protected static String expectedSupportInfo = "";
         protected static boolean expectedHasAudioStreams = true;
         protected static boolean expectedHasVideoStreams = true;
-        protected static String expectedArtistProfilePictureInfix = ".rumble.com/live/channel_images/"; // TODO
+        protected static String expectedAvatarUrl;
         protected static long expectedLength = 12948;
         protected static int expectedThumbnailWidth = 1280;
         protected static int expectedThumbnailHeight = 720;
 
         @BeforeAll
-        public static void setUpExtractor() throws ExtractionException, IOException {
+        @Override
+        public void setUp() throws ExtractionException, IOException {
             url = "https://rumble.com/v1a992g";
             expectedUrl = "https://rumble.com/v1a992g";
             expectedName = "The Truth Behind Arizona’s Paper Ballots; Jovan Pulitzer’s BOMBSHELL Paper Analysis Report 6/27/22";
@@ -79,6 +81,7 @@ public class RumbleStreamExtractorTest {
             expectedUploaderUrl = "https://rumble.com/c/RSBN";
             expectedHasAudioStreams = true;
             expectedHasVideoStreams = true;
+            expectedAvatarUrl = "https://1a-1791.com/video/z8/9/O/E/b/9OEba.baa.6-RSBN-s6x19g.png";
             expectedLength = 12948;
             expectedThumbnailWidth = 1280;
             expectedThumbnailHeight = 720;
@@ -95,9 +98,11 @@ public class RumbleStreamExtractorTest {
         }
 
         @Test
+        @Tag("offline")
         public void testAvatarThumbnailPicture() throws Exception {
-            final String avatarUrl = extractor().getUploaderAvatars().get(0).getUrl();
-            assertTrue(!avatarUrl.isEmpty() || avatarUrl == null);
+            final List<Image> avatars = extractor().getUploaderAvatars();
+            assertEquals(1, avatars.size());
+            assertEquals(expectedAvatarUrl, avatars.get(0).getUrl());
         }
 
         @Test
@@ -286,7 +291,8 @@ public class RumbleStreamExtractorTest {
 
 
         @BeforeAll
-        public static void setUpExtractor() throws ExtractionException, IOException {
+        @Override
+        public void setUp() throws ExtractionException, IOException {
             url = "https://rumble.com/v3e90sa";
             expectedUrl = "https://rumble.com/v3e90sa";
             expectedName = "America 1st News & Politics Live TV | MAGA Media";
@@ -307,7 +313,7 @@ public class RumbleStreamExtractorTest {
             expectedSupportInfo = "";
             expectedHasAudioStreams = false;
             expectedHasVideoStreams = true;
-            expectedArtistProfilePictureInfix = ".rumble.com/live/channel_images/"; // TODO
+            expectedAvatarUrl = "https://sp.rmbl.ws/z8/X/P/j/c/XPjca.baa.3-PatriotNews4u-rwcdng.png";
             expectedLength = 0;
             // this embed snapshot has no thumbnail list to take the cover image's size from
             expectedThumbnailWidth = Image.WIDTH_UNKNOWN;
