@@ -48,8 +48,8 @@ public class BitchuteTrendingKioskExtractorTest {
             testDataMap = new HashMap() {{
                 put(KeysForTestDataMap.name, BitchuteKioskLinkHandlerFactory.TRENDING_DAY);
                 put(KeysForTestDataMap.id, BitchuteKioskLinkHandlerFactory.TRENDING_DAY);
-                put(KeysForTestDataMap.url, BitchuteConstants.BASE_URL + "/#trending-day");
-                put(KeysForTestDataMap.originalUrl, BitchuteConstants.BASE_URL + "/#trending-day");
+                put(KeysForTestDataMap.url, BitchuteConstants.BASE_URL + "/");
+                put(KeysForTestDataMap.originalUrl, BitchuteConstants.BASE_URL + "/");
             }};
             Trending.setUp();
         }
@@ -113,15 +113,14 @@ public class BitchuteTrendingKioskExtractorTest {
 
         @Test
         public void testUrl() throws ParsingException {
-            // TODO evermind figure out for what this URL really are
-            //assertEquals(testDataMap.get(keysForTestDataMap.url), extractor.getUrl());
+            assertEquals(testDataMap.get(KeysForTestDataMap.url), extractor.getUrl());
         }
 
         @Test
         public void testOriginalUrl() throws ParsingException {
-            // TODO evermind figure out for what this URL really are
-            // assertEquals(testDataMap.get(keysForTestDataMap.originalUrl),
-            //         extractor.getOriginalUrl());
+            // The extractor was constructed by ID, so its original URL is canonical too.
+            assertEquals(testDataMap.get(KeysForTestDataMap.originalUrl),
+                    extractor.getOriginalUrl());
         }
 
         /*//////////////////////////////////////////////////////////////////////////

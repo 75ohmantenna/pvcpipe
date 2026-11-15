@@ -34,7 +34,20 @@ public class BitchuteKioskLinkHandlerFactory extends ListLinkHandlerFactory {
         }
         try {
             final String s = Utils.stringToURL(url).getRef();
-            return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+            if (s == null) {
+                throw new ParsingException("Missing BitChute kiosk category");
+            }
+            final String id = s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+            if (id.isEmpty()) {
+                throw new ParsingException("Missing BitChute kiosk category");
+            }
+            // Map trending URL slugs to the existing persisted kiosk IDs.
+            return switch (id) {
+                case "trending-day" -> TRENDING_DAY;
+                case "trending-week" -> TRENDING_WEEK;
+                case "trending-month" -> TRENDING_MONTH;
+                default -> id;
+            };
         } catch (final MalformedURLException e) {
             throw new ParsingException("Error parsing url id");
         }
@@ -49,6 +62,12 @@ public class BitchuteKioskLinkHandlerFactory extends ListLinkHandlerFactory {
         }
         if (id.equals(TRENDING_DAY)) {
             return BITCHUTE_LINK;
+        }
+        if (id.equals(TRENDING_WEEK)) {
+            return BITCHUTE_LINK + "#trending-week";
+        }
+        if (id.equals(TRENDING_MONTH)) {
+            return BITCHUTE_LINK + "#trending-month";
         }
         return BITCHUTE_LINK + String.format("#%s/", id);
     }

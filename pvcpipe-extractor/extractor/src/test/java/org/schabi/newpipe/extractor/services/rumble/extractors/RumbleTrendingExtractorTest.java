@@ -44,7 +44,7 @@ public class RumbleTrendingExtractorTest {
                 put(KeysForTestDataMap.name, "Live");
                 put(KeysForTestDataMap.id, "Live");
                 put(KeysForTestDataMap.url, Rumble.getBaseUrl() + "/browse/live");
-                put(KeysForTestDataMap.originalUrl, Rumble.getBaseUrl() + "browse/live");
+                put(KeysForTestDataMap.originalUrl, Rumble.getBaseUrl() + "/browse/live");
             }};
             Trending.setUp();
         }
@@ -152,15 +152,14 @@ public class RumbleTrendingExtractorTest {
 
         @Test
         public void testUrl() throws ParsingException {
-            // TODO evermind figure out for what this URL really are
-            //assertEquals(testDataMap.get(keysForTestDataMap.url), extractor.getUrl());
+            assertEquals(testDataMap.get(KeysForTestDataMap.url), extractor.getUrl());
         }
 
         @Test
         public void testOriginalUrl() throws ParsingException {
-            // TODO evermind figure out for what this URL really are
-            // assertEquals(testDataMap.get(keysForTestDataMap.originalUrl),
-            //         extractor.getOriginalUrl());
+            // The extractor was constructed by ID, so its original URL is canonical too.
+            assertEquals(testDataMap.get(KeysForTestDataMap.originalUrl),
+                    extractor.getOriginalUrl());
         }
 
         /*//////////////////////////////////////////////////////////////////////////
