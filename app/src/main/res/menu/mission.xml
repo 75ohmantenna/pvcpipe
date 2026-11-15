@@ -30,6 +30,10 @@
         android:title="@string/delete_file" />
 
     <item
+        android:id="@+id/deletion_help"
+        android:title="@string/download_deletion_help" />
+
+    <item
         android:id="@+id/delete_entry"
         android:title="@string/delete_entry" />
 

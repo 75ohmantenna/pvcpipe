@@ -778,8 +778,21 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 ? (DownloadMission) h.item.mission : null;
 
         if ((mission != null && mission.isDeletionPending() || h.item.mission.mediaDeleted)
-                && id != R.id.delete && id != R.id.delete_entry && id != R.id.source) {
+                && id != R.id.delete && id != R.id.delete_entry && id != R.id.source
+                && id != R.id.deletion_help) {
             return true; // A menu opened before deletion must not resume or recreate its target.
+        }
+
+        if (id == R.id.deletion_help) {
+            // Recheck the current row: a popup may outlive its original mission state.
+            if (mission != null && mission.isDeletionPending() || h.item.mission.mediaDeleted) {
+                new AlertDialog.Builder(mContext)
+                        .setTitle(R.string.download_deletion_help)
+                        .setMessage(R.string.download_deletion_help_message)
+                        .setPositiveButton(R.string.ok, null)
+                        .show();
+            }
+            return true;
         }
 
         if (mission != null) {
@@ -1053,6 +1066,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         MenuItem showError;
         MenuItem delete;
         MenuItem deleteEntry;
+        MenuItem deletionHelp;
         MenuItem source;
         MenuItem checksum;
 
@@ -1090,6 +1104,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             showError = menu.findItem(R.id.error_message_view);
             delete = menu.findItem(R.id.delete);
             deleteEntry = menu.findItem(R.id.delete_entry);
+            deletionHelp = menu.findItem(R.id.deletion_help);
             source = menu.findItem(R.id.source);
             checksum = menu.findItem(R.id.checksum);
 
@@ -1118,6 +1133,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             showError.setVisible(false);
             delete.setVisible(false);
             deleteEntry.setVisible(false);
+            deletionHelp.setVisible(false);
             source.setVisible(false);
             checksum.setVisible(false);
 
@@ -1127,6 +1143,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             if (mission != null) {
                 if (mission.isDeletionPending()) {
                     delete.setVisible(true);
+                    deletionHelp.setVisible(true);
                 } else if (mission.hasInvalidStorage()) {
                     retry.setVisible(true);
                     delete.setVisible(true);
@@ -1158,6 +1175,7 @@ public class MissionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                     }
                 }
             } else {
+                deletionHelp.setVisible(item.mission.mediaDeleted);
                 open.setVisible(!item.mission.mediaDeleted);
                 delete.setVisible(true);
                 deleteEntry.setVisible(DownloadManager.canDeleteEntryOnly(item.mission));

@@ -617,6 +617,8 @@
     <string name="delete_downloaded_files">Delete downloaded files</string>
     <string name="delete_downloaded_files_confirm">Erase all downloaded files from disk?</string>
     <string name="download_deletion_incomplete">Deletion incomplete</string>
+    <string name="download_deletion_help">Deletion help</string>
+    <string name="download_deletion_help_message">Deletion could not be fully completed. The file may already be gone, but its entry is kept until cleanup succeeds.\n\nIf you use removable storage or a storage provider, check that it is available and that PVCPipe still has access. Also check that the device has free internal storage. Then close this message and choose Delete again.\n\nIf deletion was not recorded, an unavailable provider or denied access may prevent confirmation. This help does not change files, permissions, or download state.</string>
     <plurals name="download_deletion_failed">
         <item quantity="one">Could not complete deletion of %1$d download. Its entry was kept. Try Delete again.</item>
         <item quantity="other">Could not complete deletion of %1$d downloads. Their entries were kept. Try Delete again.</item>

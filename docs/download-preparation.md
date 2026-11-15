@@ -131,7 +131,11 @@ media deletion can proceed. After media removal, a second checkpoint records
 `mediaDeleted` before checkpoint cleanup. Startup retains marked checkpoints without recreating
 media or publishing a finished row; Start, queue, recovery and late completion
 cannot resume them. Their row says **Deletion incomplete** and offers Delete
-again. Checkpoint cleanup removes `.new`/`.bak` companions before the main file,
+again. **Deletion help** explains that the file may already be gone, suggests checking
+storage/provider availability, access and free internal storage, and points back to
+Delete for an explicit retry. The help dialog itself changes no files, permissions
+or download state. It does not offer abandonment or regrant access, and it cannot
+resolve a permanently inaccessible provider. Checkpoint cleanup removes `.new`/`.bak` companions before the main file,
 so a companion-removal failure retains the current marker. If saving the marker
 fails, no media deletion is attempted, but a later restart can only use the older
 checkpoint: that failed write does not establish durable cancellation.
