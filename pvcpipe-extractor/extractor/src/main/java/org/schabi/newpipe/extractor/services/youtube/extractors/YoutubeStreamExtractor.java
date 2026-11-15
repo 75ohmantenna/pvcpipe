@@ -745,8 +745,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
         // We cannot store the subtitles list because the media format may change
         final List<SubtitlesStream> subtitlesToReturn = new ArrayList<>();
         final JsonArray captionsArray = playerCaptionsTracklistRenderer.getArray("captionTracks");
-        // TODO: use this to apply auto translation to different language from a source language
-        // final JsonArray autoCaptionsArray = renderer.getArray("translationLanguages");
+        // TODO: Support translated subtitles using translationLanguages.
 
         for (int i = 0; i < captionsArray.size(); i++) {
             final String languageCode = captionsArray.getObject(i).getString("languageCode");

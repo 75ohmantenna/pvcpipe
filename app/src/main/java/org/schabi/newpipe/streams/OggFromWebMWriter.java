@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
  */
 public class OggFromWebMWriter implements Closeable {
     private static final byte FLAG_UNSET = 0x00;
-    //private static final byte FLAG_CONTINUED = 0x01;
     private static final byte FLAG_FIRST = 0x02;
     private static final byte FLAG_LAST = 0x04;
 

@@ -477,7 +477,6 @@ public class StoredFileHelper implements Serializable {
         }
 
         // note: do not compare tags, files can have the same parent folder
-        //if (stringMismatch(this.tag, storage.tag)) return false;
 
         if (!Objects.equals(this.sourceTree, storage.sourceTree)) {
             return false;

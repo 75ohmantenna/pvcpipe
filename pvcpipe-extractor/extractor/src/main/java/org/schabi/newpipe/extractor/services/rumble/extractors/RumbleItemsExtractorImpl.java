@@ -17,7 +17,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-public abstract class RumbleItemsExtractorImpl /* extends RumbleCommonCodeTrendingAndSearching */ {
+public abstract class RumbleItemsExtractorImpl {
 
     public List<StreamInfoItemExtractor> extractStreamItems(final Document doc)
             throws ParsingException {
@@ -131,7 +131,7 @@ public abstract class RumbleItemsExtractorImpl /* extends RumbleCommonCodeTrendi
 
     protected abstract Elements getAllItems(Document doc);
 
-    protected boolean isPremium(final Element element) { // 20250322 shared code for now
+    protected boolean isPremium(final Element element) {
         return !element.select("use[href$=premium__lock]").isEmpty();
     }
 

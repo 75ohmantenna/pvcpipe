@@ -466,7 +466,7 @@ public final class VideoDetailFragment
         }));
         binding.detailThumbnailRootLayout.setOnClickListener(v -> {
             autoPlayEnabled = true; // forcefully start playing
-            // FIXME Workaround #7427
+            // Capture the owned playback position before reopening the player.
             if (isPlayerAvailable()) {
                 player.setRecovery();
             }
@@ -946,7 +946,7 @@ public final class VideoDetailFragment
         toggleFullscreenIfInFullscreenMode();
 
         if (isPlayerAvailable()) {
-            // FIXME Workaround #7427
+            // Capture the owned playback position before switching player modes.
             player.setRecovery();
         }
 
@@ -967,7 +967,7 @@ public final class VideoDetailFragment
         if (!isPlayerAvailable()) {
             playerHolder.startService(false, this);
         } else {
-            // FIXME Workaround #7427
+            // Capture the owned playback position before switching player modes.
             player.setRecovery();
         }
 

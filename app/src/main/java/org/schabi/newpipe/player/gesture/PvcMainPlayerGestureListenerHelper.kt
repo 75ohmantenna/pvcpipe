@@ -49,7 +49,7 @@ class PvcMainPlayerGestureListenerHelper {
         val player = playerUi.player
         val playbackAudio: PlaybackAudio = player.playbackAudio
 
-        // If we just started sliding, change the progress bar to match the system volume
+        // If we just started sliding, change the progress bar to match the internal volume
         if (!binding.pvcPlayerExt.internalVolRelativeLayout.isVisible) {
             val volumePercent: Float = playbackAudio.internalVolume
             bar.progress = (volumePercent * bar.max).toInt()

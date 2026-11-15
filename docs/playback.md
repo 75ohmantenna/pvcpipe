@@ -420,7 +420,11 @@ Delivered metadata must identify the selected occurrence by instance. Once
 synchronization makes source metadata coherent, casting retries preparation,
 including when returning to an already-current occurrence. Duplicate suppression
 covers only valid pending/established work. A metadata-clear during blocking is
-not synthesized failed-source delivery.
+not synthesized failed-source delivery. `CastPlaybackTest` checks both metadata
+and synchronization orderings, recovery/default seek positions and retries after
+returning to an already-current occurrence. Its engine, resolver and receiver
+session are controlled JVM fixtures; these checks do not establish real receiver
+startup timing or decoded playback.
 
 ### Active-cast checkpoint attribution
 
@@ -429,7 +433,8 @@ owned checkpoint or owned sender intent. Reset zeros and load/state/duration
 emissions alone do not prove provenance. Explicit seek invalidates pre-seek
 samples. Recovery/history checks combine this guard with source/metadata ownership;
 disconnect leaves pending recovery untouched when a local override is unowned.
-These policies do not resolve the separate initial source-start concern.
+Source-start scheduling also uses the coherence and retry rules described under
+[Cast synchronization liveness](#cast-synchronization-liveness).
 
 The [dated ownership/recovery records](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/playback.md#recovery-during-pending-navigation--corrected-2026-10-23)
 distinguish mocked scheduling from prepared-engine, SQLite and hardware evidence.

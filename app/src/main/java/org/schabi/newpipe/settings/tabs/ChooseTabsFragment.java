@@ -148,7 +148,6 @@ public class ChooseTabsFragment extends Fragment {
             final ChooseTabListItem[] availableTabs = getAvailableTabs(requireContext());
 
             if (availableTabs.length == 0) {
-                //Toast.makeText(requireContext(), "No available tabs", Toast.LENGTH_SHORT).show();
                 return;
             }
 

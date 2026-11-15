@@ -346,7 +346,7 @@ public final class Player implements PlaybackListener, Listener {
                 return;
             }
             case AllOthers -> {
-                // fallthrough; TODO: put other intent data in separate cases
+                // Install or replace the queue below.
             }
         }
 

@@ -1,21 +1,23 @@
 # PVCPipe action plan and documentation
 
-Reviewed 2026-10-30 against `d9f00de9f`. This is the current work queue; dated
-failures and completed fixes are evidence, not a second backlog. Establish
+Consolidated 2026-10-30 against `d9f00de9f`, with subsequent corrections below.
+This is the current work queue; dated failures and completed fixes are evidence,
+not a second backlog. Establish
 behavior from implementation, callers and configuration. Tests support only the
 conditions they actually assert.
 
 ## Action plan
 
-Work in the order below when unblocked. This plan does not resume deferred FCast
-work or authorize changes to capture defaults, translations or release publication.
+Work on open items in the order below when unblocked. This plan does not resume
+deferred FCast work or authorize changes to capture defaults, translations or
+release publication.
 
 | ID | Status | Next action and completion criteria |
 | --- | --- | --- |
 | A1 | **Defensive fix verified, 2026-11-11** | The exact synthetic ExoPlaybackException → UnexpectedLoaderException → ExtractionException chain failed with StackOverflowError before the narrow [ErrorInfo](../app/src/main/java/org/schabi/newpipe/error/ErrorInfo.kt) descent fix. `WrappedPlaybackErrorTest` now proves termination, inner message, service/action and unchanged outer retry/report/link metadata, plus unrelated-wrapper controls. Normal extraction uses a different wrapper; production reachability of this exact chain remains unproven. [Original finding](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/documentation-alignment.md#unknown-service-display-label--2026-10-30). |
 | A2 | **Decision needed: reporting collection** | Decide log-capture default and ACRA data allowlist separately from prompt visibility and per-report attachment consent. Then implement only the chosen policy and test capture, opening, attachment selection, recreation and both exports. Current behavior/remaining exposure: [reporting guide](error-reporting.md#local-collection-is-separate-from-attachment-consent). |
 | A3 | **Design review: deletion recovery** | Decide whether an additional user recovery flow is needed for media removed before its receipt becomes durable. Provider access errors must not become proof of erasure. Any change must retain cancellation, preserve unrelated data and allow an explicit safe retry. Existing [SIGKILL evidence](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/download-preparation.md#deletion-process-death-verification-2026-10-30) confirms the limitation and recovery after access is restored; it does not establish an atomic provider/database transaction. |
-| A4 | **Deferred by user: FCast source startup** | Resume only when requested. Reproduce metadata-before-synchronization and already-current-occurrence resume risks before changing source-start policy. Keep exact-occurrence clock ownership and pending recovery intact. Done requires bounded scheduling regressions and appropriate receiver observations. [Scope](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/playback.md#active-cast-checkpoint-attribution--corrected-2026-10-23). |
+| A4 | **Synchronization correction covered by controlled JVM tests** | Source preparation now waits for coherent occurrence metadata and retries after synchronization, including return to an already-current occurrence. `CastPlaybackTest` covers metadata/completion ordering, recovery/default seeks and canceled-preparation retries; `CastClockAttributionTest` covers pending recovery and clock ownership. These tests use controlled engine/resolver/session behavior, not a real receiver. See [current behavior](playback.md#cast-synchronization-liveness); fresh hardware observations remain A5. |
 | A5 | **Deferred / hardware dependent** | On an agreed build, verify receiver cold startup, active-connection loss, paused handoff/seek/speed, replacement, queue navigation and disconnect/play-here. Add second-receiver switching, secure-v4 and Android Auto/Desktop Head Unit checks only when those environments are available. Record fresh picture/audio/time observations; acknowledgements or mocked peers are insufficient. [Last receiver record](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/media3-migration.md#october-28-physical-receiver-measurements). |
 | A6 | **Unprioritized: translations** | Choose target locales and obtain reviewed translations for maintained default-English resources. Test plural forms, app/resource locale selection, wrapping and accessibility. Current French-context fallback checks do not supply French translations. [Current label boundary](error-reporting.md#report-formatting-and-boundaries). |
 | A7 | **Conditional maintenance: native dependency evidence** | When a release or native dependency update needs broader attribution evidence, extend the exact-version inventory for FCast native crates/FFmpeg rather than treating the old Java/Android audit as a complete native inventory. Preserve original notices and record evidence limits. [Dated inventory and limitations](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/license-audit.json). |
@@ -26,6 +28,9 @@ work or authorize changes to capture defaults, translations or release publicati
   A3 is an implemented limitation, not a
   promise that every interruption can be recovered automatically. Deliberate
   format/platform limits stay in the guides unless separately scheduled here.
+- A4's scheduling correction has controlled JVM coverage. It does not close
+  A5's receiver/device verification or turn older hardware results into evidence
+  for the current code.
 - For each accepted code change: trace callers and defaults, reproduce the
   changed path, perform adversarial review and fix related findings, then run
   `make ci`. Distinguish static inspection, JVM/doubles, controlled peers,

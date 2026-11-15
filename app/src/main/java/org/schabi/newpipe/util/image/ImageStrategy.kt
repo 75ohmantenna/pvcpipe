@@ -64,7 +64,6 @@ object ImageStrategy {
             .elementAtOrNull(0) ?: 1.0
 
         val preferredLevel = nonNoneQuality.toResolutionLevel()
-        // TODO: rewrite using kotlin collections API `groupBy` will be handy
         val initialComparator =
             Comparator // the first step splits the images into groups of resolution levels
                 .comparingInt { i: Image ->

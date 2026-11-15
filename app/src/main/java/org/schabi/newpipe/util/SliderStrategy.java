@@ -19,8 +19,6 @@ public interface SliderStrategy {
      */
     double valueOf(int progress);
 
-    // TODO: also implement linear strategy when needed
-
     final class Quadratic implements SliderStrategy {
         private final double leftGap;
         private final double rightGap;

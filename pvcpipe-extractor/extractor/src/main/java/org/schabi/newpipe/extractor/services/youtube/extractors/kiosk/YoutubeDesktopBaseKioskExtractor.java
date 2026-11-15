@@ -149,7 +149,6 @@ abstract class YoutubeDesktopBaseKioskExtractor extends KioskExtractor<StreamInf
                             collector.commit(new YoutubeStreamInfoItemExtractor(
                                     content.getObject("gridVideoRenderer"), timeAgoParser));
                         } else if (content.has("lockupViewModel")) {
-                            // lockupViewModels are not used yet, but may be in the future
                             final JsonObject lockupViewModel = content.getObject("lockupViewModel");
                             if ("LOCKUP_CONTENT_TYPE_VIDEO".equals(
                                     lockupViewModel.getString("contentType"))) {

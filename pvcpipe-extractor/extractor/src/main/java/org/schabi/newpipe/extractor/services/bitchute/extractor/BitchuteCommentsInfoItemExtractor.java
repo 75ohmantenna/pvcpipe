@@ -83,9 +83,7 @@ public class BitchuteCommentsInfoItemExtractor implements CommentsInfoItemExtrac
 
     @Override
     public String getUploaderUrl() {
-        // return BitchuteConstants.BASE_URL + "/profile/" + json.getString("creator");
-        // the */profile/* link is not linking to a channel but to a user that could have
-        // a channel. --> therefore disabled for now
+        // Profile URLs identify users rather than channels, so leave the channel link empty.
         return "";
     }
 
