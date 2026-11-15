@@ -33,6 +33,37 @@ verification. No existing reports or logs were purged and no installed app was
 updated during this work. A5 remains deferred; A6 is out of scope by owner decision;
 A7 remains conditional because this change updates no native dependency.
 
+### Source TODO follow-up (2026-11-15)
+
+Implemented in `3c4f277589` (gestures), `95a33ed00a` (dates),
+`38e6beb63c` (channel state) and `e845b3ad1c` (uploader URLs). This pass
+did not install an app or change its version. Each correction had independent
+design and adversarial review, a failing original-code regression, and focused
+tests.
+
+| Item | Correction and evidence |
+| --- | --- |
+| Internal-volume gestures | Accumulate signed movement instead of dropping every sub-four-pixel callback; preserve sensitivity, discard endpoint overscroll and reset DOWN/UP/CANCEL ownership. Restore a new gesture's volume/overlay independently of an old fade. 29 focused tests pass; full `make ci` passed with 1,486 app tests. |
+| YouTube date fallback | Strict cached English/UK formatters accept single-digit days and `Sep`/`Sept`, reject impossible dates, and preserve ISO/relative/null behavior. 32 focused tests pass (16 failed before correction); full gate passed with 1,154 extractor passes and three existing skips. |
+| Channel-tab restoration | Explicit lightweight fallback in the Bundle, full handler in existing StateSaver storage, preserved old constructor/serialization UID and specialized extraction strategy. Fresh system-playlist continuation no longer requires an initial fetch. 14 focused tests pass; original controlled Bundle was 1,202,796 bytes. Full gate passed with 1,498 app tests and 1,154 extractor passes. |
+| Uploader URL fallback | Six renderer overrides now call the URL getter, not the name getter, when pagination metadata lacks a channel URL. 18 focused tests pass (ten failed before correction), including explicit overrides, null Shorts/reel URLs and missing endpoints. Final combined `make ci` gate passed with 1,498 app tests, 1,172 extractor passes and three existing skips. |
+
+All four sequential `make ci` gates passed. The final tree adds 72 regression
+tests; verification also includes three build-logic tests, 17 Python tests,
+static checks, lint and debug/optimized release assembly.
+Evidence is controlled JVM/Robolectric, recorded/minimal JSON and intercepted
+HTTP, not physical-device gestures, process-death testing or live YouTube.
+Legacy/unknown Ready handlers retain their strategy and may remain large until
+recreated; StateSaver can still serialize payloads to private cache. Unsupported
+age-restricted Podcasts and unrelated course-playlist behavior are not fixed.
+Uploader fallback evidence concerns incomplete/legacy metadata, not ordinary
+fresh Pages that already carry the channel URL.
+
+Other comments are investigation leads, not automatic rewrite requirements.
+Do not add queue broadcasts, shortest-track cue selection, broad cookie sharing,
+panic/history deletion or UI migrations without evidence/decisions. A5 remains
+deferred, A6 out of scope and A7 conditional.
+
 ### Working rules and closure
 
 - A1 is a defensive exact-input fix, not a reproduced production crash.
