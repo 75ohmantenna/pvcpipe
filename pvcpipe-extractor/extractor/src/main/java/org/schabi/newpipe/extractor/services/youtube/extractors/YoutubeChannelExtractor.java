@@ -436,7 +436,9 @@ public class YoutubeChannelExtractor extends ChannelExtractor {
                                         ChannelTabs.VIDEOS,
                                         (service, linkHandler) -> new VideosTabExtractor(
                                                 service, linkHandler, tabRenderer,
-                                                channelHeaderCopy, name, id, url)));
+                                                channelHeaderCopy, name, id, url),
+                                        new ListLinkHandler(tabUrl, tabUrl, channelId,
+                                                List.of(ChannelTabs.VIDEOS), List.of())));
                                 break;
                             case "shorts":
                                 addNonVideosTab.accept(ChannelTabs.SHORTS);

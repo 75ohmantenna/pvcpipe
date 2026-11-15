@@ -30,6 +30,10 @@ import java.util.List;
  * </pre>
  */
 public class ReadyChannelTabListLinkHandler extends ListLinkHandler {
+    // Preserve compatibility with handlers saved before restoration fallbacks were introduced.
+    private static final long serialVersionUID = -4117307732798877956L;
+
+    private final ListLinkHandler restorationHandler;
 
     public interface ChannelTabExtractorBuilder extends Serializable {
         @Nonnull
@@ -44,8 +48,31 @@ public class ReadyChannelTabListLinkHandler extends ListLinkHandler {
             final String channelId,
             @Nonnull final FilterItem channelTab,
             @Nonnull final ChannelTabExtractorBuilder extractorBuilder) {
+        this(url, channelId, channelTab, extractorBuilder, null);
+    }
+
+    /**
+     * Supplies a lightweight handler with equivalent extraction behavior for state restoration.
+     * The original builder is still used while its prefetched data is available.
+     */
+    public ReadyChannelTabListLinkHandler(
+            final String url,
+            final String channelId,
+            @Nonnull final FilterItem channelTab,
+            @Nonnull final ChannelTabExtractorBuilder extractorBuilder,
+            final ListLinkHandler restorationHandler) {
         super(url, url, channelId, List.of(channelTab), List.of());
+        this.restorationHandler = restorationHandler;
         this.extractorBuilder = extractorBuilder;
+    }
+
+    /**
+     * Unknown and legacy builders retain their strategy rather than being blindly downgraded.
+     * Such handlers are not guaranteed to have a small serialized representation.
+     */
+    @Nonnull
+    public ListLinkHandler getRestorationHandler() {
+        return restorationHandler == null ? this : restorationHandler;
     }
 
     @Nonnull

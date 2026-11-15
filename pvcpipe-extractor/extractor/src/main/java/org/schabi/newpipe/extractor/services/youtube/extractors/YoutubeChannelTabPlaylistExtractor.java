@@ -82,9 +82,7 @@ public class YoutubeChannelTabPlaylistExtractor extends ChannelTabExtractor {
 
     @Override
     public InfoItemsPage getPage(final Page page) throws IOException, ExtractionException {
-        if (!playlistExisting) {
-            return InfoItemsPage.emptyPage();
-        }
+        // Continuations are requested on a fresh extractor, without fetching the initial page.
         return playlistExtractorInstance.getPage(page);
     }
 

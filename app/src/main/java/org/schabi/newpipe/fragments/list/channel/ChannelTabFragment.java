@@ -21,7 +21,6 @@ import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
-import org.schabi.newpipe.extractor.linkhandler.ListLinkHandlerFactory;
 import org.schabi.newpipe.extractor.linkhandler.ReadyChannelTabListLinkHandler;
 import org.schabi.newpipe.extractor.services.kick.KickClipFilters;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
@@ -34,6 +33,7 @@ import org.schabi.newpipe.util.ExtractorHelper;
 import org.schabi.newpipe.util.PlayButtonHelper;
 
 import java.util.List;
+import java.util.Queue;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -53,7 +53,7 @@ public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTa
     protected void saveFragmentState(@NonNull final Bundle state) {
         super.saveFragmentState(state);
         state.putString("channelName" + STATE_SUFFIX, channelName);
-        state.putSerializable("tabHandler" + STATE_SUFFIX, tabHandler);
+        state.putSerializable("tabHandler" + STATE_SUFFIX, restorationHandler());
     }
 
     @Override
@@ -65,6 +65,29 @@ public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTa
         }
         if (state.containsKey("tabHandler" + STATE_SUFFIX)) {
             tabHandler = (ListLinkHandler) state.getSerializable("tabHandler" + STATE_SUFFIX);
+        }
+    }
+
+    private ListLinkHandler restorationHandler() {
+        return tabHandler instanceof ReadyChannelTabListLinkHandler
+                ? ((ReadyChannelTabListLinkHandler) tabHandler).getRestorationHandler()
+                : tabHandler;
+    }
+
+    @Override
+    public void writeTo(final Queue<Object> objectsToSave) {
+        super.writeTo(objectsToSave);
+        // Keep prefetched data in StateSaver (memory/private cache), not the Android Bundle.
+        objectsToSave.add(tabHandler);
+    }
+
+    @Override
+    public void readFrom(@NonNull final Queue<Object> savedObjects) throws Exception {
+        super.readFrom(savedObjects);
+        // Old queues have no handler. Keep the Bundle fallback when cache is absent or old.
+        final Object restoredHandler = savedObjects.poll();
+        if (restoredHandler instanceof ListLinkHandler) {
+            tabHandler = (ListLinkHandler) restoredHandler;
         }
     }
 
@@ -249,29 +272,8 @@ public class ChannelTabFragment extends BaseListInfoFragment<InfoItem, ChannelTa
     public void handleResult(@NonNull final ChannelTabInfo result) {
         super.handleResult(result);
 
-        // FIXME this is a really hacky workaround, to avoid storing useless data in the fragment
-        //  state. The problem is, `ReadyChannelTabListLinkHandler` might contain raw JSON data that
-        //  uses a lot of memory (e.g. ~800KB for YouTube). While 800KB doesn't seem much, if
-        //  you combine just a couple of channel tab fragments you easily go over the 1MB
-        //  save&restore transaction limit, and get `TransactionTooLargeException`s. A proper
-        //  solution would require rethinking about `ReadyChannelTabListLinkHandler`s.
-        if (tabHandler instanceof ReadyChannelTabListLinkHandler) {
-            try {
-                // once `handleResult` is called, the parsed data was already saved to cache, so
-                // we can discard any raw data in ReadyChannelTabListLinkHandler and create a
-                // link handler with identical properties, but without any raw data
-                final ListLinkHandlerFactory channelTabLHFactory = result.getService()
-                        .getChannelTabLHFactory();
-                if (channelTabLHFactory != null) {
-                    // some services do not not have a ChannelTabLHFactory
-                    tabHandler = channelTabLHFactory.fromQuery(tabHandler.getId(),
-                            tabHandler.getContentFilters(), tabHandler.getSortFilter());
-                }
-            } catch (final ParsingException e) {
-                // silently ignore the error, as the app can continue to function normally
-                Log.w(TAG, "Could not recreate channel tab handler", e);
-            }
-        }
+        // Release explicitly replaceable prefetch data, but retain special extractor strategies.
+        tabHandler = restorationHandler();
 
         if (playlistControlBinding != null) {
             // PlaylistControls should be visible only if there is some item in
