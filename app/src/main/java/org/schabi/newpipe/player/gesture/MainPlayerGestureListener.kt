@@ -35,18 +35,29 @@ class MainPlayerGestureListener(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouch(v: View, event: MotionEvent): Boolean {
-        super.onTouch(v, event)
-        if (event.action == MotionEvent.ACTION_UP && isMoving) {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            // Finish an interrupted gesture before clearing ownership. A new tap may
+            // never scroll, but must not leave that gesture's overlay visible forever.
+            if (isMoving) onScrollEnd(event)
             isMoving = false
-            onScrollEnd(event)
+            pvcGestureHelper.resetGesture()
         }
-        return when (event.action) {
+        super.onTouch(v, event)
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            if (isMoving) {
+                isMoving = false
+                onScrollEnd(event)
+            } else {
+                pvcGestureHelper.resetGesture()
+            }
+        }
+        return when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                 v.parent?.requestDisallowInterceptTouchEvent(playerUi.isFullscreen)
                 true
             }
 
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 v.parent?.requestDisallowInterceptTouchEvent(false)
                 false
             }
@@ -174,7 +185,7 @@ class MainPlayerGestureListener(
             binding.brightnessRelativeLayout.animate(false, 200, AnimationType.SCALE_AND_ALPHA, 200)
         }
 
-        pvcGestureHelper.onScrollEnd(binding, event)
+        pvcGestureHelper.onScrollEnd(binding)
     }
 
     override fun onScroll(

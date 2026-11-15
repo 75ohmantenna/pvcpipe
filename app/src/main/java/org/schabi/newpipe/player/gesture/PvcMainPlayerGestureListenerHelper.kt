@@ -21,6 +21,9 @@ import org.schabi.newpipe.player.ui.MainPlayerUi
  * This class focuses on setting internal volume during scrolling for specific event.
  */
 class PvcMainPlayerGestureListenerHelper {
+    private val volumeGesture = InternalVolumeGesture()
+
+    fun resetGesture() = volumeGesture.reset()
 
     private fun isInternalVolumeEnabled(context: Context): Boolean {
         return PreferenceManager.getDefaultSharedPreferences(context)
@@ -49,14 +52,15 @@ class PvcMainPlayerGestureListenerHelper {
         val player = playerUi.player
         val playbackAudio: PlaybackAudio = player.playbackAudio
 
-        // If we just started sliding, change the progress bar to match the internal volume
-        if (!binding.pvcPlayerExt.internalVolRelativeLayout.isVisible) {
+        // Touch ownership, not a delayed overlay animation, defines a new gesture.
+        val startingGesture = !volumeGesture.isActive
+        if (startingGesture) {
             val volumePercent: Float = playbackAudio.internalVolume
             bar.progress = (volumePercent * bar.max).toInt()
+            volumeGesture.start(bar.progress, bar.max)
         }
 
-        // Update progress bar
-        bar.incrementProgressBy((distanceY / REDUCE_DISTANCE_BY_FACTOR).toInt())
+        bar.progress = volumeGesture.scroll(distanceY)
 
         // Update volume
         val currentVolumePercent: Float = bar.progress / bar.max.toFloat()
@@ -79,14 +83,22 @@ class PvcMainPlayerGestureListenerHelper {
         )
 
         // Make sure the correct layout is visible
-        if (!binding.pvcPlayerExt.internalVolRelativeLayout.isVisible) {
-            binding.pvcPlayerExt.internalVolRelativeLayout.animate(true, 200, AnimationType.SCALE_AND_ALPHA)
+        val overlay = binding.pvcPlayerExt.internalVolRelativeLayout
+        if (startingGesture || !overlay.isVisible) {
+            val wasVisible = overlay.isVisible
+            overlay.animate(true, 200, AnimationType.SCALE_AND_ALPHA)
+            if (wasVisible) {
+                // animate(true) cancels the previous hide but does not restore its scale.
+                overlay.scaleX = 1f
+                overlay.scaleY = 1f
+            }
         }
         binding.brightnessRelativeLayout.isVisible = false
         binding.volumeRelativeLayout.isVisible = false
     }
 
-    fun onScrollEnd(binding: PlayerBinding, event: MotionEvent) {
+    fun onScrollEnd(binding: PlayerBinding) {
+        resetGesture()
         if (binding.pvcPlayerExt.internalVolRelativeLayout.isVisible) {
             binding.pvcPlayerExt.internalVolRelativeLayout.animate(false, 200, AnimationType.SCALE_AND_ALPHA, 200)
         }
@@ -108,9 +120,5 @@ class PvcMainPlayerGestureListenerHelper {
     companion object {
         private val TAG = PvcMainPlayerGestureListenerHelper::class.java.simpleName
         private val DEBUG = MainActivity.DEBUG
-
-        // the swiping is to fast (one my phone).
-        // TODO Verify it does no need tuning/better handling on other phones
-        private const val REDUCE_DISTANCE_BY_FACTOR = 4
     }
 }
