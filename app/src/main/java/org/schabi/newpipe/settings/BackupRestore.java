@@ -10,6 +10,7 @@ import com.jakewharton.processphoenix.ProcessPhoenix;
 
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.error.DiagnosticPrivacy;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
@@ -216,6 +217,8 @@ final class BackupRestore {
                     Map.of(context.getString(R.string.show_search_suggestions_key), 4),
                     PreferenceManager.getDefaultSharedPreferences(context).getAll());
 
+            DiagnosticPrivacy.preserveLocalConsent(values,
+                    PreferenceManager.getDefaultSharedPreferences(context).getAll());
             final String tunnelingKey = context.getString(R.string.disable_media_tunneling_key);
             final String automaticKey =
                     context.getString(R.string.disabled_media_tunneling_automatically_key);

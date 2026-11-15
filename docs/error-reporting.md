@@ -28,7 +28,11 @@ Unrelated project links, licenses and third-party policy links are unchanged.
 
 ## Local collection is separate from attachment consent
 
-The **Logcat dumper** preference remains enabled by default. Public `ErrorInfo`
+The **Logcat dumper** preference is off by default, including on upgrades from
+versions that enabled capture. A new opt-in key deliberately ignores the old
+setting; restarting does not reset a later explicit choice. Settings imports
+preserve the current local opt-in, including when activating a previously queued
+restore. The policy change does not delete existing logs or stored crash reports. Public `ErrorInfo`
 construction triggers preference-controlled local log capture; selecting or
 clearing an attachment does not change this preference. Captures use internal
 cache storage. The configured 30-second offset is a lower-bound request to the
@@ -45,16 +49,19 @@ collection switch.
 Previously created notification or snackbar actions are not revoked and can
 still open a report.
 
-`App.initACRA` retains ACRA's default collection configuration rather than a
-stack-trace-only collection allowlist. Depending on its collectors, ACRA's local
-stored crash data can include device/build/configuration data, an installation
-identifier, preferences and logcat. The custom `AcraReportSender` reads only
-`STACK_TRACE` into a new `ErrorInfo` and opens the report screen. Exported report
-text includes that trace and the report fields, not the entire stored ACRA record.
-Report fields may include requests/URLs, search terms, comments, exception
-details, language settings and app/OS metadata. No automatic
-network report sender is configured by this application. Neither ACRA collection
-nor capture defaults are changed by the copy/share configuration.
+`App.initACRA` now selects only `STACK_TRACE` and ACRA 5.13.1's required
+`REPORT_ID`, `IS_SILENT` and `USER_CRASH_DATE` bookkeeping for new crash records.
+It does not select preferences, logcat, installation identifiers or broader
+device/build/configuration collectors. This is reduced collection, not
+anonymization: exception text and stack traces may still contain sensitive data.
+Existing stored ACRA records are not rewritten or deleted by this policy change.
+The custom `AcraReportSender` still reads only `STACK_TRACE` into a new
+`ErrorInfo` and opens the report screen. Exported report text includes that trace
+and the report fields, not the entire stored ACRA record. Report fields can still
+include requests/URLs, search terms, comments, exception details, language
+settings and app/OS metadata. No automatic network report sender is configured.
+Copy/share format, previews, timestamps and unchecked per-report log attachment
+consent are unchanged.
 
 ## Pagination diagnostics
 

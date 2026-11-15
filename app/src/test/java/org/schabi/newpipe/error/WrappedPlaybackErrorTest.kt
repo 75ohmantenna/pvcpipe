@@ -38,7 +38,7 @@ class WrappedPlaybackErrorTest {
         ReflectionHelpers.setField(app, "mBase", context)
         ReflectionHelpers.setStaticField(App::class.java, "instance", app)
         PreferenceManager.getDefaultSharedPreferences(context).edit()
-            .putBoolean(context.getString(R.string.pvc_settings_debug_logcat_dumper_key), false).commit()
+            .putBoolean(context.getString(R.string.diagnostic_log_capture_opt_in_key), false).commit()
     }
 
     @After

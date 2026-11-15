@@ -97,7 +97,7 @@ class ErrorReportTest {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        captureKey = context.getString(R.string.pvc_settings_debug_logcat_dumper_key)
+        captureKey = context.getString(R.string.diagnostic_log_capture_opt_in_key)
         saveBoolean(captureKey)
         saveBoolean(context.getString(R.string.disable_error_reports_key))
         saveBoolean(MainActivity.KEY_IS_IN_BACKGROUND)

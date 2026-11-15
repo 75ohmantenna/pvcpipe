@@ -26,7 +26,7 @@ import java.io.InterruptedIOException
 import java.net.SocketException
 import org.acra.ACRA.init
 import org.acra.ACRA.isACRASenderServiceProcess
-import org.acra.config.CoreConfigurationBuilder
+import org.schabi.newpipe.error.DiagnosticPrivacy
 import org.schabi.newpipe.error.ErrorInfo
 import org.schabi.newpipe.error.ErrorUtil
 import org.schabi.newpipe.error.ReCaptchaActivity
@@ -254,10 +254,7 @@ open class App :
             return
         }
 
-        val acraConfig =
-            CoreConfigurationBuilder()
-                .withBuildConfigClass(BuildConfig::class.java)
-        init(this, acraConfig)
+        init(this, DiagnosticPrivacy.crashConfiguration())
     }
 
     private fun initNotificationChannels() {

@@ -10,6 +10,7 @@ import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
 import java.io.IOException
 import java.nio.file.Path
+import org.schabi.newpipe.error.DiagnosticPrivacy
 
 /** Coordinates queued restore intents and pre-provider startup recovery. */
 object PendingDatabaseRestore {
@@ -31,6 +32,8 @@ object PendingDatabaseRestore {
         override fun read(): Map<String, *> = preferences.all
 
         override fun replace(values: Map<String, Any>) = ImportExportManager.replacePreferences(preferences, values)
+
+        override fun normalizeTarget(target: MutableMap<String, Any>, current: MutableMap<String, Any>) = DiagnosticPrivacy.preserveLocalConsent(target, current)
     }
 
     @JvmStatic

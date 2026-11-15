@@ -41,6 +41,8 @@ public final class RestoreTransaction {
     public interface Preferences {
         Map<String, ?> read() throws IOException;
         void replace(Map<String, Object> values) throws IOException;
+        default void normalizeTarget(final Map<String, Object> target,
+                                     final Map<String, Object> current) { }
     }
 
     @FunctionalInterface
@@ -288,6 +290,7 @@ public final class RestoreTransaction {
         final Map<String, Object> target = request.replaceAll
                 ? new HashMap<>() : RestorePreferences.copy(oldValues);
         target.putAll(intent);
+        preferences.normalizeTarget(target, oldValues);
         write(pending.resolve("previous.preferences"), RestorePreferences.encode(oldValues));
         write(pending.resolve("target.preferences"), RestorePreferences.encode(target));
         final byte[][] oldHashes = new byte[SUFFIXES.length][];

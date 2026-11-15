@@ -55,7 +55,7 @@ class ReportingActionsTest {
     @Before
     fun setUp() {
         preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        captureKey = context.getString(R.string.pvc_settings_debug_logcat_dumper_key)
+        captureKey = context.getString(R.string.diagnostic_log_capture_opt_in_key)
         savedCapture = if (preferences.contains(captureKey)) {
             preferences.getBoolean(captureKey, true)
         } else {

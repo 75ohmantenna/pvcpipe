@@ -21,6 +21,7 @@ import java.util.zip.ZipException
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createParentDirectories
+import org.schabi.newpipe.error.DiagnosticPrivacy
 import org.schabi.newpipe.streams.io.SharpInputStream
 import org.schabi.newpipe.streams.io.SharpOutputStream
 import org.schabi.newpipe.streams.io.StoredFileHelper
@@ -284,7 +285,7 @@ class ImportExportManager internal constructor(
     @Throws(IOException::class, ClassNotFoundException::class)
     fun loadSerializedPrefs(zipFile: StoredFileHelper, preferences: SharedPreferences) {
         if (!ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_SERIALIZED_PREFS) {
-                replacePreferences(preferences, decodeSerialized(it))
+                replaceImportedPreferences(preferences, decodeSerialized(it))
             }
         ) {
             throw FileNotFoundException(BackupFileLocator.FILE_NAME_SERIALIZED_PREFS)
@@ -294,11 +295,16 @@ class ImportExportManager internal constructor(
     @Throws(IOException::class, JsonParserException::class)
     fun loadJsonPrefs(zipFile: StoredFileHelper, preferences: SharedPreferences) {
         if (!ZipHelper.extractFileFromZip(zipFile, BackupFileLocator.FILE_NAME_JSON_PREFS) {
-                replacePreferences(preferences, decodeJson(it))
+                replaceImportedPreferences(preferences, decodeJson(it))
             }
         ) {
             throw FileNotFoundException(BackupFileLocator.FILE_NAME_JSON_PREFS)
         }
+    }
+
+    private fun replaceImportedPreferences(preferences: SharedPreferences, entries: MutableMap<String, Any>) {
+        DiagnosticPrivacy.preserveLocalConsent(entries, preferences.all)
+        replacePreferences(preferences, entries)
     }
 
     private fun decodeSerialized(input: InputStream): MutableMap<String, Any> = PreferencesObjectInputStream(input).use {

@@ -5,7 +5,7 @@ import androidx.preference.PreferenceManager
 import com.github.logviewer.LogcatDumper
 import java.util.Date
 import org.schabi.newpipe.App
-import org.schabi.newpipe.R
+import org.schabi.newpipe.error.DiagnosticPrivacy
 import org.schabi.newpipe.pvc.feature.logcat.PvcLogcatDumper.Companion.CAPTURE_PERIOD_BEFORE_TIMESTAMP
 
 /**
@@ -36,28 +36,27 @@ class PvcLogcatDumper {
     }
 
     companion object {
-        val logcatDump = LogcatDumper(
-            App.instance,
-            PvcLogFileNameErrorInfo(),
-            PvcLogFileFormat(),
-            logCleanupStrategy = commonCleanupStrategy(),
-            logStorageLocation = commonStorageLocation()
-        )
+        val logcatDump by lazy {
+            LogcatDumper(
+                App.instance,
+                PvcLogFileNameErrorInfo(),
+                PvcLogFileFormat(),
+                logCleanupStrategy = commonCleanupStrategy(),
+                logStorageLocation = commonStorageLocation()
+            )
+        }
 
         private const val CAPTURE_PERIOD_BEFORE_TIMESTAMP: Long = 30 * 1000
 
         fun triggerLogCapture(): Long {
-            val time = System.currentTimeMillis()
-            if (isLogcatDumperEnabled()) {
-                logcatDump.dump(time, CAPTURE_PERIOD_BEFORE_TIMESTAMP)
-            }
-            return time
+            return DiagnosticPrivacy.captureTimestamp(
+                PreferenceManager.getDefaultSharedPreferences(App.instance),
+                System.currentTimeMillis()
+            ) { time -> logcatDump.dump(time, CAPTURE_PERIOD_BEFORE_TIMESTAMP) }
         }
 
-        fun isLogcatDumperEnabled(context: Context = App.instance) = PreferenceManager.getDefaultSharedPreferences(context)
-            .getBoolean(
-                context.getString(R.string.pvc_settings_debug_logcat_dumper_key),
-                true
-            )
+        fun isLogcatDumperEnabled(context: Context = App.instance) = DiagnosticPrivacy.captureEnabled(
+            PreferenceManager.getDefaultSharedPreferences(context)
+        )
     }
 }

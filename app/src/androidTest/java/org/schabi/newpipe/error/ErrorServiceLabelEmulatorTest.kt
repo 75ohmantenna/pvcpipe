@@ -52,7 +52,7 @@ class ErrorServiceLabelEmulatorTest {
         check(nonce.matches(Regex("[a-f0-9]{32}")))
         check(File(context.filesDir, "unknown-service-label-allow").readText() == nonce)
         preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val capture = context.getString(R.string.pvc_settings_debug_logcat_dumper_key)
+        val capture = context.getString(R.string.diagnostic_log_capture_opt_in_key)
         for (key in listOf(capture, context.getString(R.string.disable_error_reports_key), MainActivity.KEY_IS_IN_BACKGROUND)) {
             saved[key] = if (preferences.contains(key)) preferences.getBoolean(key, false) else null
         }

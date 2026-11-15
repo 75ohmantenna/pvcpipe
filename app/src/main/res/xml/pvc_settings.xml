@@ -113,8 +113,8 @@
         </Preference>
 
         <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="@string/pvc_settings_debug_logcat_dumper_key"
+            android:defaultValue="false"
+            android:key="@string/diagnostic_log_capture_opt_in_key"
             android:title="@string/pvc_settings_debug_logcat_dumper_title"
             android:summary="@string/pvc_settings_debug_logcat_dumper_summary"
             app:singleLineTitle="false"

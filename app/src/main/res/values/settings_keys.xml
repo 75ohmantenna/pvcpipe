@@ -1349,5 +1349,6 @@
     <string name="pvc_settings_handle_cloudflare_challenge_enable_key">pvc_settings_handle_cloudflare_challenge_enable_key</string>
     <string name="pvc_settings_handle_cloudflare_challenge_interactive_enable_key">pvc_settings_handle_cloudflare_challenge_interactive_enable_key</string>
     <string name="pvc_settings_debug_logcat_viewer_key">pvc_settings_debug_logcat_viewer_key</string>
+    <string name="diagnostic_log_capture_opt_in_key">pvc_diagnostic_log_capture_opt_in_v1</string>
     <string name="pvc_settings_debug_logcat_dumper_key">pvc_settings_debug_logcat_dumper_key</string>
 </resources>

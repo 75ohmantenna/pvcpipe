@@ -26,7 +26,7 @@ class SearchPaginationDiagnosticsTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val captureKey = context.getString(R.string.pvc_settings_debug_logcat_dumper_key)
+        val captureKey = context.getString(R.string.diagnostic_log_capture_opt_in_key)
         val original = if (preferences.contains(captureKey)) preferences.getBoolean(captureKey, true) else null
         val marker = "PVC_SYNTHETIC_PAGE_COOKIE_86f243e9"
         val cookies = linkedMapOf("synthetic_session" to marker)
