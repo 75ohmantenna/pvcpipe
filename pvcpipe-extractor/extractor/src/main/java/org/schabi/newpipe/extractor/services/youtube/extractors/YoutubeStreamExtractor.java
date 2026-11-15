@@ -90,6 +90,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -105,6 +106,17 @@ public class YoutubeStreamExtractor extends StreamExtractor {
 
     private static final String PREMIERED = "Premiered ";
     private static final String PREMIERED_ON = "Premiered on ";
+    // English next-response dates use both US and UK ordering/month abbreviations.
+    // A single d accepts padded and unpadded days; strict uuuu rejects invalid calendar dates.
+    private static final List<DateTimeFormatter> UPLOAD_DATE_FORMATTERS = List.of(
+            DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.ENGLISH)
+                    .withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d MMM uuuu", Locale.ENGLISH)
+                    .withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.UK)
+                    .withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d MMM uuuu", Locale.UK)
+                    .withResolverStyle(ResolverStyle.STRICT));
     private static final String FORMATS = "formats";
     private static final String ADAPTIVE_FORMATS = "adaptiveFormats";
     private static final String STREAMING_DATA = "streamingData";
@@ -241,18 +253,19 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             // Try other patterns first
         }
 
-        return parseOptionalDate(dateText, "MMM dd, yyyy")
-                .or(() -> parseOptionalDate(dateText, "dd MMM yyyy"))
+        return UPLOAD_DATE_FORMATTERS.stream()
+                .map(formatter -> parseOptionalDate(dateText, formatter))
+                .flatMap(Optional::stream)
+                .findFirst()
                 .map(date -> new DateWrapper(date.atStartOfDay(), true))
                 .orElseThrow(() ->
                     new ParsingException("Could not parse upload date \"" + dateText + "\""));
     }
 
-    private Optional<LocalDate> parseOptionalDate(final String date, final String pattern) {
+    private static Optional<LocalDate> parseOptionalDate(final String date,
+                                                        final DateTimeFormatter formatter) {
         try {
-            // TODO: this parses English formatted dates only, we need a better approach to parse
-            // the textual date
-            final var formatter = DateTimeFormatter.ofPattern(pattern, Locale.ENGLISH);
+            // Non-English textual dates need separate service-format evidence and handling.
             return Optional.of(LocalDate.parse(date, formatter));
         } catch (final DateTimeParseException e) {
             return Optional.empty();
