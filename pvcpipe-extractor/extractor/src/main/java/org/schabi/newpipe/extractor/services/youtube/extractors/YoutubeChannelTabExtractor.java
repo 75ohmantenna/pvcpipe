@@ -353,7 +353,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @Override
@@ -377,7 +377,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @Override
@@ -414,7 +414,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @Override
@@ -438,7 +438,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @Override
@@ -470,7 +470,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @SuppressWarnings("DuplicatedCode")
@@ -502,7 +502,7 @@ public class YoutubeChannelTabExtractor extends ChannelTabExtractor {
 
                     @Override
                     public String getUploaderUrl() throws ParsingException {
-                        return isNullOrEmpty(channelUrl) ? super.getUploaderName() : channelUrl;
+                        return isNullOrEmpty(channelUrl) ? super.getUploaderUrl() : channelUrl;
                     }
 
                     @SuppressWarnings("DuplicatedCode")
