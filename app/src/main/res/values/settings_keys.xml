@@ -1234,7 +1234,6 @@
     <string name="list_view_mode_key">list_view_mode</string>
     <string name="list_view_mode_value">@string/list_view_mode_auto_key</string>
 
-    <!-- TODO: Use these across the app instead of hardcoding it -->
     <string name="list_view_mode_auto_key">auto</string>
     <string name="list_view_mode_list_key">list</string>
     <string name="list_view_mode_grid_key">grid</string>

@@ -133,12 +133,6 @@ public class DownloadMissionRecover extends Thread {
     }
 
     private void resolveStream() throws IOException, ExtractionException, HttpError {
-        // FIXME: this getErrorMessage() always returns "video is unavailable"
-        /*if (mExtractor.getErrorMessage() != null) {
-            mMission.notifyError(mErrCode, new ExtractionException(mExtractor.getErrorMessage()));
-            return;
-        }*/
-
         String url = null;
 
         switch (mRecovery.getKind()) {
