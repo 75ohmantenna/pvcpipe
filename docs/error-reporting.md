@@ -121,3 +121,43 @@ ACRA collection. It does not automatically send a report.
 
 See [documentation-alignment.md](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/documentation-alignment.md) for dated controlled
 before/after evidence and its limitations.
+
+## YouTube API refusal feedback (2026-11-15)
+
+A forbidden (HTTP 403) HTML response from the exact HTTPS YouTube API hosts
+`youtubei.googleapis.com` or `www.youtube.com`, on the `visitor_id`, `player`, or
+`reel/reel_item_watch` v1 paths, is classified as `RequestBlockedException` only
+when its first 16,384 characters contain a traffic/security marker (`captcha`,
+`unusual traffic`, or `automated queries`). Existing short-response validation
+still applies. Other HTML failures remain parsing failures; JSON is not scanned
+for these words.
+
+The app shows the existing neutral service-refusal message, without a sign-in
+claim or a CAPTCHA action. This exception is retryable by the user but is not
+presented as an extractor bug report. It carries a fixed message, not the response
+body or request URL. Other failures retained as suppressed exceptions retain their
+existing diagnostic content; this is not general report sanitization.
+
+A usable alternate player-client response still takes precedence over a refusal.
+When all clients fail, an explicit content restriction has priority over this
+refusal, which has priority over generic transport/parsing errors. This change
+improves feedback only: it does not unblock the request, switch endpoints, change
+VPN/network settings, send additional cookies, or solve challenges.
+
+A bounded disposable-package Pixel probe observed one visitor API response with
+HTTP 403, HTML content, and one of the above markers, then stopped. The original
+app's saved report recorded HTML responses but not their HTTP status. The laptop
+returned JSON and playable Android-client metadata for the same public test video.
+Different application UIDs and network routes can behave differently; these
+observations do not establish an IP/VPN cause, a solvable CAPTCHA, or that the
+original app's failure is identical. Offline regression tests cover classification
+and player-fallback behavior, not recovery of live playback on the phone.
+
+Follow-up on 2026-11-15: after the owner manually switched the phone's VPN
+endpoint, the same public video (`aqz-KE-bpKQ`) played in the unchanged installed
+app at revision `11ae4c41`. Device inspection confirmed a rendered video frame
+and playback advancing from 2.701 to 29.156 seconds, then paused at 32.722 seconds.
+The feedback fix above was not installed and was not needed for that recovery.
+This supports a route-dependent refusal, but does not establish the exact VPN/IP
+cause. No app installation or VPN/settings change was performed by the assistant
+during this retest.

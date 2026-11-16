@@ -24,6 +24,7 @@ import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException
 import org.schabi.newpipe.extractor.exceptions.PaidContentException
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
+import org.schabi.newpipe.extractor.exceptions.RequestBlockedException
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException
 import org.schabi.newpipe.extractor.exceptions.SoundCloudGoPlusContentException
 import org.schabi.newpipe.extractor.exceptions.UnsupportedContentInCountryException
@@ -328,6 +329,10 @@ class ErrorInfo private constructor(
                 throwable is ContentNotSupportedException ->
                     ErrorMessage(R.string.content_not_supported)
 
+                // API refusal is not evidence of a solvable challenge or a required sign-in.
+                throwable is RequestBlockedException ->
+                    ErrorMessage(R.string.too_many_requests, getServiceName(serviceId), serviceNameFirst = true)
+
                 // ReCaptchas will be handled in a special way anyway
                 throwable is ReCaptchaException ->
                     if (solvableCaptchaUrl(throwable) != null) {
@@ -387,6 +392,8 @@ class ErrorInfo private constructor(
 
                 // a site that is refusing requests for a while is nothing to report; a captcha
                 // that can be solved keeps the handling it had
+                is RequestBlockedException -> false
+
                 is ReCaptchaException -> solvableCaptchaUrl(throwable) != null
 
                 // happens often when there is no internet connection; we don't use

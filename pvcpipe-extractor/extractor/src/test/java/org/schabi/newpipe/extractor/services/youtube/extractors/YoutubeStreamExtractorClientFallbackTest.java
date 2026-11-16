@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException;
+import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -311,6 +313,63 @@ class YoutubeStreamExtractorClientFallbackTest {
         assertEquals(0, fixtures.metadataRequests);
     }
 
+    @Test
+    void androidRefusalStillAllowsVisionPlayback() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.androidBlocked = true;
+        fixtures.vision = playable(ID, "Vision fallback", "vision");
+        assertEquals("Vision fallback", fetch(fixtures).getName());
+        assertEquals(1, fixtures.visionRequests);
+    }
+
+    @Test
+    void visionRefusalCannotDiscardUsableAndroidPlayback() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.android = playable(ID, "Android fallback", "android");
+        fixtures.visionBlocked = true;
+        assertEquals("Android fallback", fetch(fixtures).getName());
+        assertEquals(1, fixtures.visionRequests);
+    }
+
+    @Test
+    void refusalOutranksTransportFailureInEitherOrder() throws Exception {
+        for (final boolean androidBlocked : new boolean[]{true, false}) {
+            final PlayerFixtures fixtures = new PlayerFixtures();
+            fixtures.androidBlocked = androidBlocked;
+            fixtures.visionBlocked = !androidBlocked;
+            final RequestBlockedException failure = assertThrows(RequestBlockedException.class,
+                    () -> fetch(fixtures));
+            assertTrue(failure.getSuppressed().length > 0);
+            assertTrue(failure.getSuppressed()[0] instanceof IOException);
+        }
+    }
+
+    @Test
+    void actualContentRestrictionOutranksRefusalInEitherOrder() throws Exception {
+        for (final boolean androidBlocked : new boolean[]{true, false}) {
+            final PlayerFixtures fixtures = new PlayerFixtures();
+            fixtures.androidBlocked = androidBlocked;
+            fixtures.visionBlocked = !androidBlocked;
+            if (androidBlocked) {
+                fixtures.vision = unavailable("UNPLAYABLE", "Video unavailable");
+            } else {
+                fixtures.android = unavailable("UNPLAYABLE", "Video unavailable");
+            }
+            assertThrows(ContentNotAvailableException.class, () -> fetch(fixtures));
+        }
+    }
+
+    @Test
+    void twoRefusalsRetainBothWithoutResponseBody() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.androidBlocked = true;
+        fixtures.visionBlocked = true;
+        final RequestBlockedException failure = assertThrows(RequestBlockedException.class,
+                () -> fetch(fixtures));
+        assertTrue(failure.getSuppressed()[0] instanceof RequestBlockedException);
+        assertTrue(!failure.getMessage().contains("fixture-secret"));
+    }
+
     private static YoutubeStreamExtractor fetch(final PlayerFixtures fixtures) throws Exception {
         NewPipe.init(fixtures);
         final YoutubeStreamExtractor extractor = (YoutubeStreamExtractor) ServiceList.YouTube
@@ -347,6 +406,8 @@ class YoutubeStreamExtractorClientFallbackTest {
         private int visionRequests;
         private int embedRequests;
         private int metadataRequests;
+        private boolean androidBlocked;
+        private boolean visionBlocked;
 
         @Override
         public Response execute(@Nonnull final Request request) throws IOException {
@@ -355,6 +416,9 @@ class YoutubeStreamExtractorClientFallbackTest {
                 return response(request, "x".repeat(5001));
             }
             if (url.contains("/visitor_id?")) {
+                if (androidBlocked && url.startsWith("https://youtubei.googleapis.com/")) {
+                    return blocked(request);
+                }
                 return response(request, "{\"responseContext\":{\"visitorData\":\"offline-visitor\"}}");
             }
             if (url.contains("/reel/reel_item_watch?")) {
@@ -381,6 +445,9 @@ class YoutubeStreamExtractorClientFallbackTest {
                 }
                 if ("VISIONOS".equals(name)) {
                     visionRequests++;
+                    if (visionBlocked) {
+                        return blocked(request);
+                    }
                     if (vision == null) {
                         throw new IOException("VISIONOS fixture unavailable");
                     }
@@ -401,6 +468,12 @@ class YoutubeStreamExtractorClientFallbackTest {
                                 + "{\"contents\":[]}}}}}");
             }
             throw new IOException("Unexpected fixture request: " + url);
+        }
+
+        private static Response blocked(final Request request) {
+            return new Response(403, "Forbidden", Map.of("Content-Type", List.of("text/html")),
+                    "<html>Unusual traffic from your computer network fixture-secret</html>",
+                    request.url());
         }
 
         private static Response response(final Request request, final String body) {

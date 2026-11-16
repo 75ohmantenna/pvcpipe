@@ -52,6 +52,7 @@ import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
 import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.YoutubeMusicPremiumContentException;
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException;
@@ -1019,7 +1020,10 @@ public class YoutubeStreamExtractor extends StreamExtractor {
                 || current instanceof SignInConfirmNotBotException;
         final boolean moreSpecific = previous.getClass() == ContentNotAvailableException.class
                 && currentRestriction && current.getClass() != ContentNotAvailableException.class;
-        if ((currentRestriction && !previousRestriction) || moreSpecific) {
+        final boolean moreInformativeRefusal = current instanceof RequestBlockedException
+                && !(previous instanceof RequestBlockedException) && !previousRestriction;
+        if ((currentRestriction && !previousRestriction)
+                || moreSpecific || moreInformativeRefusal) {
             current.addSuppressed(previous);
             return current;
         }

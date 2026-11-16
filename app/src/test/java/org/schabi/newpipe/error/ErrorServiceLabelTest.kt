@@ -32,6 +32,7 @@ import org.schabi.newpipe.error.ErrorInfo.Companion.ErrorMessage
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.exceptions.AccountTerminatedException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
+import org.schabi.newpipe.extractor.exceptions.RequestBlockedException
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException
 import org.schabi.newpipe.util.text.getText
 
@@ -57,6 +58,19 @@ class ErrorServiceLabelTest {
         doReturn("%1\$s provides this reason: %2\$s").`when`(resources).getText(R.string.account_terminated_service_provides_reason)
         doReturn(HtmlCompat.fromHtml("%1\$s requires sign-in. <a href=\"%2\$s\">FAQ</a>", HtmlCompat.FROM_HTML_MODE_LEGACY))
             .`when`(resources).getText(R.string.sign_in_confirm_not_bot_error)
+    }
+
+    @Test
+    fun `blocked API requests show neutral refusal without challenge or sign in`() {
+        val failure = RequestBlockedException()
+        assertEquals("YouTube refuses requests", message(failure, ServiceList.YouTube.serviceId).trim())
+        assertEquals(null, ErrorInfo.solvableCaptchaUrl(failure))
+        assertFalse(ErrorInfo.isReportable(failure))
+        assertTrue(ErrorInfo.isRetryable(failure))
+        val rendered = ErrorInfo.getMessage(failure, UserAction.REQUESTED_STREAM, ServiceList.YouTube.serviceId).getText(context)
+        if (rendered is Spanned) {
+            assertTrue(rendered.getSpans(0, rendered.length, URLSpan::class.java).isEmpty())
+        }
     }
 
     @Test

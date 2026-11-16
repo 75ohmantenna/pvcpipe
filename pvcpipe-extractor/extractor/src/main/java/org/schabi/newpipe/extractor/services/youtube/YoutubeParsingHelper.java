@@ -54,6 +54,7 @@ import org.schabi.newpipe.extractor.exceptions.AccountTerminatedException;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
@@ -1059,6 +1060,23 @@ public final class YoutubeParsingHelper {
                 .collect(Collectors.toUnmodifiableList());
     }
 
+    private static boolean isBlockedApiResponse(final URL url, final String body) {
+        if (!"https".equalsIgnoreCase(url.getProtocol())
+                || !("youtubei.googleapis.com".equalsIgnoreCase(url.getHost())
+                || "www.youtube.com".equalsIgnoreCase(url.getHost()))
+                || !("/youtubei/v1/visitor_id".equals(url.getPath())
+                || "/youtubei/v1/player".equals(url.getPath())
+                || "/youtubei/v1/reel/reel_item_watch".equals(url.getPath()))) {
+            return false;
+        }
+        // These markers establish refusal feedback, not a cause or a solvable challenge URL.
+        // Bound scanning and never retain body text in the exception or logs.
+        final String prefix = body.substring(0, Math.min(body.length(), 16384))
+                .toLowerCase(Locale.ROOT);
+        return prefix.contains("captcha") || prefix.contains("unusual traffic")
+                || prefix.contains("automated queries");
+    }
+
     @Nonnull
     public static String getValidJsonResponseBody(@Nonnull final Response response)
             throws ParsingException, MalformedURLException {
@@ -1084,6 +1102,9 @@ public final class YoutubeParsingHelper {
         final String responseContentType = response.getHeader("Content-Type");
         if (responseContentType != null
                 && responseContentType.toLowerCase(Locale.ROOT).contains("text/html")) {
+            if (response.responseCode() == 403 && isBlockedApiResponse(latestUrl, responseBody)) {
+                throw new RequestBlockedException();
+            }
             throw new ParsingException("Got HTML document, expected JSON response"
                     + " (latest url was: \"" + response.latestUrl() + "\")");
         }
