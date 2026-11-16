@@ -120,6 +120,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
     protected PlayerBinding binding;
     private final Handler controlsVisibilityHandler = new Handler(Looper.getMainLooper());
+    private boolean destroyed;
     @Nullable
     private SurfaceHolderCallback surfaceHolderCallback;
     boolean surfaceIsSetup = false;
@@ -435,6 +436,26 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
     @Override
     public void destroy() {
+        destroyed = true;
+        // Main and popup UIs reuse the same binding. Stop work before handing it over.
+        // Clear listeners first: canceling an animation can otherwise run its end callback.
+        for (final View view : new View[]{binding.playbackControlRoot,
+                binding.playbackControlsShadow, binding.playerTopShadow,
+                binding.playerBottomShadow}) {
+            view.animate().setListener(null).cancel();
+            // A reused, visible control must not inherit a half-finished fade.
+            view.setAlpha(view.getVisibility() == View.VISIBLE ? 1.0f : 0.0f);
+        }
+        controlsVisibilityHandler.removeCallbacksAndMessages(null);
+        for (final PopupMenu menu : new PopupMenu[]{qualityPopupMenu, audioTrackPopupMenu,
+                playbackSpeedPopupMenu, captionPopupMenu}) {
+            if (menu != null) {
+                menu.setOnDismissListener(null);
+                menu.setOnMenuItemClickListener(null);
+                menu.dismiss();
+            }
+        }
+        isSomePopupMenuVisible = false;
         super.destroy();
         seekbarPreviewThumbnailHolder.close();
         binding.endScreen.setImageDrawable(null);
@@ -714,6 +735,9 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     }
 
     public void showControlsThenHide() {
+        if (destroyed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "showControlsThenHide() called");
         }
@@ -731,6 +755,9 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     }
 
     public void showControls(final long duration) {
+        if (destroyed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "showControls() called");
         }
@@ -742,6 +769,9 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     }
 
     public void hideControls(final long duration, final long delay) {
+        if (destroyed) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "hideControls() called with: duration = [" + duration
                     + "], delay = [" + delay + "]");
