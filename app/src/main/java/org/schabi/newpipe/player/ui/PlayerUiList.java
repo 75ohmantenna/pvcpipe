@@ -1,12 +1,18 @@
 package org.schabi.newpipe.player.ui;
 
+import android.view.LayoutInflater;
+
+import org.schabi.newpipe.databinding.PlayerBinding;
+import org.schabi.newpipe.player.Player;
+import org.schabi.newpipe.player.PlayerType;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 public final class PlayerUiList {
-    final List<PlayerUi> playerUis = new ArrayList<>();
+    private final List<PlayerUi> playerUis = new ArrayList<>();
 
     /**
      * Creates a {@link PlayerUiList} starting with the provided player uis. The provided player uis
@@ -22,6 +28,48 @@ public final class PlayerUiList {
     }
 
     /**
+     * Selects the mode UI, retiring its previous owner before reusing a video binding.
+     * Repeated selection keeps the current UI; notification and session UIs survive mode changes.
+     * @param player the player whose readiness is replayed to a replacement UI
+     * @param playerType the requested player mode
+     */
+    public void selectMode(final Player player, final PlayerType playerType) {
+        if ((get(MainPlayerUi.class).isPresent() && playerType == PlayerType.MAIN)
+                || (get(BackgroundPlayerUi.class).isPresent() && playerType == PlayerType.AUDIO)
+                || (get(PopupPlayerUi.class).isPresent() && playerType == PlayerType.POPUP)) {
+            // correct UI already in place
+            return;
+        }
+
+        // try to reuse binding if possible
+        final PlayerBinding binding = get(VideoPlayerUi.class).map(VideoPlayerUi::getBinding)
+                .orElseGet(() -> {
+                    if (playerType == PlayerType.AUDIO) {
+                        return null;
+                    } else {
+                        return PlayerBinding.inflate(LayoutInflater.from(player.getContext()));
+                    }
+                });
+
+        switch (playerType) {
+            case MAIN:
+                destroyAll(PopupPlayerUi.class);
+                destroyAll(BackgroundPlayerUi.class);
+                addAndPrepare(new MainPlayerUi(player, binding));
+                break;
+            case POPUP:
+                destroyAll(MainPlayerUi.class);
+                destroyAll(BackgroundPlayerUi.class);
+                addAndPrepare(new PopupPlayerUi(player, binding));
+                break;
+            case AUDIO:
+                destroyAll(VideoPlayerUi.class); // destroys both MainPlayerUi and PopupPlayerUi
+                addAndPrepare(new BackgroundPlayerUi(player));
+                break;
+        }
+    }
+
+    /**
      * Adds the provided player ui to the list and calls on it the initialization functions that
      * apply based on the current player state. The preparation step needs to be done since when UIs
      * are removed and re-added, the player will not call e.g. initPlayer again since the exoplayer
@@ -31,7 +79,7 @@ public final class PlayerUiList {
      *                 PlayerUi#getPlayer()} will be used to query information about the player
      *                 state
      */
-    public void addAndPrepare(final PlayerUi playerUi) {
+    private void addAndPrepare(final PlayerUi playerUi) {
         if (playerUi.getPlayer().getFragmentListener().isPresent()) {
             // make sure UIs know whether a service is connected or not
             playerUi.onFragmentListenerSet();

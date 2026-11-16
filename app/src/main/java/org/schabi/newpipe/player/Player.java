@@ -20,7 +20,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.util.Log;
-import android.view.LayoutInflater;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -45,7 +44,6 @@ import androidx.media3.common.VideoSize;
 
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
-import org.schabi.newpipe.databinding.PlayerBinding;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
@@ -76,12 +74,8 @@ import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.player.resolver.PlaybackSources;
-import org.schabi.newpipe.player.ui.BackgroundPlayerUi;
-import org.schabi.newpipe.player.ui.MainPlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUi;
 import org.schabi.newpipe.player.ui.PlayerUiList;
-import org.schabi.newpipe.player.ui.PopupPlayerUi;
-import org.schabi.newpipe.player.ui.VideoPlayerUi;
 import org.schabi.newpipe.util.DependentPreferenceHelper;
 import org.schabi.newpipe.util.ExtractorHelper;
 import org.schabi.newpipe.util.ListHelper;
@@ -316,7 +310,7 @@ public final class Player implements PlaybackListener, Listener {
         if (playerIntentType != PlayerIntentType.TimestampChange) {
             playerType = IntentCompat.getSerializableExtra(intent, PLAYER_TYPE, PlayerType.class);
         }
-        initUIsForCurrentPlayerType();
+        UIs.selectMode(this, playerType);
         isAudioOnly = audioPlayerSelected();
 
         if (intent.hasExtra(PLAYBACK_QUALITY)) {
@@ -487,42 +481,6 @@ public final class Player implements PlaybackListener, Listener {
             return null;
         }
         return SerializedCache.getInstance().take(queueCache, PlayQueue.class);
-    }
-
-    private void initUIsForCurrentPlayerType() {
-        if ((UIs.get(MainPlayerUi.class).isPresent() && playerType == PlayerType.MAIN)
-                || (UIs.get(BackgroundPlayerUi.class).isPresent() && playerType == PlayerType.AUDIO)
-                || (UIs.get(PopupPlayerUi.class).isPresent() && playerType == PlayerType.POPUP)) {
-            // correct UI already in place
-            return;
-        }
-
-        // try to reuse binding if possible
-        final PlayerBinding binding = UIs.get(VideoPlayerUi.class).map(VideoPlayerUi::getBinding)
-                .orElseGet(() -> {
-                    if (playerType == PlayerType.AUDIO) {
-                        return null;
-                    } else {
-                        return PlayerBinding.inflate(LayoutInflater.from(context));
-                    }
-                });
-
-        switch (playerType) {
-            case MAIN:
-                UIs.destroyAll(PopupPlayerUi.class);
-                UIs.destroyAll(BackgroundPlayerUi.class);
-                UIs.addAndPrepare(new MainPlayerUi(this, binding));
-                break;
-            case POPUP:
-                UIs.destroyAll(MainPlayerUi.class);
-                UIs.destroyAll(BackgroundPlayerUi.class);
-                UIs.addAndPrepare(new PopupPlayerUi(this, binding));
-                break;
-            case AUDIO:
-                UIs.destroyAll(VideoPlayerUi.class); // destroys both MainPlayerUi and PopupPlayerUi
-                UIs.addAndPrepare(new BackgroundPlayerUi(this));
-                break;
-        }
     }
 
     private void initPlayback(@NonNull final PlayQueue queue,

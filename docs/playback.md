@@ -313,6 +313,21 @@ rotation changes window bounds without replacing the player. Entering landscape
 preserves paused and completed playback rather than starting or replaying it.
 Opening a new video still supplies its explicit autoplay request.
 
+[`PlayerUiList`](../app/src/main/java/org/schabi/newpipe/player/ui/PlayerUiList.java)
+owns mode UI selection and replacement. Re-selecting the current mode keeps its
+UI. Main and popup modes reuse the video binding only after the previous UI has
+finished engine teardown and terminal destruction; background mode discards it.
+Notification and media-session UIs survive mode changes. A replacement receives
+the current fragment, engine and playback readiness in that order, where present.
+Engine teardown alone leaves the surviving UI usable; terminal destruction stops
+its delayed callbacks, animations and menus before another UI uses the binding.
+
+`PlayerUiListTest` covers real main/popup UI construction, binding reuse and
+teardown with a controlled player, and separately controls replacement construction
+to verify readiness ordering. `VideoPlayerUiOwnershipTest` exercises real menus,
+animations and delayed callbacks. These JVM/Robolectric checks do not establish
+popup-window behavior, decoded playback or physical-device surface scheduling.
+
 The detail container owns safe insets for inline and multiwindow playback; the
 main control overlay applies them only in true fullscreen, avoiding double padding
 after rotation or reparenting. Time counters use opaque black backgrounds for
