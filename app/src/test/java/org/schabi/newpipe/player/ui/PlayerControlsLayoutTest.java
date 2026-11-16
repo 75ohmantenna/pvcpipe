@@ -10,8 +10,6 @@ import static org.junit.Assert.assertTrue;
 
 import android.app.Application;
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
@@ -28,6 +26,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.views.PlayerCounterTextView;
 import org.schabi.newpipe.databinding.PlayerBinding;
 import org.schabi.newpipe.databinding.FragmentVideoDetailBinding;
 
@@ -139,19 +138,16 @@ public class PlayerControlsLayoutTest {
     }
 
     @Test
-    public void numericLabelsHaveOpaqueBlackBackgroundsAndInteractiveFeedback() {
+    public void numericLabelsUseCompactBackingsAndInteractiveFeedback() {
         final PlayerBinding binding = newBinding();
         for (final View counter : new View[]{binding.playbackCurrentTime,
                 binding.playbackEndTime, binding.currentDisplaySeek}) {
-            final GradientDrawable background = (GradientDrawable) counter.getBackground();
-            assertEquals(Color.BLACK, background.getColor().getDefaultColor());
+            assertTrue(counter instanceof PlayerCounterTextView);
         }
         for (final View counter : new View[]{binding.qualityTextView,
                 binding.playbackSpeed, binding.playbackLiveSync}) {
-            assertTrue(counter.getBackground() instanceof RippleDrawable);
-            final RippleDrawable ripple = (RippleDrawable) counter.getBackground();
-            final GradientDrawable background = (GradientDrawable) ripple.getDrawable(0);
-            assertEquals(Color.BLACK, background.getColor().getDefaultColor());
+            assertTrue(counter instanceof PlayerCounterTextView);
+            assertTrue(counter.getForeground() instanceof RippleDrawable);
         }
     }
 

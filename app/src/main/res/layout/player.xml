@@ -207,12 +207,12 @@
 
                     </LinearLayout>
 
-                    <org.schabi.newpipe.views.NewPipeTextView
+                    <org.schabi.newpipe.views.PlayerCounterTextView
                         android:id="@+id/qualityTextView"
                         android:layout_width="wrap_content"
                         android:layout_height="35dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/player_counter_selectable_background"
+                        android:foreground="@drawable/player_counter_selectable_background"
                         android:gravity="center"
                         android:minWidth="0dp"
                         android:padding="@dimen/player_main_buttons_padding"
@@ -221,12 +221,12 @@
                         tools:ignore="HardcodedText,RtlHardcoded"
                         tools:text="720p" />
 
-                    <org.schabi.newpipe.views.NewPipeTextView
+                    <org.schabi.newpipe.views.PlayerCounterTextView
                         android:id="@+id/playbackSpeed"
                         android:layout_width="wrap_content"
                         android:layout_height="35dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/player_counter_selectable_background"
+                        android:foreground="@drawable/player_counter_selectable_background"
                         android:gravity="center"
                         android:minWidth="0dp"
                         android:padding="@dimen/player_main_buttons_padding"
@@ -475,11 +475,10 @@
                     android:orientation="vertical"
                     android:paddingBottom="12dp">
 
-                    <org.schabi.newpipe.views.NewPipeTextView
+                    <org.schabi.newpipe.views.PlayerCounterTextView
                         android:id="@+id/currentDisplaySeek"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/player_counter_background"
                         android:paddingLeft="5dp"
                         android:paddingRight="5dp"
                         android:paddingBottom="2dp"
@@ -516,11 +515,10 @@
                 android:paddingLeft="@dimen/player_main_controls_padding"
                 android:paddingRight="@dimen/player_main_controls_padding">
 
-                <org.schabi.newpipe.views.NewPipeTextView
+                <org.schabi.newpipe.views.PlayerCounterTextView
                     android:id="@+id/playbackCurrentTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/player_counter_background"
                     android:gravity="center"
                     android:minHeight="30dp"
                     android:paddingStart="4dp"
@@ -545,11 +543,10 @@
                     tools:progress="25"
                     tools:secondaryProgress="50" />
 
-                <org.schabi.newpipe.views.NewPipeTextView
+                <org.schabi.newpipe.views.PlayerCounterTextView
                     android:id="@+id/playbackEndTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/player_counter_background"
                     android:gravity="center"
                     android:minHeight="30dp"
                     android:paddingStart="4dp"
@@ -561,11 +558,11 @@
                     tools:ignore="HardcodedText"
                     tools:text="1:23:49" />
 
-                <org.schabi.newpipe.views.NewPipeTextView
+                <org.schabi.newpipe.views.PlayerCounterTextView
                     android:id="@+id/playbackLiveSync"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:background="@drawable/player_counter_selectable_background"
+                    android:foreground="@drawable/player_counter_selectable_background"
                     android:gravity="center"
                     android:paddingLeft="4dp"
                     android:paddingRight="4dp"
