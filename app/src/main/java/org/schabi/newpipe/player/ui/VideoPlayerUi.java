@@ -1764,7 +1764,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
      * latter two conditions prevent "The surface has been released" errors). So this function can
      * be called many times and even while the UI is in unready states.
      */
-    public void setupVideoSurfaceIfNeeded() {
+    protected void setupVideoSurfaceIfNeeded() {
         if (!surfaceIsSetup && player.getExoPlayer() != null
                 && binding.getRoot().getParent() != null) {
             // make sure there is nothing left over from previous calls

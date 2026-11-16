@@ -322,10 +322,17 @@ the current fragment, engine and playback readiness in that order, where present
 Engine teardown alone leaves the surviving UI usable; terminal destruction stops
 its delayed callbacks, animations and menus before another UI uses the binding.
 
+`MainPlayerUi.attachTo` owns transfer into the detail container and surface
+readiness. Repeating attachment to the same container keeps the view in place,
+while still connecting a newly available engine. Engine creation also retries
+surface readiness for an already attached UI. The fragment owns container geometry;
+popup window attachment remains with the popup UI.
+
 `PlayerUiListTest` covers real main/popup UI construction, binding reuse and
 teardown with a controlled player, and separately controls replacement construction
 to verify readiness ordering. `VideoPlayerUiOwnershipTest` exercises real menus,
-animations and delayed callbacks. These JVM/Robolectric checks do not establish
+animations, delayed callbacks and view transfers with a controlled engine and local
+surface stand-in. These JVM/Robolectric checks do not establish
 popup-window behavior, decoded playback or physical-device surface scheduling.
 
 The detail container owns safe insets for inline and multiwindow playback; the

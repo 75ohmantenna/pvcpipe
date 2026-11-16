@@ -6,7 +6,9 @@ package org.schabi.newpipe.player.ui;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,16 +19,23 @@ import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.graphics.SurfaceTexture;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.appcompat.widget.PopupMenu;
 import androidx.preference.PreferenceManager;
+
+import androidx.media3.exoplayer.ExoPlayer;
 
 import org.junit.After;
 import org.junit.Before;
@@ -37,6 +46,9 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+import org.robolectric.shadows.ShadowSurfaceView;
 import org.robolectric.util.ReflectionHelpers;
 import org.robolectric.shadows.ShadowChoreographer;
 import org.schabi.newpipe.R;
@@ -48,9 +60,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Exercises real UI teardown with a mock player; no engine or playback is started. */
+/** Exercises real attachment/teardown with a controlled player and engine; no playback starts. */
 @RunWith(RobolectricTestRunner.class)
-@Config(application = Application.class, sdk = {26, 36})
+@Config(application = Application.class, sdk = {26, 36},
+        shadows = VideoPlayerUiOwnershipTest.SurfaceViewWithSurface.class)
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class VideoPlayerUiOwnershipTest {
     private ActivityController<Activity> activity;
     private Context context;
@@ -80,6 +94,7 @@ public class VideoPlayerUiOwnershipTest {
         for (final MainPlayerUi ui : new ArrayList<>(liveUis)) {
             discard(ui);
         }
+        ((SurfaceViewWithSurface) Shadows.shadowOf(binding.surfaceView)).releaseSurface();
         activity.pause().stop().destroy();
         ShadowChoreographer.setPaused(false);
         verify(player, never()).play();
@@ -106,6 +121,84 @@ public class VideoPlayerUiOwnershipTest {
         assertEquals(View.GONE, binding.playbackControlRoot.getVisibility());
         ui.showControls(0);
         assertEquals(View.VISIBLE, binding.playbackControlRoot.getVisibility());
+    }
+
+    @Test
+    public void attachmentTransfersTheRootBetweenHosts() {
+        final MainPlayerUi ui = createUi();
+        final FrameLayout other = new FrameLayout(context);
+        ui.attachTo(host);
+        assertSame(host, binding.getRoot().getParent());
+        ui.attachTo(other);
+        assertEquals(0, host.getChildCount());
+        assertEquals(1, other.getChildCount());
+        assertSame(binding.getRoot(), other.getChildAt(0));
+    }
+
+    @Test
+    public void sameHostAttachmentKeepsTheViewAndConnectsALateEngine() {
+        final MainPlayerUi ui = createUi();
+        final int[] changes = new int[2];
+        host.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
+            @Override
+            public void onChildViewAdded(final View parent, final View child) {
+                changes[0]++;
+            }
+
+            @Override
+            public void onChildViewRemoved(final View parent, final View child) {
+                changes[1]++;
+            }
+        });
+        ui.attachTo(host);
+
+        final ExoPlayer engine = mock(ExoPlayer.class);
+        when(player.getExoPlayer()).thenReturn(engine);
+        assertTrue(binding.surfaceView.getHolder().getSurface().isValid());
+        ui.attachTo(host);
+        ui.attachTo(host);
+
+        assertEquals(1, changes[0]);
+        assertEquals(0, changes[1]);
+        assertSame(host, binding.getRoot().getParent());
+        verify(engine).setVideoSurfaceHolder(binding.surfaceView.getHolder());
+    }
+
+    @Test
+    public void engineInitializationConnectsAnAlreadyAttachedUi() {
+        final MainPlayerUi ui = createUi();
+        ui.attachTo(host);
+        final ExoPlayer engine = mock(ExoPlayer.class);
+        when(player.getExoPlayer()).thenReturn(engine);
+        ui.initPlayer();
+        verify(engine).setVideoSurfaceHolder(binding.surfaceView.getHolder());
+    }
+
+    @Test
+    public void attachmentDoesNotForceAReleasedSurfaceIntoTheEngine() {
+        final MainPlayerUi ui = createUi();
+        final ExoPlayer engine = mock(ExoPlayer.class);
+        when(player.getExoPlayer()).thenReturn(engine);
+        binding.surfaceView.getHolder().getSurface().release();
+        assertFalse(binding.surfaceView.getHolder().getSurface().isValid());
+        ui.attachTo(host);
+        assertSame(host, binding.getRoot().getParent());
+        verify(engine, never()).setVideoSurfaceHolder(any());
+    }
+
+    @Test
+    public void attachmentReconnectsTheSurfaceAfterEngineTeardown() {
+        final MainPlayerUi ui = createUi();
+        final ExoPlayer engine = mock(ExoPlayer.class);
+        when(player.getExoPlayer()).thenReturn(engine);
+        ui.attachTo(host);
+        ui.destroyPlayer();
+        final ExoPlayer replacement = mock(ExoPlayer.class);
+        when(player.getExoPlayer()).thenReturn(replacement);
+        ui.attachTo(host);
+        assertSame(host, binding.getRoot().getParent());
+        verify(engine).setVideoSurfaceHolder(binding.surfaceView.getHolder());
+        verify(replacement).setVideoSurfaceHolder(binding.surfaceView.getHolder());
     }
 
     @Test
@@ -258,13 +351,18 @@ public class VideoPlayerUiOwnershipTest {
     }
 
     private MainPlayerUi attachUi(final boolean show) {
-        host.addView(binding.getRoot());
-        final MainPlayerUi ui = new MainPlayerUi(player, binding);
-        liveUis.add(ui);
+        final MainPlayerUi ui = createUi();
+        ui.attachTo(host);
         if (show) {
             ui.showControls(0);
         }
         Shadows.shadowOf(Looper.getMainLooper()).idle();
+        return ui;
+    }
+
+    private MainPlayerUi createUi() {
+        final MainPlayerUi ui = new MainPlayerUi(player, binding);
+        liveUis.add(ui);
         return ui;
     }
 
@@ -289,5 +387,29 @@ public class VideoPlayerUiOwnershipTest {
 
     private static void idle(final long millis) {
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis));
+    }
+
+    /** Robolectric's default holder returns null; supply a surface with controlled validity. */
+    @Implements(SurfaceView.class)
+    public static class SurfaceViewWithSurface extends ShadowSurfaceView {
+        private final SurfaceTexture texture = new SurfaceTexture(0);
+        private final Surface surface = new Surface(texture);
+        private final SurfaceHolder holder = new FakeSurfaceHolder() {
+            @Override
+            public Surface getSurface() {
+                return surface;
+            }
+        };
+
+        @Override
+        @Implementation
+        protected SurfaceHolder getHolder() {
+            return holder;
+        }
+
+        void releaseSurface() {
+            surface.release();
+            texture.release();
+        }
     }
 }

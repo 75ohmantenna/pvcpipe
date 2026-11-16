@@ -250,6 +250,19 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
         player.useVideoAndSubtitles(fragmentIsVisible);
     }
 
+    /**
+     * Attaches the main player and connects its surface when the engine is ready.
+     * Repeated attachment to the same host keeps the view in place and retries surface readiness.
+     * @param host the detail view's player container
+     */
+    public void attachTo(@NonNull final ViewGroup host) {
+        if (binding.getRoot().getParent() != host) {
+            removeViewFromParent();
+            host.addView(binding.getRoot());
+        }
+        setupVideoSurfaceIfNeeded();
+    }
+
     @Override
     public void removeViewFromParent() {
         // view was added to fragment
