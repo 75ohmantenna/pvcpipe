@@ -21,9 +21,6 @@ import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import java.util.List;
-import java.util.Map;
-
 import javax.annotation.Nonnull;
 
 /**
@@ -124,29 +121,20 @@ public final class YoutubePostLiveStreamDvrDashManifestCreator {
             throw new CreationException("targetDurationSec value is <= 0: " + targetDurationSec);
         }
 
-        try {
-            // Try to avoid redirects when streaming the content by saving the latest URL we get
-            // from video servers.
-            final Response response = getInitializationResponse(realPostLiveStreamDvrStreamingUrl,
-                    itagItem, DeliveryType.LIVE);
-            realPostLiveStreamDvrStreamingUrl = response.latestUrl().replace(SQ_0, "")
-                    .replace(RN_0, "").replace(ALR_YES, "");
+        // Save the final URL to avoid redirects when streaming the content.
+        final Response response = getInitializationResponse(realPostLiveStreamDvrStreamingUrl,
+                itagItem, DeliveryType.LIVE);
+        realPostLiveStreamDvrStreamingUrl = response.latestUrl().replace(SQ_0, "")
+                .replace(RN_0, "").replace(ALR_YES, "");
 
-            final int responseCode = response.responseCode();
-            if (responseCode != 200) {
-                throw new CreationException(
-                        "Could not get the initialization sequence: response code " + responseCode);
-            }
-
-            final Map<String, List<String>> responseHeaders = response.responseHeaders();
-            streamDurationString = responseHeaders.get("X-Head-Time-Millis").get(0);
-            segmentCount = responseHeaders.get("X-Head-Seqnum").get(0);
-        } catch (final IndexOutOfBoundsException e) {
+        final int responseCode = response.responseCode();
+        if (responseCode != 200) {
             throw new CreationException(
-                    "Could not get the value of the X-Head-Time-Millis or the X-Head-Seqnum header",
-                    e);
+                    "Could not get the initialization sequence: response code " + responseCode);
         }
 
+        streamDurationString = response.getHeader("X-Head-Time-Millis");
+        segmentCount = response.getHeader("X-Head-Seqnum");
         if (isNullOrEmpty(segmentCount)) {
             throw new CreationException("Could not get the number of segments");
         }
@@ -155,7 +143,12 @@ public final class YoutubePostLiveStreamDvrDashManifestCreator {
         try {
             streamDuration = Long.parseLong(streamDurationString);
         } catch (final NumberFormatException e) {
-            streamDuration = durationSecondsFallback;
+            try {
+                streamDuration = Math.multiplyExact(durationSecondsFallback, 1000L);
+            } catch (final ArithmeticException overflow) {
+                throw new CreationException("Post-live stream duration exceeds milliseconds range",
+                        overflow);
+            }
         }
 
         final Document doc = generateDocumentAndDoCommonElementsGeneration(itagItem,
