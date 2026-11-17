@@ -108,6 +108,8 @@ evermind-logcattoolkit = { module = "com.github.evermind-zz:logcat-toolkit", ver
 fcast-sender-sdk = { module = "org.fcast:sender-sdk", version.ref = "fcast" }
 google-android-material = { module = "com.google.android.material:material", version.ref = "material" }
 google-autoservice-annotations = { module = "com.google.auto.service:auto-service-annotations", version.ref = "autoservice-google" }
+guava-android = { module = "com.google.guava:guava", version = "33.7.2-android" }
+guava-jre = { module = "com.google.guava:guava", version = "33.7.2-jre" }
 jakewharton-phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "phoenix" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { module = "junit:junit", version.ref = "junit" }

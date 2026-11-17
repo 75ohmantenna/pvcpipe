@@ -93,6 +93,11 @@ dependencies {
     implementation(libs.mozilla.rhino.core)
 
     checkstyle(libs.puppycrawl.checkstyle)
+    constraints {
+        add("checkstyle", libs.guava.jre) {
+            because("CVE-2026-102554")
+        }
+    }
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)

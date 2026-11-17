@@ -258,7 +258,7 @@ dependencies {
     implementation(libs.newpipe.nanojson)
     implementation(libs.pvcpipe.extractor)
 
-    /** Checkstyle **/
+    /** Static analysis **/
     checkstyle(libs.puppycrawl.checkstyle)
     ktlint(libs.pinterest.ktlint)
 
@@ -299,6 +299,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     /** Third-party libraries **/
+
+    // Collections and concurrent utilities
+    implementation(libs.guava.android)
 
     // HTML parser
     implementation(libs.jsoup)
@@ -367,6 +370,16 @@ dependencies {
     implementation(libs.evermind.challengefloatsaway)
 
     constraints {
+        add("checkstyle", libs.guava.jre) {
+            because("CVE-2026-102554")
+        }
+        add("ksp", libs.guava.jre) {
+            because("CVE-2026-102554")
+        }
+        add("ktlint", "ch.qos.logback:logback-classic:1.6.7") {
+            because("Logback core security fixes")
+        }
+
         // No app API use; retain the pin for legacy-support-core-utils' transitive dependency.
         implementation(libs.androidx.localbroadcastmanager)
         // Transitive libraries the app uses. coil-compose used to raise them to these versions;

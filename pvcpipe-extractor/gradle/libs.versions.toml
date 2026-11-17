@@ -21,6 +21,7 @@ evermind-hlsdownloader = { module = "com.github.evermind-zz:hlsdownloader", vers
 google-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
 google-gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 google-protobuf = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf-lib" }
+guava-jre = { module = "com.google.guava:guava", version = "33.7.2-jre" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine" }
