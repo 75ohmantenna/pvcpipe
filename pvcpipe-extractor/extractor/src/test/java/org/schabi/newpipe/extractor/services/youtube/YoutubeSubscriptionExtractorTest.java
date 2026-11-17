@@ -1,12 +1,15 @@
 package org.schabi.newpipe.extractor.services.youtube;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.schabi.newpipe.FileUtils.resolveTestResource;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.InitNewPipeTest;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -16,15 +19,20 @@ import org.schabi.newpipe.extractor.subscription.SubscriptionExtractor;
 import org.schabi.newpipe.extractor.subscription.SubscriptionItem;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Test for {@link YoutubeSubscriptionExtractor}
  */
+@Tag("offline")
 class YoutubeSubscriptionExtractorTest {
 
     private static YoutubeSubscriptionExtractor subscriptionExtractor;
@@ -139,6 +147,49 @@ class YoutubeSubscriptionExtractorTest {
             final List<SubscriptionItem> subscriptionItems = subscriptionExtractor.fromZipInputStream(fileInputStream);
             assertSubscriptionItems(subscriptionItems);
         }
+    }
+
+    @Test
+    void zipFindsSubscriptionsAfterReadableUnrelatedCsv() throws Exception {
+        final byte[] archive = makeZip("channel,url,title\nignored,https://example.test,Ignored");
+        final int[] closeCount = {0};
+        final var input = new ByteArrayInputStream(archive) {
+            @Override
+            public void close() {
+                closeCount[0]++;
+            }
+        };
+        final var subscriptions = subscriptionExtractor.fromInputStream(input, "application/zip");
+        assertEquals(List.of("Fixture"), subscriptions.stream().map(SubscriptionItem::getName).toList());
+        assertEquals(1, closeCount[0]);
+    }
+
+    @Test
+    void zipReportsReadFailureBeforeTryingOtherEntries() throws Exception {
+        final byte[] complete = makeZip("x".repeat(3000));
+        final int localHeaderLength = 30;
+        final int filenameLength = "other.csv".length();
+        // Keep the local header and one compressed byte so the read fails inside the CSV parser.
+        final var input = new ByteArrayInputStream(
+                Arrays.copyOf(complete, localHeaderLength + filenameLength + 1));
+        final var failure = assertThrows(SubscriptionExtractor.InvalidSourceException.class,
+                () -> subscriptionExtractor.fromInputStream(input, "zip"));
+        assertInstanceOf(IOException.class, failure.getCause());
+    }
+
+    private static byte[] makeZip(final String unrelated) throws IOException {
+        final var bytes = new ByteArrayOutputStream();
+        try (var archive = new ZipOutputStream(bytes)) {
+            archive.putNextEntry(new ZipEntry("other.csv"));
+            archive.write(unrelated.getBytes(StandardCharsets.UTF_8));
+            archive.closeEntry();
+            archive.putNextEntry(new ZipEntry("Takeout/SUBSCRIPTIONS.CSV"));
+            archive.write(("Channel Id,Channel Url,Channel Title\nUC1JTQBa5QxZCpXrFSkMxmPw,"
+                    + "http://www.youtube.com/channel/UC1JTQBa5QxZCpXrFSkMxmPw,Fixture\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            archive.closeEntry();
+        }
+        return bytes.toByteArray();
     }
 
     @Test

@@ -109,18 +109,14 @@ public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
             ZipEntry zipEntry;
             while ((zipEntry = zipInputStream.getNextEntry()) != null) {
                 if (zipEntry.getName().toLowerCase(Locale.ROOT).endsWith(".csv")) {
-                    try {
-                        final List<SubscriptionItem> csvItems = fromCsvInputStream(zipInputStream);
-
-                        // Return it only if it has items (it exits early if it's the wrong file
-                        // format), otherwise try the next file
-                        if (!csvItems.isEmpty()) {
-                            return csvItems;
-                        }
-                    } catch (final ExtractionException e) {
-                        // Ignore error and go to next file
+                    // This reader borrows the current entry. Closing it would close the archive.
+                    final List<SubscriptionItem> csvItems = parseCsv(
+                            new BufferedReader(new InputStreamReader(zipInputStream)));
+                    if (!csvItems.isEmpty()) {
+                        return csvItems;
                     }
                 }
+                zipInputStream.closeEntry();
             }
         } catch (final IOException e) {
             throw new InvalidSourceException("Error reading contents of zip file", e);
@@ -132,6 +128,14 @@ public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
 
     public List<SubscriptionItem> fromCsvInputStream(@Nonnull final InputStream contentInputStream)
             throws ExtractionException {
+        try (var reader = new BufferedReader(new InputStreamReader(contentInputStream))) {
+            return parseCsv(reader);
+        } catch (final IOException e) {
+            throw new InvalidSourceException("Error reading CSV file", e);
+        }
+    }
+
+    private List<SubscriptionItem> parseCsv(final BufferedReader reader) throws IOException {
         // Expected format of CSV file:
         // Channel Id,Channel Url,Channel Title
         //UC1JTQBa5QxZCpXrFSkMxmPw,http://www.youtube.com/channel/UC1JTQBa5QxZCpXrFSkMxmPw,Raycevick
@@ -142,7 +146,7 @@ public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
         //      The first line is always a header
         //      Header names are different based on the locale
         //      Fortunately the data is always the same order no matter what locale
-        try (var reader = new BufferedReader(new InputStreamReader(contentInputStream))) {
+        try {
             return reader.lines()
                     .skip(1) // ignore header and skip first line
                     .map(line -> line.split(","))
@@ -159,8 +163,8 @@ public class YoutubeSubscriptionExtractor extends SubscriptionExtractor {
                     })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toUnmodifiableList());
-        } catch (final UncheckedIOException | IOException e) {
-            throw new InvalidSourceException("Error reading CSV file", e);
+        } catch (final UncheckedIOException e) {
+            throw e.getCause();
         }
     }
 }
