@@ -202,19 +202,20 @@ in the background and show its progress in a notification.
 - An import reads its source: a channel address, a file exported from a
   service, or an earlier export of this app. It counts and skips channels
   from unsupported services. For every remaining entry it loads the channel
-  and its first tab before storing any, then stores the results in source
-  order, in batches.
+  and tries to load its first tab before writing. Channels with unavailable
+  tabs are still saved, and any existing feed entries are kept. Successful
+  channel lookups are stored in source order, in batches. The completion
+  message reports failed channel lookups and invites the user to retry.
 - Each batch is a database transaction. A batch that fails rolls back that
   batch, not the batches stored before it. Import updates existing
   subscriptions as well as inserting new ones; a successful count is the
-  number of supported source entries processed, not necessarily new rows.
+  number of successful channel lookups, including updates.
 - An export takes a snapshot of the subscriptions and writes it to the
   document the user chose.
-- A source that cannot be opened, a channel that cannot be loaded and a write
-  that fails all come back as `Outcome.Failure`. None of them is reported as
-  an import or export of nothing. A cancelled coroutine stays cancelled and
-  is not turned into a failure. An empty source, or one containing only
-  unsupported services, can succeed with a count of zero.
+- A source that cannot be opened, an import where every channel lookup
+  fails, and a write that fails come back as `Outcome.Failure`.
+  Cancellation propagates to the worker. An empty source, or one containing
+  only unsupported services, can succeed with a count of zero.
 
 ## Backup and restore
 

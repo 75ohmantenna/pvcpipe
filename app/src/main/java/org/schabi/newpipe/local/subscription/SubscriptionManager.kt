@@ -51,14 +51,16 @@ class SubscriptionManager internal constructor(private val database: AppDatabase
         }
     }
 
-    fun upsertAll(infoList: List<Pair<ChannelInfo, ChannelTabInfo>>) {
+    fun upsertAll(infoList: List<Pair<ChannelInfo, ChannelTabInfo?>>) {
         val listEntities = infoList.map { SubscriptionEntity.from(it.first) }
 
         database.runInTransaction {
             subscriptionTable.upsertAll(listEntities)
             infoList.forEachIndexed { index, info ->
-                val streams = info.second.relatedItems.filterIsInstance<StreamInfoItem>()
-                feedDatabaseManager.upsertAll(listEntities[index].uid, streams)
+                info.second?.let { tab ->
+                    val streams = tab.relatedItems.filterIsInstance<StreamInfoItem>()
+                    feedDatabaseManager.upsertAll(listEntities[index].uid, streams)
+                }
             }
         }
     }

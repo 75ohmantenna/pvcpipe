@@ -51,15 +51,16 @@ class SubscriptionImportWorker(
             }
         }
         return when (outcome) {
-            is SubscriptionTransfer.Outcome.Failure -> importFailure(outcome.cause)
+            is SubscriptionTransfer.Outcome.Failure -> importFailure(outcome.cause, outcome.failed, outcome.skipped)
 
             is SubscriptionTransfer.Outcome.Success -> {
                 withContext(Dispatchers.Main) {
                     val message = SubscriptionImportPresentation.completion(
                         applicationContext.resources,
-                        outcome.skipped
+                        outcome.skipped,
+                        outcome.failed
                     )
-                    val duration = if (outcome.skipped > 0) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                    val duration = if (outcome.skipped > 0 || outcome.failed > 0) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
                     Toast.makeText(applicationContext, message, duration).show()
                 }
                 Result.success()
@@ -67,12 +68,17 @@ class SubscriptionImportWorker(
         }
     }
 
-    private suspend fun importFailure(cause: Exception): Result {
+    private suspend fun importFailure(cause: Exception, failed: Int = 0, skipped: Int = 0): Result {
         if (BuildConfig.DEBUG) {
             Log.e(TAG, "Error while importing subscriptions", cause)
         }
         withContext(Dispatchers.Main) {
-            Toast.makeText(applicationContext, R.string.subscriptions_import_unsuccessful, Toast.LENGTH_SHORT).show()
+            if (failed > 0) {
+                val message = SubscriptionImportPresentation.completion(applicationContext.resources, skipped, failed)
+                Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(applicationContext, R.string.subscriptions_import_unsuccessful, Toast.LENGTH_SHORT).show()
+            }
         }
         return Result.failure()
     }

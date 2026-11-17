@@ -9,10 +9,20 @@ import java.util.Locale
 import org.schabi.newpipe.R
 
 internal object SubscriptionImportPresentation {
-    fun completion(resources: Resources, skipped: Int): String = if (skipped > 0) {
-        resources.getQuantityString(R.plurals.import_subscriptions_skipped, skipped, skipped)
-    } else {
-        resources.getString(R.string.subscription_import_finished)
+    fun completion(resources: Resources, skipped: Int, failed: Int = 0): String {
+        if (failed > 0) {
+            val failure = resources.getQuantityString(R.plurals.import_subscriptions_failed, failed, failed)
+            return if (skipped == 0) {
+                failure
+            } else {
+                resources.getString(R.string.import_subscriptions_failed_and_skipped, failure, skipped)
+            }
+        }
+        return if (skipped > 0) {
+            resources.getQuantityString(R.plurals.import_subscriptions_skipped, skipped, skipped)
+        } else {
+            resources.getString(R.string.subscription_import_finished)
+        }
     }
 
     fun progress(context: Context, current: Int, total: Int): String {

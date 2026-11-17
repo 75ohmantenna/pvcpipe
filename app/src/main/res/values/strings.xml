@@ -492,6 +492,11 @@
         <item quantity="one">Import finished. Skipped %1$d channel of a service PVCPipe does not support.</item>
         <item quantity="other">Import finished. Skipped %1$d channels of services PVCPipe does not support.</item>
     </plurals>
+    <plurals name="import_subscriptions_failed">
+        <item quantity="one">Couldn’t load %1$d channel. Retry the import.</item>
+        <item quantity="other">Couldn’t load %1$d channels. Retry the import.</item>
+    </plurals>
+    <string name="import_subscriptions_failed_and_skipped">%1$s Skipped %2$d from unsupported services.</string>
     <string name="subscription_import_finished">Import finished.</string>
     <string name="subscription_import_progress">%1$s/%2$s</string>
     <string name="import_title">Import</string>

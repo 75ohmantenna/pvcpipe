@@ -129,24 +129,33 @@ class SubscriptionTransferDatabaseTest {
     }
 
     @Test
-    fun extractionFailureLeavesExistingSubscriptionAndFeedUnchanged() = runBlocking {
+    fun partialImportUpdatesChannelWithoutTabAndKeepsExistingFeed() = runBlocking {
         val original = insertOriginal()
+        val initial = transfer(subscriptionItems(1))
+        assertEquals(
+            SubscriptionTransfer.Outcome.Success(1),
+            initial.`import`(SubscriptionImportInput.PreviousExportMode(INPUT)) { }
+        )
         val failure = IOException("Channel extraction failed")
         val transfer = transfer(subscriptionItems(3)) { item ->
-            if (item.url == channelUrl(2)) {
-                throw failure
+            when (item.url) {
+                channelUrl(1) -> ChannelInfo(item.serviceId, item.url, item.url, item.url, "updated with no tab") to null
+                channelUrl(2) -> throw failure
+                else -> extracted(item)
             }
-            extracted(item)
         }
 
         val result = transfer.`import`(SubscriptionImportInput.PreviousExportMode(INPUT)) { }
 
-        assertTrue(result is SubscriptionTransfer.Outcome.Failure)
-        assertEquals(1, rowCount("subscriptions"))
-        assertEquals(original, database.subscriptionDAO().getSubscription(original.uid))
-        assertEquals(0, rowCount("streams"))
-        assertEquals(0, rowCount("feed"))
-        assertEquals(0, rowCount("feed_last_updated"))
+        assertEquals(SubscriptionTransfer.Outcome.Success(2, failed = 1), result)
+        assertEquals(2, rowCount("subscriptions"))
+        val updated = database.subscriptionDAO().getSubscription(original.uid)!!
+        assertEquals("updated with no tab", updated.name)
+        assertEquals(original.notificationMode, updated.notificationMode)
+        assertEquals(1, feedCountFor(original.uid))
+        assertEquals(2, rowCount("streams"))
+        assertEquals(2, rowCount("feed"))
+        assertEquals(2, rowCount("feed_last_updated"))
     }
 
     @Test
@@ -187,7 +196,7 @@ class SubscriptionTransferDatabaseTest {
     private fun transfer(
         items: List<SubscriptionItem>,
         output: ByteArrayOutputStream = ByteArrayOutputStream(),
-        extraction: suspend (SubscriptionItem) -> Pair<ChannelInfo, ChannelTabInfo> = { extracted(it) }
+        extraction: suspend (SubscriptionItem) -> Pair<ChannelInfo, ChannelTabInfo?> = { extracted(it) }
     ): SubscriptionTransfer {
         val json = """{"subscriptions":[${items.joinToString(",") {
             """{"service_id":${it.serviceId},"url":"${it.url}","name":"${it.name}"}"""
@@ -203,7 +212,7 @@ class SubscriptionTransferDatabaseTest {
                 return output
             }
 
-            override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> = extraction(item)
+            override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo?> = extraction(item)
         }
         return SubscriptionTransfer(operations)
     }

@@ -190,7 +190,7 @@ class SubscriptionTransferTest {
     }
 
     @Test
-    fun `channel extraction failure prevents every database write`() = runBlocking {
+    fun `all channel lookups failing reports a counted failure without writes`() = runBlocking {
         val cause = IOException("channel unavailable")
         val operations = TestOperations().apply {
             source = items(4)
@@ -201,9 +201,35 @@ class SubscriptionTransferTest {
         val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) { progress.add(it) }
 
         assertSame(cause, (result as SubscriptionTransfer.Outcome.Failure).cause)
-        assertTrue(operations.extracted.isNotEmpty())
+        assertEquals(4, result.failed)
+        assertEquals(4, operations.extracted.size)
         assertTrue(operations.stored.isEmpty())
         assertTrue(progress.none { it is SubscriptionTransfer.Progress.Importing })
+    }
+
+    @Test
+    fun `failed lookup leaves successful channels in order and retains a channel without tabs`() = runBlocking {
+        val operations = TestOperations().apply {
+            source = items(3) + SubscriptionItem(3, "removed", "removed")
+            missingServices = setOf(3)
+            beforeExtract = { if (it == source[1]) throw IOException("channel unavailable") }
+            withoutTab = source[2]
+        }
+        val progress = ArrayList<SubscriptionTransfer.Progress>()
+
+        val result = transfer(operations).`import`(SubscriptionImportInput.ChannelUrlMode(17, "source")) {
+            progress.add(it)
+        }
+
+        assertEquals(SubscriptionTransfer.Outcome.Success(2, skipped = 1, failed = 1), result)
+        val stored = operations.stored.single()
+        assertEquals(listOf(operations.source[0], operations.source[2]), stored.map { it.first.toItem() })
+        assertEquals(null, stored[1].second)
+        assertEquals(listOf(1, 2, 3), progress.filterIsInstance<SubscriptionTransfer.Progress.Loading>().map { it.current })
+        assertEquals(
+            listOf(SubscriptionTransfer.Progress.Importing(0, 2), SubscriptionTransfer.Progress.Importing(2, 2)),
+            progress.filterIsInstance<SubscriptionTransfer.Progress.Importing>()
+        )
     }
 
     @Test
@@ -605,6 +631,7 @@ class SubscriptionTransferTest {
         var sourceError: Exception? = null
         var extractError: Exception? = null
         var beforeExtract: (suspend (SubscriptionItem) -> Unit)? = null
+        var withoutTab: SubscriptionItem? = null
         var storeError: Exception? = null
         var snapshotError: Exception? = null
         var missingServices = emptySet<Int>()
@@ -613,7 +640,7 @@ class SubscriptionTransferTest {
         var sourceContents: String? = null
         var outputDestination: String? = null
         val extracted = ArrayList<SubscriptionItem>()
-        val stored = ArrayList<List<Pair<ChannelInfo, ChannelTabInfo>>>()
+        val stored = ArrayList<List<Pair<ChannelInfo, ChannelTabInfo?>>>()
         val effects = ArrayList<String>()
 
         override fun openInput(url: String): InputStream? = input
@@ -639,7 +666,7 @@ class SubscriptionTransferTest {
 
         override fun hasService(serviceId: Int): Boolean = serviceId !in missingServices
 
-        override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> {
+        override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo?> {
             input?.let { assertTrue("source must close before extraction", it.closed) }
             effects.add("extract")
             extracted.add(item)
@@ -650,7 +677,7 @@ class SubscriptionTransferTest {
                 item.serviceId,
                 ListLinkHandler(item.url, item.url, item.url, listOf(ChannelTabs.VIDEOS), emptyList())
             )
-            return channel to tab
+            return channel to tab.takeUnless { item == withoutTab }
         }
 
         override suspend fun snapshot(): List<SubscriptionItem> {
@@ -659,7 +686,7 @@ class SubscriptionTransferTest {
             return subscriptions
         }
 
-        override fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>) {
+        override fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo?>>) {
             val expected = source.count { hasService(it.serviceId) }.takeIf { it > 0 } ?: extracted.size
             assertEquals("all channels must extract before storage", expected, extracted.size)
             effects.add("store")

@@ -46,13 +46,13 @@ class SubscriptionTransfer internal constructor(
 
     sealed class Outcome {
         /**
-         * @param count the number of supported input entries processed on import, or entries
+         * @param count the number of channels processed successfully on import, or entries
          * exported; imported entries are not necessarily newly inserted subscriptions
          * @param skipped the number of channels an import left out, because the app does not
          * have their service
          */
-        data class Success(val count: Int, val skipped: Int = 0) : Outcome()
-        data class Failure(val cause: Exception) : Outcome()
+        data class Success(val count: Int, val skipped: Int = 0, val failed: Int = 0) : Outcome()
+        data class Failure(val cause: Exception, val failed: Int = 0, val skipped: Int = 0) : Outcome()
     }
 
     suspend fun `import`(
@@ -78,8 +78,7 @@ class SubscriptionTransfer internal constructor(
             if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
-        // An export may list channels of a service this app does not have (any more). One channel
-        // that cannot be loaded fails the whole import, so those are left out and counted.
+        // An export may list channels from services this app does not have (any more).
         val subscriptions = source.filter { operations.hasService(it.serviceId) }
         val skipped = source.size - subscriptions.size
 
@@ -87,16 +86,21 @@ class SubscriptionTransfer internal constructor(
         val permits = Semaphore(PARALLEL_EXTRACTIONS)
         var index = 1
         val qty = subscriptions.size
-        val channels = try {
+        val results = try {
             withContext(ioDispatcher.limitedParallelism(PARALLEL_EXTRACTIONS)) {
                 subscriptions.map { item ->
                     async {
                         permits.withPermit {
-                            val channel = operations.extract(item)
-                            mutex.withLock {
-                                progress(Progress.Loading(index++, qty, channel.first.name))
+                            val result = try {
+                                Result.success(operations.extract(item))
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                Result.failure(e)
                             }
-                            channel
+                            mutex.withLock {
+                                progress(Progress.Loading(index++, qty, result.getOrNull()?.first?.name ?: item.name))
+                            }
+                            result
                         }
                     }
                 }.awaitAll()
@@ -106,21 +110,27 @@ class SubscriptionTransfer internal constructor(
             return Outcome.Failure(e)
         }
 
+        val channels = results.mapNotNull { it.getOrNull() }
+        val failed = qty - channels.size
+        if (failed > 0 && channels.isEmpty()) {
+            return Outcome.Failure(results.first().exceptionOrNull() as Exception, failed, skipped)
+        }
+
         try {
-            progress(Progress.Importing(0, qty))
+            progress(Progress.Importing(0, channels.size))
             index = 0
             for (chunk in channels.chunked(BUFFER_COUNT_BEFORE_INSERT)) {
                 withContext(ioDispatcher) {
                     operations.store(chunk)
                 }
                 index += chunk.size
-                progress(Progress.Importing(index, qty))
+                progress(Progress.Importing(index, channels.size))
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             return Outcome.Failure(e)
         }
-        return Outcome.Success(qty, skipped)
+        return Outcome.Success(channels.size, skipped, failed)
     }
 
     suspend fun export(destination: String, progress: suspend (Progress) -> Unit): Outcome = try {
@@ -148,9 +158,9 @@ class SubscriptionTransfer internal constructor(
         fun channelSource(serviceId: Int, url: String): List<SubscriptionItem>
         fun streamSource(serviceId: Int, stream: InputStream, url: String): List<SubscriptionItem>
         fun hasService(serviceId: Int): Boolean
-        suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo>
+        suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo?>
         suspend fun snapshot(): List<SubscriptionItem>
-        fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>)
+        fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo?>>)
     }
 
     internal open class AndroidOperations(
@@ -174,16 +184,22 @@ class SubscriptionTransfer internal constructor(
 
         override fun hasService(serviceId: Int): Boolean = ServiceHelper.hasService(serviceId)
 
-        override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo> {
+        override suspend fun extract(item: SubscriptionItem): Pair<ChannelInfo, ChannelTabInfo?> {
             val channel = ExtractorHelper.getChannelInfo(item.serviceId, item.url, true).await()
-            val tab = ExtractorHelper.getChannelTab(item.serviceId, channel.tabs[0], true).await()
+            val firstTab = channel.tabs.firstOrNull() ?: return channel to null
+            val tab = try {
+                ExtractorHelper.getChannelTab(item.serviceId, firstTab, true).await()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                null
+            }
             return channel to tab
         }
 
         override suspend fun snapshot(): List<SubscriptionItem> = manager.subscriptions().awaitFirst()
             .map { SubscriptionItem(it.serviceId, it.url ?: "", it.name ?: "") }
 
-        override fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo>>) {
+        override fun store(channels: List<Pair<ChannelInfo, ChannelTabInfo?>>) {
             manager.upsertAll(channels)
         }
     }
