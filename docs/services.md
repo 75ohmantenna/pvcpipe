@@ -113,6 +113,9 @@ other tabs and restoring defaults only when none remain.
 restriction, visionOS, and optionally iOS. The app supplies proof tokens only
 through the web-client provider; see [playback.md](playback.md#youtube-proof-tokens).
 A `login_required` response mentioning a bot becomes `SignInConfirmNotBotException`.
+Once a player response supplies usable media, a failed watch-metadata request is
+recorded with the stream's optional extraction errors. The title and any other
+metadata already available from the player response can still be used for playback.
 
 ### JavaScript compatibility regression coverage — 2026-11-13
 

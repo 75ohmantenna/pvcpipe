@@ -1066,6 +1066,7 @@ public final class YoutubeParsingHelper {
                 || "www.youtube.com".equalsIgnoreCase(url.getHost()))
                 || !("/youtubei/v1/visitor_id".equals(url.getPath())
                 || "/youtubei/v1/player".equals(url.getPath())
+                || "/youtubei/v1/next".equals(url.getPath())
                 || "/youtubei/v1/reel/reel_item_watch".equals(url.getPath()))) {
             return false;
         }

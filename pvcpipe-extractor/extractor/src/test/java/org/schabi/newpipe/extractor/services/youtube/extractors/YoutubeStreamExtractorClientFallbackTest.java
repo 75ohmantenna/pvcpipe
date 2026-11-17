@@ -21,6 +21,7 @@ import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -140,6 +141,36 @@ class YoutubeStreamExtractorClientFallbackTest {
         assertEquals("Vision title", extractor.getName());
         assertEquals(1, extractor.getThumbnails().size());
         assertEquals("https://example.com/thumb.jpg", extractor.getThumbnails().get(0).getUrl());
+    }
+
+    @Test
+    void watchMetadataRefusalKeepsPlayableStreamAndRecordsCause() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = playable(ID, "Vision title", "vision");
+        fixtures.metadataId = OTHER_ID;
+        fixtures.watchBlocked = true;
+        final StreamInfo info = StreamInfo.getInfo(fetch(fixtures));
+
+        assertEquals("Vision title", info.getName());
+        assertEquals(1, info.getVideoStreams().size());
+        assertEquals("https://example.com/thumb.jpg", info.getThumbnails().get(0).getUrl());
+        assertTrue(info.getStreamSegments().isEmpty());
+        assertTrue(info.getErrors().stream().anyMatch(error ->
+                error.getCause() instanceof RequestBlockedException
+                        && error.getMessage().equals("Could not load YouTube watch metadata")));
+    }
+
+    @Test
+    void interruptedWatchMetadataFetchStopsExtraction() {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = playable(ID, "Vision title", "vision");
+        fixtures.interruptWatch = true;
+        try {
+            final IOException failure = assertThrows(IOException.class, () -> fetch(fixtures));
+            assertEquals("watch metadata interrupted", failure.getMessage());
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -408,6 +439,8 @@ class YoutubeStreamExtractorClientFallbackTest {
         private int metadataRequests;
         private boolean androidBlocked;
         private boolean visionBlocked;
+        private boolean watchBlocked;
+        private boolean interruptWatch;
 
         @Override
         public Response execute(@Nonnull final Request request) throws IOException {
@@ -463,6 +496,13 @@ class YoutubeStreamExtractorClientFallbackTest {
                 throw new IOException("Unexpected player client " + name);
             }
             if (url.contains("/next?")) {
+                if (interruptWatch) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("watch metadata interrupted");
+                }
+                if (watchBlocked) {
+                    return blocked(request);
+                }
                 return response(request,
                         "{\"contents\":{\"twoColumnWatchNextResults\":{\"results\":{\"results\":"
                                 + "{\"contents\":[]}}}}}");

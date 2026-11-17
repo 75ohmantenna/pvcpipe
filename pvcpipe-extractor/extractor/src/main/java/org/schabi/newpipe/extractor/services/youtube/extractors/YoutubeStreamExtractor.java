@@ -138,7 +138,9 @@ public class YoutubeStreamExtractor extends StreamExtractor {
     private static boolean fetchIosClient;
 
     private JsonObject playerResponse;
-    private JsonObject nextResponse;
+    private JsonObject nextResponse = new JsonObject();
+    @Nullable
+    private ParsingException watchMetadataError;
 
     @Nullable
     private JsonObject visionOsStreamingData;
@@ -590,6 +592,9 @@ public class YoutubeStreamExtractor extends StreamExtractor {
     @Override
     public List<Image> getUploaderAvatars() throws ParsingException {
         assertPageFetched();
+        if (watchMetadataError != null) {
+            return Collections.emptyList();
+        }
         final JsonObject owner = getVideoSecondaryInfoRenderer().getObject("owner")
                         .getObject("videoOwnerRenderer");
 
@@ -617,6 +622,9 @@ public class YoutubeStreamExtractor extends StreamExtractor {
 
     @Override
     public long getUploaderSubscriberCount() throws ParsingException {
+        if (watchMetadataError != null) {
+            return UNKNOWN_SUBSCRIBER_COUNT;
+        }
         final JsonObject videoOwnerRenderer = JsonUtils.getObject(videoSecondaryInfoRenderer,
                 "owner.videoOwnerRenderer");
 
@@ -942,7 +950,14 @@ public class YoutubeStreamExtractor extends StreamExtractor {
                         .value(RACY_CHECK_OK, true)
                         .done())
                 .getBytes(StandardCharsets.UTF_8);
-        nextResponse = getJsonPostResponse(NEXT, nextBody, localization);
+        try {
+            nextResponse = getJsonPostResponse(NEXT, nextBody, localization);
+        } catch (final IOException | ExtractionException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw e;
+            }
+            watchMetadataError = new ParsingException("Could not load YouTube watch metadata", e);
+        }
     }
 
     private static void checkPlayabilityStatus(@Nonnull final JsonObject playabilityStatus)
@@ -1766,6 +1781,9 @@ public class YoutubeStreamExtractor extends StreamExtractor {
     @Nonnull
     @Override
     public List<MetaInfo> getMetaInfo() throws ParsingException {
+        if (watchMetadataError != null) {
+            throw watchMetadataError;
+        }
         return YoutubeMetaInfoHelper.getMetaInfo(nextResponse
                 .getObject("contents")
                 .getObject("twoColumnWatchNextResults")

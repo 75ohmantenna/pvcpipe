@@ -153,6 +153,10 @@ observations do not establish an IP/VPN cause, a solvable CAPTCHA, or that the
 original app's failure is identical. Offline regression tests cover classification
 and player-fallback behavior, not recovery of live playback on the phone.
 
+The same host and body-marker checks now apply to the `next` v1 path. When
+playable metadata is already available, a refused `next` request is recorded
+as an optional watch-metadata extraction error.
+
 Follow-up on 2026-11-15: after the owner manually switched the phone's VPN
 endpoint, the same public video (`aqz-KE-bpKQ`) played in the unchanged installed
 app at revision `11ae4c41`. Device inspection confirmed a rendered video frame
