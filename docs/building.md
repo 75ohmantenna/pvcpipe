@@ -11,7 +11,7 @@
 - Python 3 for the offline recorded-fixture privacy and deletion-driver checks
   in `make ci`.
   These checks use only the Python standard library.
-- Both Gradle wrappers download Gradle 9.8.2 and verify its SHA-256 checksum.
+- Both Gradle wrappers download Gradle 9.9.1 and verify its SHA-256 checksum.
   A globally installed Gradle does not change the wrapper version. Initial builds
   also need access to the dependency repositories declared in the settings files.
 
