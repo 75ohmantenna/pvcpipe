@@ -89,6 +89,8 @@ import org.schabi.newpipe.extractor.utils.Parser;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -945,21 +947,27 @@ public class YoutubeStreamExtractor extends StreamExtractor {
 
         fetchWebClientMetadataAndSetThumbnails(localization, contentCountry, videoId);
 
-        final byte[] nextBody = JsonWriter.string(
-                prepareDesktopJsonBuilder(localization, contentCountry)
-                        .value(VIDEO_ID, videoId)
-                        .value(CONTENT_CHECK_OK, true)
-                        .value(RACY_CHECK_OK, true)
-                        .done())
-                .getBytes(StandardCharsets.UTF_8);
         try {
+            final byte[] nextBody = JsonWriter.string(
+                    prepareDesktopJsonBuilder(localization, contentCountry)
+                            .value(VIDEO_ID, videoId)
+                            .value(CONTENT_CHECK_OK, true)
+                            .value(RACY_CHECK_OK, true)
+                            .done())
+                    .getBytes(StandardCharsets.UTF_8);
             nextResponse = getJsonPostResponse(NEXT, nextBody, localization);
         } catch (final IOException | ExtractionException e) {
-            if (Thread.currentThread().isInterrupted()) {
+            if (isMetadataFetchInterrupted(e)) {
                 throw e;
             }
             watchMetadataError = new ParsingException("Could not load YouTube watch metadata", e);
         }
+    }
+
+    private static boolean isMetadataFetchInterrupted(final Exception failure) {
+        return Thread.currentThread().isInterrupted()
+                || (failure instanceof InterruptedIOException
+                        && !(failure instanceof SocketTimeoutException));
     }
 
     private static void checkPlayabilityStatus(@Nonnull final JsonObject playabilityStatus)
@@ -1182,7 +1190,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
     private void fetchWebClientMetadataAndSetThumbnails(
             @Nonnull final Localization localization,
             @Nonnull final ContentCountry contentCountry,
-            @Nonnull final String videoId) {
+            @Nonnull final String videoId) throws IOException, ExtractionException {
         playerMicroFormatRenderer = new JsonObject();
         thumbnailsArray = playerResponse.getObject(VIDEO_DETAILS)
                 .getObject(THUMBNAIL)
@@ -1209,7 +1217,10 @@ public class YoutubeStreamExtractor extends StreamExtractor {
                     thumbnailsArray = thumbnailWebJsonObj.getArray(THUMBNAILS);
                 }
             }
-        } catch (final IOException | ExtractionException ignored) {
+        } catch (final IOException | ExtractionException e) {
+            if (isMetadataFetchInterrupted(e)) {
+                throw e;
+            }
             // WEB metadata is optional; keep the selected playable client's thumbnails.
         }
     }

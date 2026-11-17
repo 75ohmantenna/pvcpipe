@@ -90,10 +90,11 @@ status-specific feedback for other HTTP failures. Manual retry remains available
 where the caller supplies it. A usable alternate player response takes precedence.
 If all clients fail, content restrictions take priority, followed by refusals,
 other HTTP failures, and generic transport or parsing errors.
-When a usable player response is already available, a refused `next` request
-becomes an optional watch-metadata error. The player handles data HTTP failures
-through the failed queue-item path. [Local media request recovery](playback.md#errors)
-handles eligible media requests separately.
+When a usable player response is already available, a failure preparing or
+fetching `next` becomes an optional watch-metadata error. The player handles data
+HTTP failures through the failed queue-item path.
+[Local media request recovery](playback.md#errors) handles eligible media requests
+separately.
 
 The [recorded November 15 device observations](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/error-reporting.md#youtube-api-refusal-feedback-2026-11-15)
 retain the original refusal and later route-dependent recovery in the tested

@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
 import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
+import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException;
 import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
@@ -26,12 +27,15 @@ import org.schabi.newpipe.extractor.stream.StreamInfo;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.lang.reflect.Field;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -159,6 +163,51 @@ class YoutubeStreamExtractorClientFallbackTest {
         assertTrue(info.getErrors().stream().anyMatch(error ->
                 error.getCause() instanceof RequestBlockedException
                         && error.getMessage().equals("Could not load YouTube watch metadata")));
+    }
+
+    @Test
+    void failedColdWebVersionDiscoveryKeepsPlaybackAndReportsOptionalError() throws Exception {
+        YoutubeParsingHelper.resetClientVersion();
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = playable(ID, "Vision title", "vision");
+
+        final StreamInfo info = StreamInfo.getInfo(fetch(fixtures));
+
+        assertEquals("Vision title", info.getName());
+        assertEquals(1, info.getVideoStreams().size());
+        assertEquals("https://example.com/thumb.jpg", info.getThumbnails().get(0).getUrl());
+        assertTrue(fixtures.webDiscoveryRequests > 0);
+        assertEquals(0, fixtures.watchRequests);
+        assertTrue(info.getErrors().stream().anyMatch(error ->
+                error.getCause() instanceof ParsingException
+                        && error.getMessage().equals("Could not load YouTube watch metadata")));
+    }
+
+    @Test
+    void interruptedWebDiscoveryStopsBeforeNextRequestEvenWithoutThreadFlag() {
+        YoutubeParsingHelper.resetClientVersion();
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = playable(ID, "Vision title", "vision");
+        fixtures.webDiscoveryFailure = new InterruptedIOException("WEB discovery cancelled");
+
+        assertSame(fixtures.webDiscoveryFailure,
+                assertThrows(InterruptedIOException.class, () -> fetch(fixtures)));
+        assertEquals(1, fixtures.webDiscoveryRequests);
+        assertEquals(0, fixtures.watchRequests);
+    }
+
+    @Test
+    void watchMetadataSocketTimeoutRemainsOptional() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.vision = playable(ID, "Vision title", "vision");
+        fixtures.watchFailure = new SocketTimeoutException("watch metadata timed out");
+
+        final StreamInfo info = StreamInfo.getInfo(fetch(fixtures));
+
+        assertEquals(1, info.getVideoStreams().size());
+        assertEquals(1, fixtures.watchRequests);
+        assertTrue(info.getErrors().stream().anyMatch(error ->
+                error.getCause() == fixtures.watchFailure));
     }
 
     @Test
@@ -466,18 +515,32 @@ class YoutubeStreamExtractorClientFallbackTest {
         private int visionRequests;
         private int embedRequests;
         private int metadataRequests;
+        private int webDiscoveryRequests;
+        private int watchRequests;
         private boolean androidBlocked;
         private boolean visionBlocked;
         private int androidStatus = 200;
         private int visionStatus = 200;
         private boolean watchBlocked;
         private boolean interruptWatch;
+        private IOException webDiscoveryFailure;
+        private IOException watchFailure;
 
         @Override
         public Response execute(@Nonnull final Request request) throws IOException {
             final String url = request.url();
             if (url.contains("/guide?")) {
                 return response(request, "x".repeat(5001));
+            }
+            if (url.equals("https://www.youtube.com/sw.js_data")) {
+                webDiscoveryRequests++;
+                if (webDiscoveryFailure != null) {
+                    throw webDiscoveryFailure;
+                }
+                return response(request, "[]");
+            }
+            if (url.equals("https://www.youtube.com/sw.js") || url.contains("/results?")) {
+                return response(request, "<html>Missing WEB client version</html>");
             }
             if (url.contains("/visitor_id?")) {
                 if (androidBlocked && url.startsWith("https://youtubei.googleapis.com/")) {
@@ -533,12 +596,16 @@ class YoutubeStreamExtractorClientFallbackTest {
                 throw new IOException("Unexpected player client " + name);
             }
             if (url.contains("/next?")) {
+                watchRequests++;
                 if (interruptWatch) {
                     Thread.currentThread().interrupt();
                     throw new IOException("watch metadata interrupted");
                 }
                 if (watchBlocked) {
                     return blocked(request);
+                }
+                if (watchFailure != null) {
+                    throw watchFailure;
                 }
                 return response(request,
                         "{\"contents\":{\"twoColumnWatchNextResults\":{\"results\":{\"results\":"
