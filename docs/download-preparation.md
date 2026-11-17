@@ -60,6 +60,12 @@ unfinished downloads are not migrated.
   If the final write failed, only an earlier checkpoint is available; it
   does not necessarily describe the completed file.
 
+The host regression injects a serialization failure during the final
+`AtomicFile` write and drops the completion message before history insertion.
+A new manager restores the earlier pending checkpoint, keeps the output bytes,
+and leaves finished history empty. The previous checkpoint alone cannot certify
+the payload as complete.
+
 The media file, the checkpoint and the finished-downloads database are separate
 things on disk. Deletion also uses private receipts for removed finished media.
 No transaction spans them.
