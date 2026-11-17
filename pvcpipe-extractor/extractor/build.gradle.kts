@@ -8,7 +8,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     alias(libs.plugins.google.protobuf)
-    id("com.squareup.wire") version "5.5.1"
+    id("com.squareup.wire") version "7.2.2"
     checkstyle
 }
 
