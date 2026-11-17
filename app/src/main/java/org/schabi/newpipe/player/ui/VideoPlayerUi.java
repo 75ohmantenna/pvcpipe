@@ -74,6 +74,7 @@ import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.fragments.detail.VideoDetailFragment;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.player.Player;
+import org.schabi.newpipe.player.resolver.PlaybackResolver;
 import org.schabi.newpipe.player.gesture.BasePlayerGestureListener;
 import org.schabi.newpipe.player.gesture.DisplayPortion;
 import org.schabi.newpipe.player.helper.PlayerHelper;
@@ -1164,17 +1165,20 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
 
                 case VIDEO_STREAM:
                 case POST_LIVE_STREAM:
-                    if (player.getCurrentMetadata() != null
+                    final boolean onDemandHls =
+                            PlaybackResolver.youtubeOnDemandHlsUrl(info) != null;
+                    if (!onDemandHls && (player.getCurrentMetadata() != null
                             && player.getCurrentMetadata().getMaybeQuality().isEmpty()
                             || (info.getVideoStreams().isEmpty()
-                            && info.getVideoOnlyStreams().isEmpty())) {
+                            && info.getVideoOnlyStreams().isEmpty()))) {
                         break;
                     }
 
-                    buildQualityMenu();
-                    buildAudioTrackMenu();
-
-                    binding.qualityTextView.setVisibility(View.VISIBLE);
+                    if (!onDemandHls) {
+                        buildQualityMenu();
+                        buildAudioTrackMenu();
+                        binding.qualityTextView.setVisibility(View.VISIBLE);
+                    }
                     binding.surfaceView.setVisibility(View.VISIBLE);
                     // fallthrough
                 default:

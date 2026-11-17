@@ -60,6 +60,23 @@ public final class PlaybackSources {
     public MediaSource resolve(@NonNull final StreamInfo info,
                                final boolean audioPlayer,
                                final boolean audioOnly) {
+        final String hlsUrl = PlaybackResolver.youtubeOnDemandHlsUrl(info);
+        if (hlsUrl != null) {
+            final MediaItemTag tag = StreamInfoTag.of(info)
+                    .withSourceType(SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY);
+            final MediaSource source = environment.youtubeOnDemandSource(hlsUrl, tag);
+            if (audioPlayer || audioOnly) {
+                return source;
+            }
+            final List<MediaSource> subtitles = environment.subtitleSources(info);
+            if (subtitles.isEmpty()) {
+                return source;
+            }
+            final List<MediaSource> sources = new ArrayList<>();
+            sources.add(source);
+            sources.addAll(subtitles);
+            return environment.merge(sources);
+        }
         final Settings selection = settings;
         if (audioPlayer) {
             return resolveAudio(info, selection);
@@ -309,6 +326,8 @@ public final class PlaybackSources {
 
         @Nullable
         MediaSource liveSource(StreamInfo info, @Nullable String hlsOverride, MediaItemTag tag);
+
+        MediaSource youtubeOnDemandSource(String url, MediaItemTag tag);
 
         MediaSource streamSource(StreamInfo info, @Nullable Stream stream, MediaItemTag tag)
                 throws ResolverException;

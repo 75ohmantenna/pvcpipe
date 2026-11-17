@@ -77,6 +77,49 @@ public class PlaybackSourcesTest {
     }
 
     @Test
+    public void youtubeOnDemandManifestPlaysInBothModesWithoutInventingAQuality() {
+        final String url = "https://manifest.googlevideo.com/fixture?sig=abc%2fdef";
+        final MediaSource subtitle = PlaybackSourcesTestEnvironment.source(null);
+        environment.subtitles.add(subtitle);
+
+        for (final StreamType type : List.of(StreamType.VIDEO_STREAM,
+                StreamType.POST_LIVE_STREAM)) {
+            final StreamInfo current = info("manifest-only", type);
+            current.setHlsUrl(url);
+
+            final MediaSource videoSource = sources.resolve(current, false, false);
+            final MediaSource audioSource = sources.resolve(current, true, true);
+
+            for (final MediaSource source : List.of(videoSource, audioSource)) {
+                assertSame(current, tag(source).getMaybeStreamInfo().orElseThrow());
+                assertFalse(tag(source).getMaybeQuality().isPresent());
+                assertSame(MediaItemTag.SourceType.VIDEO_WITH_AUDIO_OR_AUDIO_ONLY,
+                        tag(source).getMaybeSourceType().orElseThrow());
+            }
+        }
+        assertEquals(List.of(url, url, url, url), environment.youtubeOnDemandManifests);
+        assertEquals(2, environment.merges.size());
+        assertSame(subtitle, environment.merges.get(0).get(1));
+        assertTrue(environment.streams.isEmpty());
+    }
+
+    @Test
+    public void youtubeFallbackKeepsIndividualFormatsAndRejectsUnusableManifests() {
+        final StreamInfo current = muxed("with-formats", true);
+        current.setHlsUrl("https://manifest.googlevideo.com/fixture");
+        assertNotNull(sources.resolve(current, false, false));
+        assertNotNull(sources.resolve(current, true, false));
+        assertFalse(environment.streams.isEmpty());
+        final StreamInfo unsafe = info("invalid", StreamType.VIDEO_STREAM);
+        for (final String url : List.of("/relative.m3u8", "file:///playlist.m3u8",
+                "https://user@manifest.googlevideo.com/playlist.m3u8", "https://")) {
+            unsafe.setHlsUrl(url);
+            assertNull(sources.resolve(unsafe, false, false));
+        }
+        assertTrue(environment.youtubeOnDemandManifests.isEmpty());
+    }
+
+    @Test
     public void videoResolutionUsesTheDefaultQualityAndRetainsItsSelection() {
         final StreamInfo current = muxed("quality", false);
         final VideoStream preferred = video("preferred", "1080p", false);

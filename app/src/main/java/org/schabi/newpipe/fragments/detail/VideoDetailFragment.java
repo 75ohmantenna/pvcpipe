@@ -80,6 +80,7 @@ import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.local.playlist.LocalPlaylistFragment;
 import org.schabi.newpipe.player.Player;
+import org.schabi.newpipe.player.resolver.PlaybackResolver;
 import org.schabi.newpipe.player.PlayerIntentType;
 import org.schabi.newpipe.player.PlayerService;
 import org.schabi.newpipe.player.PlayerType;
@@ -1483,12 +1484,13 @@ public final class VideoDetailFragment
 
         binding.detailControlsDownload.setVisibility(
                 StreamTypeUtil.isLiveStream(info.getStreamType()) ? View.GONE : View.VISIBLE);
+        final boolean onDemandHls = PlaybackResolver.youtubeOnDemandHlsUrl(info) != null;
         binding.detailControlsBackground.setVisibility(
-                info.getAudioStreams().isEmpty() && info.getVideoStreams().isEmpty()
+                !onDemandHls && info.getAudioStreams().isEmpty() && info.getVideoStreams().isEmpty()
                         ? View.GONE : View.VISIBLE);
 
-        final boolean noVideoStreams =
-                info.getVideoStreams().isEmpty() && info.getVideoOnlyStreams().isEmpty();
+        final boolean noVideoStreams = !onDemandHls
+                && info.getVideoStreams().isEmpty() && info.getVideoOnlyStreams().isEmpty();
         binding.detailControlsPopup.setVisibility(noVideoStreams ? View.GONE : View.VISIBLE);
         binding.detailThumbnailPlayButton.setImageResource(
                 noVideoStreams ? R.drawable.ic_headset_shadow : R.drawable.ic_play_arrow_shadow);

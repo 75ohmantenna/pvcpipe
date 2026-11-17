@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -27,6 +28,26 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class CastInlineManifestTest {
+    @Test
+    public void youtubeOnDemandManifestUsesTheExistingReceiverRelay() throws Exception {
+        final String upstream = "https://manifest.googlevideo.com/only.m3u8?sig=a%2fb";
+        final String watchUrl = "https://www.youtube.com/watch?v=fixture";
+        final StreamInfo info = new StreamInfo(ServiceList.YouTube.getServiceId(),
+                watchUrl, watchUrl, StreamType.POST_LIVE_STREAM, "fixture", "fixture", 0);
+        info.setHlsUrl(upstream);
+        final Context context = mock(Context.class);
+        final CastMediaServer server = mock(CastMediaServer.class);
+        final String relay = "http://127.0.0.1:1234/fixture";
+        when(server.register(upstream, CastManifest.HLS)).thenReturn(relay);
+
+        try (CastMediaResolver resolver = new CastMediaResolver(context)) {
+            final CastMedia media = resolver.resolve(info, StreamInfoTag.of(info), server);
+            assertEquals(relay, media.url());
+            assertEquals(CastManifest.HLS, media.mimeType());
+        }
+        verify(server).manifest(upstream, CastManifest.HLS);
+    }
+
     @Test
     public void wholeInlineManifestCannotEvictItsFirstSegmentWhenPublishing() throws Exception {
         try (CastMediaServer server = new CastMediaServer(InetAddress.getLoopbackAddress())) {

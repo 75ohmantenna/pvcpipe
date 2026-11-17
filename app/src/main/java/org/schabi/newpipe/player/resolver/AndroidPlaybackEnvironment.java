@@ -83,6 +83,12 @@ final class AndroidPlaybackEnvironment implements PlaybackSources.Environment {
     }
 
     @Override
+    public MediaSource youtubeOnDemandSource(final String url, final MediaItemTag tag) {
+        return dataSource.getYoutubeHlsMediaSourceFactory().createMediaSource(
+                new MediaItem.Builder().setUri(Uri.parse(url)).setTag(tag).build());
+    }
+
+    @Override
     public MediaSource streamSource(final StreamInfo info,
                                     @Nullable final Stream stream,
                                     final MediaItemTag tag) throws ResolverException {

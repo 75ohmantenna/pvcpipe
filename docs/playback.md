@@ -26,6 +26,12 @@ stream types do not need rebuilding merely to toggle video. Preloading the
 queue, expiring loaded items and managing the timeline belong to
 `MediaSourceManager`, not here.
 
+YouTube on-demand and ended live items with only a top-level HLS manifest
+can play locally and through the FCast relay. The local video player keeps
+external captions available. The audio player may fetch a muxed video
+playlist. Individual extracted formats retain priority, and the manifest
+does not add an individual quality or download format.
+
 ## Rumble source metadata
 
 Rumble keeps the existing progressive/HLS construction and encoded-height quality

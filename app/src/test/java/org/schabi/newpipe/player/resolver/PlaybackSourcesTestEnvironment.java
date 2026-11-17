@@ -34,6 +34,7 @@ final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environmen
     final List<String> errors = new ArrayList<>();
     final List<String> warnings = new ArrayList<>();
     final List<String> liveManifests = new ArrayList<>();
+    final List<String> youtubeOnDemandManifests = new ArrayList<>();
     final Set<StreamInfo> liveInfos = new HashSet<>();
     final Set<Stream> failedStreams = new HashSet<>();
     int selectedAudioIndex;
@@ -74,6 +75,12 @@ final class PlaybackSourcesTestEnvironment implements PlaybackSources.Environmen
                                  final MediaItemTag tag) {
         liveManifests.add(hlsOverride == null ? info.getHlsUrl() : hlsOverride);
         return liveInfos.contains(info) ? source(tag) : null;
+    }
+
+    @Override
+    public MediaSource youtubeOnDemandSource(final String url, final MediaItemTag tag) {
+        youtubeOnDemandManifests.add(url);
+        return source(tag);
     }
 
     @Override

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import android.app.Application;
 
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.C;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
@@ -40,6 +41,27 @@ import java.util.List;
 @Config(manifest = Config.NONE, application = Application.class, sdk = 26)
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlaybackSourcesNativeHlsTest {
+    @Test
+    public void youtubeManifestOnlyUsesTheOnDemandHlsFactory() {
+        final String watchUrl = "https://www.youtube.com/watch?v=fixture";
+        final String signedUrl = "https://manifest.googlevideo.com/api/manifest/hls?sig=a%2fb";
+        final StreamInfo info = new StreamInfo(ServiceList.YouTube.getServiceId(),
+                watchUrl, watchUrl, StreamType.POST_LIVE_STREAM, "fixture", "Fixture", 0);
+        info.setHlsUrl(signedUrl);
+        final PlayerDataSource dataSource = mock(PlayerDataSource.class);
+        when(dataSource.getYoutubeHlsMediaSourceFactory()).thenReturn(hlsFactory());
+        final PlaybackSources sources = new PlaybackSources(RuntimeEnvironment.getApplication(),
+                dataSource, mock(PlaybackSources.QualityResolver.class));
+
+        final MediaSource source = sources.resolve(info, false, false);
+
+        assertEquals(signedUrl, source.getMediaItem().localConfiguration.uri.toString());
+        assertEquals(C.TIME_UNSET, source.getMediaItem().liveConfiguration.targetOffsetMs);
+        assertSame(info, MediaItemTag.from(source.getMediaItem()).orElseThrow()
+                .getMaybeStreamInfo().orElseThrow());
+        verify(dataSource, never()).getLiveHlsMediaSourceFactory();
+    }
+
     @Test
     public void nativeVideoLoadsOriginalMasterAndKeepsQualityAndAudioMetadata() throws Exception {
         for (final StreamType type : List.of(StreamType.VIDEO_STREAM, StreamType.LIVE_STREAM)) {

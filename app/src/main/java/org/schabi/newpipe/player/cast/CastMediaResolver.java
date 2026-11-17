@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
+import org.schabi.newpipe.player.resolver.PlaybackResolver;
 import org.schabi.newpipe.util.ListHelper;
 import org.schabi.newpipe.util.StreamTypeUtil;
 
@@ -81,6 +82,10 @@ public final class CastMediaResolver implements Closeable {
             if (info.getHlsUrl() != null && !info.getHlsUrl().isBlank()) {
                 return remoteManifest(mediaServer, info.getHlsUrl(), CastManifest.HLS);
             }
+        }
+        final String onDemandHlsUrl = PlaybackResolver.youtubeOnDemandHlsUrl(info);
+        if (onDemandHlsUrl != null) {
+            return remoteManifest(mediaServer, onDemandHlsUrl, CastManifest.HLS);
         }
         VideoStream video = tag == null ? null : tag.getMaybeQuality()
                 .map(MediaItemTag.Quality::getSelectedVideoStream).orElse(null);

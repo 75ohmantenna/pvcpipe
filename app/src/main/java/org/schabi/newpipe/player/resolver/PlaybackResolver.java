@@ -2,6 +2,7 @@ package org.schabi.newpipe.player.resolver;
 
 import static org.schabi.newpipe.extractor.stream.AudioStream.UNKNOWN_BITRATE;
 import static org.schabi.newpipe.extractor.stream.VideoStream.RESOLUTION_UNKNOWN;
+import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
 
 import android.net.Uri;
 import android.util.Log;
@@ -37,6 +38,8 @@ import org.schabi.newpipe.util.StreamTypeUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -188,6 +191,38 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
         throw new RuntimeException("no audio or video stream. That should never happen");
     }
     //endregion
+
+    /**
+     * Selects the top-level YouTube VOD manifest when extraction supplied only HLS media.
+     * @param info extracted information for the selected item
+     * @return the manifest URL, or null when the fallback is unavailable
+     */
+    @Nullable
+    static String youtubeOnDemandHlsUrl(final StreamInfo info) {
+        final StreamType type = info.getStreamType();
+        if (info.getServiceId() != ServiceList.YouTube.getServiceId()
+                || (type != StreamType.VIDEO_STREAM && type != StreamType.POST_LIVE_STREAM)
+                || !isNullOrEmpty(info.getAudioStreams())
+                || !isNullOrEmpty(info.getVideoStreams())
+                || !isNullOrEmpty(info.getVideoOnlyStreams())) {
+            return null;
+        }
+        final String url = info.getHlsUrl();
+        if (isNullOrEmpty(url)) {
+            return null;
+        }
+        try {
+            final URI uri = new URI(url);
+            if (uri.getHost() != null && uri.getRawUserInfo() == null
+                    && ("https".equalsIgnoreCase(uri.getScheme())
+                    || "http".equalsIgnoreCase(uri.getScheme()))) {
+                return url;
+            }
+        } catch (final URISyntaxException ignored) {
+            // The manifest must be a usable network URL.
+        }
+        return null;
+    }
 
 
     //region Live media sources
