@@ -12,13 +12,17 @@ import urllib.request
 import zipfile
 
 
-FFMPEG_COMMIT = "b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090"
-FFMPEG_REPO = "https://github.com/evermind-zz/FFmpeg4slimhls-converter.git"
+FFMPEG_COMMIT = "38353ad6c3f9912ac0912cfee7763fd18da4badb"
+FFMPEG_REPO = "https://github.com/FFmpeg/FFmpeg.git"
 BASE_URL = ("https://jitpack.io/com/github/75ohmantenna/slimhls-converter/"
             "7e7f373dbf/slimhls-converter-7e7f373dbf.aar")
-BASE_SHA256 = "1ea205c289effc445acacaa1fa00f2e564c001e9ccc155e5201168065b13e01a"
-PREVIOUS_SHA256 = "2743910cd6d4bc5999d8aa7de6ccdb6249bde0d3c7b50335e71fa46972d52074"
-VENDORED_SHA256 = "bfb1710ee391b4862cda0d56395a505d32c15935c58b8e9cc5ae671ec6848307"
+VENDORED_SHA256 = "9314320010f1302cfdf5f55bd9107196b9fb281820eabee927f6d91e5febd997"
+BASE_AAR_SHA256S = {
+    "1ea205c289effc445acacaa1fa00f2e564c001e9ccc155e5201168065b13e01a",
+    "2743910cd6d4bc5999d8aa7de6ccdb6249bde0d3c7b50335e71fa46972d52074",
+    "bfb1710ee391b4862cda0d56395a505d32c15935c58b8e9cc5ae671ec6848307",
+    VENDORED_SHA256,
+}
 ARCHITECTURES = {
     "armeabi-v7a": ("arm", "armv7a-linux-androideabi", 19),
     "arm64-v8a": ("arm64", "aarch64-linux-android", 21),
@@ -79,7 +83,7 @@ def main():
     if not base.exists():
         with urllib.request.urlopen(BASE_URL) as response, base.open("wb") as output:
             shutil.copyfileobj(response, output)
-    if hashlib.sha256(base.read_bytes()).hexdigest() not in (BASE_SHA256, PREVIOUS_SHA256, VENDORED_SHA256):
+    if hashlib.sha256(base.read_bytes()).hexdigest() not in BASE_AAR_SHA256S:
         parser.error("Converter AAR checksum mismatch")
     binaries = {}
     for abi, (arch, prefix, api) in ARCHITECTURES.items():
@@ -93,6 +97,7 @@ def main():
             f"--arch={arch}", "--disable-everything", "--disable-zlib", "--disable-doc",
             "--disable-avdevice", "--disable-swscale", "--disable-encoders", "--disable-filters",
             "--disable-indevs", "--disable-outdevs", "--disable-debug", "--disable-autodetect",
+            "--disable-network",
             "--disable-asm", "--enable-avformat", "--enable-avcodec", "--enable-avutil",
             "--enable-swresample", "--enable-decoder=h264", "--enable-decoder=aac",
             "--enable-demuxer=mpegts", "--enable-demuxer=concat", "--enable-demuxer=mov",
