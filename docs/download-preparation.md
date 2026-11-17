@@ -60,15 +60,46 @@ unfinished downloads are not migrated.
   If the final write failed, only an earlier checkpoint is available; it
   does not necessarily describe the completed file.
 
-The host regression injects a serialization failure during the final
-`AtomicFile` write and drops the completion message before history insertion.
-A new manager restores the earlier pending checkpoint, keeps the output bytes,
-and leaves finished history empty. The previous checkpoint alone cannot certify
-the payload as complete.
+`DownloadFinalCheckpointTest` covers a final write failure followed by
+a lost completion message. The earlier checkpoint can restore a pending
+mission even when the output already contains the downloaded bytes.
 
 The media file, the checkpoint and the finished-downloads database are separate
 things on disk. Deletion also uses private receipts for removed finished media.
 No transaction spans them.
+
+## Data-sync foreground timeout
+
+The download service handles Android's data-sync timeout without waiting for a
+bound Downloads screen to disconnect. It closes download admission, stops its
+foreground/started lifetime promptly, and pauses network missions and writes their
+checkpoints off the main thread. Queue, connectivity and binder calls cannot
+restart work while the timeout gate is closed. Explicit user resume is accepted
+only after the app is foreground again and the pause has completed; it restores
+the service's started lifetime as well as its foreground notification.
+
+A manager interrupted by timeout remains the sole in-process owner of its files
+across immediate service recreation. Its handler is replaced with a manager-owned
+completion sink while detached, then rebound to the new service. This prevents a
+second deserialized mission from writing alongside a worker still stopping.
+
+New HLS requests are checkpointed with their original playlist before preparation.
+Preparation is an initializer owned by the mission, and cancellation closes the
+active HTTP call. Late results cannot publish into a paused/replaced initializer.
+The initializer must checkpoint the segment plan before downloading segments. Older,
+already-prepared checkpoints retain their existing behavior and are not reparsed.
+
+Existing same-file post-processing is deliberately not forcibly interrupted:
+that would damage the source it is rewriting. It may finish in-process after the
+foreground service has stopped, and its completion is still recorded. This does
+not guarantee conversion survives process death or an indefinite I/O stall; those
+remain existing recovery/error boundaries, not resumable conversion guarantees.
+
+Host regressions cover admission, detached completion, checkpoint writes and
+cancellation of stalled HLS preparation.
+The [recorded Pixel lifecycle check](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/download-preparation.md#native-timeout-lifecycle-follow-up-2026-11-13)
+invoked the timeout callback directly. Platform delivery at the Android
+deadline remains unverified.
 
 ## Ranged response integrity and Start
 
@@ -124,7 +155,7 @@ places:
 
 ## Removing entries
 
-"Delete" first hides an entry during its undo window. When deletion commits,
+**Delete** first hides an entry during its undo window. When deletion commits,
 `DownloadManager.deleteMission` checks file/checkpoint deletion before removing
 the entry, and catches provider/database runtime failures. A failure restores
 the row and reports how many entries were kept for retry. Bulk deletion continues
@@ -141,8 +172,8 @@ again. **Deletion help** explains that the file may already be gone, suggests ch
 storage/provider availability, access and free internal storage, and points back to
 Delete for an explicit retry. The help dialog itself changes no files, permissions
 or download state. It does not offer abandonment or regrant access, and it cannot
-resolve a permanently inaccessible provider. Checkpoint cleanup removes `.new`/`.bak` companions before the main file,
-so a companion-removal failure retains the current marker. If saving the marker
+resolve a permanently inaccessible provider. Cleanup removes `.new` and `.bak`
+companions first, so a companion-removal failure retains the current marker. If saving the marker
 fails, no media deletion is attempted, but a later restart can only use the older
 checkpoint: that failed write does not establish durable cancellation.
 
@@ -169,7 +200,7 @@ reproduces that uncertainty and verifies recovery after provider access is resto
 it does not remove the cross-provider transaction gap. Old app builds do not
 understand these deletion receipts.
 
-"Delete entry" keeps the file and is offered only for finished downloads.
+**Delete entry** keeps the file and is offered only for finished downloads.
 `DownloadManager.deleteMission` also refuses entry-only removal for unfinished
 missions, since their checkpoint could otherwise replay at startup. Old checkpoints
 without the deletion marker default to normal behavior; earlier app builds do not
@@ -178,12 +209,11 @@ for the tested boundaries.
 
 ## HLS downloads
 
-Completed combined HLS video and M4A-labeled AAC HLS audio are prepared with Media3's `HlsPlaylistParser` and
-remuxed by `PvcFromHlsRemuxer` with the bundled FFmpeg. Master playlists remain
-selection errors. Streams identified as live/ongoing and video-only HLS are rejected before
-destination/picker effects; MP3/Opus/unknown-codec HLS audio and HLS subtitles
-are not offered. Audio media playlists must also have an explicit ENDLIST tag;
-a live snapshot is rejected during mission preparation.
+Media3's `HlsPlaylistParser` prepares combined video and M4A-labeled AAC audio
+media playlists. `PvcFromHlsRemuxer` remuxes them with the bundled FFmpeg.
+Download selection rejects master playlists, live or ongoing streams, video-only
+HLS, HLS subtitles and HLS audio with other or unknown codecs. Audio media
+playlists also require an explicit `EXT-X-ENDLIST` tag during preparation.
 
 - `PvcHlsPreProcessor` parses the streamed successful response against its
   effective URL after redirects. It retains Media3-resolved byte ranges,
@@ -219,25 +249,22 @@ a live snapshot is rejected during mission preparation.
   identity; they fail with an explicit-IV error rather than invent a sequence.
   Explicit-IV encrypted and unencrypted legacy checkpoints remain supported.
 
-### Audio HLS — 2026-11-13
+### Audio HLS
 
-The audio dropdown admits URL-based HLS AAC streams declared M4A, including
-SoundCloud's AAC 96/160 kbps variants. Existing progressive choices and defaults
-are preserved, including unknown-language groups. Only progressive audio can
-be paired with progressive video-only downloads; an unpairable HLS language displays a warning and requires an explicit
-"Download video without audio" confirmation before destination preparation. It
-does not silently substitute another language. Existing intentional video-only
-downloads without a new HLS audio track remain available. Playlist headers
-are never used as media sizes. Audio HLS uses a checked bitrate/duration
-estimate in bytes, or retains unknown size.
+The audio dropdown offers URL-based HLS AAC streams declared as M4A, including
+SoundCloud's AAC 96 and 160 kbps variants. Progressive video-only streams can
+be paired with progressive audio. When the selected language is available only
+as HLS audio, the dialog requires **Download video without audio** confirmation
+before preparing the destination. Audio HLS estimates size from bitrate and
+duration when both are available and otherwise shows an unknown size.
 
 Audio HLS uses the same durable playlist/plan checkpoints, whole-resource resume,
 byte windows, initialization maps and identity AES-128 handling as video HLS.
 The persisted mission kind selects mandatory audio mapping, no video, AAC
 bitstream validation and MP4 container output, saved with `.m4a`/`audio/mp4`.
 Missing audio or non-AAC content fails conversion before output copying. The
-bundled native build adds the AAC demuxer for raw ADTS segments; MPEG-TS and
-fragmented MP4 inputs remain supported without re-encoding. See `app/libs/README.md`.
+bundled native build accepts raw ADTS, MPEG-TS and fragmented MP4 without
+re-encoding. [Converter components and provenance](../app/libs/README.md)
 
 Controlled host tests exercise generated ADTS, MPEG-TS and fMP4 audio, explicit
 no-video output, duration/container/codec checks, restored plans and rejection
@@ -248,43 +275,8 @@ WebM Opus-to-Ogg conversion rejects block-laced input. `WebMReader` does not
 split laced blocks into packets, so treating a whole block as one packet
 would produce an invalid output file.
 
-### Controlled HLS conversion follow-up — 2026-10-30
-
-The pinned dependency consumed whole resources where the three logical windows
-required `ABCD`, `XYZ` and `12`. The new production-path consumer regressions
-verify those exact bytes, shared-stream ownership, restored plans, legacy
-checkpoints, sequence-300 AES, encrypted maps, truncation and failure atomicity.
-
-Generated eight-second TS and fragmented-MP4/map fixtures were parsed through the
-real preprocessor and remuxed through the same converter with a host FFmpeg
-executor. `ffprobe` found both video and audio: TS output was **8.000000s** and
-fragmented MP4 **8.000313s**, within the 0.25s acceptance window. The earlier
-untimed fMP4 concat produced 14.112917s; that failing regression was retained and
-corrected, not relaxed. Nonzero real FFmpeg conversion also failed without
-overwriting the output.
-
-`HlsDownloadIntegrationTest` additionally covers real mission workers, Android
-`RunFFmpeg`, restored missions and decoded reopening; the native player harness
-covers rendition/caption behavior. Both compile, but were **not device-executed**
-in this follow-up: no device was attached and no emulator binary/KVM was available.
-Host conversion is not Android decoder or receiver evidence. Generated fixture
-commands and timestamp origins are in `app/src/androidTest/assets/media3-engine/README.txt`.
-
-### Android converter integration review — 2026-10-30
-
-A later disposable API 26 emulator run reached the real mission workers and
-bundled binary. The fMP4/map case failed with FFmpeg status 183: the bundled
-minimal build had no MOV/MP4 demuxer. Enabling it exposed the additional H.264
-framing filter required by concat, which had also been disabled (status 8).
-The [vendored converter and source-pinned recipe](../app/libs/README.md) now
-enable both components for all four ABIs and verify the artifact in `make ci`.
-Its Java wrapper and metadata remain unchanged. A controlled run of the rebuilt
-Android executable produced an 8.000313s MP4 containing both video and audio.
-The packaged app then passed all four `HlsDownloadIntegrationTest` cases on the
-disposable emulator, including restored fMP4 missions and decoded reopening;
-the combined native-player/download selection passed 21 tests. This is controlled
-Android evidence, separate from the earlier host-only run and real hardware.
-
+[Recorded host and Android HLS conversion checks](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/download-preparation.md#controlled-hls-conversion-follow-up--2026-10-30)
+include the original failures and subsequent test results.
 
 ## Sharing or opening a finished file
 
@@ -305,7 +297,7 @@ grants read access to that one file.
 - Preview thumbnails for the share sheet come from a separate `FileProvider`
   that covers only the `share_preview` cache folder.
 
-### URL share previews (2026-11-13)
+### URL share previews
 
 URL sharing keeps its text/title and chooser permissions. Cached image lookup,
 decode, bounded rendering, JPEG creation, URI canonicalization and provider MIME
@@ -358,75 +350,3 @@ Controlled native/HTTP drivers are indexed in [building.md](building.md#controll
 They require isolated fixtures, not an existing user installation.
 The [baseline download records](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/download-preparation.md#cold-process-restart-verification-2026-10-24)
 preserve exact observations, failed attempts and their evidence limits.
-
-## Data-sync foreground timeout (2026-11-13)
-
-The download service handles Android's data-sync timeout without waiting for a
-bound Downloads screen to disconnect. It closes download admission, stops its
-foreground/started lifetime promptly, and pauses network missions and writes their
-checkpoints off the main thread. Queue, connectivity and binder calls cannot
-restart work while the timeout gate is closed. Explicit user resume is accepted
-only after the app is foreground again and the pause has completed; it restores
-the service's started lifetime as well as its foreground notification.
-
-A manager interrupted by timeout remains the sole in-process owner of its files
-across immediate service recreation. Its handler is replaced with a manager-owned
-completion sink while detached, then rebound to the new service. This prevents a
-second deserialized mission from writing alongside a worker still stopping.
-
-New HLS requests are checkpointed with their original playlist before preparation.
-Preparation is an initializer owned by the mission, and cancellation closes the
-active HTTP call. Late results cannot publish into a paused/replaced initializer.
-The prepared segment plan must be checkpointed before downloads begin. Older,
-already-prepared checkpoints retain their existing behavior and are not reparsed.
-
-Existing same-file post-processing is deliberately not forcibly interrupted:
-that would damage the source it is rewriting. It may finish in-process after the
-foreground service has stopped, and its completion is still recorded. This does
-not guarantee conversion survives process death or an indefinite I/O stall; those
-remain existing recovery/error boundaries, not resumable conversion guarantees.
-
-Focused JVM regressions cover admission, detached completion, started-lifetime
-call ordering, checkpoint serialization and stalled playlist/key HTTP cancellation
-with fresh retries. These checks alone do not establish Android scheduling.
-The native direct-callback follow-up below covers bound timeout/resume/unbind;
-the platform deadline itself has not been forced.
-
-### Audio HLS native device follow-up (2026-11-13)
-
-A physical Pixel 6a running Android 17/API 37 executed the rebuilt ARM64
-converter pinned in `app/libs/README.md`. Synthetic manifest byte windows,
-including the fMP4 initialization map, were staged with their playlist durations.
-Production-equivalent concat/copy arguments, mandatory audio mapping, `-vn`,
-`aac_adtstoasc` and MP4 output produced one AAC audio track and no video for
-ADTS (8.021333 seconds), fMP4 (8.021333 seconds) and MPEG-TS (8.000000 seconds).
-No-audio and Opus inputs were rejected with exit code 234.
-
-The isolated temporary device files were removed and their absence verified;
-app data, settings and UI were unchanged. This verifies the shipped ARM64 native
-conversion path, not the full Java mission/service integration, Android decoding
-or live SoundCloud downloads. Those remain separately unverified for this change.
-
-### Native timeout lifecycle follow-up (2026-11-13)
-
-`DownloadTimeoutDeviceTest` passed on a physical Pixel 6a running Android 17/API
-37 in an explicitly opted-in, newly installed verification package. Two cycles
-invoked the service timeout callback twice, waited for a readable checkpoint,
-resumed from a real foreground About activity, and removed the final test binding.
-Native ActivityManager state confirmed the started/foreground lifetime remained
-active after each unbind; the warm service and manager identity were retained.
-The controlled loopback download finished with exactly 2,097,289 expected bytes
-and retired its checkpoint files. The non-skipped result markers reported two
-cycles and exact-byte verification; the run took 5.194 seconds and the maximum
-paired callback invocation took 7 ms on that run, not a timing guarantee.
-
-The first attempt found a test assertion error: checkpoint storage must pass
-through `StoredFileHelper.deserialize` before its transient URI representation is
-used. The corrected test passed; no production defect was established by that
-failure. This is a direct callback test, not evidence of Android delivering its
-six-hour budget timeout, process-death recovery, or conversion completion after
-service timeout. Existing JVM tests cover additional failure/admission paths.
-
-The disposable debug target and instrumentation packages were removed after the
-run and their absence verified. No existing package was updated or removed, no
-permission was granted, and no global timeout/device setting was changed.

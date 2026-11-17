@@ -8,11 +8,10 @@ Source data for the relative-date parser compiled into the extractor.
 - `unique_patterns.json` is the input of the generator that writes the
   pattern classes.
 
-The generators are not in this directory. `GenerateOverview`,
-`GeneratePatternClasses` and `CheckAll` are in
-`../../timeago-generator/src/main/java/org/schabi/newpipe/timeago_generator/`.
-Their file paths are relative to `pvcpipe-extractor/`, so run them with that
-working directory. `GeneratePatternClasses` writes the Java pattern classes
-and `PatternMap` under `timeago-parser/src/main/java/`; the extractor adds
-that directory to its main source set. Generation is not a dependency of a
-normal app build.
+Run `GenerateOverview`, `GeneratePatternClasses` and `CheckAll` from the
+`pvcpipe-extractor/` working directory. Their paths are relative to that
+directory. The entry points are in the
+[generator sources](../../timeago-generator/src/main/java/org/schabi/newpipe/timeago_generator/).
+`GeneratePatternClasses` writes the Java pattern classes and `PatternMap`
+under `timeago-parser/src/main/java/`. Normal app builds compile those checked-in
+sources directly.

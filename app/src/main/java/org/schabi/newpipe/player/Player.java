@@ -179,7 +179,7 @@ public final class Player implements PlaybackListener, Listener {
     @NonNull
     private final PlaybackSources playbackSources;
 
-    private final PlayerService service; //TODO try to remove and replace everything with context
+    private final PlayerService service;
 
     /*//////////////////////////////////////////////////////////////////////////
     // Player states
@@ -1936,7 +1936,7 @@ public final class Player implements PlaybackListener, Listener {
 
     void setActivityListener(final PlayerEventListener listener) {
         listeners.setActivityListener(listener);
-        // TODO why not queue update?
+        // The activity receives metadata, playback state and progress on attachment.
         notifyMetadataUpdateToListeners();
         notifyPlaybackUpdateToListeners();
         triggerProgressUpdate();

@@ -608,7 +608,7 @@
     <string name="error_unknown_host">Could not find the server</string>
     <string name="error_connect_host">Cannot connect to the server</string>
     <string name="error_http_no_content">The server did not send any data</string>
-    <string name="error_http_unsupported_range">The server does not support multi-threaded downloads. Retry with @string/msg_threads = 1</string>
+    <string name="error_http_unsupported_range">The server rejected the requested byte range.</string>
     <string name="error_http_not_found">Not found</string>
     <string name="error_postprocessing_failed">Post-processing failed</string>
     <string name="error_postprocessing_stopped">PVCPipe was closed while working on the file</string>
@@ -654,7 +654,7 @@
     <string name="remove_watched_popup_warning">Streams that have been watched before and after being added to the playlist will be removed.
 \nAre you sure\?</string>
     <string name="remove_watched_popup_partially_watched_streams">Remove partially watched streams</string>
-    <string name="new_seek_duration_toast">Due to ExoPlayer constraints, the seek duration was set to %d seconds</string>
+    <string name="new_seek_duration_toast">Inexact seeking uses a %d-second seek interval.</string>
     <!-- Time duration plurals -->
     <plurals name="seconds">
         <item quantity="one">%d second</item>
@@ -786,7 +786,7 @@
     <string name="select_night_theme_toast">You can select your favorite night theme below</string>
     <string name="night_theme_available">This option is only available if %s is selected for Theme</string>
     <string name="download_has_started">Download request submitted</string>
-    <string name="description_select_note">You can now select text inside the description. Note that the page may flicker and links may not be clickable while in selection mode.</string>
+    <string name="description_select_note">Select text in the description. The page may flicker, and some links may be unavailable in selection mode.</string>
     <string name="description_select_enable">Enable selecting text in the description</string>
     <string name="description_select_disable">Disable selecting text in the description</string>
     <string name="metadata_category">Category</string>
@@ -901,9 +901,9 @@
     <string name="trending_movies">Trending movies/shows</string>
     <string name="trending_music">Trending music</string>
     <string name="entry_deleted">Entry deleted</string>
-    <string name="player_http_403">Received HTTP error 403 from the server during playback, possibly because the streaming URL expired or the IP address was banned</string>
+    <string name="player_http_403">The server refused a media request during playback (HTTP 403).</string>
     <string name="player_http_invalid_status">Received HTTP error %1$s from the server during playback</string>
-    <string name="youtube_player_http_403">Received HTTP error 403 from the server during playback, possibly because of an IP ban or a problem deobfuscating the streaming URL</string>
+    <string name="youtube_player_http_403">YouTube refused a media request during playback (HTTP 403).</string>
     <string name="sign_in_confirm_not_bot_error">%1$s refused to provide data and requires you to sign in to confirm you are not a bot.\n\n%1$s may have temporarily banned your IP address. You can wait or try a different IP address (for example, by toggling your VPN or switching from Wi-Fi to mobile data).\n\nSee <a href="%2$s">this FAQ entry</a> for more information.</string>
     <string name="unsupported_content_in_country">This content is not available for the currently selected content country.\n\nChange your selection from \"Settings > Content > Default content country\".</string>
     <string name="settings_category_sponsor_block_categories_title">SponsorBlock categories</string>
@@ -976,7 +976,7 @@
     <string name="disable_error_reports_summary">Stop showing new error report screens, notifications and snackbars. Does not disable local log capture or crash collection.</string>
     <string name="enable_return_youtube_dislike_title">Show dislike count</string>
     <string name="enable_return_youtube_dislike_summary">Use the ReturnYouTubeDislike API to show a video\'s dislike count. This works only for YouTube videos.\n<b>WARNING: The API will see your IP address. Use at your own risk!</b></string>
-    <string name="pvc_about_fork">PVCPipe is a direct fork of BravePipe. Many thanks to its creator, evermind-zz, for building and maintaining the project PVCPipe is based on.</string>
+    <string name="pvc_about_fork">PVCPipe is a fork of BravePipe, which is based on NewPipe. Thanks to evermind-zz and the BravePipe and NewPipe contributors.</string>
     <string name="pvc_about_title">About this fork</string>
     <string name="pvc_github_url" translatable="false">https://github.com/75ohmantenna/pvcpipe</string>
     <string name="pvc_supported_platforms" translatable="false">\n\u2022 BitChute\n\u2022 Rumble\n\u2022 Odysee\n\u2022 Kick</string>

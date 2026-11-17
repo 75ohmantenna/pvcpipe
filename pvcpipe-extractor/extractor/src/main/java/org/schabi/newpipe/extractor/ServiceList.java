@@ -44,20 +44,18 @@ public final class ServiceList {
     public static final KickService Kick = new KickService(8);
 
     /**
-     * When creating a new service, put this service in the end of this list,
-     * and give it the next free id.
+     * Register a new service at the end of this list with the next unused ID.
      * <p>
-     * Ids 2, 3 and 4 belonged to services that were removed. They stay retired, because data the
-     * app has stored refers to services by id.
+     * IDs 2, 3 and 4 remain retired because saved data can still reference them.
      * </p>
      */
     private static final List<StreamingService> SERVICES = List.of(
             YouTube, SoundCloud, Bitchute, Rumble, Odysee, Kick);
 
     /**
-     * Get all the supported services.
+     * Returns the supported services in registration order.
      *
-     * @return a unmodifiable list of all the supported services
+     * @return the unmodifiable service list
      */
     public static List<StreamingService> all() {
         return SERVICES;

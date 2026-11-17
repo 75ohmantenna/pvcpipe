@@ -108,7 +108,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
     public static final long DPAD_CONTROLS_HIDE_TIME = 7000;  // 7 Seconds
     public static final int SEEK_OVERLAY_DURATION = 450; // 450 millis
 
-    // other constants (TODO remove playback speeds and use normal menu for popup, too)
+    // Presets for the compact popup playback-speed menu.
     private static final float[] PLAYBACK_SPEEDS = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
 
     private enum PlayButtonAction {
@@ -1106,7 +1106,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         if (player.getCasting().isActive()) {
             return;
         }
-        //TODO check if this causes black screen when switching to fullscreen
+        // Remove the foreground cover once the local engine renders a frame.
         animate(binding.surfaceForeground, false, DEFAULT_CONTROLS_DURATION);
     }
     //endregion
@@ -1442,7 +1442,7 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
         if (DEBUG) {
             Log.d(TAG, "onDismiss() called with: menu = [" + menu + "]");
         }
-        isSomePopupMenuVisible = false; //TODO check if this works
+        isSomePopupMenuVisible = false;
         player.getSelectedVideoStream()
                 .ifPresent(s -> binding.qualityTextView.setText(s.getResolution()));
 

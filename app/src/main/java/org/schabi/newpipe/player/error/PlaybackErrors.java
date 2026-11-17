@@ -41,7 +41,7 @@ public final class PlaybackErrors {
         /**
          * Playback of a livestream lagged too far behind the playable window
          * ({@link PlaybackException#ERROR_CODE_BEHIND_LIVE_WINDOW BEHIND_LIVE_WINDOW}): seek to
-         * the latest timestamp and restart. This is the only error the user is not told about.
+         * the live default position and restart without an error notification.
          */
         RESTART_AT_LIVE_EDGE,
         /**

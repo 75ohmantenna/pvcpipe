@@ -2,17 +2,18 @@
 
 `slimhls-converter-7e7f373dbf-mov-aac.aar` retains the Java wrapper and AAR metadata
 from [slimhls-converter at 7e7f373dbfd97e5797fc374315e7da71910bf595](https://github.com/75ohmantenna/slimhls-converter/tree/7e7f373dbfd97e5797fc374315e7da71910bf595).
-Only its four `libffmpeg.so` executables are replaced. The original binaries had
-MPEG-TS and concat demuxers but no MOV/MP4 demuxer: real Android fMP4 downloads
-failed with exit status 183 even though host FFmpeg conversion passed.
+The four `libffmpeg.so` executables are rebuilt with the components described
+below. The initial Android fMP4 failure is recorded with the
+[integration results](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/download-preparation.md#android-converter-integration-review--2026-10-30).
 
 The rebuilt executables use the same
 [FFmpeg source commit b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090](https://github.com/evermind-zz/FFmpeg4slimhls-converter/tree/b4d9fa6cb93a3ef8209508b2fb9cd1dc95f03090)
 and NDK **25.2.9519653**, adding `--enable-demuxer=mov`, `--enable-demuxer=aac` and
 `--enable-bsf=h264_mp4toannexb`.
-Concat requires the H.264 framing filter when reading MP4 fragments. MPEG-TS/concat and raw ADTS AAC input,
-H.264/AAC, MP4 output and file/concat protocols remain enabled. Both 64-bit ABIs
-retain 16 KiB load-segment alignment. No new network protocol or encoder is enabled.
+Concat requires the H.264 framing filter when reading MP4 fragments. The build
+supports MPEG-TS, fragmented MP4 and raw ADTS input, H.264 and AAC, MP4 output,
+and the file and concat protocols. Both 64-bit ABIs use 16 KiB load-segment
+alignment.
 The wrapper is GPL-3.0; the minimal FFmpeg build reports LGPL-2.1-or-later.
 The linked source trees and build recipe provide the corresponding sources.
 
@@ -33,7 +34,7 @@ python3 tools/rebuild_hls_converter.py \
 
 `--source` and `--base-aar` accept verified local caches. By default, the checked-in
 AAR supplies the unchanged wrapper; an original AAR is downloaded only when no
-local artifact is available. The recipe checks the source commit/cleanliness
+local artifact is available. The recipe checks the source commit and worktree
 and the known AAR checksum before building all four
 ABIs, then checks ELF alignment and preserves the non-native AAR entries.
 FFmpeg embeds configure/toolchain paths, so changing those paths can change binary

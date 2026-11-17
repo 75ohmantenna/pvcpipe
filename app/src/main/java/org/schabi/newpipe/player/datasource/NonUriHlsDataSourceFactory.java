@@ -104,19 +104,9 @@ public final class NonUriHlsDataSourceFactory implements HlsDataSourceFactory {
      * Create a {@link DataSource} for the given data type.
      *
      * <p>
-     * Contrary to {@link androidx.media3.exoplayer.hls.DefaultHlsDataSourceFactory
-     * ExoPlayer's default implementation}, this implementation is not always using the
-     * {@link DataSource.Factory} passed to the
-     * {@link androidx.media3.exoplayer.hls.HlsMediaSource.Factory
-     * HlsMediaSource.Factory} constructor, only when it's not
-     * {@link C#DATA_TYPE_MANIFEST the manifest type}.
-     * </p>
-     *
-     * <p>
-     * This change allow playback of non-URI HLS contents, when the manifest is not a master
-     * manifest/playlist (otherwise, endless loops should be encountered because the
-     * {@link DataSource}s created for media playlists should use the master playlist response
-     * instead).
+     * Manifest requests read the supplied bytes. Other requests use the upstream
+     * data source. Use this factory for an inline media playlist only. An inline
+     * master playlist requires a factory that can load its child playlists.
      * </p>
      *
      * @param dataType the data type for which the {@link DataSource} will be used, which is one of

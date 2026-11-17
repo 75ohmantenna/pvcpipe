@@ -30,8 +30,6 @@ public abstract class SuggestionExtractor {
         return service;
     }
 
-    // TODO: Create a more general Extractor class
-
     public void forceLocalization(@Nullable final Localization localization) {
         this.forcedLocalization = localization;
     }

@@ -117,35 +117,19 @@ Once a player response supplies usable media, a failed watch-metadata request is
 recorded with the stream's optional extraction errors. The title and any other
 metadata already available from the player response can still be used for playback.
 
-### JavaScript compatibility regression coverage — 2026-11-13
+### Player JavaScript compatibility
 
-The deterministic `forkCiTest` gate now runs exact-output throttling-function
-shape tests instead of the disabled legacy live tests. They cover direct and
-array-selected names, dollar-named parameters, early-return removal, the regex
-fallback, selected-function-only evaluation, URL query boundaries and encoding,
-and cold/warm/cache-clear concurrency. Only the first nonempty `n` query value
-is transformed; unrelated query bytes, path and fragment are preserved. Malformed
-percent encoding fails with a parsing error before downloading player code.
+Offline tests cover signature output and throttling-function shapes, including
+array-selected names, selected-function evaluation, URL encoding and cache
+concurrency. The transform rewrites only the first nonempty `n` query value.
+Player cache generations isolate in-flight evaluations from explicit clears.
 
-Player cache generations isolate in-flight work from explicit clears. Cold
-script/function extraction is synchronized per generation; independent JavaScript
-evaluations remain outside that lock. Parameter-only clears retain the selected
-player but retire the old result map. Controlled concurrent tests assert one
-cold fetch and separate correct results, not physical-device throughput.
-
-The stored January 2026 `c9168c90` player verifies the exact signature output and
-timestamp. The signature golden was independently checked with Node 22/V8 and
-Rhino using the extracted function, not the full player. Diagnostic cold/warm
-timings are informational, not a timing-sensitive test or phone benchmark.
-
-**Known unresolved compatibility gap:** investigation of that same historical
-player found the broad throttling-name pattern selects an unrelated URL helper
-(`FI`), which leaves the tested `n` unchanged. This is not a valid deobfuscation
-result or an intentional compatibility contract. The synthetic shape tests do
-not establish modern/live throttling support. A modern algorithm still needs a
-verified input/output oracle before replacing the working signature path or
-introducing full-player evaluation. No such modernization or live-playback
-claim is included in this change.
+The stored January 2026 player `c9168c90` has a verified signature output and
+timestamp. For the same player, the throttling-name matcher selected an
+unrelated URL helper and left the tested `n` unchanged. Correct throttling for
+that player remains an open compatibility issue and requires a verified
+input/output pair for regression coverage.
+[Recorded investigation](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/services.md#javascript-compatibility-regression-coverage--2026-11-13)
 
 ## SoundCloud
 
@@ -250,66 +234,11 @@ resolution. Read [the soundcloud implementation](../pvcpipe-extractor/extractor/
   it only when marked successful, nonblank and free of those challenge
   markers. This needs a working WebView on the device.
 
-### 2026-11-03 rebuilt-extractor follow-up
-
-At 00:27–00:32 UTC, a JDK 21 harness using the rebuilt 0.2.4 extractor exercised
-fresh public results with the TV research identity (`ResearchModel`, Android 13,
-SDK 33). Requests were GET-only, cookie-free, capped at 1 MiB / 20 seconds,
-at most one request start per second; media probes read only 4 KiB ranges.
-This was a desktop HTTP client, not Android OkHttp, a decoder or a receiver.
-
-Two VODs, two Shorts and one active live item resolved and replayed in separate
-fresh JVMs from their returned public URLs:
-[VOD 1](https://rumble.com/v7hnjfy-sci-fi-movie-or-space-history.html),
-[VOD 2](https://rumble.com/v7gtth4-beyond-space-defense-war-sabotage-and-survival-beyond-earth.html),
-[Short 1](https://rumble.com/shorts/v7hh3vw),
-[Short 2](https://rumble.com/shorts/v7hnt9y), and
-[live](https://rumble.com/v7hrvsa-ep-4026b-ds-election-panictheir-own-are-turning-on-thempropaganda-failedtim.html).
-VOD audio was labeled AAC; automatic English captions were marked generated.
-MP4 and HLS probes returned HTTP 206 with matching file/playlist signatures.
-Normal autoplay and Shorts-feed related lists had no collector errors.
-Cold FYMVideos metadata resolved through `_c1330192`; legacy watch/embed comments
-returned two top-level records, and the sampled Short returned eight, without
-claiming complete threads.
-
-| Fresh listing | First-page visible rows | Second-page visible rows | Overlapping public URLs |
-| --- | ---: | ---: | ---: |
-| Video search, `space`, offsets 0/20 | 20 | 20 | 0 |
-| Creator search, `space`, API 8, offsets 0/19 | 19 | 19 | 19 |
-| Live, offsets 0/20 | 20 | 20 | 0 |
-| Shorts, API 7, offsets 0/10 | 10 | 10 | 0 |
-
-**Creator pagination remains a demonstrated server-contract limit:** this query
-repeated the entire page despite API 8 and the advanced raw offset. The extractor
-does not claim reliable distinct-page enumeration or silently switch feeds.
-Earlier NASA offset observations remain historical, not proof for this query.
-
-Follow-up (2026-11-11): creator continuations now carry the preceding page's
-visible creator identities. If a fully readable response repeats that identity
-set, the extractor stops without appending duplicates, even if metadata or ordering
-changes. Partial overlap still continues using raw-row offsets. This is covered
-by offline fixtures, not a new live-network validation.
-
-The retained HTML paths also returned HTTP 200 and parsed without collector
-errors on this host in the same run:
-
-| Retained path | Visible rows |
-| --- | ---: |
-| Video search: today | 17 |
-| Video search: this week | 25 |
-| Video search: this month | 25 |
-| Video search: this year | 25 |
-| Creator search: most recent | 39 |
-| Battle leaderboard | 50 |
-| Editor Picks | 25 |
-| Latest | 25 |
-| Trending Today | 25 |
-| FYMVideos Videos tab | 25 |
-| FYMVideos Livestreams tab | 0 |
-
-The empty Livestreams result came from valid HTML, not a suppressed challenge.
-These dated successes do not establish Android challenge behavior, future
-availability, API/HTML ranking equivalence or real playback/download/cast success.
+Creator continuations carry the preceding page's visible creator identities.
+A fully readable page with the same identity set stops pagination. Partial
+overlap continues using the raw-row offset. The
+[recorded HTTP sample](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/services.md#2026-11-03-rebuilt-extractor-follow-up)
+shows the repeated-page response that motivated this check.
 
 ## Odysee
 
@@ -398,72 +327,8 @@ not implemented. Playback has no Pusher/Centrifugo dependency. See
 and the [dated protocol record](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/service-protocol-observations.md#kick-follow-up--2026-10-18).
 Earlier transport observations do not verify newer code or real receivers.
 
-### Public extraction follow-up — 2026-10-30
-
-A temporary `KickPublicSmokeTest` used `DownloaderTestImpl` directly with
-`-Ddownloader=REAL`, not recorded/mock responses. Search `xqc`, channel metadata,
-Videos/Clips, a distinct second Clips cursor page and a distinct second
-Featured `after` page succeeded. Selected public content:
-
-- VOD: `https://kick.com/xqc/videos/01a18946-1d20-7dc3-ba54-8b71a4c0a844`.
-  Extraction exposed five video qualities and five subtitle playlists; master,
-  a video media playlist and a subtitle playlist were fetched successfully.
-- Clip: `https://kick.com/xqc/clips/clip_01M66HHJD5N91Z25HG2V10XM6Y`.
-  Extraction and its HLS media playlist succeeded, with one combined video stream.
-
-Signed media URLs/tokens are intentionally not recorded. The temporary harness
-was removed after execution. This is public HTTP/extractor evidence, not Android
-decoded playback, in-app UI, completed device download or real FCast receiver proof.
-The native caption/download instrumentation classes compile but were not run:
-no Android device was attached, and this host had no emulator binary or KVM.
-Host/controller checks covered filter transitions, external collection visible-tab
-selection and hidden-tab preference precedence; they do not substitute for device UI.
-
-The integrated `make ci` gate passed: fixture sanitation, build-source tests,
-style/dependency-order checks, complete app JVM/extractor offline suites,
-Android lint, and debug/release assembly. `assembleDebugAndroidTest` also passed.
-The host's composite-build lock script raised `OverlappingFileLockException`;
-verification used a temporary Gradle home reusing the existing caches, with the
-same global file lock held once around each invocation. Host configuration was
-not changed. No APK was installed and no application data was cleared.
-
-### Integration review follow-up — 2026-10-30
-
-Reviewing the integration on current `master` reproduced six failing regression
-cases: Clips and Featured could follow multi-page cursor cycles when consumers
-created fresh extractors; clip extraction ignored deleted/pruned/banned statuses
-and could ignore subscriber-only privacy when a public status was also present.
-Continuation pages now retain cursor history. Listings and direct playback use
-the same restriction predicates, including legacy recording metadata.
-All 202 Kick offline regression cases passed after those corrections.
-
-Two further controller regressions reproduced Clips choices reverting to date/all
-after parent refresh or saved-state reconstruction. The parent now captures a
-lightweight handler before clearing metadata and saves it independently of child
-fragments. Both tests exercise the real refresh/selection methods with controlled
-metadata and child destruction; they are not device UI or process-death evidence.
-
-The integration-review environment had a disposable API 26 x86_64 emulator.
-It exposed two assumptions missed by host-only conversion and compilation:
-the original bundled FFmpeg lacked MOV/MP4 input, and concat additionally needed
-the H.264 MP4-to-Annex-B filter. The converter now includes both for all four
-ABIs, with its wrapper/metadata unchanged and 16 KiB alignment retained for the
-64-bit binaries. See [the pinned build recipe](../app/libs/README.md).
-The rebuilt Android executable produced an 8.000313s MP4 with audio and video
-from the mapped fixture in a controlled binary-level check.
-
-The selected-caption failure test had incorrectly required `Player.onPlayerError`.
-The native engine instead reported the actual caption HTTP 404 through its load
-listener while audio/video decoding continued. That case now checks both the load
-failure and continued decoding; master/video failure assertions remain fatal.
-
-After the native corrections, the packaged app passed all **21 tests** in
-`Media3SourceEngineIntegrationTest` and `HlsDownloadIntegrationTest` on that
-disposable emulator. This includes TS/fMP4 mission completion, restored plans,
-decoded reopening, native captions, quality changes and genuine error paths.
-The JVM suites passed **1,250 app cases** and **935 extractor cases** with three
-pre-existing extractor skips and no failures. The phone installation was not
-used. These controlled results do not establish live-site or receiver behavior.
+The [recorded public extraction and emulator checks](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/services.md#public-extraction-follow-up--2026-10-30)
+identify the fixtures, environments and coverage for that build.
 
 ## Removed services
 
@@ -479,8 +344,7 @@ instance preferences and the saved search presets of the three services, and
 clears the selected service if it was a removed one. It tells the user once
 if a tab went or the selected service changed.
 
-Database rows that carry a retired id are not deleted. This is what the app
-does with them:
+Database rows with retired IDs remain stored.
 
 - Subscriptions, history entries, playlist entries and bookmarked playlists
   stay listed. Subscription headings identify the unavailable ID. Opening one shows
@@ -490,8 +354,7 @@ does with them:
   are not reported as errors on every refresh.
 - The channel and playlist pickers for main-page tabs do not offer them.
 - A subscription import leaves out channels of services the app does not have
-  and says how many it skipped. Without that, one such channel would fail the
-  whole import.
+  and reports the number skipped.
 
 Use `ServiceHelper.hasService` when checking whether a stored service ID is
 currently supported.
@@ -500,8 +363,8 @@ currently supported.
 
 - Give a new service the next unused ID in `ServiceList` and append it to
   the registration list.
-- The app side of a service is small: a theme in `styles_services.xml` and
-  `colors_services.xml` named after the service, an icon in
+- On the app side, add themes in `styles_services.xml`, colors in
+  `colors_services.xml`, an icon in
   `PvcServiceHelper`, a link filter in `AndroidManifest.xml`, and names for
   any new kiosk in `KioskTranslator`.
 - Themes resolved by `ThemeHelper` through `getIdentifier` need an explicit
@@ -514,17 +377,12 @@ currently supported.
   APK's resource table: a working debug theme does not prove release retention.
 - Tests are in
   `pvcpipe-extractor/extractor/src/test/java/org/schabi/newpipe/extractor/services/`,
-  one directory per service. Tests tagged `offline` run in `make ci`. The
-  others may contact the website. For Odysee the one class that does is
-  `OdyseeLiveTest`.
+  one directory per service. Tests tagged `offline` run in `make ci` with the mock
+  downloader. The regular `test` task can contact live websites.
 
 ```sh
 ./gradlew :pvcpipe-extractor:extractor:forkCiTest
-./gradlew :pvcpipe-extractor:extractor:test --tests '*services.rumble*'
-./gradlew :pvcpipe-extractor:extractor:test --tests '*services.bitchute*'
-./gradlew :pvcpipe-extractor:extractor:test --tests '*OdyseeLiveTest*'
-./gradlew :pvcpipe-extractor:extractor:test --tests '*services.kick*'
+./gradlew :pvcpipe-extractor:extractor:forkCiTest --tests '*services.kick*'
 ```
 
-An offline test shows that the code handles a recorded or made-up answer. It
-cannot show that a website still gives that answer.
+See [extractor test commands](building.md#tests) for downloader selection.

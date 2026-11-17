@@ -15,31 +15,23 @@
   A globally installed Gradle does not change the wrapper version. Initial builds
   also need access to the dependency repositories declared in the settings files.
 
-Toolchain and dependency versions are pinned in `gradle/libs.versions.toml`,
-`gradle-wrapper.properties` and the daemon JVM criteria files. Java language
-targets do not make every desktop JDK API available on Android; SDK APIs and
-core-library desugaring still determine runtime availability.
+The build scripts declare the compiler toolchains. The version catalogs,
+wrapper properties and daemon JVM criteria declare the other tool versions.
+Android API levels and core-library desugaring determine which Java APIs the
+app can use at runtime.
 
 ## Dependency integrity boundary
 
-Dependency coordinates are fixed in both version catalogs and the build
-scripts, but this repository does not currently enforce a complete resolved
-transitive dependency lock or Gradle dependency-verification allowlist. The
-wrapper distribution and vendored HLS converter have explicit SHA-256 checks;
-these do not authenticate every downloaded dependency, repository metadata,
-wrapper JAR or installed SDK/JDK. A lock fixes selected versions, not their bytes.
+The version catalogs and build scripts pin direct dependencies. SHA-256
+checks cover the Gradle distribution and the vendored HLS converter. Resolved
+transitive dependencies lack a complete lock and Gradle verification allowlist.
+Version locks fix selection, and verification checksums authenticate the bytes
+against reviewed values.
 
-The 2026-11-13 review did not establish dependency drift and did not change
-versions or enable a cache-derived strict policy. Before enabling enforcement,
-review initial checksums and their provenance, then validate the root app,
-`buildSrc`, included extractor and extractor standalone build. Include the
-release gate, Android test and restore-fixture compilation, and host-selected
-tools such as protoc. Review metadata for an explicitly supported host matrix
-rather than assuming one host's cache covers every platform. Automatically
-generated checksums are an initial trust decision, not independent proof of
-authenticity. Verify that a deliberately modified dependency is rejected in an
-isolated cache before enforcing the policy; do not bypass missing coverage with
-broad trusted-group exceptions.
+For dependency-verification work, review where initial checksums come from.
+Validate the app, build logic, composite and standalone extractor builds,
+instrumentation compilation and host-specific tools on the supported platforms.
+Use an isolated cache to verify that the policy rejects a modified dependency.
 
 ## Layout
 
@@ -49,7 +41,7 @@ broad trusted-group exceptions.
 | `pvcpipe-extractor/` | The `extractor` and `timeago-generator` Gradle projects; `timeago-parser/` supplies additional Java sources to `extractor`. |
 | `buildSrc/` | Shared version parsing and validation, regression tests, and `checkDependenciesOrder`. |
 | `checkstyle/` | The Checkstyle rules for the app. The extractor has its own in `pvcpipe-extractor/checkstyle/`. |
-| `docs/` | The guides and action plan listed in [README.md](README.md). |
+| `docs/` | The guides and verification records listed in [README.md](README.md). |
 
 `settings.gradle.kts` includes `pvcpipe-extractor` as a composite build and
 substitutes it for the app's `com.github.75ohmantenna:pvcpipe-extractor`
@@ -63,48 +55,20 @@ publishing step. This repository declares no publication workflow.
 make ci                        # every check below, then both APKs
 ```
 
-`make ci` verifies the converter artifact, runs the offline fixture-sanitizer
-and deletion-driver unit tests, and checks recorded fixtures for known captured identifiers. The deletion-driver
-tests substitute validation, native execution and shell calls; they never run ADB
-and do not establish Android deletion behavior. The two suites are named explicitly
-so a future device-dependent host suite is not silently included.
+`make ci` verifies the converter and checks recorded fixtures for known
+captured identifiers. It runs the two named Python suites. The deletion-driver
+suite substitutes validation, native execution and shell calls, so it runs
+without ADB.
 
-It then runs five serial Gradle invocations and stops at the first failure:
-static/build-logic checks, JVM tests, Android lint, the debug APK, then the release
-APK. Each invocation uses `--no-daemon` so compiler and lint memory is released
+The remaining stages run in order and stop on failure. They cover static
+and build-logic checks, JVM tests, Android lint, debug assembly and release
+assembly. Each invocation uses `--no-daemon` to release compiler and lint memory
 between stages.
 
-Run builds serially. `make ci` explicitly passes `--max-workers=1` in every
-Gradle invocation so user-home `gradle.properties` cannot raise the gate's
-worker count. Project `gradle.properties` defines the default worker and memory
-limits for ordinary builds, but user-home properties take precedence over those
-defaults; the gate does not override heap or metaspace settings.
-
-The sanitizer discovers identifiers across every recording on each invocation.
-Only a discovery pass with no replacement variants and no noncanonical cookies
-skips the second transformation/revalidation pass. Short and empty cookie values
-still require rewriting; binary request bodies still fail the CLI review gate.
-No clean-corpus result or parsed recording is cached between invocations.
-
-Offline fixture replay constructs one Gson parser per `MockDownloader`, without
-a static response cache. The SoundCloud privacy regression reuses downloaders
-by parent directory only within its test method; it still exercises all 13
-recordings and compares against the replay map's selected response.
-
-Before the explicit CI worker flag was added, a local comparison on 2026-10-30
-(second `make ci` run per revision, existing caches retained, no `clean`) measured:
-
-| Observation | Before | After |
-| --- | ---: | ---: |
-| Complete gate | 185.401 s | 129.023 s |
-| Fixture scan, median of three | 84.401 s | 31.299 s |
-
-These are incremental host observations, not cold-build or executed-test
-speedups. The forced SoundCloud replay request passed before and after but
-did not improve in elapsed time; it also reruns Gradle prerequisites. That
-comparison kept all five Gradle process boundaries, task coverage and project
-resource settings unchanged. Both APK variants passed assembly; no device test
-was run.
+`make ci` sets `--max-workers=1` on each Gradle invocation. Ordinary builds
+use the worker and memory defaults in `gradle.properties`, with user-home
+properties taking precedence. The gate also uses the configured heap and
+metaspace settings.
 
 | Task | What it does |
 | --- | --- |
@@ -127,10 +91,10 @@ runner redirects output to a unique temporary file, enforces a 30-second wait,
 and terminates/reaps the child and removes the file on failure or interruption.
 Controlled JVM child fixtures cover normal/nonzero exits, verbose output, timeout
 and interruption; they do not prove packaged Android executable compatibility.
-The checked-in converter AAR supplies MPEG-TS and MP4 input plus the H.264
-framing filter needed by concat. `make ci` checks its pinned checksum; the
-[native build recipe](../app/libs/README.md) records source revisions, NDK,
-enabled components and per-ABI hashes. Ordinary builds do not require an NDK.
+The checked-in converter AAR supplies MPEG-TS, fragmented MP4 and raw ADTS
+input, plus the H.264 framing filter needed by concat. `make ci` checks its
+pinned checksum. Ordinary builds use the prebuilt artifact. See the
+[native build recipe](../app/libs/README.md) for rebuilding with the pinned NDK.
 
 APKs are written under `app/build/outputs/apk/`:
 
@@ -202,31 +166,8 @@ for the intended user and verify their absence. Compare the original app's
 package/version/update metadata before and after; this does not inspect or prove
 the contents of its private data.
 
-### Isolated Pixel verification (2026-11-13)
-
-The native timeout test passed on Pixel 6a/Android 17 (API 37); its exact scope
-and result are recorded in [download-preparation.md](download-preparation.md#native-timeout-lifecycle-follow-up-2026-11-13).
-Default debug package/provider identity was checked in the merged manifest.
-Invalid verification identifiers and combining verification with the restore
-fixture both failed at build configuration as intended. Checkstyle and ktlint
-passed. The explicit device run emitted completion markers; absent opt-in emitted
-none, and partial opt-in failed before fixture setup.
-
-A separately identified, signed, non-debuggable 0.2.7 release with a fresh suffix completed
-R8 optimization and resource shrinking. On the same Pixel it cold-launched and
-rendered its main Live tab after the disposable app's notification request was
-declined. No media was played or downloaded. Another app then became foreground;
-the verification process and its paused Main activity remained alive, with no
-AndroidRuntime errors in that process's captured stream. Verification did not
-reclaim focus, so About navigation was not checked. This is limited optimized
-startup/UI evidence, not full extractor, playback, Android decoding or every
-R8-sensitive feature coverage.
-
-All three newly installed verification packages were removed for the test user
-and their absence verified. The original package set and normal app's code path,
-version and update time matched the preflight snapshot. Private user-app data
-was not read or compared. No pre-existing package was updated or removed, no
-permission was granted, and no global device setting was changed.
+[Recorded Pixel verification](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/building.md#isolated-pixel-verification-2026-11-13)
+covers the isolated debug configuration and a separately signed release startup.
 
 ## Release signing
 
@@ -312,7 +253,7 @@ Build native tests without installing them:
 ```
 
 Use a disposable emulator for Gradle-managed instrumentation. In this checkout,
-`connectedDebugAndroidTest` was observed uninstalling both debug packages after
+`connectedDebugAndroidTest` was observed uninstalling the debug app and its instrumentation package after
 testing. Reinstalling an APK cannot recover private data deleted by uninstall.
 The [dated incident](https://github.com/75ohmantenna/pvcpipe/blob/d9f00de9f26353e0f0d6a4bf68c2a4c2f5a678d2/docs/local-playlist-mutations.md) is retained in Git history.
 
@@ -367,12 +308,10 @@ or a general Cloudflare bypass. Build APKs separately with
 the selected emulator/package/signatures before installation. Do not set the
 restore-fixture property for these classes.
 
-For Rumble reliability changes, run `forkCiTest --tests '*services.rumble*'`
-through the root composite task path above, never the live-default extractor
-`test` task or REC mode. Keep bounded fresh GET-only research, Android UI/decoder
-checks, controlled completed downloads and real FCast receiver evidence separate.
-Public media probes are limited to 4 KiB ranges under the current research scope;
-a completed public recording/audio download requires separate authorization.
+For offline Rumble verification, run
+`./gradlew :pvcpipe-extractor:extractor:forkCiTest --tests '*services.rumble*'`.
+Report Android decoding, completed downloads, live HTTP and physical-receiver
+results with the build and environment used for each check.
 
 ## Controlled validation tools
 
@@ -403,7 +342,7 @@ logs and distinguish JVM, controlled peers, emulator and actual hardware results
 Use Android Studio App Inspection or `adb run-as` on a disposable debug app for
 network, database and layout inspection. Network inspection does not cover every
 native socket or WebView stack. Do not edit preferences behind running caches or
-share captured cookies/private data. Stetho and `dumpapp` have been removed.
+share captured cookies or private data.
 
 OMP configuration is in `.omp/config.yml`; machine-specific LSP settings belong
 in the ignored `.omp/lsp.json`. JDT LS imports Android through
@@ -430,12 +369,9 @@ nor a successful server launch replace `make ci` or cross-file lookup checks.
 
 ## Saved state
 
-Fragments, activities and dialogs save their state by hand in Android
-`Bundle`s. The app once used an annotation processor for this. The keys it
-generated are still read, so state saved by an older build survives an
-update. `DownloadDialogSavedStateTest` and `SearchFragmentSavedStateTest`
-exercise restoration through those older keys.
-
-`org.schabi.newpipe.util.StateSaver` is something else. It keeps large list
-state out of the `Bundle`, in memory across a configuration change and on
-disk otherwise.
+Fragments, activities and dialogs explicitly save state in Android bundles.
+`DownloadDialogSavedStateTest` and `SearchFragmentSavedStateTest` verify
+that their older generated keys are still read. Channel tabs save a compact
+fallback in the bundle and use `StateSaver` for a full handler when available.
+`StateSaver` keeps larger state in memory across a configuration change or
+serializes it to private cache.

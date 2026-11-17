@@ -12,8 +12,8 @@
   `buildSrc/src/main/kotlin/PvcVersion.kt` computes and validates the Android code.
 - Read `app/build.gradle.kts` for SDK levels, application IDs, packaging and signing,
   and `settings.gradle.kts` for the bundled extractor's composite-build substitution.
-- `Makefile` defines the local release gate: run `make ci` before committing a
-  release. Instrumentation is separate and subject to the safety rules below.
+- `Makefile` defines the local gate. Run `make ci` before pushing. Follow the
+  device-test rules below when running instrumentation.
 - `docs/README.md` separates current guides from dated observations. Historical
   failures and hardware results stay historical; add dated follow-ups rather
   than claiming older runs verify newer code.
@@ -22,13 +22,14 @@
   Follow `docs/playback.md` and `app/src/main/java/org/schabi/newpipe/player/cast/`.
 - Verify significant behavior by running the changed path. Distinguish controlled
   protocol peers and emulator results from real receiver/hardware evidence.
-- Playback audit findings 4–5 and the equal-index history snapshot race have
-  controlled JVM-verified ownership corrections; see `docs/playback.md` under
-  "Recovery during pending navigation", "Initial cast preparation ownership"
-  and "Equal-index history snapshot ownership". The later "Cast synchronization
-  liveness" correction retries coherent source metadata after synchronization.
-  Keep dated audit observations and mocked JVM evidence separate from current
-  guarantees and real engine/device/receiver scheduling.
+- Playback recovery, history and FCast source preparation depend on the exact
+  queue occurrence. Follow the [ownership rules in the playback guide](docs/playback.md#recovery-during-pending-navigation).
+
+## Commits
+
+- Load and follow `/home/user/.codex/skills/commit-conventions/SKILL.md` before
+  preparing, creating, amending, rewriting or verifying commit messages or
+  pull-request merge messages.
 
 ## RTK shell commands
 

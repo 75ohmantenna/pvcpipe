@@ -5,8 +5,7 @@ import io.reactivex.rxjava3.core.Single
 import java.io.Closeable
 
 /**
- * This interface was created to allow for multiple methods to generate poTokens in the future (e.g.
- * via WebView and via a local DOM implementation)
+ * Generates proof tokens using the integrity data from one session.
  */
 interface PoTokenGenerator : Closeable {
     /**

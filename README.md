@@ -11,13 +11,13 @@
 
 </div>
 
-PVCPipe stores your subscriptions, playlists and history on your device, and
-groups your subscriptions by site in a list or a grid. It is a fork of
+PVCPipe stores subscriptions, playlists and playback history on your device.
+Browse subscriptions by site in a list or grid. PVCPipe is a fork of
 [BravePipe](https://github.com/bravepipeproject/BravePipe), which is based on
 [NewPipe](https://github.com/TeamNewPipe/NewPipe).
 
 > [!NOTE]
-> PVCPipe is still in development. Expect bugs and changes in site support.
+> PVCPipe is in development. Playback depends on the site, item and network.
 
 ## Supported sites
 
@@ -30,6 +30,8 @@ groups your subscriptions by site in a list or a grid. It is a fork of
 | [Odysee](https://odysee.com/) | ✓ | ✓ | ✓ |
 | [Kick](https://kick.com/) | ✓ | | ✓ |
 
+See the [service guide](docs/services.md) for supported links and features.
+
 ## Casting
 
 Cast videos to [FCast](https://fcast.org/) receivers on your local network. Use
@@ -38,6 +40,11 @@ controls then operate playback on the receiver. See
 [setup and limits](docs/playback.md#fcast-video-casting).
 
 PVCPipe is independent of FUTO. FCast is a registered trademark of FUTO.
+
+## Building
+
+See the [build guide](docs/building.md) for requirements and commands. The
+[documentation index](docs/README.md) links to the other project guides.
 
 ## License
 

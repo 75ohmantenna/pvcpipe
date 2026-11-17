@@ -1,19 +1,18 @@
 # Settings import fixtures
 
-The ZIP files are synthetic backup archives for settings-import tests. They
-contain no user backup data. Their names describe the entries:
+The ZIP files are synthetic backup archives for settings-import tests.
+Filename components identify the entries.
 
-- `db` or `nodb`: whether `newpipe.db` is in it.
-- `ser`, `vulnser` or `noser`: whether `newpipe.settings` holds ordinary
-  serialized preferences, an injection payload, or is missing.
-- `json` or `nojson`: whether `preferences.json` is in it.
+- `db` and `nodb` mark the presence or absence of `newpipe.db`.
+- `ser`, `vulnser` and `noser` mark ordinary serialized preferences, an
+  injection-test payload or an absent `newpipe.settings`, respectively.
+- `json` and `nojson` mark the presence or absence of `preferences.json`.
 
-The standalone `newpipe.db` is a text placeholder, not a SQLite database.
+The standalone `newpipe.db` is a text placeholder.
 `BackupRestoreFailureTest` packs it into archives built during the test, and
-`ImportExportManagerTest` compares its text after export. Those controlled
-rollback/preparation and archive-copy tests do not establish that SQLite can
-open that payload; those tests explicitly inject a no-op database validator.
-`BackupValidationTest` separately creates real SQLite candidates from exported
+`ImportExportManagerTest` compares its text after export. These tests use
+a no-op database validator to exercise rollback, preparation and archive copying.
+`BackupValidationTest` creates SQLite candidates from exported
 Room schemas (versions 2–9), plus a version-1 fixture derived from migration
 inputs. It uses the production validator, Room and native host SQLite under
-Robolectric; these are JVM results, not device observations.
+Robolectric.

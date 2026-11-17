@@ -62,46 +62,8 @@ selection, active-live manifest choice or the existing FCast controls. JVM
 construction and controlled peers are separate evidence from decoded Android
 playback, completed public downloads and real receiver/segment access.
 
-### 2026-11-03 verification follow-up
-
-The rebuilt 0.2.4 checkout passed `make ci`, the 171-case offline Rumble gate,
-and the 241-case targeted app regression selection. This includes real extractor
-replay through serialized queue/library URLs and timestamp service-intent consumers,
-AAC selection/download preparation/exact recovery, and controlled cast/HLS/range peers.
-
-On a newly created, empty API-35 x86_64 emulator (`sdk_gphone64_x86_64`,
-`emulator-5580`), matching debug/test signing was verified before installation.
-Only direct instrumentation with the ordinary AndroidJUnitRunner was used:
-
-| Selected suite | Passed | Failed |
-| --- | ---: | ---: |
-| PlaybackSourcesIntegrationTest | 11 | 0 |
-| Media3SourceEngineIntegrationTest | 16 | 1 |
-| HlsDownloadIntegrationTest | 4 | 0 |
-
-`kickNativeMasterDecodesBothLanguagesAndKeepsCaptionsAcrossSeekAndQualityChange`
-timed out preparing its controlled source. It was not rerun or counted as a pass.
-The completed controlled HLS download/postprocessing scenarios are not completed
-public Rumble downloads or AAC-file transfer proof.
-
-The actual debug app rendered public VOD and Short frames and an active live
-frame from `v7hs29o-live-from-rumble-studio.html`. The earlier `v7hrvsa` sample
-had become recorded content by the Android run; a separately selected
-`v7hr9m2` premium item correctly showed the paid-content error. No entitlement
-bypass was attempted. Player logs showed decoded video sizes and playing/buffering
-transitions; repeated buffering, slow initialization and a System UI ANR prevent
-a smooth-playback or general device guarantee. A full-watch history entry
-reopened after process restart with an empty app info cache and retained its slug.
-A non-Rumble comparison using YouTube `jNQXAC9IVRw` remained on its loading surface
-within the observation window and was stopped; it is not a successful playback
-comparison or evidence that Rumble-specific code caused the delay.
-
-Manual timestamp seeking without a duplicate queue entry, live-quality switching,
-sidecar caption selection, background audio, and a device playlist round-trip
-were not established by this run. Their deterministic consumer tests are separate
-evidence. Real receiver decoding/control/segment access and a completed public
-download remain unverified; no real FCast receiver was available, and the public
-download scope allowed only bounded range probes. The physical phone was untouched.
+[Recorded 0.2.4 Rumble verification](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/playback.md#2026-11-03-verification-follow-up)
+includes the controlled emulator results and the public streams exercised.
 
 ## Seek interval settings
 
@@ -244,9 +206,10 @@ completion does not automatically replay the video.
 callbacks to it; connection generations discard stale events. The SDK supports
 v2/v3 and secure v4, with different acknowledgement, startup-pause and end-event
 policies. Source echoes or playback evidence are not proof of receiver decoding.
-Paused startup enforces the sender's latest explicit intent rather than adopting
-the SDK's synthetic Playing callback. Initial source-start ordering remains
-[deferred work](README.md#action-plan).
+Paused startup follows the sender's latest explicit intent, including when
+the SDK sends a synthetic Playing callback. See
+[cast synchronization](#cast-synchronization-liveness) for load ownership and
+[open verification](README.md#open-verification) for receiver coverage.
 
 Sources needing stable headers or manifests use a per-cast HTTP proxy. Its
 allowlisted token routes, worker/manifest/route budgets and header deadlines
@@ -413,7 +376,7 @@ keeps the engine versions and observed callback evidence separate.
 
 ### Recovery during pending navigation
 
-`Player.setRecovery()` now captures a position only when the engine's current
+`Player.setRecovery()` captures a position only when the engine's current
 media-item tag carries a `LoadedMediaSource` whose `getStream()` is the selected
 `PlayQueueItem` instance. URL equality, matching numerical indices and
 `currentItem` are not ownership evidence. Missing or mismatched source ownership
@@ -518,18 +481,19 @@ list in `PlayerBroadcasts`, or the receiver never gets it.
 ## Errors
 
 [`PlaybackErrors`](../app/src/main/java/org/schabi/newpipe/player/error/PlaybackErrors.java)
-sorts ExoPlayer's error codes by what the player does about them: restart at
-the live edge, skip the stream, reload, or shut down. `Player.onPlayerError`
+sorts ExoPlayer's error codes by what the player does about them. It can
+restart at the live edge, skip the stream, reload, or shut down. `Player.onPlayerError`
 carries that out and reports errors that recovery does not handle.
 
-When local Media3 playback reports HTTP 403 or 410 for an HTTPS YouTube
-media or manifest path on `googlevideo.com` or a subdomain, PVCPipe can
-refresh the selected queue occurrence once. It bypasses that stream's cached
-extraction, keeps the play/pause setting, and restores the on-demand position
-or the live default position. A refused replacement follows the usual
-playback error path. An active FCast receiver keeps its own clock and playback
-when this error comes from the local engine. Receiver-side failures and
-YouTube data-API errors have their existing handling.
+HTTP 403 or 410 from a local Media3 HTTPS request to `googlevideo.com`
+or a subdomain can trigger one fresh extraction for the active, selected
+YouTube queue occurrence. Eligible paths are `/videoplayback`, its subpaths
+and `/api/manifest/` subpaths. The retry bypasses cached extraction,
+preserves play/pause intent and restores on-demand progress or the live
+default position. Further refusals after replacement follow normal playback
+error handling. A receiver that owns the selected occurrence's clock keeps
+playing when the local engine encounters this refusal. YouTube data-API
+refusals use [separate handling](error-reporting.md#youtube-api-refusal-feedback).
 
 ## Listeners
 
@@ -580,5 +544,5 @@ tried.
 engine, session, history and controlled-receiver checks; inspect their guards and
 [device safety](building.md#testing-on-an-existing-installation) first. A protocol
 acknowledgement, passing mock or assembled APK does not establish receiver picture,
-audio, cold startup or automotive UI. See [the action plan](README.md#action-plan)
+audio, cold startup or automotive UI. See [open verification](README.md#open-verification)
 for deferred and hardware-dependent verification.

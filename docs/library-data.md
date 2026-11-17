@@ -43,11 +43,10 @@ their cold replay still depends on the HTML embed lookup and can be challenged.
 Database stream identity is `(service_id, url)`, so an old bare link and a newly
 resolved full link can coexist rather than being guessed into one history row.
 
-On 2026-11-03, the disposable debug emulator's Rumble history entry reopened after
-a process restart using its full slugged watch URL with an empty app info cache;
-fresh title/view metadata loaded. Separate JVM tests replay serialized
-`PlayQueueItem` URLs and `StreamEntity.toStreamInfoItem()` URLs after evicting
-resolver state. A manual device playlist round-trip was not established.
+Offline tests exercise queue and library URL replay after resolver-cache
+eviction. The
+[recorded Rumble playback check](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/playback.md#2026-11-03-verification-follow-up)
+covers reopening history after a process restart.
 
 A permanent thumbnail stores a stream ID, not an independent image copy.
 `StreamDAO.deleteOrphans` preserves streams referenced by history, playlist
@@ -135,10 +134,8 @@ ordinary stream/channel notifications use stable tags, so their URL-derived
 numeric IDs cannot overwrite an untagged foreground slot. Existing notifications
 from older versions may remain untagged until Android dismisses them.
 
-The 2026-11-13 regression tests exercise queued events, reentrant acknowledgment,
-group changes, canceled refresh draining, cached results, and notification-ID
-collisions in controlled JVM/Robolectric tests. This is not verification of
-Android's real foreground-service/WorkManager scheduling on a physical device.
+JVM/Robolectric tests cover the queued events, group changes, canceled refresh
+draining and notification-ID collisions with controlled executors and callbacks.
 
 `FeedLoadManager` builds the refresh and does its loading and storing. It
 leaves out subscriptions of services the app does not have, and it uses a
@@ -183,15 +180,13 @@ groups. Custom groups can still contain channels from multiple services.
 Subscriptions from retired or unknown services remain grouped by their original
 IDs. Their headings use the translatable format **Unavailable service (ID %1$d)**
 with the actual stored ID, so different unavailable services remain distinguishable.
-The new format has a default-English resource; its number is formatted using the
-bound view's UI resource locale. Supported services retain their registered names.
-The shared service-name helper's `<unknown>` fallback in other screens is unchanged.
+The format uses the bound view's resource locale for the ID. Supported services
+use their registered names.
 
 Headers resolve service labels when bound, expose accessibility-heading metadata
 through AndroidX compatibility APIs, and wrap without a two-line ellipsis limit.
 The same heading metadata applies to the general Subscriptions section title.
-These changes affect presentation only; section ordering, channel IDs and stored
-subscription data are unchanged. The empty list retains its import/export hint.
+The empty list offers an import/export hint.
 
 ## Subscription import and export
 
@@ -210,8 +205,9 @@ in the background and show its progress in a notification.
   batch, not the batches stored before it. Import updates existing
   subscriptions as well as inserting new ones; a successful count is the
   number of successful channel lookups, including updates.
-- An export takes a snapshot of the subscriptions and writes it to the
-  document the user chose.
+- For YouTube Takeout, select the ZIP archive or its subscription CSV. ZIP
+  import checks CSV entries in order and uses the first with subscriptions.
+- Export snapshots the subscriptions and writes them to the chosen document.
 - A source that cannot be opened, an import where every channel lookup
   fails, and a write that fails come back as `Outcome.Failure`.
   Cancellation propagates to the worker. An empty source, or one containing
@@ -379,6 +375,5 @@ also change compatibility.
 host SQLite, while fragment/rendering and persistence adapters may be controlled
 substitutes. Native suites and host drivers remain separate; see
 [building.md](building.md#controlled-validation-tools) and inspect isolation before
-execution. Backups do not include downloaded media or pending/finished download
-state, and neither process-interruption tests nor host filesystem sync establish
-arbitrary device power-loss durability.
+execution. A process-interruption test does not establish durability under
+device power loss.
