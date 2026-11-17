@@ -8,6 +8,8 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
+import org.schabi.newpipe.extractor.exceptions.ParsingException;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -21,9 +23,16 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("offline")
 class SoundcloudClientDiscoveryTest {
     private static final String ID = "0123456789abcdef0123456789abcdef";
+    private static final String ASSET = "https://a.sndcdn.com/assets/app.js";
+    private static final String STALE_ASSET = "https://a.sndcdn.com/assets/stale.js";
     private final List<String> requests = new ArrayList<>();
     private String mobile = page("{\"runtimeConfig\":{\"clientId\":\"" + ID + "\"}}");
     private int status = 200;
+    private int desktopStatus = 200;
+    private int assetStatus = 206;
+    private Integer staleAssetStatus;
+    private int resolveStatus = 200;
+    private String resolveBody = "{\"id\":123,\"policy\":\"ALLOW\"}";
     private IOException failure;
 
     private static String page(final String json) {
@@ -43,15 +52,25 @@ class SoundcloudClientDiscoveryTest {
                     }
                     return new Response(status, "", Map.of(), mobile, request.url());
                 }
-                final String body;
                 if (request.url().equals("https://soundcloud.com")) {
-                    body = "<script src='https://a.sndcdn.com/assets/app.js'></script>";
-                } else if (request.url().equals("https://a.sndcdn.com/assets/app.js")) {
-                    body = "var config={unused:0,client_id:\"" + ID + "\"};";
-                } else {
-                    throw new AssertionError("Unexpected request: " + request.url());
+                    String body = "<script src='" + ASSET + "'></script>";
+                    if (staleAssetStatus != null) {
+                        body += "<script src='" + STALE_ASSET + "'></script>";
+                    }
+                    return new Response(desktopStatus, "", Map.of(), body, request.url());
                 }
-                return new Response(200, "", Map.of(), body, request.url());
+                if (request.url().equals(ASSET)) {
+                    return new Response(assetStatus, "", Map.of(),
+                            "var config={unused:0,client_id:\"" + ID + "\"};", request.url());
+                }
+                if (request.url().equals(STALE_ASSET) && staleAssetStatus != null) {
+                    return new Response(staleAssetStatus, "", Map.of(),
+                            "var config={unused:0,client_id:\"wrong\"};", request.url());
+                }
+                if (request.url().startsWith("https://api-v2.soundcloud.com/resolve?")) {
+                    return new Response(resolveStatus, "", Map.of(), resolveBody, request.url());
+                }
+                throw new AssertionError("Unexpected request: " + request.url());
             }
         });
     }
@@ -98,6 +117,52 @@ class SoundcloudClientDiscoveryTest {
     void errorResponseCannotSupplyAnId() throws Exception {
         status = 503;
         assertFallback();
+    }
+
+    @Test
+    void failedDesktopPageDoesNotSelectScriptsFromItsBody() {
+        status = 404;
+        desktopStatus = 503;
+        final var error = assertThrows(HttpResponseException.class,
+                SoundcloudParsingHelper::clientId);
+        assertEquals(503, error.responseCode());
+        assertEquals(2, requests.size());
+    }
+
+    @Test
+    void removedBundleDoesNotHideWorkingPartialResponse() throws Exception {
+        status = 404;
+        staleAssetStatus = 410;
+        assertEquals(ID, SoundcloudParsingHelper.clientId());
+        assertEquals(List.of(STALE_ASSET, ASSET), requests.subList(2, 4));
+    }
+
+    @Test
+    void failedBundleCannotSupplyOrCacheAnId() throws Exception {
+        status = 404;
+        assetStatus = 503;
+        final var error = assertThrows(HttpResponseException.class,
+                SoundcloudParsingHelper::clientId);
+        assertEquals(503, error.responseCode());
+
+        assetStatus = 206;
+        assertEquals(ID, SoundcloudParsingHelper.clientId());
+    }
+
+    @Test
+    void apiResolvePreservesHttpErrorsAndStillParsesSuccessfulBodies() throws Exception {
+        final String url = "https://soundcloud.com/fixture/track";
+        resolveStatus = 403;
+        final var error = assertThrows(HttpResponseException.class,
+                () -> SoundcloudParsingHelper.resolveFor(NewPipe.getDownloader(), url));
+        assertEquals(403, error.responseCode());
+
+        resolveStatus = 200;
+        assertEquals(123, SoundcloudParsingHelper.resolveFor(NewPipe.getDownloader(), url)
+                .getInt("id"));
+        resolveBody = "<html>Invalid JSON</html>";
+        assertThrows(ParsingException.class,
+                () -> SoundcloudParsingHelper.resolveFor(NewPipe.getDownloader(), url));
     }
 
     @Test

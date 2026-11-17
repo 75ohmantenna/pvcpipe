@@ -21,6 +21,7 @@ import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException
 import org.schabi.newpipe.extractor.exceptions.ExtractionException
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException
 import org.schabi.newpipe.extractor.exceptions.PaidContentException
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
@@ -259,7 +260,8 @@ class ErrorInfo private constructor(
                             }
                         }
 
-                        cause is Loader.UnexpectedLoaderException && cause.cause is ExtractionException ->
+                        cause is Loader.UnexpectedLoaderException &&
+                            (cause.cause is ExtractionException || cause.cause is HttpResponseException) ->
                             getMessage(cause.cause, action, serviceId)
 
                         throwable.type == ExoPlaybackException.TYPE_SOURCE ->
@@ -340,6 +342,17 @@ class ErrorInfo private constructor(
                     } else {
                         ErrorMessage(R.string.too_many_requests, getServiceName(serviceId), serviceNameFirst = true)
                     }
+
+                throwable is HttpResponseException ->
+                    if (throwable.responseCode() == 403 && serviceId == YouTube.serviceId) {
+                        ErrorMessage(R.string.youtube_api_http_403)
+                    } else {
+                        ErrorMessage(R.string.extractor_http_invalid_status, throwable.responseCode().toString())
+                    }
+
+                throwable is ExtractionException &&
+                    (throwable.cause is HttpResponseException || throwable.cause is RequestBlockedException) ->
+                    getMessage(throwable.cause, action, serviceId)
 
                 // test this at the end as many exceptions could be a subclass of IOException
                 throwable != null && throwable.isNetworkRelated ->

@@ -50,10 +50,12 @@ import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
 import org.schabi.newpipe.extractor.exceptions.PaidContentException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.exceptions.YoutubeMusicPremiumContentException;
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
@@ -1027,18 +1029,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
         if (previous == null) {
             return current;
         }
-        // A restriction returned by a player is more informative than another client's
-        // transport error or malformed response. Keep the first equally specific error.
-        final boolean previousRestriction = previous instanceof ContentNotAvailableException
-                || previous instanceof SignInConfirmNotBotException;
-        final boolean currentRestriction = current instanceof ContentNotAvailableException
-                || current instanceof SignInConfirmNotBotException;
-        final boolean moreSpecific = previous.getClass() == ContentNotAvailableException.class
-                && currentRestriction && current.getClass() != ContentNotAvailableException.class;
-        final boolean moreInformativeRefusal = current instanceof RequestBlockedException
-                && !(previous instanceof RequestBlockedException) && !previousRestriction;
-        if ((currentRestriction && !previousRestriction)
-                || moreSpecific || moreInformativeRefusal) {
+        if (playerFailurePriority(current) > playerFailurePriority(previous)) {
             current.addSuppressed(previous);
             return current;
         }
@@ -1046,6 +1037,22 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             previous.addSuppressed(current);
         }
         return previous;
+    }
+
+    private static int playerFailurePriority(final Exception failure) {
+        // Prefer explicit content restrictions, then server refusals and other HTTP errors.
+        // Keep the first among equally informative failures.
+        if (failure instanceof ContentNotAvailableException
+                || failure instanceof SignInConfirmNotBotException) {
+            return failure.getClass() == ContentNotAvailableException.class ? 4 : 5;
+        }
+        if (failure instanceof RequestBlockedException || failure instanceof ReCaptchaException) {
+            return 3;
+        }
+        if (failure instanceof HttpResponseException httpFailure) {
+            return httpFailure.responseCode() == 403 || httpFailure.responseCode() == 429 ? 2 : 1;
+        }
+        return 0;
     }
 
     private static void checkPlayableResponse(@Nullable final JsonObject response,

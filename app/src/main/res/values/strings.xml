@@ -217,6 +217,8 @@
     <!-- error strings -->
     <string name="general_error">Error</string>
     <string name="network_error">Network error</string>
+    <string name="extractor_http_invalid_status">The server returned HTTP %1$s while loading data.</string>
+    <string name="youtube_api_http_403">YouTube refused the data request (HTTP 403). Wait before retrying, or try another network.</string>
     <string name="could_not_load_thumbnails">Could not load all thumbnails</string>
     <string name="parsing_error">Could not extract the requested information</string>
     <string name="content_not_available">Content unavailable</string>

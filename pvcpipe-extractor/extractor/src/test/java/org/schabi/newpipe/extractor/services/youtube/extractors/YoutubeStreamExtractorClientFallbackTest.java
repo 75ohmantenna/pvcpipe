@@ -14,6 +14,7 @@ import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException;
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException;
 import org.schabi.newpipe.extractor.exceptions.RequestBlockedException;
@@ -401,6 +402,34 @@ class YoutubeStreamExtractorClientFallbackTest {
         assertTrue(!failure.getMessage().contains("fixture-secret"));
     }
 
+    @Test
+    void ordinary403TakesPrecedenceOverServerErrorInEitherOrder() {
+        for (final int androidStatus : List.of(403, 503)) {
+            final PlayerFixtures fixtures = new PlayerFixtures();
+            fixtures.androidStatus = androidStatus;
+            fixtures.visionStatus = androidStatus == 403 ? 503 : 403;
+            final var failure = assertThrows(HttpResponseException.class, () -> fetch(fixtures));
+            assertEquals(403, failure.responseCode());
+            assertEquals(503, ((HttpResponseException) failure.getSuppressed()[0]).responseCode());
+        }
+    }
+
+    @Test
+    void httpFailureStillAllowsPlayableAlternateClient() throws Exception {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.androidStatus = 403;
+        fixtures.vision = playable(ID, "Vision fallback", "vision");
+        assertEquals("Vision fallback", fetch(fixtures).getName());
+    }
+
+    @Test
+    void explicitRestrictionTakesPrecedenceOverOrdinary403() {
+        final PlayerFixtures fixtures = new PlayerFixtures();
+        fixtures.androidStatus = 403;
+        fixtures.vision = unavailable("UNPLAYABLE", "Video unavailable");
+        assertThrows(ContentNotAvailableException.class, () -> fetch(fixtures));
+    }
+
     private static YoutubeStreamExtractor fetch(final PlayerFixtures fixtures) throws Exception {
         NewPipe.init(fixtures);
         final YoutubeStreamExtractor extractor = (YoutubeStreamExtractor) ServiceList.YouTube
@@ -439,6 +468,8 @@ class YoutubeStreamExtractorClientFallbackTest {
         private int metadataRequests;
         private boolean androidBlocked;
         private boolean visionBlocked;
+        private int androidStatus = 200;
+        private int visionStatus = 200;
         private boolean watchBlocked;
         private boolean interruptWatch;
 
@@ -456,6 +487,9 @@ class YoutubeStreamExtractorClientFallbackTest {
             }
             if (url.contains("/reel/reel_item_watch?")) {
                 androidRequests++;
+                if (androidStatus != 200) {
+                    return new Response(androidStatus, "", Map.of(), null, request.url());
+                }
                 if (android == null) {
                     throw new IOException("ANDROID fixture unavailable");
                 }
@@ -480,6 +514,9 @@ class YoutubeStreamExtractorClientFallbackTest {
                     visionRequests++;
                     if (visionBlocked) {
                         return blocked(request);
+                    }
+                    if (visionStatus != 200) {
+                        return new Response(visionStatus, "", Map.of(), null, request.url());
                     }
                     if (vision == null) {
                         throw new IOException("VISIONOS fixture unavailable");

@@ -1,5 +1,7 @@
 package org.schabi.newpipe.extractor.downloader;
 
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Collections;
@@ -55,6 +57,20 @@ public class Response {
     @Nonnull
     public String latestUrl() {
         return latestUrl;
+    }
+
+    /**
+     * Require a successful HTTP response before consuming the body.
+     *
+     * @return this response
+     * @throws HttpResponseException if the status is outside the 2xx range
+     */
+    @Nonnull
+    public Response ensureSuccessResponseCode() throws HttpResponseException {
+        if (responseCode < 200 || responseCode >= 300) {
+            throw new HttpResponseException(responseCode);
+        }
+        return this;
     }
 
     /*//////////////////////////////////////////////////////////////////////////

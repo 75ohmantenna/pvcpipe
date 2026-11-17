@@ -135,7 +135,10 @@ input/output pair for regression coverage.
 
 SoundCloud is audio only. Client-ID discovery tries the mobile runtime config
 then desktop scripts; a mobile socket timeout permits fallback, other interrupted
-I/O stops it. The result is cached in memory. Account import reads public follows.
+I/O stops it. Desktop discovery can continue past a failed script response and
+accepts successful partial responses. The result is cached in memory. Response
+parsers in the shared API helpers preserve HTTP failures before parsing their
+bodies. Account import reads public follows.
 API-ID extraction accepts track prefixes; non-track API resources and lookalike
 hosts are rejected before downloader access. Web/short links can require widget
 resolution. Read [the soundcloud implementation](../pvcpipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/soundcloud/linkHandler/) before changing URL acceptance.

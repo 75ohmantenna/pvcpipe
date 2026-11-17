@@ -21,6 +21,7 @@ import org.schabi.newpipe.extractor.channel.ChannelInfoItemsCollector;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.localization.DateWrapper;
@@ -134,7 +135,7 @@ public final class SoundcloudParsingHelper {
             // The desktop site's asset discovery remains available if mobile discovery fails.
         }
 
-        final Response download = dl.get("https://soundcloud.com");
+        final Response download = dl.get("https://soundcloud.com").ensureSuccessResponseCode();
         final String responseBody = download.responseBody();
         final String clientIdPattern = ",client_id:\"(.*?)\"";
 
@@ -146,20 +147,28 @@ public final class SoundcloudParsingHelper {
 
         final var headers = Map.of("Range", List.of("bytes=0-50000"));
 
+        HttpResponseException assetFailure = null;
         for (final Element element : possibleScripts) {
             final String srcUrl = element.attr("src");
             if (!isNullOrEmpty(srcUrl)) {
                 try {
                     clientId = Parser.matchGroup1(clientIdPattern, dl.get(srcUrl, headers)
-                            .responseBody());
+                            .ensureSuccessResponseCode().responseBody());
                     return clientId;
                 } catch (final RegexException ignored) {
                     // Ignore it and proceed to try searching other script
+                } catch (final HttpResponseException e) {
+                    // Another bundle can still supply a usable client ID.
+                    if (assetFailure == null) {
+                        assetFailure = e;
+                    }
                 }
             }
         }
 
-        // Officially give up
+        if (assetFailure != null) {
+            throw assetFailure;
+        }
         throw new ExtractionException("Couldn't extract client id");
     }
 
@@ -191,7 +200,7 @@ public final class SoundcloudParsingHelper {
 
         try {
             final String response = downloader.get(apiUrl, SoundCloud.getLocalization())
-                    .responseBody();
+                    .ensureSuccessResponseCode().responseBody();
             return JsonParser.object().from(response);
         } catch (final JsonParserException e) {
             throw new ParsingException("Could not parse json response", e);
@@ -208,7 +217,8 @@ public final class SoundcloudParsingHelper {
             ReCaptchaException {
 
         final String response = NewPipe.getDownloader().get("https://w.soundcloud.com/player/?url="
-                + Utils.encodeUrlUtf8(apiUrl), SoundCloud.getLocalization()).responseBody();
+                + Utils.encodeUrlUtf8(apiUrl), SoundCloud.getLocalization())
+                .ensureSuccessResponseCode().responseBody();
 
         return Jsoup.parse(response).select("link[rel=\"canonical\"]").first()
                 .attr("abs:href");
@@ -255,7 +265,7 @@ public final class SoundcloudParsingHelper {
                     + Utils.encodeUrlUtf8(url.toString())
                     + "&format=json&client_id=" + SoundcloudParsingHelper.clientId();
             final String response = NewPipe.getDownloader().get(widgetUrl,
-                    SoundCloud.getLocalization()).responseBody();
+                    SoundCloud.getLocalization()).ensureSuccessResponseCode().responseBody();
             final JsonObject o = JsonParser.object().from(response);
             return String.valueOf(JsonUtils.getValue(o, "id"));
         } catch (final JsonParserException e) {
@@ -296,7 +306,7 @@ public final class SoundcloudParsingHelper {
                                          final String apiUrl) throws IOException,
             ReCaptchaException, ParsingException {
         final String response = NewPipe.getDownloader().get(apiUrl, SoundCloud.getLocalization())
-                .responseBody();
+                .ensureSuccessResponseCode().responseBody();
         final JsonObject responseObject;
 
         try {
@@ -346,12 +356,8 @@ public final class SoundcloudParsingHelper {
                                            final String apiUrl,
                                            final boolean charts) throws IOException,
             ReCaptchaException, ParsingException {
-        final Response response = NewPipe.getDownloader().get(apiUrl, SoundCloud
-                .getLocalization());
-        if (response.responseCode() >= 400) {
-            throw new IOException("Could not get streams from API, HTTP " + response
-                    .responseCode());
-        }
+        final Response response = NewPipe.getDownloader().get(apiUrl, SoundCloud.getLocalization())
+                .ensureSuccessResponseCode();
 
         final JsonObject responseObject;
         try {
@@ -406,11 +412,8 @@ public final class SoundcloudParsingHelper {
     public static String getInfoItemsFromApi(final MultiInfoItemsCollector collector,
                                              final String apiUrl) throws ReCaptchaException,
             ParsingException, IOException {
-        final Response response = NewPipe.getDownloader().get(apiUrl, SoundCloud.getLocalization());
-        if (response.responseCode() >= 400) {
-            throw new IOException("Could not get streams from API, HTTP "
-                    + response.responseCode());
-        }
+        final Response response = NewPipe.getDownloader().get(apiUrl, SoundCloud.getLocalization())
+                .ensureSuccessResponseCode();
 
         final JsonObject responseObject;
         try {

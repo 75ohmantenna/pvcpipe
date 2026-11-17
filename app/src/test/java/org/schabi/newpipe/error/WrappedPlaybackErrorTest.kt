@@ -20,6 +20,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import org.schabi.newpipe.App
 import org.schabi.newpipe.R
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException
+import org.schabi.newpipe.extractor.exceptions.ParsingException
 import org.schabi.newpipe.extractor.exceptions.PrivateContentException
 import org.schabi.newpipe.player.mediasource.FailedMediaSource
 
@@ -76,6 +79,36 @@ class WrappedPlaybackErrorTest {
         assertEquals(context.getString(R.string.player_stream_failure), ErrorInfo.getMessage(unrelated, UserAction.PLAY_STREAM, 0).getText(context).toString())
         val ordinary = FailedMediaSource.StreamInfoLoadException(PrivateContentException("private"))
         assertEquals(context.getString(R.string.private_content), ErrorInfo.getMessage(ordinary, UserAction.PLAY_STREAM, 0).getText(context).toString())
+    }
+
+    @Test
+    fun `data refusal has a distinct message through extraction and playback wrappers`() {
+        val context = RuntimeEnvironment.getApplication()
+        val failure = HttpResponseException(403)
+        val errors = listOf(
+            failure,
+            ParsingException("watch metadata", failure),
+            FailedMediaSource.StreamInfoLoadException(failure),
+            source(Loader.UnexpectedLoaderException(failure))
+        )
+        for (error in errors) {
+            val info = ErrorInfo(error, UserAction.REQUESTED_STREAM, "fixture", ServiceList.YouTube.serviceId)
+            assertEquals(context.getString(R.string.youtube_api_http_403), info.getMessage(context).toString())
+            assertTrue(info.isRetryable)
+            assertNull(info.recaptchaUrl)
+        }
+    }
+
+    @Test
+    fun `other data status messages include the code and malformed data stays reportable`() {
+        val context = RuntimeEnvironment.getApplication()
+        for ((code, serviceId) in listOf(503 to ServiceList.YouTube.serviceId, 403 to ServiceList.SoundCloud.serviceId)) {
+            val info = ErrorInfo(HttpResponseException(code), UserAction.REQUESTED_STREAM, "fixture", serviceId)
+            assertEquals(context.getString(R.string.extractor_http_invalid_status, code.toString()), info.getMessage(context).toString().trim())
+        }
+        val malformed = ErrorInfo(ParsingException("malformed JSON"), UserAction.REQUESTED_STREAM, "fixture", ServiceList.YouTube.serviceId)
+        assertEquals(context.getString(R.string.parsing_error), malformed.getMessage(context).toString())
+        assertTrue(malformed.isReportable)
     }
 
     private fun source(cause: IOException) = ExoPlaybackException.createForSource(cause, PlaybackException.ERROR_CODE_IO_UNSPECIFIED)

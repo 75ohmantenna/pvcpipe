@@ -12,6 +12,7 @@ import androidx.collection.ArraySet;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
 import org.schabi.newpipe.player.mediaitem.MediaItemTag;
 import org.schabi.newpipe.player.mediasource.FailedMediaSource;
 import org.schabi.newpipe.player.mediasource.LoadedMediaSource;
@@ -510,7 +511,8 @@ public class MediaSourceManager {
                         })
                 )
                 .onErrorReturn(throwable -> {
-                    if (forceLoad || throwable instanceof ExtractionException) {
+                    if (forceLoad || throwable instanceof ExtractionException
+                            || throwable instanceof HttpResponseException) {
                         return FailedMediaSource.of(stream, new StreamInfoLoadException(throwable));
                     }
                     // Non-source related error expected here (e.g. network),

@@ -1,7 +1,9 @@
 package org.schabi.newpipe.player.playback;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -37,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.schabi.newpipe.extractor.exceptions.HttpResponseException;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
@@ -604,6 +607,28 @@ public class MediaSourceManagerTest {
         assertSame(failure, source.getError().getCause());
         verify(first).getStream(true);
         verify(first, never()).getStream();
+    }
+
+    @Test
+    public void apiFailureIsHandledAsASourceErrorWhileTransportFailureCanPropagate()
+            throws Exception {
+        final PlayQueueItem refused = item("https://example.test/watch/refused");
+        final PlayQueueItem offline = item("https://example.test/watch/offline");
+        final var httpError = new HttpResponseException(403);
+        final var transportError = new IOException("network connection failed");
+        doReturn(Single.error(httpError)).when(refused).getStream();
+        doReturn(Single.error(transportError)).when(offline).getStream();
+        start(refused, offline);
+
+        final FailedMediaSource refusedSource = (FailedMediaSource) playlist().get(0);
+        assertTrue(refusedSource.getError() instanceof FailedMediaSource.StreamInfoLoadException);
+        assertSame(httpError, refusedSource.getError().getCause());
+        assertFalse(refusedSource.shouldBeReplacedWith(refused, true));
+        refusedSource.maybeThrowSourceInfoRefreshError();
+
+        final FailedMediaSource offlineSource = (FailedMediaSource) playlist().get(1);
+        assertSame(transportError, offlineSource.getError().getCause());
+        assertThrows(IOException.class, offlineSource::maybeThrowSourceInfoRefreshError);
     }
 
     private void subscribeManager() {

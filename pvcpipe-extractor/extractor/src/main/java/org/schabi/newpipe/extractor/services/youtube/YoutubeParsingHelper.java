@@ -1060,7 +1060,13 @@ public final class YoutubeParsingHelper {
                 .collect(Collectors.toUnmodifiableList());
     }
 
-    private static boolean isBlockedApiResponse(final URL url, final String body) {
+    private static boolean isBlockedApiResponse(final String latestUrl, final String body) {
+        final URL url;
+        try {
+            url = new URL(latestUrl);
+        } catch (final MalformedURLException e) {
+            return false;
+        }
         if (!"https".equalsIgnoreCase(url.getProtocol())
                 || !("youtubei.googleapis.com".equalsIgnoreCase(url.getHost())
                 || "www.youtube.com".equalsIgnoreCase(url.getHost()))
@@ -1080,14 +1086,24 @@ public final class YoutubeParsingHelper {
 
     @Nonnull
     public static String getValidJsonResponseBody(@Nonnull final Response response)
-            throws ParsingException, MalformedURLException {
+            throws IOException, ParsingException {
         if (response.responseCode() == 404) {
             throw new ContentNotAvailableException("Not found"
                     + " (\"" + response.responseCode() + " " + response.responseMessage() + "\")");
         }
 
         final String responseBody = response.responseBody();
-        if (responseBody.length() < 50) { // Ensure to have a valid response
+        final boolean responseTooShort = responseBody.length() < 50;
+        final String responseContentType = response.getHeader("Content-Type");
+        final boolean isHtml = responseContentType != null
+                && responseContentType.toLowerCase(Locale.ROOT).contains("text/html");
+        if (response.responseCode() == 403 && isHtml && !responseTooShort
+                && isBlockedApiResponse(response.latestUrl(), responseBody)) {
+            throw new RequestBlockedException();
+        }
+
+        response.ensureSuccessResponseCode();
+        if (responseTooShort) {
             throw new ParsingException("JSON response is too short");
         }
 
@@ -1100,12 +1116,7 @@ public final class YoutubeParsingHelper {
             }
         }
 
-        final String responseContentType = response.getHeader("Content-Type");
-        if (responseContentType != null
-                && responseContentType.toLowerCase(Locale.ROOT).contains("text/html")) {
-            if (response.responseCode() == 403 && isBlockedApiResponse(latestUrl, responseBody)) {
-                throw new RequestBlockedException();
-            }
+        if (isHtml) {
             throw new ParsingException("Got HTML document, expected JSON response"
                     + " (latest url was: \"" + response.latestUrl() + "\")");
         }

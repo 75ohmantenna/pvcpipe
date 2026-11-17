@@ -80,16 +80,20 @@ HTML formatting. Public `ErrorInfo` constructors bound exception text through
 `RequestBlockedException` when it comes from `youtubei.googleapis.com` or
 `www.youtube.com` over HTTPS, on the `visitor_id`, `player`, `next` or
 `reel/reel_item_watch` v1 path, and the first 16,384 characters contain
-`captcha`, `unusual traffic` or `automated queries`. The short-response
-validation still applies. Other HTML responses use the normal parsing error.
+`captcha`, `unusual traffic` or `automated queries`. The classifier requires
+at least 50 characters. HTTP 404 indicates unavailable content. Other unsuccessful
+responses preserve their HTTP status before body validation. Unexpected HTML and
+malformed JSON in successful responses still produce extraction errors.
 
-The app shows the service-refusal message and allows a manual retry. The
-exception carries a fixed message. A usable alternate player response takes
-precedence. If all clients fail, an explicit content restriction takes
-priority, followed by refusal and then generic transport or parsing errors.
+The app shows a service-refusal message for recognized challenge pages and
+status-specific feedback for other HTTP failures. Manual retry remains available
+where the caller supplies it. A usable alternate player response takes precedence.
+If all clients fail, content restrictions take priority, followed by refusals,
+other HTTP failures, and generic transport or parsing errors.
 When a usable player response is already available, a refused `next` request
-becomes an optional watch-metadata error. [Local media request recovery](playback.md#errors)
-handles eligible playback requests separately.
+becomes an optional watch-metadata error. The player handles data HTTP failures
+through the failed queue-item path. [Local media request recovery](playback.md#errors)
+handles eligible media requests separately.
 
 The [recorded November 15 device observations](https://github.com/75ohmantenna/pvcpipe/blob/e7cb3f6b25b55cc47b2b409e9b2f621fe9e311bb/docs/error-reporting.md#youtube-api-refusal-feedback-2026-11-15)
 retain the original refusal and later route-dependent recovery in the tested
