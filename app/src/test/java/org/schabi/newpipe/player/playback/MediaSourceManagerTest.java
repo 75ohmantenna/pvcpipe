@@ -15,6 +15,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -49,6 +50,7 @@ import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.util.SponsorBlock;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -551,6 +553,57 @@ public class MediaSourceManagerTest {
         queue = new SinglePlayQueue(first);
         queue.append(List.of(rest));
         queue.init();
+    }
+
+    @Test
+    public void refreshUsesFreshExtractionOnlyForTheSelectedOccurrence() throws Exception {
+        final PlayQueueItem first = item("https://example.test/watch/same");
+        final PlayQueueItem duplicate = item("https://example.test/watch/same");
+        final StreamInfo fresh = mock(StreamInfo.class);
+        final String url = first.getUrl();
+        when(fresh.getUrl()).thenReturn(url);
+        doReturn(Single.just(fresh)).when(first).getStream(true);
+        createQueue(first, duplicate);
+        manager = new MediaSourceManager(mock(Context.class), listener, queue, first);
+        drain();
+
+        verify(first).getStream(true);
+        verify(first, never()).getStream();
+        verify(duplicate).getStream();
+        verify(duplicate, never()).getStream(true);
+        verify(listener).sourceOf(same(first), same(fresh));
+        assertSame(first, ((LoadedMediaSource) playlist().get(0)).getStream());
+        assertSame(duplicate, ((LoadedMediaSource) playlist().get(1)).getStream());
+    }
+
+    @Test
+    public void selectionThatSupersedesRefreshUsesTheNormalLoadPath() {
+        final PlayQueueItem first = item("https://example.test/watch/first");
+        final PlayQueueItem second = item("https://example.test/watch/second");
+        createQueue(first, second);
+        manager = new MediaSourceManager(mock(Context.class), listener, queue, first);
+        queue.setIndex(1);
+        drain();
+
+        verify(first, never()).getStream(true);
+        verify(second, never()).getStream(true);
+        verify(second).getStream();
+    }
+
+    @Test
+    public void rejectedFreshExtractionBecomesATerminalSourceError() throws Exception {
+        final PlayQueueItem first = item("https://example.test/watch/first");
+        final var failure = new IOException("fresh request failed");
+        doReturn(Single.error(failure)).when(first).getStream(true);
+        createQueue(first);
+        manager = new MediaSourceManager(mock(Context.class), listener, queue, first);
+        drain();
+
+        final FailedMediaSource source = (FailedMediaSource) playlist().get(0);
+        assertTrue(source.getError() instanceof FailedMediaSource.StreamInfoLoadException);
+        assertSame(failure, source.getError().getCause());
+        verify(first).getStream(true);
+        verify(first, never()).getStream();
     }
 
     private void subscribeManager() {

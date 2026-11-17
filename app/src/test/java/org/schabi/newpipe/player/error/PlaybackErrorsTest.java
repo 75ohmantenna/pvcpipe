@@ -1,16 +1,27 @@
 package org.schabi.newpipe.player.error;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.RELOAD;
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.RESTART_AT_LIVE_EDGE;
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.SHUT_DOWN;
 import static org.schabi.newpipe.player.error.PlaybackErrors.Recovery.SKIP_STREAM;
 
+import android.net.Uri;
+import android.os.SystemClock;
+
 import androidx.media3.common.PlaybackException;
+import androidx.media3.datasource.DataSpec;
+import androidx.media3.datasource.HttpDataSource;
 
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Map;
 
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlaybackErrorsTest {
@@ -68,6 +79,41 @@ public class PlaybackErrorsTest {
         assertEquals(List.of(RESTART_AT_LIVE_EDGE),
                 List.of(PlaybackErrors.Recovery.values()).stream()
                         .filter(PlaybackErrors.Recovery::isCatchable).toList());
+    }
+
+    @Test
+    public void aRefusalMustBelongToAnHttpsYoutubeMediaRequest() {
+        assertTrue(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "https",
+                "r1.example.googlevideo.com", "/videoplayback")));
+        assertTrue(PlaybackErrors.isYoutubeMediaRefusal(mediaError(410, "https",
+                "MANIFEST.GOOGLEVIDEO.COM", "/api/manifest/hls_playlist")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(404, "https",
+                "googlevideo.com", "/videoplayback")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "http",
+                "googlevideo.com", "/videoplayback")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "https",
+                "googlevideo.com.example.test", "/videoplayback")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "https",
+                "fakegooglevideo.com", "/videoplayback")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "https",
+                "googlevideo.com", "/videoplayback-lookalike")));
+        assertFalse(PlaybackErrors.isYoutubeMediaRefusal(mediaError(403, "https",
+                "www.youtube.com", "/youtubei/v1/player")));
+    }
+
+    private static PlaybackException mediaError(final int response, final String scheme,
+                                                 final String host, final String path) {
+        final Uri uri = mock(Uri.class);
+        when(uri.getScheme()).thenReturn(scheme);
+        when(uri.getHost()).thenReturn(host);
+        when(uri.getEncodedPath()).thenReturn(path);
+        final DataSpec dataSpec = new DataSpec.Builder().setUri(uri).build();
+        final var refusal = new HttpDataSource.InvalidResponseCodeException(
+                response, null, null, Map.of(), dataSpec, new byte[0]);
+        try (var clock = mockStatic(SystemClock.class)) {
+            return new PlaybackException("fixture", new IllegalStateException(refusal),
+                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS);
+        }
     }
 
     private static void assertRecovery(final PlaybackErrors.Recovery expected,

@@ -520,8 +520,16 @@ list in `PlayerBroadcasts`, or the receiver never gets it.
 [`PlaybackErrors`](../app/src/main/java/org/schabi/newpipe/player/error/PlaybackErrors.java)
 sorts ExoPlayer's error codes by what the player does about them: restart at
 the live edge, skip the stream, reload, or shut down. `Player.onPlayerError`
-carries that out and tells the user about every error except the live-edge
-restart.
+carries that out and reports errors that recovery does not handle.
+
+When local Media3 playback reports HTTP 403 or 410 for an HTTPS YouTube
+media or manifest path on `googlevideo.com` or a subdomain, PVCPipe can
+refresh the selected queue occurrence once. It bypasses that stream's cached
+extraction, keeps the play/pause setting, and restores the on-demand position
+or the live default position. A refused replacement follows the usual
+playback error path. An active FCast receiver keeps its own clock and playback
+when this error comes from the local engine. Receiver-side failures and
+YouTube data-API errors have their existing handling.
 
 ## Listeners
 

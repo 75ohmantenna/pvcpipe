@@ -83,6 +83,9 @@ public class MediaSourceManager {
     @NonNull
     private final PlayQueue playQueue;
 
+    @Nullable
+    private PlayQueueItem refreshItem;
+
     /**
      * Determines the gap time between the playback position and the playback duration which
      * the {@link #getEdgeIntervalSignal()} begins to request loading.
@@ -141,7 +144,14 @@ public class MediaSourceManager {
     public MediaSourceManager(@NonNull final Context context,
                               @NonNull final PlaybackListener listener,
                               @NonNull final PlayQueue playQueue) {
-        this(context, listener, playQueue, 400L,
+        this(context, listener, playQueue, null);
+    }
+
+    public MediaSourceManager(@NonNull final Context context,
+                              @NonNull final PlaybackListener listener,
+                              @NonNull final PlayQueue playQueue,
+                              @Nullable final PlayQueueItem refreshItem) {
+        this(context, listener, playQueue, refreshItem, 400L,
                 /*playbackNearEndGapMillis=*/TimeUnit.MILLISECONDS.convert(30, TimeUnit.SECONDS),
                 /*progressUpdateIntervalMillis*/TimeUnit.MILLISECONDS.convert(2, TimeUnit.SECONDS));
     }
@@ -149,6 +159,7 @@ public class MediaSourceManager {
     private MediaSourceManager(@NonNull final Context context,
                                @NonNull final PlaybackListener listener,
                                @NonNull final PlayQueue playQueue,
+                               @Nullable final PlayQueueItem refreshItem,
                                final long loadDebounceMillis,
                                final long playbackNearEndGapMillis,
                                final long progressUpdateIntervalMillis) {
@@ -164,6 +175,7 @@ public class MediaSourceManager {
         this.context = context;
         this.playbackListener = listener;
         this.playQueue = playQueue;
+        this.refreshItem = refreshItem;
 
         this.playbackNearEndGapMillis = playbackNearEndGapMillis;
         this.progressUpdateIntervalMillis = progressUpdateIntervalMillis;
@@ -428,6 +440,10 @@ public class MediaSourceManager {
             return;
         }
 
+        if (refreshItem != null && refreshItem != itemsToLoad.center) {
+            refreshItem = null;
+        }
+
         // Evict the previous items being loaded to free up memory, before start loading new ones
         maybeClearLoaders();
 
@@ -464,7 +480,11 @@ public class MediaSourceManager {
     }
 
     private Single<ManagedMediaSource> getLoadedMediaSource(@NonNull final PlayQueueItem stream) {
-        return stream.getStream()
+        final boolean forceLoad = stream == refreshItem;
+        if (forceLoad) {
+            refreshItem = null;
+        }
+        return (forceLoad ? stream.getStream(true) : stream.getStream())
                 .map(streamInfo -> Optional
                         .ofNullable(playbackListener.sourceOf(stream, streamInfo))
                         .<ManagedMediaSource>flatMap(source ->
@@ -490,7 +510,7 @@ public class MediaSourceManager {
                         })
                 )
                 .onErrorReturn(throwable -> {
-                    if (throwable instanceof ExtractionException) {
+                    if (forceLoad || throwable instanceof ExtractionException) {
                         return FailedMediaSource.of(stream, new StreamInfoLoadException(throwable));
                     }
                     // Non-source related error expected here (e.g. network),

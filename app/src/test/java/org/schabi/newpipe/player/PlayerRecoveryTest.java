@@ -27,6 +27,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -34,7 +35,10 @@ import androidx.preference.PreferenceManager;
 
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Timeline;
+import androidx.media3.datasource.DataSpec;
+import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.SinglePeriodTimeline;
@@ -46,6 +50,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.error.ErrorInfo;
+import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -57,6 +63,7 @@ import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.player.mediasource.FailedMediaSource;
 import org.schabi.newpipe.player.mediasource.LoadedMediaSource;
 import org.schabi.newpipe.player.mediasource.ManagedMediaSourcePlaylist;
+import org.schabi.newpipe.player.playback.MediaSourceManager;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.PlayQueueEvent.SelectEvent;
 import org.schabi.newpipe.player.playqueue.PlayQueueItem;
@@ -67,7 +74,9 @@ import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.image.ImageStrategy;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1064,8 +1073,12 @@ public class PlayerRecoveryTest {
     }
 
     private void start() throws Exception {
+        start(StreamType.VIDEO_STREAM);
+    }
+
+    private void start(final StreamType type) throws Exception {
         final String url = "https://example.com/watch/same-url";
-        stream = new StreamInfo(0, url, url, StreamType.VIDEO_STREAM, "same", "same", 0);
+        stream = new StreamInfo(0, url, url, type, "same", "same", 0);
         stream.setDuration(120);
         queue = new SinglePlayQueue(new PlayQueueItem(stream));
         queue.init();
@@ -1086,6 +1099,101 @@ public class PlayerRecoveryTest {
                     when(exoPlayer.getCurrentMediaItem()).thenReturn(readySource);
                     player.onPlaybackSynchronize(queue.getItem(), true);
                 }));
+    }
+
+    @Test
+    public void youtubeRefusalRefreshesOnceAndKeepsTheOwnedPosition() throws Exception {
+        start();
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        final var error = youtubeRefusal();
+        final List<Object> refreshed = new ArrayList<>();
+        try (var manager = mockConstruction(MediaSourceManager.class,
+                (sourceManager, construction) -> refreshed.add(construction.arguments().get(3)));
+             var errorInfo = mockConstruction(ErrorInfo.class);
+             var notifications = mockStatic(ErrorUtil.class)) {
+            player.onPlayerError(error);
+            player.onPlayerError(error);
+            assertEquals(List.of(queue.getItem()), refreshed);
+            assertEquals(PLAYING_POSITION, queue.getItem().getRecoveryPosition());
+            verify(listeners, times(2)).onPlayerError(error, true);
+            verify(exoPlayer, never()).setPlayWhenReady(anyBoolean());
+
+            player.onPlaybackUnblock(mock(MediaSource.class));
+            final MediaItem replacement = loadedItem(queue.getItem());
+            when(exoPlayer.getCurrentMediaItem()).thenReturn(replacement);
+            player.onPlayerError(error);
+            assertEquals(1, manager.constructed().size());
+            assertEquals(1, errorInfo.constructed().size());
+            verify(listeners).onPlayerError(error, false);
+        }
+    }
+
+    @Test
+    public void localYoutubeRefusalKeepsTheActiveReceiverAndItsRecovery() throws Exception {
+        start();
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        queue.setRecovery(0, SELECTED_RECOVERY);
+        when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(queue.getItem())).thenReturn(true);
+        final long receiverPosition = 19_000L;
+        when(casting.getPosition()).thenReturn(receiverPosition);
+        final var error = youtubeRefusal();
+        try (var managers = mockConstruction(MediaSourceManager.class)) {
+            player.onPlayerError(error);
+            assertTrue(managers.constructed().isEmpty());
+            assertEquals(receiverPosition, queue.getItem().getRecoveryPosition());
+            verify(listeners).onPlayerError(error, true);
+        }
+    }
+
+    @Test
+    public void liveYoutubeRefusalUsesTheLiveDefaultInsteadOfAnOldPosition() throws Exception {
+        start(StreamType.LIVE_STREAM);
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        queue.setRecovery(0, SELECTED_RECOVERY);
+        final var error = youtubeRefusal();
+        try (var managers = mockConstruction(MediaSourceManager.class)) {
+            player.onPlayerError(error);
+            assertEquals(1, managers.constructed().size());
+            assertEquals(PlayQueueItem.RECOVERY_UNSET, queue.getItem().getRecoveryPosition());
+            verify(listeners).onPlayerError(error, true);
+        }
+    }
+
+    @Test
+    public void refusedOldSourceCannotSkipANewerSelectedOccurrence() throws Exception {
+        start();
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        final MediaItem oldSource = exoPlayer.getCurrentMediaItem();
+        final PlayQueueItem next = new PlayQueueItem(stream);
+        queue.append(List.of(next));
+        queue.setIndex(1);
+        // Selection is newer, but ExoPlayer still exposes the old prepared timeline.
+        when(exoPlayer.getCurrentMediaItem()).thenReturn(oldSource);
+        final var error = youtubeRefusal();
+        try (var managers = mockConstruction(MediaSourceManager.class)) {
+            player.onPlayerError(error);
+            assertTrue(managers.constructed().isEmpty());
+            assertSame(next, queue.getItem());
+            verify(listeners).onPlayerError(error, true);
+        }
+    }
+
+    private static PlaybackException youtubeRefusal() {
+        final Uri uri = mock(Uri.class);
+        when(uri.getScheme()).thenReturn("https");
+        when(uri.getHost()).thenReturn("manifest.googlevideo.com");
+        when(uri.getEncodedPath()).thenReturn("/api/manifest/hls_playlist");
+        final var cause = new HttpDataSource.InvalidResponseCodeException(
+                403, null, null, Map.of(), new DataSpec.Builder().setUri(uri).build(), new byte[0]);
+        try (var clock = mockStatic(SystemClock.class)) {
+            return new PlaybackException("fixture", cause,
+                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS);
+        }
     }
 
     private MediaItem loadedItem(final PlayQueueItem item) {

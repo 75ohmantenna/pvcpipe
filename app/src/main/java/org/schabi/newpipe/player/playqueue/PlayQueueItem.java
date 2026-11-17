@@ -142,7 +142,12 @@ public class PlayQueueItem implements Serializable {
 
     @NonNull
     public Single<StreamInfo> getStream() {
-        return ExtractorHelper.getStreamInfo(this.serviceId, this.url, false)
+        return getStream(false);
+    }
+
+    @NonNull
+    public Single<StreamInfo> getStream(final boolean forceLoad) {
+        return ExtractorHelper.getStreamInfo(this.serviceId, this.url, forceLoad)
                 .subscribeOn(Schedulers.io())
                 .doOnError(throwable -> error = throwable);
     }

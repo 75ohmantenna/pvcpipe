@@ -49,6 +49,7 @@ import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.history.PlaybackHistory;
 import org.schabi.newpipe.player.event.PlayerEventListener;
@@ -154,6 +155,9 @@ public final class Player implements PlaybackListener, Listener {
 
     @Nullable
     private PlayQueueItem currentItem;
+    @Nullable
+    private PlayQueueItem youtubeRefreshItem;
+    private boolean youtubeRefreshPending;
     @Nullable
     private MediaItemTag currentMetadata;
     private final PlayerThumbnail thumbnail = new PlayerThumbnail(this);
@@ -485,6 +489,9 @@ public final class Player implements PlaybackListener, Listener {
 
     private void initPlayback(@NonNull final PlayQueue queue,
                               final boolean playOnReady) {
+        if (queue != playQueue) {
+            youtubeRefreshItem = null;
+        }
         destroyPlayer();
         initPlayer(playOnReady);
         casting.setPlayWhenReadyForSource(playOnReady);
@@ -614,12 +621,16 @@ public final class Player implements PlaybackListener, Listener {
         }
         // Selection can advance or reindex before ExoPlayer switches sources. Neither a URL,
         // numerical index nor currentItem establishes which occurrence owns the captured clock.
+        return loadedSourceFromEngine()
+                .map(source -> source.getStream() == playQueue.getItem())
+                .orElse(false);
+    }
+
+    private Optional<LoadedMediaSource> loadedSourceFromEngine() {
         return MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
                 .flatMap(tag -> tag.getMaybeExtras(Object.class))
                 .filter(LoadedMediaSource.class::isInstance)
-                .map(LoadedMediaSource.class::cast)
-                .map(source -> source.getStream() == playQueue.getItem())
-                .orElse(false);
+                .map(LoadedMediaSource.class::cast);
     }
 
     /**
@@ -645,12 +656,17 @@ public final class Player implements PlaybackListener, Listener {
     }
 
     public void reloadPlayQueueManager() {
+        youtubeRefreshPending = false;
+        reloadPlayQueueManager(null);
+    }
+
+    private void reloadPlayQueueManager(@Nullable final PlayQueueItem refreshItem) {
         if (playQueueManager != null) {
             playQueueManager.dispose();
         }
 
         if (playQueue != null) {
-            playQueueManager = new MediaSourceManager(context, this, playQueue);
+            playQueueManager = new MediaSourceManager(context, this, playQueue, refreshItem);
         }
     }
 
@@ -959,6 +975,7 @@ public final class Player implements PlaybackListener, Listener {
 
     @Override // own playback listener
     public void onPlaybackUnblock(final MediaSource mediaSource) {
+        youtubeRefreshPending = false;
         if (DEBUG) {
             Log.d(TAG, "Playback - onPlaybackUnblock() called");
         }
@@ -1330,6 +1347,10 @@ public final class Player implements PlaybackListener, Listener {
         Log.e(TAG, "ExoPlayer - onPlayerError() called with:", error);
 
         saveStreamProgressState();
+        if (PlaybackErrors.isYoutubeMediaRefusal(error) && recoverYoutubeMedia()) {
+            listeners.onPlayerError(error, true);
+            return;
+        }
         final PlaybackErrors.Recovery recovery = PlaybackErrors.recoveryFor(error.errorCode);
 
         switch (recovery) {
@@ -1360,6 +1381,45 @@ public final class Player implements PlaybackListener, Listener {
         }
 
         listeners.onPlayerError(error, recovery.isCatchable());
+    }
+
+    private boolean recoverYoutubeMedia() {
+        final PlayQueueItem item = playQueue == null ? null : playQueue.getItem();
+        if (item == null || exoPlayerIsNull()) {
+            return false;
+        }
+        final PlayQueueItem engineItem = loadedSourceFromEngine()
+                .map(LoadedMediaSource::getStream).orElse(null);
+        if (engineItem != null && engineItem != item
+                && engineItem.getServiceId() == YouTube.getServiceId()) {
+            // Selection advanced before the engine moved away from the refused occurrence.
+            return true;
+        }
+        if (item.getServiceId() != YouTube.getServiceId()) {
+            return false;
+        }
+        if (casting.isActive() && casting.ownsClock(item)) {
+            // A local load error cannot interrupt playback on the receiver.
+            return true;
+        }
+        if (item == youtubeRefreshItem) {
+            return youtubeRefreshPending;
+        }
+        if (engineItem != item) {
+            return false;
+        }
+
+        youtubeRefreshItem = item;
+        youtubeRefreshPending = true;
+        final StreamType type = MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
+                .map(MediaItemTag::getStreamType).orElse(item.getStreamType());
+        if (type == StreamType.LIVE_STREAM || type == StreamType.AUDIO_LIVE_STREAM) {
+            playQueue.unsetRecovery(playQueue.getIndex());
+        } else {
+            setRecovery();
+        }
+        reloadPlayQueueManager(item);
+        return true;
     }
 
     private void createErrorNotification(@NonNull final PlaybackException error) {
@@ -1429,6 +1489,10 @@ public final class Player implements PlaybackListener, Listener {
         }
         if (exoPlayerIsNull() || playQueue == null) {
             return;
+        }
+        if (item != youtubeRefreshItem) {
+            youtubeRefreshItem = null;
+            youtubeRefreshPending = false;
         }
         if (currentItem == item) {
             // Returning to an unchanged engine source can restore previously lost coherence.

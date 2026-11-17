@@ -17,15 +17,21 @@ import static androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFE
 import static androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT;
 import static androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED;
 
+import android.net.Uri;
+
 import androidx.annotation.NonNull;
 
 import androidx.media3.common.PlaybackException;
+import androidx.media3.datasource.HttpDataSource;
+
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Sorts the errors {@link androidx.media3.exoplayer.ExoPlayer ExoPlayer} reports by how the
  * player recovers from them.
- * <p>
- * It only reads the error code, so it can be tested without a player.
  */
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlaybackErrors {
@@ -73,6 +79,39 @@ public final class PlaybackErrors {
     }
 
     private PlaybackErrors() {
+    }
+
+    /**
+     * Matches refused YouTube media requests.
+     * @param error the playback error reported by the engine
+     * @return whether the error is eligible for fresh YouTube media extraction
+     */
+    public static boolean isYoutubeMediaRefusal(@NonNull final PlaybackException error) {
+        if (error.errorCode != ERROR_CODE_IO_BAD_HTTP_STATUS) {
+            return false;
+        }
+        final Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable cause = error.getCause(); cause != null && seen.add(cause);
+             cause = cause.getCause()) {
+            if (cause instanceof HttpDataSource.InvalidResponseCodeException refusal) {
+                return (refusal.responseCode == 403 || refusal.responseCode == 410)
+                        && isYoutubeMediaRequest(refusal.dataSpec.uri);
+            }
+        }
+        return false;
+    }
+
+    private static boolean isYoutubeMediaRequest(final Uri uri) {
+        final String host = uri.getHost();
+        final String path = uri.getEncodedPath();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null
+                || host == null || path == null) {
+            return false;
+        }
+        final String lowerHost = host.toLowerCase(Locale.ROOT);
+        return (lowerHost.equals("googlevideo.com") || lowerHost.endsWith(".googlevideo.com"))
+                && (path.equals("/videoplayback") || path.startsWith("/videoplayback/")
+                || path.startsWith("/api/manifest/"));
     }
 
     /**
