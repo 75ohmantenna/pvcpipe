@@ -22,6 +22,7 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.Arrays;
 import java.util.Objects;
 
 import javax.net.ssl.SSLException;
@@ -924,6 +925,28 @@ public class DownloadMission extends Mission {
         if (storage != null) {
             storage.releasePermission();
         }
+        finishDeletion();
+        return true;
+    }
+
+    /**
+     * Retires the checkpoint of an idle mission before a replacement can use its output.
+     *
+     * @return whether the checkpoint was removed and the mission can no longer run
+     */
+    public synchronized boolean forgetForReplacement() {
+        if (running || isPsRunning() || (init != null && init.isAlive())
+                || Arrays.stream(threads).anyMatch(Thread::isAlive) || !deleteMetadata()) {
+            return false;
+        }
+        deletionPending = true;
+        enqueued = false;
+        pause();
+        finishDeletion();
+        return true;
+    }
+
+    private void finishDeletion() {
         if (psAlgorithm != null) {
             try {
                 psAlgorithm.cleanupTemporalDir();
@@ -932,7 +955,6 @@ public class DownloadMission extends Mission {
             }
         }
         notify(DownloadManagerService.MESSAGE_DELETED);
-        return true;
     }
 
     public boolean isDeletionPending() {

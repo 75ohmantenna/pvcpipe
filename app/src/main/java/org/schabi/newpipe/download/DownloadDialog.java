@@ -1012,7 +1012,7 @@ public class DownloadDialog extends DialogFragment
                     message = R.string.permission_denied;
                     break;
                 case OVERWRITE:
-                    Log.e(TAG, "Failed to truncate the download file", failure.cause);
+                    Log.e(TAG, "Failed to overwrite the download destination", failure.cause);
                     message = R.string.overwrite_failed;
                     break;
                 case INSUFFICIENT_STORAGE:

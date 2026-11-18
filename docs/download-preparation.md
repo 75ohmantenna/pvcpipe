@@ -39,6 +39,11 @@ started or that a checkpoint has been saved. Destination preparation happens
 first: an existing file selected for overwrite may already have been changed
 if dispatch then fails.
 
+An overwrite retires the previous mission before reusing its destination.
+If its checkpoint or finished entry cannot be removed, the replacement stops
+before changing the output. Once retirement succeeds, a later file-preparation
+or dispatch failure leaves the previous mission retired.
+
 ## Checkpoints
 
 A pending mission stores a serialized checkpoint under the app's private

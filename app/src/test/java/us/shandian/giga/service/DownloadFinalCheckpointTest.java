@@ -3,6 +3,8 @@ package us.shandian.giga.service;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -41,12 +43,7 @@ public class DownloadFinalCheckpointTest {
     @Test
     public void failedFinalCheckpointAndUndeliveredCompletionRestorePendingMission()
             throws Exception {
-        final ContextWrapper context = new ContextWrapper(RuntimeEnvironment.getApplication()) {
-            @Override
-            public File getFilesDir() {
-                return folder.getRoot();
-            }
-        };
+        final ContextWrapper context = downloadContext();
         final File pending = folder.newFolder("pending_downloads");
         final File output = folder.newFile("download.mp4");
         final File checkpoint = new File(pending, "1234");
@@ -83,6 +80,66 @@ public class DownloadFinalCheckpointTest {
             assertTrue(history.loadFinishedMissions().isEmpty());
         }
         assertArrayEquals(payload, Files.readAllBytes(output.toPath()));
+    }
+
+    @Test
+    public void replacedMissionCannotReplayEvenWhenItCannotWriteACheckpoint() throws Exception {
+        final ContextWrapper context = downloadContext();
+        final File output = folder.newFile("download.mp4");
+        final var storage = new StoredFileHelper(context, Uri.fromFile(output), "video/mp4");
+        final var mission = new DownloadMission(new String[]{"https://example.test/file"},
+                storage, 'v', null);
+        final Handler handler = new Handler(context.getMainLooper());
+        final var manager = new DownloadManager(context, handler, null, null);
+        manager.startMission(mission);
+        mission.errObject = new CheckpointWriteFailure();
+
+        assertTrue(manager.forgetMission(storage));
+        assertNull(manager.findPendingMission(mission.timestamp));
+
+        final byte[] replacement = {10, 20, 30, 40};
+        Files.write(output.toPath(), replacement);
+        final var restarted = new DownloadManager(context, handler, null, null);
+        assertNull(restarted.findPendingMission(mission.timestamp));
+        assertArrayEquals(replacement, Files.readAllBytes(output.toPath()));
+    }
+
+    @Test
+    public void failedCheckpointRemovalRetainsOldMissionUntilRetry() throws Exception {
+        final ContextWrapper context = downloadContext();
+        final File output = folder.newFile("download.mp4");
+        final byte[] payload = {10, 20, 30, 40};
+        Files.write(output.toPath(), payload);
+        final var storage = new StoredFileHelper(context, Uri.fromFile(output), "video/mp4");
+        final var mission = new DownloadMission(new String[]{"https://example.test/file"},
+                storage, 'v', null);
+        final Handler handler = new Handler(context.getMainLooper());
+        final var manager = new DownloadManager(context, handler, null, null);
+        manager.startMission(mission);
+        final var companion = Files.createDirectory(
+                new File(mission.metadata.getPath() + ".new").toPath());
+        final var blocked = Files.createFile(companion.resolve("blocked"));
+
+        assertFalse(manager.forgetMission(storage));
+        assertSame(mission, manager.findPendingMission(mission.timestamp));
+        assertFalse(mission.isDeletionPending());
+        final var restarted = new DownloadManager(context, handler, null, null);
+        assertNotNull(restarted.findPendingMission(mission.timestamp));
+
+        Files.delete(blocked);
+        assertTrue(restarted.forgetMission(storage));
+        assertNull(new DownloadManager(context, handler, null, null)
+                .findPendingMission(mission.timestamp));
+        assertArrayEquals(payload, Files.readAllBytes(output.toPath()));
+    }
+
+    private ContextWrapper downloadContext() {
+        return new ContextWrapper(RuntimeEnvironment.getApplication()) {
+            @Override
+            public File getFilesDir() {
+                return folder.getRoot();
+            }
+        };
     }
 
     private static final class CheckpointWriteFailure extends IOException {

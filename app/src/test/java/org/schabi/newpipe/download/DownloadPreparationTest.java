@@ -632,7 +632,7 @@ public class DownloadPreparationTest {
     }
 
     @Test
-    public void overwriteTruncateFailureRetainsPendingMissionAndOutput() throws Exception {
+    public void overwriteTruncateFailureLeavesOutputAndDoesNotSubmit() throws Exception {
         Files.writeString(environment.output, "pending recording");
         environment.state = MissionState.Pending;
         saveToFolder();
@@ -640,15 +640,14 @@ public class DownloadPreparationTest {
         environment.collision.confirm();
         assertEquals(DownloadPreparation.FailureReason.OVERWRITE,
                 environment.failures.get(0).reason);
-        assertEquals(MissionState.Pending, environment.state);
-        assertTrue(environment.forgotten.isEmpty());
+        assertEquals(List.of(environment.storage), environment.forgotten);
         assertTrue(environment.launches.isEmpty());
         assertEquals("pending recording", Files.readString(environment.output));
         assertEquals(0, environment.submissions);
     }
 
     @Test
-    public void dispatchFailureRetainsPendingMissionAndDoesNotReportSuccess() throws Exception {
+    public void dispatchFailureAfterRetirementDoesNotReportSuccess() throws Exception {
         Files.writeString(environment.output, "pending recording");
         environment.state = MissionState.Pending;
         saveToFolder();
@@ -657,8 +656,8 @@ public class DownloadPreparationTest {
         assertEquals(DownloadPreparation.FailureReason.DISPATCH,
                 environment.failures.get(0).reason);
         assertNotNull(environment.failures.get(0).cause);
-        assertEquals(MissionState.Pending, environment.state);
-        assertTrue(environment.forgotten.isEmpty());
+        assertEquals(List.of(environment.storage), environment.forgotten);
+        assertEquals(0, Files.size(environment.output));
         assertTrue(environment.launches.isEmpty());
         assertEquals(0, environment.submissions);
     }
@@ -767,7 +766,7 @@ public class DownloadPreparationTest {
     }
 
     @Test
-    public void acceptedDispatchReportsSuccessDespiteMetadataCleanupFailure() throws Exception {
+    public void failedRetirementPreservesPendingMissionAndOutput() throws Exception {
         Files.writeString(environment.output, "pending recording");
         environment.state = MissionState.Pending;
         saveToFolder();
@@ -775,11 +774,31 @@ public class DownloadPreparationTest {
         environment.failForget = true;
         request.confirm();
         request.confirm();
-        assertEquals(1, environment.launches.size());
-        assertEquals(1, environment.submissions);
-        assertTrue(environment.failures.isEmpty());
-        assertEquals(1, environment.cleanupWarnings.size());
-        assertEquals("metadata cleanup failed", environment.cleanupWarnings.get(0).getMessage());
+        assertEquals(1, environment.forgetAttempts);
+        assertEquals(1, environment.failures.size());
+        assertEquals(DownloadPreparation.FailureReason.OVERWRITE,
+                environment.failures.get(0).reason);
+        assertEquals(MissionState.Pending, environment.state);
+        assertEquals("pending recording", Files.readString(environment.output));
+        assertTrue(environment.launches.isEmpty());
+        assertEquals(0, environment.submissions);
+    }
+
+    @Test
+    public void failedRetirementPreventsRecreatingOutputWhenFolderLookupMisses() throws Exception {
+        Files.writeString(environment.output, "pending recording");
+        environment.state = MissionState.Pending;
+        environment.missingLookup = true;
+        saveToFolder();
+
+        environment.failForget = true;
+        environment.collision.confirm();
+
+        assertEquals(DownloadPreparation.FailureReason.OVERWRITE,
+                environment.failures.get(0).reason);
+        assertNull(environment.createdName);
+        assertEquals("pending recording", Files.readString(environment.output));
+        assertTrue(environment.launches.isEmpty());
     }
 
     private void selectUnsupportedSecondary() {

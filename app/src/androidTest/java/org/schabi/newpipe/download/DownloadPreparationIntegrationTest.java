@@ -358,8 +358,9 @@ public class DownloadPreparationIntegrationTest {
         }
 
         @Override
-        public void forget(final StoredFileHelper file) {
+        public boolean forget(final StoredFileHelper file) {
             forgotten.add(file);
+            return true;
         }
 
         @Override

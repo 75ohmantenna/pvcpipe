@@ -535,22 +535,23 @@ public class DownloadManager {
         }
     }
 
-    public void forgetMission(final StoredFileHelper storage) {
+    /**
+     * Removes a collision's mission before its destination is reused.
+     *
+     * @param storage the destination to overwrite
+     * @return whether the destination is free of a previous mission
+     */
+    public boolean forgetMission(final StoredFileHelper storage) {
         synchronized (this) {
             final Mission mission = getAnyMission(storage);
-            if (mission == null) {
-                return;
+            if (mission instanceof DownloadMission pending) {
+                if (!pending.forgetForReplacement()) {
+                    return false;
+                }
+                mMissionsPending.remove(pending);
+                return true;
             }
-
-            if (mission instanceof DownloadMission) {
-                mMissionsPending.remove(mission);
-            } else if (mission instanceof FinishedMission) {
-                mMissionsFinished.remove(mission);
-                mFinishedMissionStore.deleteMission(mission);
-            }
-
-            mission.storage = null;
-            mission.delete();
+            return mission == null || deleteMission(mission, false);
         }
     }
 

@@ -5,7 +5,6 @@ import static org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTT
 
 import android.content.Context;
 import android.net.Uri;
-import android.util.Log;
 
 import androidx.documentfile.provider.DocumentFile;
 import androidx.preference.PreferenceManager;
@@ -231,12 +230,9 @@ final class DownloadPreparation {
         DocumentMetadata documentMetadata(Uri uri) throws IOException;
         StoredFileHelper file(StoredDirectoryHelper folder, Uri uri) throws IOException;
         MissionState missionState(StoredFileHelper file);
-        void forget(StoredFileHelper file);
+        boolean forget(StoredFileHelper file);
         void dispatch(Launch launch);
         void rememberKind(Kind kind);
-        default void warnCleanupFailure(final RuntimeException error) {
-            // Test adapters can observe cleanup independently from an accepted submission.
-        }
     }
 
     private final Platform platform;
@@ -440,11 +436,17 @@ final class DownloadPreparation {
                     return;
                 }
             } else {
-                replacedMission = state == MissionState.Finished || state == MissionState.Pending
-                        ? storage : null;
+                final boolean replacesMission =
+                        state == MissionState.Finished || state == MissionState.Pending;
                 if (target == null) {
+                    // Creating by name can replace an output even when the lookup missed it.
+                    if (replacesMission && !forgetForOverwrite(storage, presentation)) {
+                        return;
+                    }
                     replacement = folder.createFile(filename, mime);
+                    replacedMission = null;
                 } else {
+                    replacedMission = replacesMission ? storage : null;
                     StoredFileHelper resolved;
                     try {
                         resolved = platform.file(folder, target);
@@ -471,6 +473,9 @@ final class DownloadPreparation {
             fail(presentation, FailureReason.PERMISSION_DENIED, null);
             return;
         }
+        if (replacedMission != null && !forgetForOverwrite(replacedMission, presentation)) {
+            return;
+        }
         try {
             if (storage.length() > 0) {
                 storage.truncate();
@@ -485,14 +490,22 @@ final class DownloadPreparation {
             fail(presentation, FailureReason.DISPATCH, error);
             return;
         }
-        if (replacedMission != null) {
-            try {
-                platform.forget(replacedMission);
-            } catch (final RuntimeException error) {
-                platform.warnCleanupFailure(error);
-            }
-        }
         presentation.submitted();
+    }
+
+    private boolean forgetForOverwrite(final StoredFileHelper storage,
+                                       final Presentation presentation) {
+        try {
+            if (platform.forget(storage)) {
+                return true;
+            }
+        } catch (final RuntimeException error) {
+            fail(presentation, FailureReason.OVERWRITE, error);
+            return false;
+        }
+        fail(presentation, FailureReason.OVERWRITE,
+                new IOException("Unable to retire the previous download"));
+        return false;
     }
 
     private static final class Ready implements Serializable {
@@ -652,14 +665,8 @@ final class DownloadPreparation {
         }
 
         @Override
-        public void forget(final StoredFileHelper file) {
-            manager.forgetMission(file);
-        }
-
-        @Override
-        public void warnCleanupFailure(final RuntimeException error) {
-            Log.w(DownloadPreparation.class.getSimpleName(),
-                    "Download submitted; replaced mission cleanup failed", error);
+        public boolean forget(final StoredFileHelper file) {
+            return manager.forgetMission(file);
         }
 
         @Override

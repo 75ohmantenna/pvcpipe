@@ -31,7 +31,6 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
     final List<DownloadPreparation.Launch> launches = new ArrayList<>();
     final List<DownloadPreparation.Failure> failures = new ArrayList<>();
     final List<StoredFileHelper> forgotten = new ArrayList<>();
-    final List<RuntimeException> cleanupWarnings = new ArrayList<>();
     final List<DownloadPreparation.Kind> remembered = new ArrayList<>();
     final StoredFileHelper storage;
     final StoredFileHelper uniqueStorage;
@@ -49,6 +48,7 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
     boolean writable = true;
     int submissions;
     int resolutions;
+    int forgetAttempts;
     String createdName;
     String createdMime;
 
@@ -135,17 +135,14 @@ final class DownloadPreparationEnvironment implements DownloadPreparation.Platfo
     }
 
     @Override
-    public void forget(final StoredFileHelper file) {
+    public boolean forget(final StoredFileHelper file) {
+        forgetAttempts++;
         if (failForget) {
-            throw new IllegalStateException("metadata cleanup failed");
+            return false;
         }
         forgotten.add(file);
         state = MissionState.None;
-    }
-
-    @Override
-    public void warnCleanupFailure(final RuntimeException error) {
-        cleanupWarnings.add(error);
+        return true;
     }
 
     @Override
