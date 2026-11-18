@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -52,9 +53,11 @@ import org.mockito.MockedStatic;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
+import org.schabi.newpipe.player.audio.PlaybackAudio;
 import org.schabi.newpipe.player.cast.CastPlayback;
 import org.schabi.newpipe.player.event.PlayerListeners;
 import org.schabi.newpipe.player.history.PlaybackHistory;
@@ -1077,8 +1080,12 @@ public class PlayerRecoveryTest {
     }
 
     private void start(final StreamType type) throws Exception {
+        start(type, ServiceList.YouTube.getServiceId());
+    }
+
+    private void start(final StreamType type, final int serviceId) throws Exception {
         final String url = "https://example.com/watch/same-url";
-        stream = new StreamInfo(0, url, url, type, "same", "same", 0);
+        stream = new StreamInfo(serviceId, url, url, type, "same", "same", 0);
         stream.setDuration(120);
         queue = new SinglePlayQueue(new PlayQueueItem(stream));
         queue.init();
@@ -1149,6 +1156,89 @@ public class PlayerRecoveryTest {
     }
 
     @Test
+    public void playHereRefreshesRejectedYoutubeSourceAtReceiverPosition() throws Exception {
+        returnFromRefusedYoutubeCast(true, StreamType.VIDEO_STREAM);
+    }
+
+    @Test
+    public void disconnectRefreshesRejectedLiveYoutubeSourcePausedAtDefault() throws Exception {
+        returnFromRefusedYoutubeCast(false, StreamType.LIVE_STREAM);
+    }
+
+    private void returnFromRefusedYoutubeCast(final boolean playHere, final StreamType type)
+            throws Exception {
+        start(type);
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        setField("playbackAudio", mock(PlaybackAudio.class));
+        final PlayQueueItem item = queue.getItem();
+        final long resumePosition = 19_000L;
+        when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(item)).thenReturn(true);
+        when(casting.getPosition()).thenReturn(SELECTED_RECOVERY);
+        when(exoPlayer.getPlaybackState()).thenReturn(ExoPlayer.STATE_IDLE);
+        final List<Object> refreshed = new ArrayList<>();
+        try (var managers = mockConstruction(MediaSourceManager.class,
+                (manager, construction) -> refreshed.add(construction.arguments().get(3)))) {
+            player.onPlayerError(youtubeRefusal());
+            assertTrue(refreshed.isEmpty());
+            assertEquals(SELECTED_RECOVERY, item.getRecoveryPosition());
+            verify(exoPlayer, never()).prepare();
+
+            when(casting.isActive()).thenReturn(false);
+            when(casting.ownsClock(item)).thenReturn(false);
+            player.restoreLocalAfterCasting(resumePosition, playHere);
+
+            assertEquals(List.of(item), refreshed);
+            assertEquals(type == StreamType.LIVE_STREAM ? PlayQueueItem.RECOVERY_UNSET
+                    : resumePosition, item.getRecoveryPosition());
+            player.onPlaybackUnblock(mock(MediaSource.class));
+            final var engine = inOrder(exoPlayer);
+            engine.verify(exoPlayer).setPlayWhenReady(playHere);
+            engine.verify(exoPlayer).prepare();
+            if (!playHere) {
+                verify(exoPlayer, never()).play();
+                verify(exoPlayer, never()).setPlayWhenReady(true);
+            }
+        }
+    }
+
+    @Test
+    public void localHttpErrorLeavesReceiverInControlAndPreparesAfterDisconnect() throws Exception {
+        start(StreamType.VIDEO_STREAM, ServiceList.Rumble.getServiceId());
+        final PlayerListeners listeners = mock(PlayerListeners.class);
+        setField("listeners", listeners);
+        final PlayQueueItem item = queue.getItem();
+        queue.append(List.of(new PlayQueueItem(stream)));
+        final long receiverPosition = 19_000L;
+        when(casting.isActive()).thenReturn(true);
+        when(casting.ownsClock(item)).thenReturn(true);
+        when(casting.getPosition()).thenReturn(receiverPosition);
+        when(exoPlayer.getPlaybackState()).thenReturn(ExoPlayer.STATE_IDLE);
+        final var error = httpRefusal("cdn.example.test", "/video.mp4");
+        try (var managers = mockConstruction(MediaSourceManager.class);
+             var errorInfo = mockConstruction(ErrorInfo.class);
+             var notifications = mockStatic(ErrorUtil.class)) {
+            player.onPlayerError(error);
+            assertSame(item, queue.getItem());
+            assertTrue(errorInfo.constructed().isEmpty());
+            assertTrue(managers.constructed().isEmpty());
+            assertEquals(receiverPosition, item.getRecoveryPosition());
+            verify(listeners).onPlayerError(error, true);
+            verify(exoPlayer, never()).prepare();
+
+            when(casting.isActive()).thenReturn(false);
+            when(casting.ownsClock(item)).thenReturn(false);
+            player.restoreLocalAfterCasting(receiverPosition, false);
+
+            final var engine = inOrder(exoPlayer);
+            engine.verify(exoPlayer).seekTo(receiverPosition);
+            engine.verify(exoPlayer).prepare();
+            verify(exoPlayer, never()).play();
+        }
+    }
+
+    @Test
     public void liveYoutubeRefusalUsesTheLiveDefaultInsteadOfAnOldPosition() throws Exception {
         start(StreamType.LIVE_STREAM);
         final PlayerListeners listeners = mock(PlayerListeners.class);
@@ -1170,24 +1260,41 @@ public class PlayerRecoveryTest {
         setField("listeners", listeners);
         final MediaItem oldSource = exoPlayer.getCurrentMediaItem();
         final PlayQueueItem next = new PlayQueueItem(stream);
+        subscriptions.clear();
+        subscriptions.add(queue.getBroadcastReceiver()
+                .filter(event -> event instanceof SelectEvent)
+                .subscribe(event -> player.onPlaybackSynchronize(queue.getItem(), false)));
         queue.append(List.of(next));
         queue.setIndex(1);
         // Selection is newer, but ExoPlayer still exposes the old prepared timeline.
         when(exoPlayer.getCurrentMediaItem()).thenReturn(oldSource);
+        when(exoPlayer.getPlaybackState()).thenReturn(ExoPlayer.STATE_IDLE);
+        when(exoPlayer.getPlayWhenReady()).thenReturn(true);
         final var error = youtubeRefusal();
         try (var managers = mockConstruction(MediaSourceManager.class)) {
             player.onPlayerError(error);
+            verify(exoPlayer, never()).prepare();
+            mainThread.triggerActions();
+
             assertTrue(managers.constructed().isEmpty());
             assertSame(next, queue.getItem());
             verify(listeners).onPlayerError(error, true);
+            final var engine = inOrder(exoPlayer);
+            engine.verify(exoPlayer).seekToDefaultPosition(1);
+            engine.verify(exoPlayer).prepare();
+            verify(exoPlayer, never()).setPlayWhenReady(anyBoolean());
         }
     }
 
     private static PlaybackException youtubeRefusal() {
+        return httpRefusal("manifest.googlevideo.com", "/api/manifest/hls_playlist");
+    }
+
+    private static PlaybackException httpRefusal(final String host, final String path) {
         final Uri uri = mock(Uri.class);
         when(uri.getScheme()).thenReturn("https");
-        when(uri.getHost()).thenReturn("manifest.googlevideo.com");
-        when(uri.getEncodedPath()).thenReturn("/api/manifest/hls_playlist");
+        when(uri.getHost()).thenReturn(host);
+        when(uri.getEncodedPath()).thenReturn(path);
         final var cause = new HttpDataSource.InvalidResponseCodeException(
                 403, null, null, Map.of(), new DataSpec.Builder().setUri(uri).build(), new byte[0]);
         try (var clock = mockStatic(SystemClock.class)) {

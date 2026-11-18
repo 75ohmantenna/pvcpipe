@@ -491,9 +491,15 @@ YouTube queue occurrence. Eligible paths are `/videoplayback`, its subpaths
 and `/api/manifest/` subpaths. The retry bypasses cached extraction,
 preserves play/pause intent and restores on-demand progress or the live
 default position. Further refusals after replacement follow normal playback
-error handling. A receiver that owns the selected occurrence's clock keeps
-playing when the local engine encounters this refusal. YouTube data-API
-refusals use [separate handling](error-reporting.md#youtube-api-refusal-feedback).
+error handling. If selection advances before the old source's refusal arrives,
+the local engine prepares after synchronization seeks to the new occurrence.
+
+While a receiver owns the selected occurrence's clock, local engine errors
+leave the receiver in control. On return to the device, the local engine
+prepares again. An eligible YouTube refusal refreshes the same occurrence from
+the receiver's owned checkpoint or the live default. Disconnect leaves local
+playback paused. YouTube data-API refusals use
+[separate handling](error-reporting.md#youtube-api-refusal-feedback).
 
 ## Listeners
 

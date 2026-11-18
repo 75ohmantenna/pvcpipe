@@ -159,6 +159,9 @@ public final class Player implements PlaybackListener, Listener {
     private PlayQueueItem youtubeRefreshItem;
     private boolean youtubeRefreshPending;
     @Nullable
+    private PlayQueueItem deferredYoutubeRefreshItem;
+    private boolean localPreparationDeferred;
+    @Nullable
     private MediaItemTag currentMetadata;
     private final PlayerThumbnail thumbnail = new PlayerThumbnail(this);
 
@@ -492,6 +495,8 @@ public final class Player implements PlaybackListener, Listener {
         if (queue != playQueue) {
             youtubeRefreshItem = null;
         }
+        localPreparationDeferred = false;
+        deferredYoutubeRefreshItem = null;
         destroyPlayer();
         initPlayer(playOnReady);
         casting.setPlayWhenReadyForSource(playOnReady);
@@ -606,13 +611,16 @@ public final class Player implements PlaybackListener, Listener {
         }
 
         final int queuePos = playQueue.getIndex();
+        setRecovery(queuePos, currentRecoveryPosition());
+    }
+
+    private long currentRecoveryPosition() {
         final long windowPos = getCurrentPosition();
         final long duration = getDuration();
 
         // A valid local or cast clock must survive an unknown/temporarily empty duration.
         // Clamping against TIME_UNSET or zero would lose the position during a source change.
-        setRecovery(queuePos, duration <= 0
-                ? Math.max(0, windowPos) : MathUtils.clamp(windowPos, 0, duration));
+        return duration <= 0 ? Math.max(0, windowPos) : MathUtils.clamp(windowPos, 0, duration);
     }
 
     private boolean loadedSourceOwnsSelectedItem() {
@@ -976,6 +984,8 @@ public final class Player implements PlaybackListener, Listener {
     @Override // own playback listener
     public void onPlaybackUnblock(final MediaSource mediaSource) {
         youtubeRefreshPending = false;
+        localPreparationDeferred = false;
+        deferredYoutubeRefreshItem = null;
         if (DEBUG) {
             Log.d(TAG, "Playback - onPlaybackUnblock() called");
         }
@@ -1347,7 +1357,19 @@ public final class Player implements PlaybackListener, Listener {
         Log.e(TAG, "ExoPlayer - onPlayerError() called with:", error);
 
         saveStreamProgressState();
-        if (PlaybackErrors.isYoutubeMediaRefusal(error) && recoverYoutubeMedia()) {
+        final PlayQueueItem item = playQueue == null ? null : playQueue.getItem();
+        final boolean youtubeRefusal = PlaybackErrors.isYoutubeMediaRefusal(error);
+        if (item != null && casting.ownsClock(item)) {
+            // The local engine may load while paused. Leave recovery to the local handoff.
+            localPreparationDeferred = true;
+            if (youtubeRefusal && item.getServiceId() == YouTube.getServiceId()
+                    && loadedSourceOwnsSelectedItem()) {
+                deferredYoutubeRefreshItem = item;
+            }
+            listeners.onPlayerError(error, true);
+            return;
+        }
+        if (youtubeRefusal && recoverYoutubeMedia(item)) {
             listeners.onPlayerError(error, true);
             return;
         }
@@ -1383,8 +1405,7 @@ public final class Player implements PlaybackListener, Listener {
         listeners.onPlayerError(error, recovery.isCatchable());
     }
 
-    private boolean recoverYoutubeMedia() {
-        final PlayQueueItem item = playQueue == null ? null : playQueue.getItem();
+    private boolean recoverYoutubeMedia(@Nullable final PlayQueueItem item) {
         if (item == null || exoPlayerIsNull()) {
             return false;
         }
@@ -1393,14 +1414,11 @@ public final class Player implements PlaybackListener, Listener {
         if (engineItem != null && engineItem != item
                 && engineItem.getServiceId() == YouTube.getServiceId()) {
             // Selection advanced before the engine moved away from the refused occurrence.
+            localPreparationDeferred = true;
             return true;
         }
         if (item.getServiceId() != YouTube.getServiceId()) {
             return false;
-        }
-        if (casting.isActive() && casting.ownsClock(item)) {
-            // A local load error cannot interrupt playback on the receiver.
-            return true;
         }
         if (item == youtubeRefreshItem) {
             return youtubeRefreshPending;
@@ -1409,17 +1427,21 @@ public final class Player implements PlaybackListener, Listener {
             return false;
         }
 
-        youtubeRefreshItem = item;
-        youtubeRefreshPending = true;
+        refreshYoutubeMedia(item, currentRecoveryPosition());
+        return true;
+    }
+
+    private void refreshYoutubeMedia(final PlayQueueItem item, final long position) {
         final StreamType type = MediaItemTag.from(simpleExoPlayer.getCurrentMediaItem())
                 .map(MediaItemTag::getStreamType).orElse(item.getStreamType());
         if (type == StreamType.LIVE_STREAM || type == StreamType.AUDIO_LIVE_STREAM) {
             playQueue.unsetRecovery(playQueue.getIndex());
-        } else {
-            setRecovery();
+        } else if (position >= 0) {
+            setRecovery(playQueue.getIndex(), position);
         }
+        youtubeRefreshItem = item;
+        youtubeRefreshPending = true;
         reloadPlayQueueManager(item);
-        return true;
     }
 
     private void createErrorNotification(@NonNull final PlaybackException error) {
@@ -1494,7 +1516,11 @@ public final class Player implements PlaybackListener, Listener {
             youtubeRefreshItem = null;
             youtubeRefreshPending = false;
         }
-        if (currentItem == item) {
+        if (item != deferredYoutubeRefreshItem) {
+            deferredYoutubeRefreshItem = null;
+        }
+        final boolean prepareAfterSeek = localPreparationDeferred && !casting.ownsClock(item);
+        if (currentItem == item && !prepareAfterSeek) {
             // Returning to an unchanged engine source can restore previously lost coherence.
             if (currentMetadata != null) {
                 casting.onSourceChanged();
@@ -1525,7 +1551,8 @@ public final class Player implements PlaybackListener, Listener {
             Log.e(TAG, "Playback - Trying to seek to invalid index=[" + playQueueIndex
                     + "] with playlist length=[" + playlistSize + "]");
 
-        } else if (wasBlocked || playlistIndex != playQueueIndex || !isPlaying()) {
+        } else if (wasBlocked || playlistIndex != playQueueIndex || !isPlaying()
+                || prepareAfterSeek) {
             // either the player needs to be unblocked, or the play queue index has just been
             // changed and needs to be synchronized, or the player is not playing
             if (DEBUG) {
@@ -1544,6 +1571,9 @@ public final class Player implements PlaybackListener, Listener {
                 playQueue.unsetRecovery(playQueueIndex);
             } else {
                 simpleExoPlayer.seekToDefaultPosition(playQueueIndex);
+            }
+            if (prepareAfterSeek) {
+                prepareAfterLocalError();
             }
         }
         // Metadata may already have arrived for this occurrence before manager synchronization.
@@ -2096,6 +2126,22 @@ public final class Player implements PlaybackListener, Listener {
         if (exoPlayerIsNull()) {
             return;
         }
+        final PlayQueueItem item = playQueue == null ? null : playQueue.getItem();
+        final int playbackState = simpleExoPlayer.getPlaybackState();
+        if (currentState == STATE_PAUSED_SEEK) {
+            changeState(STATE_PAUSED);
+        }
+        if (item != null && item == deferredYoutubeRefreshItem && item != youtubeRefreshItem
+                && loadedSourceOwnsSelectedItem() && playbackState == ExoPlayer.STATE_IDLE) {
+            localPreparationDeferred = false;
+            deferredYoutubeRefreshItem = null;
+            updatePlaybackState(false, playbackState);
+            // The replacement's prepared callback handles audio focus. Checkpoint the receiver
+            // position without sampling the refused engine's position through play().
+            setPlaying(playHere);
+            refreshYoutubeMedia(item, position);
+            return;
+        }
         // A negative position means casting had only a reset/pending clock. Leave the
         // selected occurrence's engine position/recovery for normal synchronization.
         if (position >= 0) {
@@ -2106,14 +2152,26 @@ public final class Player implements PlaybackListener, Listener {
             // before play() checkpoints its local preview; leave consumption to synchronization.
             simpleExoPlayer.seekTo(playQueue.getIndex(), playQueue.getItem().getRecoveryPosition());
         }
-        if (currentState == STATE_PAUSED_SEEK) {
-            changeState(STATE_PAUSED);
+        updatePlaybackState(false, playbackState);
+        if (localPreparationDeferred) {
+            if (!playHere) {
+                setPlaying(false);
+            }
+            if (item != null && currentItem == item && loadedSourceFromEngine()
+                    .map(source -> source.getStream() == item).orElse(true)) {
+                prepareAfterLocalError();
+            }
         }
-        updatePlaybackState(false, simpleExoPlayer.getPlaybackState());
         if (playHere) {
             play();
         }
         triggerProgressUpdate();
+    }
+
+    private void prepareAfterLocalError() {
+        localPreparationDeferred = false;
+        deferredYoutubeRefreshItem = null;
+        prepareIfIdle();
     }
 
     public void onCastingStateChanged(final int state) {
